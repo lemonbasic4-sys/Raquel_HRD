@@ -688,6 +688,13 @@ switch ($effective_role) {
                             <hr class="dropdown-divider">
                         </li>
                     <?php endif; ?>
+                    <button type="button" class="dropdown-item d-flex align-items-center justify-content-between w-100 border-0 bg-transparent sound-toggle-btn" id="soundToggleBtn" onclick="if(window.toggleUiSound) window.toggleUiSound();" style="font-size:0.82rem; padding: 6px 10px; cursor: pointer;">
+                            <span><i class="fas fa-volume-up me-2 sound-icon text-success" style="width: 18px; text-align: center;"></i>Sound Effects</span>
+                            <span class="badge bg-success sound-status-badge" style="font-size:0.7rem;">ON</span>
+                    </button>
+                    <li>
+                        <hr class="dropdown-divider">
+                    </li>
                     <li><a class="dropdown-item" href="<?php echo BASE_URL; ?>/logout.php"><i
                                 class="fas fa-sign-out-alt me-2"></i>Logout</a></li>
                 </ul>
