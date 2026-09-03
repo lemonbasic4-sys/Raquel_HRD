@@ -434,22 +434,16 @@ $waiting_stmt->close();
             </header>
             <div class="package-card__body">
                 <div class="row g-3 mb-4">
-                    <div class="col-sm-4">
+                    <div class="col-sm-6">
                         <div class="package-stat">
                             <strong><?php echo count($members); ?> Members</strong>
                             Department Team Size
                         </div>
                     </div>
-                    <div class="col-sm-4">
+                    <div class="col-sm-6">
                         <div class="package-stat">
                             <strong><?php echo $package['shared_behavior_score'] !== null ? number_format((float)$package['shared_behavior_score'], 2) : 'Calculating…'; ?></strong>
                             Shared Behavior Score
-                        </div>
-                    </div>
-                    <div class="col-sm-4">
-                        <div class="package-stat">
-                            <strong><?php echo e($package['step_label']); ?></strong>
-                            Your Review Step
                         </div>
                     </div>
                 </div>
