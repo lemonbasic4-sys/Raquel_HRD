@@ -115,38 +115,8 @@ require_once '../includes/header.php';
         </header>
         <div class="package-card__body">
             <div class="row g-3">
-                <div class="col-sm-6 col-md-3">
-                    <div class="package-stat">
-                        <span class="text-muted small text-uppercase fw-bold">Individual KRA</span>
-                        <div class="d-flex align-items-baseline gap-2 mt-1">
-                            <strong class="tabular-nums text-dark"><?php echo number_format((float)$evaluation['kra_subtotal'], 2); ?></strong>
-                            <?php if (abs((float)$evaluation['kra_subtotal'] - $orig_kra_subtotal) > 0.001): ?>
-                                <span class="badge bg-warning text-dark small" title="Original Self-Rating: <?php echo number_format($orig_kra_subtotal, 2); ?>">
-                                    Self: <?php echo number_format($orig_kra_subtotal, 2); ?>
-                                </span>
-                            <?php endif; ?>
-                        </div>
-                        <div class="small text-muted">Weight: <?php echo number_format($kra_weight, 0); ?>%</div>
-                    </div>
-                </div>
-
-                <div class="col-sm-6 col-md-3">
-                    <div class="package-stat">
-                        <span class="text-muted small text-uppercase fw-bold">Behavior Rating</span>
-                        <div class="d-flex align-items-baseline gap-2 mt-1">
-                            <strong class="tabular-nums text-dark"><?php echo number_format((float)$evaluation['behavior_average'], 2); ?></strong>
-                            <?php if (abs((float)$evaluation['behavior_average'] - $orig_beh_average) > 0.001): ?>
-                                <span class="badge bg-warning text-dark small" title="Original Self-Rating: <?php echo number_format($orig_beh_average, 2); ?>">
-                                    Self: <?php echo number_format($orig_beh_average, 2); ?>
-                                </span>
-                            <?php endif; ?>
-                        </div>
-                        <div class="small text-muted">Weight: <?php echo number_format($beh_weight, 0); ?>%</div>
-                    </div>
-                </div>
-
-                <div class="col-sm-6 col-md-3">
-                    <div class="package-stat">
+                <div class="col-sm-6">
+                    <div class="package-stat h-100 d-flex flex-column justify-content-between" style="border:2px solid var(--bs-border-color,#dee2e6);border-radius:10px;padding:14px 18px;">
                         <span class="text-muted small text-uppercase fw-bold">Overall Score</span>
                         <div class="d-flex align-items-baseline gap-2 mt-1">
                             <strong class="tabular-nums text-success" style="font-size:1.8rem;"><?php echo $evaluation['total_score'] !== null ? number_format((float)$evaluation['total_score'], 2) : '&mdash;'; ?></strong>
@@ -156,17 +126,17 @@ require_once '../includes/header.php';
                                 </span>
                             <?php endif; ?>
                         </div>
-                        <div class="small text-muted">Performance Level: <strong><?php echo e($evaluation['performance_level'] ?: '&mdash;'); ?></strong></div>
+                        <div class="small text-muted mt-1">Performance Level: <strong><?php echo e($evaluation['performance_level'] ?: '&mdash;'); ?></strong></div>
                     </div>
                 </div>
 
-                <div class="col-sm-6 col-md-3">
-                    <div class="package-stat">
+                <div class="col-sm-6">
+                    <div class="package-stat h-100 d-flex flex-column justify-content-between" style="border:2px solid var(--bs-border-color,#dee2e6);border-radius:10px;padding:14px 18px;">
                         <span class="text-muted small text-uppercase fw-bold">Shared Team Behavior</span>
-                        <strong class="tabular-nums" style="color:var(--rp-primary-gold-dark);">
+                        <strong class="tabular-nums mt-1" style="color:var(--rp-primary-gold-dark);font-size:1.8rem;">
                             <?php echo $evaluation['shared_behavior_score'] !== null ? number_format((float)$evaluation['shared_behavior_score'], 2) : 'Pending'; ?>
                         </strong>
-                        <div class="small text-muted">Applied at Board approval</div>
+                        <div class="small text-muted mt-1">Applied at Board approval</div>
                     </div>
                 </div>
             </div>
@@ -271,6 +241,15 @@ require_once '../includes/header.php';
                     </tbody>
                 </table>
             </div>
+            <div class="d-flex justify-content-end align-items-center gap-3 mt-3 pt-3 border-top">
+                <span class="text-muted small text-uppercase fw-bold">Key Result Areas (KRA) Total:</span>
+                <span class="fw-bold tabular-nums" style="font-size:1.15rem;"><?php echo number_format((float)$evaluation['kra_subtotal'], 2); ?>
+                    <?php if (abs((float)$evaluation['kra_subtotal'] - $orig_kra_subtotal) > 0.001): ?>
+                        <span class="badge bg-warning text-dark ms-1" title="Original: <?php echo number_format($orig_kra_subtotal, 2); ?>">Self: <?php echo number_format($orig_kra_subtotal, 2); ?></span>
+                    <?php endif; ?>
+                </span>
+                <span class="text-muted small">(Weight: <?php echo number_format($kra_weight, 0); ?>%)</span>
+            </div>
             <?php else: ?>
                 <p class="text-muted small mb-0"><i class="fas fa-info-circle me-1"></i>No KRA criteria recorded.</p>
             <?php endif; ?>
@@ -319,6 +298,15 @@ require_once '../includes/header.php';
                         <?php endforeach; ?>
                     </tbody>
                 </table>
+            </div>
+            <div class="d-flex justify-content-end align-items-center gap-3 mt-3 pt-3 border-top">
+                <span class="text-muted small text-uppercase fw-bold">Core Behaviors &amp; Values Total:</span>
+                <span class="fw-bold tabular-nums" style="font-size:1.15rem;"><?php echo number_format((float)$evaluation['behavior_average'], 2); ?>
+                    <?php if (abs((float)$evaluation['behavior_average'] - $orig_beh_average) > 0.001): ?>
+                        <span class="badge bg-warning text-dark ms-1" title="Original: <?php echo number_format($orig_beh_average, 2); ?>">Self: <?php echo number_format($orig_beh_average, 2); ?></span>
+                    <?php endif; ?>
+                </span>
+                <span class="text-muted small">(Weight: <?php echo number_format($beh_weight, 0); ?>%)</span>
             </div>
             <?php else: ?>
                 <p class="text-muted small mb-0"><i class="fas fa-info-circle me-1"></i>No behavior criteria recorded.</p>
