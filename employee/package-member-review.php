@@ -178,16 +178,21 @@ $est_perf_level = getPerformanceLevel($est_final_score);
         <div class="package-card__body">
             <div class="row g-3">
                 <div class="col-md-6 col-sm-6">
-                    <div class="package-stat">
-                        <strong class="tabular-nums text-success" id="stat-shared-behavior"><?php echo number_format((float)$shared_beh, 2); ?></strong>
-                        Shared Department Behavior Result
+                    <div class="package-stat h-100 d-flex flex-column justify-content-between" style="background: #F4FBF7; border: 2px solid #86EFAC; border-radius: 12px; padding: 1.1rem 1.25rem;">
+                        <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+                            <strong class="tabular-nums text-success m-0" id="stat-shared-behavior" style="font-size: 1.6rem; line-height: 1;"><?php echo number_format((float)$shared_beh, 2); ?></strong>
+                            <span class="badge bg-success-subtle text-success border border-success px-2 py-1 small">Department Shared</span>
+                        </div>
+                        <div class="text-muted fw-semibold" style="font-size: 0.85rem;">Shared Department Behavior Result</div>
                     </div>
                 </div>
                 <div class="col-md-6 col-sm-6">
-                    <div class="package-stat" style="background:#FAF8F0; border:2px solid var(--rp-primary-gold);">
-                        <strong class="tabular-nums text-primary" id="stat-est-total-score"><?php echo number_format($est_final_score, 2); ?></strong>
-                        <span class="badge bg-success small ms-1" id="stat-perf-level"><?php echo e($est_perf_level); ?></span>
-                        <div class="small text-muted mt-1 fw-normal" style="font-size:0.75rem;">Estimated Current / Final Score</div>
+                    <div class="package-stat h-100 d-flex flex-column justify-content-between" style="background: #FAF8F0; border: 2px solid var(--rp-primary-gold); border-radius: 12px; padding: 1.1rem 1.25rem;">
+                        <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+                            <strong class="tabular-nums text-primary m-0" id="stat-est-total-score" style="font-size: 1.6rem; line-height: 1;"><?php echo number_format($est_final_score, 2); ?></strong>
+                            <span class="badge bg-success px-2 py-1 small" id="stat-perf-level"><?php echo e($est_perf_level); ?></span>
+                        </div>
+                        <div class="text-muted fw-semibold" style="font-size: 0.85rem;">Estimated Current / Final Score</div>
                     </div>
                 </div>
             </div>
