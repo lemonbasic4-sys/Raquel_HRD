@@ -158,6 +158,12 @@ $adj_beh_avg = $beh_count > 0 ? round($adj_beh_total / $beh_count, 2) : 0.0;
 
 $est_final_score = calculateEvalTotal($adj_kra_subtotal, $shared_beh, $kra_w, $beh_w);
 $est_perf_level = getPerformanceLevel($est_final_score);
+
+$kra_criteria = array_values(array_filter($criteria, static fn($c) => $c['section'] === 'KRA'));
+$beh_criteria = array_values(array_filter($criteria, static fn($c) => $c['section'] !== 'KRA'));
+$kra_count = count($kra_criteria);
+$beh_count = count($beh_criteria);
+$devplan_count = count($existing_dev_plans);
 ?>
 <main class="evaluation-packages container-fluid py-4">
     <section class="package-hero">
@@ -199,40 +205,151 @@ $est_perf_level = getPerformanceLevel($est_final_score);
         </div>
     </section>
 
-    <form method="post" class="package-card" id="reviewForm">
-        <div class="package-card__body">
-            <input type="hidden" name="package_id" value="<?php echo $package_id; ?>">
-            <input type="hidden" name="evaluation_id" value="<?php echo $evaluation_id; ?>">
-            <?php echo csrfField(); ?>
+<style>
+/* Tabbed Layout for Evaluation Sections */
+.eval-tabs-wrapper {
+    position: relative;
+    background-color: #f8fafc;
+    border-bottom: 2px solid #e2e8f0;
+    border-radius: 12px 12px 0 0;
+}
+.eval-tabs-wrapper::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 32px;
+    background: linear-gradient(to right, rgba(248, 250, 252, 0), rgba(248, 250, 252, 1));
+    pointer-events: none;
+}
+.eval-tabs-header {
+    display: flex;
+    padding: 12px 16px;
+    gap: 8px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+.eval-tabs-header::-webkit-scrollbar {
+    display: none;
+}
+.eval-tab-btn {
+    background: transparent;
+    border: none;
+    outline: none;
+    padding: 10px 18px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #64748b;
+    cursor: pointer;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+.eval-tab-btn:hover {
+    color: var(--rp-forest-green, #0f5132);
+    background-color: rgba(15, 81, 50, 0.08);
+}
+.eval-tab-btn.active {
+    color: #ffffff;
+    background-color: var(--rp-forest-green, #0f5132);
+    box-shadow: 0 2px 8px rgba(15, 81, 50, 0.25);
+}
+.eval-tab-badge {
+    background-color: #e2e8f0;
+    color: #64748b;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 700;
+    transition: all 0.2s ease;
+}
+.eval-tab-btn.active .eval-tab-badge {
+    background-color: rgba(255, 255, 255, 0.25);
+    color: #ffffff;
+}
+.eval-tab-content {
+    display: none;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 0.25s ease, transform 0.25s ease;
+}
+.eval-tab-content.active {
+    display: block;
+    opacity: 1;
+    transform: translateY(0);
+}
+.eval-section-title {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--rp-forest-green, #0f5132);
+    margin-top: 0;
+    margin-bottom: 16px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+</style>
 
-            <div class="alert alert-info border border-info d-flex align-items-center gap-3 p-3 mb-4 rounded-3 shadow-sm">
-                <i class="fas fa-edit fa-2x text-info"></i>
-                <div class="small">
-                    <strong class="d-block text-dark mb-1" style="font-size:1rem;">How to Adjust Ratings:</strong>
-                    Enter your adjusted rating score directly in the input box under <strong>Evaluator Adjusted Rating</strong> (supports decimal values between 1.00 and 4.00). Subtotals and Estimated Final Score recalculate automatically in real time.
-                </div>
+    <form method="post" class="package-card p-0 shadow-sm" id="reviewForm" style="border-radius:12px; border:1px solid #E2E8F0; overflow:hidden;">
+        <input type="hidden" name="package_id" value="<?php echo $package_id; ?>">
+        <input type="hidden" name="evaluation_id" value="<?php echo $evaluation_id; ?>">
+        <?php echo csrfField(); ?>
+
+        <!-- Tabs Header -->
+        <div class="eval-tabs-wrapper">
+            <div class="eval-tabs-header" role="tablist">
+                <button type="button" class="eval-tab-btn active" id="btn-tab-kra" onclick="switchReviewTab(event, 'tab-kra')" role="tab" aria-selected="true" aria-controls="tab-kra">
+                    <i class="fas fa-chart-pie me-1"></i>Key Result Areas (KRA) <span class="eval-tab-badge ms-1"><?php echo $kra_count; ?></span>
+                </button>
+                <button type="button" class="eval-tab-btn" id="btn-tab-behaviors" onclick="switchReviewTab(event, 'tab-behaviors')" role="tab" aria-selected="false" aria-controls="tab-behaviors">
+                    <i class="fas fa-users me-1"></i>Core Behaviors &amp; Values <span class="eval-tab-badge ms-1"><?php echo $beh_count; ?></span>
+                </button>
+                <button type="button" class="eval-tab-btn" id="btn-tab-devplan" onclick="switchReviewTab(event, 'tab-devplan')" role="tab" aria-selected="false" aria-controls="tab-devplan">
+                    <i class="fas fa-seedling me-1"></i>Developmental Plan &amp; Recommendations <span class="eval-tab-badge ms-1" id="badge-devplan-count"><?php echo $devplan_count > 0 ? $devplan_count : 1; ?></span>
+                </button>
             </div>
+        </div>
 
-            <?php foreach (['KRA' => 'Key Result Areas (KRA)', 'Behavior' => 'Core Behaviors & Values (Shared Score Component)'] as $section => $label): ?>
-                <h2 class="h5 fw-bold mt-4 mb-3" style="color:var(--rp-forest-green); border-bottom:2px solid #E2E8F0; padding-bottom:0.5rem;">
-                    <i class="fas <?php echo $section === 'KRA' ? 'fa-chart-pie' : 'fa-users'; ?> me-2"></i><?php echo $label; ?>
-                </h2>
-                <div class="table-responsive mb-4">
+        <div class="package-card__body p-4">
+            <!-- TAB 1: Key Result Areas (KRA) -->
+            <div id="tab-kra" class="eval-tab-content active" role="tabpanel" aria-labelledby="btn-tab-kra">
+                <div class="alert alert-info border border-info d-flex align-items-center gap-3 p-3 mb-4 rounded-3 shadow-sm" style="background-color: #e6f7ff; border-color: #91d5ff !important; color: #003a8c;">
+                    <i class="fas fa-info-circle fa-2x text-primary"></i>
+                    <div class="small">
+                        <strong class="d-block mb-1" style="font-size:1rem; color:#002766;">How to Adjust Ratings:</strong>
+                        Enter your adjusted rating score directly in the input box under <strong>Evaluator Adjusted Rating</strong> (supports decimal values between 1.00 and 4.00). Subtotals and Estimated Final Score recalculate automatically in real time.
+                    </div>
+                </div>
+
+                <div class="eval-section-title">
+                    <span><i class="fas fa-chart-pie me-2"></i>Key Result Areas (KRA)</span>
+                    <span class="badge bg-light text-secondary border px-3 py-2 fw-semibold" style="font-size:0.85rem;">
+                        KRA Weight: <strong class="text-dark"><?php echo $kra_w; ?>%</strong>
+                    </span>
+                </div>
+
+                <div class="table-responsive mb-3">
                     <table class="package-table table align-middle">
                         <thead>
                             <tr>
                                 <th style="width: 42%;">Criterion</th>
-                                <?php if ($section === 'KRA'): ?>
-                                    <th class="text-end" style="width: 12%;">Weight</th>
-                                <?php endif; ?>
+                                <th class="text-end" style="width: 12%;">Weight</th>
                                 <th class="text-end" style="width: 18%;">Employee Self-Rating</th>
                                 <th style="width: 28%;">Evaluator Adjusted Rating</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <?php foreach ($criteria as $criterion): ?>
+                            <?php foreach ($kra_criteria as $criterion): ?>
                                 <?php
-                                if ($criterion['section'] !== $section) continue;
                                 $effective = $criterion['supervisor_override_score'] !== null ? (float)$criterion['supervisor_override_score'] : (float)$criterion['score_value'];
                                 $is_modified = ($criterion['supervisor_override_score'] !== null && abs((float)$criterion['supervisor_override_score'] - (float)$criterion['score_value']) > 0.001);
                                 ?>
@@ -248,9 +365,7 @@ $est_perf_level = getPerformanceLevel($est_final_score);
                                             </span>
                                         <?php endif; ?>
                                     </td>
-                                    <?php if ($section === 'KRA'): ?>
-                                        <td class="text-end tabular-nums fw-bold text-muted"><?php echo number_format((float)$criterion['weight'], 2); ?>%</td>
-                                    <?php endif; ?>
+                                    <td class="text-end tabular-nums fw-bold text-muted"><?php echo number_format((float)$criterion['weight'], 2); ?>%</td>
                                     <td class="text-end tabular-nums fw-semibold" style="font-size:1.1rem;">
                                         <?php echo number_format((float)$criterion['score_value'], 2); ?>
                                     </td>
@@ -263,7 +378,7 @@ $est_perf_level = getPerformanceLevel($est_final_score);
                                                    min="1.00"
                                                    max="4.00"
                                                    step="0.01"
-                                                   data-section="<?php echo e($section); ?>"
+                                                   data-section="KRA"
                                                    data-weight="<?php echo (float)$criterion['weight']; ?>"
                                                    value="<?php echo e(number_format($effective, 2, '.', '')); ?>"
                                                    aria-label="Rating for <?php echo e($criterion['criterion_name']); ?>"
@@ -278,44 +393,106 @@ $est_perf_level = getPerformanceLevel($est_final_score);
                 </div>
 
                 <!-- Section Total Score Lookup Below Table -->
-                <?php if ($section === 'KRA'): ?>
-                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 px-3 py-2 rounded-3 border mb-4 shadow-sm" style="background:#F8FAFC; border-color:#E2E8F0 !important;">
-                        <div class="d-flex align-items-center gap-2">
-                            <i class="fas fa-chart-pie text-success fa-lg"></i>
-                            <span class="fw-bold text-dark" style="font-size: 1.05rem;">Key Result Areas (KRA) Total:</span>
-                        </div>
-                        <div class="d-flex align-items-center gap-3">
-                            <span class="text-muted small fw-semibold">Self-Rating: <strong class="text-secondary tabular-nums"><?php echo number_format($self_kra_subtotal, 2); ?></strong></span>
-                            <div class="d-flex align-items-center gap-1 bg-white px-3 py-1 rounded-2 border" style="border-color:#0f5132 !important;">
-                                <span class="text-muted small me-1">Total Score:</span>
-                                <strong class="text-success tabular-nums fs-5" id="lookup-kra-subtotal"><?php echo number_format($adj_kra_subtotal, 2); ?></strong>
-                                <span class="text-muted small fw-bold">/ 4.00</span>
-                            </div>
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 px-3 py-2 rounded-3 border mb-2 shadow-sm" style="background:#F8FAFC; border-color:#E2E8F0 !important;">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="fas fa-chart-pie text-success fa-lg"></i>
+                        <span class="fw-bold text-dark" style="font-size: 1.05rem;">Key Result Areas (KRA) Total:</span>
+                    </div>
+                    <div class="d-flex align-items-center gap-3">
+                        <span class="text-muted small fw-semibold">Self-Rating: <strong class="text-secondary tabular-nums"><?php echo number_format($self_kra_subtotal, 2); ?></strong></span>
+                        <div class="d-flex align-items-center gap-1 bg-white px-3 py-1 rounded-2 border" style="border-color:#0f5132 !important;">
+                            <span class="text-muted small me-1">Total Score:</span>
+                            <strong class="text-success tabular-nums fs-5" id="lookup-kra-subtotal"><?php echo number_format($adj_kra_subtotal, 2); ?></strong>
+                            <span class="text-muted small fw-bold">/ 4.00</span>
                         </div>
                     </div>
-                <?php else: ?>
-                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 px-3 py-2 rounded-3 border mb-4 shadow-sm" style="background:#F8FAFC; border-color:#E2E8F0 !important;">
-                        <div class="d-flex align-items-center gap-2">
-                            <i class="fas fa-users text-primary fa-lg"></i>
-                            <span class="fw-bold text-dark" style="font-size: 1.05rem;">Core Behaviors &amp; Values Total:</span>
-                        </div>
-                        <div class="d-flex align-items-center gap-3">
-                            <span class="text-muted small fw-semibold">Self-Rating: <strong class="text-secondary tabular-nums"><?php echo number_format($self_beh_avg, 2); ?></strong></span>
-                            <div class="d-flex align-items-center gap-1 bg-white px-3 py-1 rounded-2 border" style="border-color:#0f5132 !important;">
-                                <span class="text-muted small me-1">Total Score:</span>
-                                <strong class="text-success tabular-nums fs-5" id="lookup-beh-indiv"><?php echo number_format($adj_beh_avg, 2); ?></strong>
-                                <span class="text-muted small fw-bold">/ 4.00</span>
-                            </div>
-                        </div>
-                    </div>
-                <?php endif; ?>
-            <?php endforeach; ?>
+                </div>
+            </div>
 
-            <!-- F6: Developmental Plan Section -->
-            <div class="mt-5 pt-3 border-top">
-                <h2 class="h5 fw-bold mb-3" style="color:var(--rp-forest-green);">
-                    <i class="fas fa-seedling me-2"></i>Developmental Plan &amp; Recommendations
-                </h2>
+            <!-- TAB 2: Core Behaviors & Values -->
+            <div id="tab-behaviors" class="eval-tab-content" role="tabpanel" aria-labelledby="btn-tab-behaviors">
+                <div class="eval-section-title">
+                    <span><i class="fas fa-users me-2"></i>Core Behaviors &amp; Values (Shared Score Component)</span>
+                    <span class="badge bg-light text-secondary border px-3 py-2 fw-semibold" style="font-size:0.85rem;">
+                        Behavior Weight: <strong class="text-dark"><?php echo $beh_w; ?>%</strong>
+                    </span>
+                </div>
+
+                <div class="table-responsive mb-3">
+                    <table class="package-table table align-middle">
+                        <thead>
+                            <tr>
+                                <th style="width: 48%;">Criterion</th>
+                                <th class="text-end" style="width: 22%;">Employee Self-Rating</th>
+                                <th style="width: 30%;">Evaluator Adjusted Rating</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($beh_criteria as $criterion): ?>
+                                <?php
+                                $effective = $criterion['supervisor_override_score'] !== null ? (float)$criterion['supervisor_override_score'] : (float)$criterion['score_value'];
+                                $is_modified = ($criterion['supervisor_override_score'] !== null && abs((float)$criterion['supervisor_override_score'] - (float)$criterion['score_value']) > 0.001);
+                                ?>
+                                <tr>
+                                    <td>
+                                        <div class="fw-bold text-dark" style="font-size:1.05rem;"><?php echo e($criterion['criterion_name']); ?></div>
+                                        <?php if (!empty($criterion['description'])): ?>
+                                            <div class="small text-muted mt-1"><?php echo e($criterion['description']); ?></div>
+                                        <?php endif; ?>
+                                        <?php if ($is_modified): ?>
+                                            <span class="audit-chip audit-chip--adjusted mt-1">
+                                                <i class="fas fa-edit me-1"></i>Adjusted from <?php echo number_format((float)$criterion['score_value'], 2); ?>
+                                            </span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td class="text-end tabular-nums fw-semibold" style="font-size:1.1rem;">
+                                        <?php echo number_format((float)$criterion['score_value'], 2); ?>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <input class="form-control fw-bold text-center eval-score-input"
+                                                   id="rating_<?php echo (int)$criterion['score_id']; ?>"
+                                                   name="rating[<?php echo (int)$criterion['score_id']; ?>]"
+                                                   type="number"
+                                                   min="1.00"
+                                                   max="4.00"
+                                                   step="0.01"
+                                                   data-section="Behavior"
+                                                   data-weight="<?php echo (float)$criterion['weight']; ?>"
+                                                   value="<?php echo e(number_format($effective, 2, '.', '')); ?>"
+                                                   aria-label="Rating for <?php echo e($criterion['criterion_name']); ?>"
+                                                   style="width: 110px !important; height: 44px !important; font-size: 1.25rem !important; font-weight: 700 !important; color: #0f172a !important; background-color: #ffffff !important; border: 2px solid #0f5132 !important; border-radius: 8px !important; display: inline-block !important; opacity: 1 !important; visibility: visible !important;">
+                                            <span class="fw-bold text-secondary" style="font-size: 1rem;">/ 4.00</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Section Total Score Lookup Below Table -->
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 px-3 py-2 rounded-3 border mb-2 shadow-sm" style="background:#F8FAFC; border-color:#E2E8F0 !important;">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="fas fa-users text-primary fa-lg"></i>
+                        <span class="fw-bold text-dark" style="font-size: 1.05rem;">Core Behaviors &amp; Values Total:</span>
+                    </div>
+                    <div class="d-flex align-items-center gap-3">
+                        <span class="text-muted small fw-semibold">Self-Rating: <strong class="text-secondary tabular-nums"><?php echo number_format($self_beh_avg, 2); ?></strong></span>
+                        <div class="d-flex align-items-center gap-1 bg-white px-3 py-1 rounded-2 border" style="border-color:#0f5132 !important;">
+                            <span class="text-muted small me-1">Total Score:</span>
+                            <strong class="text-success tabular-nums fs-5" id="lookup-beh-indiv"><?php echo number_format($adj_beh_avg, 2); ?></strong>
+                            <span class="text-muted small fw-bold">/ 4.00</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 3: Developmental Plan & Recommendations -->
+            <div id="tab-devplan" class="eval-tab-content" role="tabpanel" aria-labelledby="btn-tab-devplan">
+                <div class="eval-section-title">
+                    <span><i class="fas fa-seedling me-2"></i>Developmental Plan &amp; Recommendations</span>
+                </div>
                 <p class="text-muted small mb-3">
                     Specify growth areas, required support, and target completion timelines for this team member during consolidation.
                 </p>
@@ -362,6 +539,7 @@ $est_perf_level = getPerformanceLevel($est_final_score);
                 </button>
             </div>
 
+            <!-- Form Action Buttons -->
             <div class="d-flex flex-wrap gap-3 mt-4 pt-3 border-top align-items-center">
                 <button class="btn-action-primary btn" type="submit">
                     <i class="fas fa-save me-1"></i>Save Adjustments &amp; Developmental Plan
@@ -375,6 +553,27 @@ $est_perf_level = getPerformanceLevel($est_final_score);
 </main>
 
 <script>
+function switchReviewTab(event, tabId) {
+    if (event) event.preventDefault();
+    const contents = document.querySelectorAll('.eval-tab-content');
+    const buttons = document.querySelectorAll('.eval-tab-btn');
+
+    contents.forEach(function (content) {
+        content.classList.remove('active');
+    });
+    buttons.forEach(function (btn) {
+        btn.classList.remove('active');
+        btn.setAttribute('aria-selected', 'false');
+    });
+
+    const activeContent = document.getElementById(tabId);
+    if (activeContent) activeContent.classList.add('active');
+    if (event && event.currentTarget) {
+        event.currentTarget.classList.add('active');
+        event.currentTarget.setAttribute('aria-selected', 'true');
+    }
+}
+
 document.addEventListener('DOMContentLoaded', function () {
     const kraWeightPct = <?php echo $kra_w; ?>;
     const behWeightPct = <?php echo $beh_w; ?>;
@@ -433,10 +632,16 @@ document.addEventListener('DOMContentLoaded', function () {
         inp.addEventListener('change', recalcLiveScore);
     });
 
-
     // Dev Plan Dynamic Table Rows
     const btnAddDevRow = document.getElementById('btnAddDevRow');
     const devPlanBody = document.getElementById('devPlanBody');
+
+    function updateDevPlanBadge() {
+        const badge = document.getElementById('badge-devplan-count');
+        if (badge && devPlanBody) {
+            badge.textContent = devPlanBody.children.length;
+        }
+    }
 
     if (btnAddDevRow && devPlanBody) {
         btnAddDevRow.addEventListener('click', function () {
@@ -453,6 +658,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 </td>
             `;
             devPlanBody.appendChild(tr);
+            updateDevPlanBadge();
         });
 
         devPlanBody.addEventListener('click', function (e) {
@@ -463,6 +669,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 } else {
                     tr.querySelectorAll('input').forEach(i => i.value = '');
                 }
+                updateDevPlanBadge();
             }
         });
     }
