@@ -177,25 +177,13 @@ $est_perf_level = getPerformanceLevel($est_final_score);
     <section class="package-card" aria-label="Score Summary">
         <div class="package-card__body">
             <div class="row g-3">
-                <div class="col-md-3 col-sm-6">
-                    <div class="package-stat">
-                        <strong class="tabular-nums" id="stat-kra-subtotal"><?php echo number_format((float)$evaluation['kra_subtotal'], 2); ?></strong>
-                        Current Individual KRA Subtotal
-                    </div>
-                </div>
-                <div class="col-md-3 col-sm-6">
-                    <div class="package-stat">
-                        <strong class="tabular-nums" id="stat-beh-average"><?php echo number_format((float)$evaluation['behavior_average'], 2); ?></strong>
-                        Individual Behavior Rating
-                    </div>
-                </div>
-                <div class="col-md-3 col-sm-6">
+                <div class="col-md-6 col-sm-6">
                     <div class="package-stat">
                         <strong class="tabular-nums text-success" id="stat-shared-behavior"><?php echo number_format((float)$shared_beh, 2); ?></strong>
                         Shared Department Behavior Result
                     </div>
                 </div>
-                <div class="col-md-3 col-sm-6">
+                <div class="col-md-6 col-sm-6">
                     <div class="package-stat" style="background:#FAF8F0; border:2px solid var(--rp-primary-gold);">
                         <strong class="tabular-nums text-primary" id="stat-est-total-score"><?php echo number_format($est_final_score, 2); ?></strong>
                         <span class="badge bg-success small ms-1" id="stat-perf-level"><?php echo e($est_perf_level); ?></span>
@@ -388,7 +376,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const sharedBehVal = <?php echo $shared_beh; ?>;
 
     const ratingInputs = document.querySelectorAll('.eval-score-input');
-    const statKraSubtotal = document.getElementById('stat-kra-subtotal');
     const statEstTotal = document.getElementById('stat-est-total-score');
     const statPerfLevel = document.getElementById('stat-perf-level');
 
@@ -424,9 +411,6 @@ document.addEventListener('DOMContentLoaded', function () {
         const level = getPerfLevel(estTotal);
 
         // Update Top Score Stat Cards
-        if (statKraSubtotal) statKraSubtotal.textContent = kraSubtotal.toFixed(2);
-        const statBehAverage = document.getElementById('stat-beh-average');
-        if (statBehAverage) statBehAverage.textContent = behAverage.toFixed(2);
         if (statEstTotal) statEstTotal.textContent = estTotalRounded;
         if (statPerfLevel) statPerfLevel.textContent = level;
 

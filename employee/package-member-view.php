@@ -109,25 +109,13 @@ require_once '../includes/header.php';
     <section class="package-card" aria-label="Score Summary Card">
         <div class="package-card__body">
             <div class="row g-3 mb-3">
-                <div class="col-sm-3">
-                    <div class="package-stat">
-                        <strong class="tabular-nums"><?php echo number_format((float) $evaluation['kra_subtotal'], 2); ?></strong>
-                        Individual KRA Subtotal
-                    </div>
-                </div>
-                <div class="col-sm-3">
-                    <div class="package-stat">
-                        <strong class="tabular-nums"><?php echo number_format((float) $evaluation['behavior_average'], 2); ?></strong>
-                        Individual Behavior Rating
-                    </div>
-                </div>
-                <div class="col-sm-3">
+                <div class="col-sm-6">
                     <div class="package-stat">
                         <strong class="tabular-nums text-success"><?php echo $evaluation['shared_behavior_score'] !== null ? number_format((float) $evaluation['shared_behavior_score'], 2) : 'Pending'; ?></strong>
                         Shared Department Behavior
                     </div>
                 </div>
-                <div class="col-sm-3">
+                <div class="col-sm-6">
                     <div class="package-stat">
                         <strong class="tabular-nums text-dark"><?php echo number_format((float) $evaluation['total_score'], 2); ?></strong>
                         Overall Total Score
