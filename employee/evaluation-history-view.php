@@ -11,7 +11,8 @@ if ($evaluation_id <= 0) {
 }
 
 $evaluation_stmt = $conn->prepare("SELECT ev.*, et.template_name, et.kra_weight, et.behavior_weight,
-        ep.package_id, ep.status AS package_status, ep.shared_behavior_score, d.department_name
+        ep.package_id, ep.status AS package_status, ep.shared_behavior_score, d.department_name,
+        CONCAT(emp.first_name, ' ', emp.last_name) AS employee_name
     FROM evaluations ev
     JOIN users u ON u.employee_id = ev.employee_id AND u.user_id = ?
     JOIN evaluation_templates et ON et.template_id = ev.template_id
