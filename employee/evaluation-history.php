@@ -87,9 +87,14 @@ require_once '../includes/header.php';
     }
     .eh-score-pill__label { font-size: .63rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: #94a3b8; line-height: 1; }
     .eh-score-pill__value { font-size: 1.1rem; font-weight: 800; color: #1a2233; font-variant-numeric: tabular-nums; line-height: 1.3; margin-top: 2px; }
-    .eh-score-pill--total { background: linear-gradient(135deg, #0a3a2a, #1a6648); border-color: transparent; }
-    .eh-score-pill--total .eh-score-pill__label { color: rgba(255,255,255,.65); }
+    .eh-score-pill--total { border-color: transparent; }
+    .eh-score-pill--total .eh-score-pill__label { color: rgba(255,255,255,.7); }
     .eh-score-pill--total .eh-score-pill__value { color: #fff; font-size: 1.2rem; }
+    /* Score-tier colours */
+    .eh-score-pill--outstanding  { background: linear-gradient(135deg,#146c43,#198754); }
+    .eh-score-pill--exceeds      { background: linear-gradient(135deg,#087990,#0dcaf0); }
+    .eh-score-pill--meets        { background: linear-gradient(135deg,#cc8800,#ffc107); }
+    .eh-score-pill--needs        { background: linear-gradient(135deg,#a71d2a,#dc3545); }
     .eh-score-pill--pending .eh-score-pill__value { color: #94a3b8; font-size: .85rem; }
     .eh-card__cta { flex-shrink: 0; }
     .eh-audit-btn {
@@ -142,6 +147,16 @@ require_once '../includes/header.php';
                         $has_total = $ev['total_score'] !== null;
                         $level     = $ev['performance_level'] ?: null;
                         $submitted = !empty($ev['submitted_date']) ? date('M d, Y', strtotime($ev['submitted_date'])) : null;
+                        // Derive score-tier pill class
+                        if ($has_total) {
+                            $ts = (float)$ev['total_score'];
+                            if ($ts >= 3.60)      $pill_class = 'eh-score-pill--total eh-score-pill--outstanding';
+                            elseif ($ts >= 2.60)  $pill_class = 'eh-score-pill--total eh-score-pill--exceeds';
+                            elseif ($ts >= 2.00)  $pill_class = 'eh-score-pill--total eh-score-pill--meets';
+                            else                  $pill_class = 'eh-score-pill--total eh-score-pill--needs';
+                        } else {
+                            $pill_class = 'eh-score-pill--pending';
+                        }
                     ?>
                     <div class="eh-card">
                         <div class="eh-card__icon"><i class="fas fa-file-alt"></i></div>
@@ -177,7 +192,7 @@ require_once '../includes/header.php';
                                 <span class="eh-score-pill__label">Behavior</span>
                                 <span class="eh-score-pill__value"><?php echo $ev['behavior_average'] !== null ? number_format((float)$ev['behavior_average'], 2) : '&mdash;'; ?></span>
                             </div>
-                            <div class="eh-score-pill <?php echo $has_total ? 'eh-score-pill--total' : 'eh-score-pill--pending'; ?>">
+                            <div class="eh-score-pill <?php echo $pill_class; ?>">
                                 <span class="eh-score-pill__label">Total</span>
                                 <span class="eh-score-pill__value"><?php echo $has_total ? number_format((float)$ev['total_score'], 2) : 'Pending'; ?></span>
                             </div>

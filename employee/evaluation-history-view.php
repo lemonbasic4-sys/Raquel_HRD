@@ -116,19 +116,38 @@ require_once '../includes/header.php';
         <div class="package-card__body">
             <div class="row g-3">
                 <div class="col-sm-6">
-                    <div class="package-stat h-100 d-flex flex-column justify-content-between" style="border:2px solid var(--bs-border-color,#dee2e6);border-radius:10px;padding:14px 18px;">
-                        <span class="text-muted small text-uppercase fw-bold">Overall Score</span>
+                    <?php
+                    $ts_val   = $evaluation['total_score'] !== null ? (float)$evaluation['total_score'] : null;
+                    if ($ts_val !== null) {
+                        if ($ts_val >= 3.60)     { $score_bg = 'linear-gradient(135deg,#146c43,#198754)'; $score_border = '#146c43'; }
+                        elseif ($ts_val >= 2.60) { $score_bg = 'linear-gradient(135deg,#087990,#0dcaf0)'; $score_border = '#087990'; }
+                        elseif ($ts_val >= 2.00) { $score_bg = 'linear-gradient(135deg,#cc8800,#ffc107)'; $score_border = '#cc8800'; }
+                        else                     { $score_bg = 'linear-gradient(135deg,#a71d2a,#dc3545)'; $score_border = '#a71d2a'; }
+                        $score_card_style = "background:{$score_bg};border:2px solid {$score_border};border-radius:10px;padding:14px 18px;";
+                        $score_label_style = 'color:rgba(255,255,255,.75)';
+                        $score_value_style = 'font-size:1.8rem;color:#fff;';
+                        $score_sub_style   = 'color:rgba(255,255,255,.8)';
+                    } else {
+                        $score_card_style  = 'border:2px solid var(--bs-border-color,#dee2e6);border-radius:10px;padding:14px 18px;';
+                        $score_label_style = 'color:#6c757d';
+                        $score_value_style = 'font-size:1.8rem;color:#6c757d;';
+                        $score_sub_style   = 'color:#6c757d';
+                    }
+                    ?>
+                    <div class="package-stat h-100 d-flex flex-column justify-content-between" style="<?php echo $score_card_style; ?>">
+                        <span class="small text-uppercase fw-bold" style="<?php echo $score_label_style; ?>">Overall Score</span>
                         <div class="d-flex align-items-baseline gap-2 mt-1">
-                            <strong class="tabular-nums text-success" style="font-size:1.8rem;"><?php echo $evaluation['total_score'] !== null ? number_format((float)$evaluation['total_score'], 2) : '&mdash;'; ?></strong>
-                            <?php if ($evaluation['total_score'] !== null && abs((float)$evaluation['total_score'] - $orig_total_score) > 0.001): ?>
+                            <strong class="tabular-nums" style="<?php echo $score_value_style; ?>"><?php echo $ts_val !== null ? number_format($ts_val, 2) : '&mdash;'; ?></strong>
+                            <?php if ($ts_val !== null && abs($ts_val - $orig_total_score) > 0.001): ?>
                                 <span class="badge bg-light text-dark border small" title="Original Self Total: <?php echo number_format($orig_total_score, 2); ?>">
                                     Orig: <?php echo number_format($orig_total_score, 2); ?>
                                 </span>
                             <?php endif; ?>
                         </div>
-                        <div class="small text-muted mt-1">Performance Level: <strong><?php echo e($evaluation['performance_level'] ?: '&mdash;'); ?></strong></div>
+                        <div class="small mt-1" style="<?php echo $score_sub_style; ?>">Performance Level: <strong><?php echo e($evaluation['performance_level'] ?: '&mdash;'); ?></strong></div>
                     </div>
                 </div>
+
 
                 <div class="col-sm-6">
                     <div class="package-stat h-100 d-flex flex-column justify-content-between" style="border:2px solid var(--bs-border-color,#dee2e6);border-radius:10px;padding:14px 18px;">
