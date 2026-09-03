@@ -182,152 +182,236 @@ require_once '../includes/header.php';
         </div>
     </section>
 
-    <!-- ── Criteria Breakdown Tables ──────────────────────────────────────── -->
-    <?php foreach (['KRA' => ['title' => 'Key Result Areas (KRA)', 'items' => $kra], 'Behavior' => ['title' => 'Core Behaviors & Values', 'items' => $behavior]] as $sec_key => $sec_data): ?>
-        <?php if (!empty($sec_data['items'])): ?>
-            <section class="package-card" role="region" aria-label="<?php echo e($sec_data['title']); ?>">
-                <header class="package-card__header">
-                    <h2 class="h5 mb-0 fw-bold"><i class="fas <?php echo $sec_key === 'KRA' ? 'fa-chart-pie' : 'fa-users'; ?> me-2"></i><?php echo e($sec_data['title']); ?></h2>
-                </header>
-                <div class="package-card__body">
-                    <div class="table-responsive">
-                        <table class="package-table table align-middle mb-0">
-                            <thead>
-                                <tr>
-                                    <th style="width: 40%;">Criterion</th>
-                                    <?php if ($sec_key === 'KRA'): ?>
-                                        <th class="text-end" style="width: 10%;">Weight</th>
-                                    <?php endif; ?>
-                                    <th class="text-end" style="width: 18%;">Original Self-Rating</th>
-                                    <th class="text-end" style="width: 18%;">Reviewed / Adjusted Rating</th>
-                                    <th class="text-center" style="width: 14%;">Variance</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($sec_data['items'] as $criterion): ?>
-                                    <?php
-                                    $orig = (float)$criterion['score_value'];
-                                    $rev = (float)$criterion['reviewed_score'];
-                                    $diff = round($rev - $orig, 2);
-                                    $is_adj = abs($diff) > 0.001;
-                                    ?>
-                                    <tr>
-                                        <td>
-                                            <div class="fw-bold text-dark" style="font-size:1.05rem;"><?php echo e($criterion['criterion_name']); ?></div>
-                                            <?php if (!empty($criterion['description'])): ?>
-                                                <div class="small text-muted mt-1"><?php echo e($criterion['description']); ?></div>
-                                            <?php endif; ?>
-                                        </td>
-                                        <?php if ($sec_key === 'KRA'): ?>
-                                            <td class="text-end tabular-nums fw-bold text-muted"><?php echo number_format((float)$criterion['weight'], 2); ?>%</td>
-                                        <?php endif; ?>
-                                        <td class="text-end tabular-nums fw-semibold" style="font-size:1.05rem;">
-                                            <?php echo number_format($orig, 2); ?>
-                                        </td>
-                                        <td class="text-end tabular-nums fw-bold text-dark" style="font-size:1.1rem;">
-                                            <?php echo number_format($rev, 2); ?>
-                                        </td>
-                                        <td class="text-center">
-                                            <?php if ($is_adj): ?>
-                                                <span class="badge <?php echo $diff > 0 ? 'bg-success' : 'bg-danger'; ?> px-2 py-1" style="font-size:0.85rem;">
-                                                    <?php echo ($diff > 0 ? '+' : '') . number_format($diff, 2); ?>
-                                                </span>
-                                            <?php else: ?>
-                                                <span class="text-muted small">&mdash;</span>
-                                            <?php endif; ?>
-                                        </td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </section>
+    <!-- ── Tabbed Sections ──────────────────────────────────────────────── -->
+    <style>
+        .eval-tabs-wrapper{background:#fff;border-radius:14px;border:1px solid var(--bs-border-color,#dee2e6);box-shadow:0 2px 12px rgba(0,0,0,.07);overflow:hidden;display:flex;flex-direction:column;}
+        .eval-tab-nav{display:flex;gap:6px;padding:14px 16px 0;border-bottom:1px solid #e2e8f0;background:#f8fafc;flex-shrink:0;flex-wrap:wrap;}
+        .eval-tab-btn{background:none;border:none;padding:8px 18px 10px;border-radius:8px 8px 0 0;font-size:.82rem;font-weight:600;color:#64748b;cursor:pointer;letter-spacing:.3px;transition:color .18s,background .18s,border-bottom .18s;border-bottom:3px solid transparent;position:relative;top:1px;}
+        .eval-tab-btn:hover{color:#0a3a2a;background:#edf7f2;}
+        .eval-tab-btn.active{color:#0a3a2a;border-bottom:3px solid #0a3a2a;background:#fff;}
+        .eval-tab-badge{display:inline-flex;align-items:center;justify-content:center;background:#e2e8f0;color:#475569;border-radius:20px;font-size:.7rem;font-weight:700;padding:1px 7px;margin-left:6px;min-width:22px;}
+        .eval-tab-btn.active .eval-tab-badge{background:#0a3a2a;color:#fff;}
+        .eval-tab-content{display:none;padding:20px;}
+        .eval-tab-content.active{display:block;}
+    </style>
+
+    <div class="eval-tabs-wrapper">
+        <nav class="eval-tab-nav" role="tablist" aria-label="Evaluation Sections">
+            <button class="eval-tab-btn active" role="tab" aria-selected="true"  onclick="switchHistoryTab(event,'tab-kra')"   id="htab-kra">
+                <i class="fas fa-chart-pie me-1"></i>Key Result Areas
+                <span class="eval-tab-badge"><?php echo count($kra); ?></span>
+            </button>
+            <button class="eval-tab-btn"        role="tab" aria-selected="false" onclick="switchHistoryTab(event,'tab-beh')"   id="htab-beh">
+                <i class="fas fa-users me-1"></i>Core Behaviors &amp; Values
+                <span class="eval-tab-badge"><?php echo count($behavior); ?></span>
+            </button>
+            <?php
+            $dev_plan_stmt = $conn->prepare("SELECT * FROM evaluation_dev_plans WHERE evaluation_id = ? ORDER BY sort_order");
+            $dev_plan_stmt->bind_param('i', $evaluation_id);
+            $dev_plan_stmt->execute();
+            $hist_dev_plans = $dev_plan_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+            $dev_plan_stmt->close();
+            ?>
+            <?php if (!empty($hist_dev_plans)): ?>
+            <button class="eval-tab-btn"        role="tab" aria-selected="false" onclick="switchHistoryTab(event,'tab-devplan')" id="htab-devplan">
+                <i class="fas fa-seedling me-1"></i>Developmental Plan
+                <span class="eval-tab-badge"><?php echo count($hist_dev_plans); ?></span>
+            </button>
+            <?php endif; ?>
+            <?php if ($remarks || !empty($evaluation['employee_signature_data']) || !empty($evaluation['employee_consent_agreed'])): ?>
+            <button class="eval-tab-btn"        role="tab" aria-selected="false" onclick="switchHistoryTab(event,'tab-remarks')" id="htab-remarks">
+                <i class="fas fa-comments me-1"></i>Remarks &amp; Signature
+            </button>
+            <?php endif; ?>
+        </nav>
+
+        <!-- Tab 1: KRA -->
+        <div class="eval-tab-content active" id="tab-kra" role="tabpanel">
+            <?php if (!empty($kra)): ?>
+            <div class="table-responsive">
+                <table class="package-table table align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th style="width:40%;">Criterion</th>
+                            <th class="text-end" style="width:10%;">Weight</th>
+                            <th class="text-end" style="width:18%;">Original Self-Rating</th>
+                            <th class="text-end" style="width:18%;">Reviewed / Adjusted</th>
+                            <th class="text-center" style="width:14%;">Variance</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($kra as $criterion): ?>
+                        <?php
+                            $orig = (float)$criterion['score_value'];
+                            $rev  = (float)$criterion['reviewed_score'];
+                            $diff = round($rev - $orig, 2);
+                            $is_adj = abs($diff) > 0.001;
+                        ?>
+                        <tr>
+                            <td>
+                                <div class="fw-bold text-dark" style="font-size:1.05rem;"><?php echo e($criterion['criterion_name']); ?></div>
+                                <?php if (!empty($criterion['description'])): ?>
+                                    <div class="small text-muted mt-1"><?php echo e($criterion['description']); ?></div>
+                                <?php endif; ?>
+                            </td>
+                            <td class="text-end tabular-nums fw-bold text-muted"><?php echo number_format((float)$criterion['weight'], 2); ?>%</td>
+                            <td class="text-end tabular-nums fw-semibold" style="font-size:1.05rem;"><?php echo number_format($orig, 2); ?></td>
+                            <td class="text-end tabular-nums fw-bold text-dark" style="font-size:1.1rem;"><?php echo number_format($rev, 2); ?></td>
+                            <td class="text-center">
+                                <?php if ($is_adj): ?>
+                                    <span class="badge <?php echo $diff > 0 ? 'bg-success' : 'bg-danger'; ?> px-2 py-1" style="font-size:.85rem;">
+                                        <?php echo ($diff > 0 ? '+' : '') . number_format($diff, 2); ?>
+                                    </span>
+                                <?php else: ?>
+                                    <span class="text-muted small">&mdash;</span>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+            <?php else: ?>
+                <p class="text-muted small mb-0"><i class="fas fa-info-circle me-1"></i>No KRA criteria recorded.</p>
+            <?php endif; ?>
+        </div>
+
+        <!-- Tab 2: Core Behaviors -->
+        <div class="eval-tab-content" id="tab-beh" role="tabpanel">
+            <?php if (!empty($behavior)): ?>
+            <div class="table-responsive">
+                <table class="package-table table align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th style="width:40%;">Criterion</th>
+                            <th class="text-end" style="width:20%;">Original Self-Rating</th>
+                            <th class="text-end" style="width:20%;">Reviewed / Adjusted</th>
+                            <th class="text-center" style="width:20%;">Variance</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($behavior as $criterion): ?>
+                        <?php
+                            $orig = (float)$criterion['score_value'];
+                            $rev  = (float)$criterion['reviewed_score'];
+                            $diff = round($rev - $orig, 2);
+                            $is_adj = abs($diff) > 0.001;
+                        ?>
+                        <tr>
+                            <td>
+                                <div class="fw-bold text-dark" style="font-size:1.05rem;"><?php echo e($criterion['criterion_name']); ?></div>
+                                <?php if (!empty($criterion['description'])): ?>
+                                    <div class="small text-muted mt-1"><?php echo e($criterion['description']); ?></div>
+                                <?php endif; ?>
+                            </td>
+                            <td class="text-end tabular-nums fw-semibold" style="font-size:1.05rem;"><?php echo number_format($orig, 2); ?></td>
+                            <td class="text-end tabular-nums fw-bold text-dark" style="font-size:1.1rem;"><?php echo number_format($rev, 2); ?></td>
+                            <td class="text-center">
+                                <?php if ($is_adj): ?>
+                                    <span class="badge <?php echo $diff > 0 ? 'bg-success' : 'bg-danger'; ?> px-2 py-1" style="font-size:.85rem;">
+                                        <?php echo ($diff > 0 ? '+' : '') . number_format($diff, 2); ?>
+                                    </span>
+                                <?php else: ?>
+                                    <span class="text-muted small">&mdash;</span>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+            <?php else: ?>
+                <p class="text-muted small mb-0"><i class="fas fa-info-circle me-1"></i>No behavior criteria recorded.</p>
+            <?php endif; ?>
+        </div>
+
+        <!-- Tab 3: Developmental Plan (conditionally rendered) -->
+        <?php if (!empty($hist_dev_plans)): ?>
+        <div class="eval-tab-content" id="tab-devplan" role="tabpanel">
+            <div class="table-responsive">
+                <table class="table table-bordered align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Area for Improvement / Development</th>
+                            <th>Support Needed / Action Plan</th>
+                            <th>Target Time Frame</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($hist_dev_plans as $dp): ?>
+                        <tr>
+                            <td class="fw-semibold text-dark"><?php echo e($dp['improvement_area'] ?: '—'); ?></td>
+                            <td><?php echo e($dp['support_needed'] ?: '—'); ?></td>
+                            <td><span class="badge bg-light text-dark border"><?php echo e($dp['time_frame'] ?: '—'); ?></span></td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
         <?php endif; ?>
-    <?php endforeach; ?>
 
-    <!-- Developmental Plan Section -->
-    <?php
-    $dev_plan_stmt = $conn->prepare("SELECT * FROM evaluation_dev_plans WHERE evaluation_id = ? ORDER BY sort_order");
-    $dev_plan_stmt->bind_param('i', $evaluation_id);
-    $dev_plan_stmt->execute();
-    $hist_dev_plans = $dev_plan_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-    $dev_plan_stmt->close();
-    ?>
-    <?php if (!empty($hist_dev_plans)): ?>
-        <section class="package-card" aria-label="Developmental Plan">
-            <header class="package-card__header">
-                <h2 class="h5 mb-0 fw-bold"><i class="fas fa-seedling me-2"></i>Developmental Plan &amp; Recommendations</h2>
-            </header>
-            <div class="package-card__body">
-                <div class="table-responsive">
-                    <table class="table table-bordered align-middle mb-0">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Area for Improvement / Development</th>
-                                <th>Support Needed / Action Plan</th>
-                                <th>Target Time Frame</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ($hist_dev_plans as $dp): ?>
-                                <tr>
-                                    <td class="fw-semibold text-dark"><?php echo e($dp['improvement_area'] ?: '—'); ?></td>
-                                    <td><?php echo e($dp['support_needed'] ?: '—'); ?></td>
-                                    <td><span class="badge bg-light text-dark border"><?php echo e($dp['time_frame'] ?: '—'); ?></span></td>
-                                </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
+        <!-- Tab 4: Remarks & Signature -->
+        <?php if ($remarks || !empty($evaluation['employee_signature_data']) || !empty($evaluation['employee_consent_agreed'])): ?>
+        <div class="eval-tab-content" id="tab-remarks" role="tabpanel">
+
+            <?php if ($remarks): ?>
+            <h3 class="h6 fw-bold text-uppercase text-muted mb-3" style="letter-spacing:.5px;">
+                <i class="fas fa-comments me-1"></i>Evaluator Comments &amp; Review Remarks
+            </h3>
+            <?php foreach ($remarks as $remark): ?>
+                <div class="p-3 bg-light rounded-3 mb-2 border">
+                    <i class="fas fa-quote-left text-muted me-2"></i><?php echo nl2br(e($remark)); ?>
                 </div>
-            </div>
-        </section>
-    <?php endif; ?>
+            <?php endforeach; ?>
+            <?php endif; ?>
 
-    <!-- Remarks / Comments Audit Log -->
-    <?php if ($remarks): ?>
-        <section class="package-card" aria-label="Review Remarks">
-            <header class="package-card__header">
-                <h2 class="h5 mb-0 fw-bold"><i class="fas fa-comments me-2"></i>Evaluator Comments &amp; Review Remarks</h2>
-            </header>
-            <div class="package-card__body">
-                <?php foreach ($remarks as $remark): ?>
-                    <div class="p-3 bg-light rounded-3 mb-2 border">
-                        <i class="fas fa-quote-left text-muted me-2"></i><?php echo nl2br(e($remark)); ?>
-                    </div>
-                <?php endforeach; ?>
-            </div>
-        </section>
-    <?php endif; ?>
-    <!-- Digital Signature & Declaration Audit -->
-    <?php if (!empty($evaluation['employee_signature_data']) || !empty($evaluation['employee_consent_agreed'])): ?>
-        <section class="package-card" aria-label="Digital Signature & Declaration">
-            <header class="package-card__header">
-                <h2 class="h5 mb-0 fw-bold"><i class="fas fa-file-signature me-2"></i>Employee Declaration & Digital Signature</h2>
-            </header>
-            <div class="package-card__body">
-                <div class="row align-items-center g-3">
-                    <div class="col-md-6">
-                        <div class="p-3 bg-light rounded border">
-                            <span class="badge bg-success mb-2"><i class="fas fa-check-circle me-1"></i>Declaration Verified</span>
-                            <div class="small text-secondary mb-0">
-                                <em>"I hereby declare and certify that the scores, self-assessment ratings, and comments provided in this form are accurate, complete, and submitted voluntarily."</em>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-6 text-md-center">
-                        <div class="p-3 bg-white rounded border d-inline-block text-center shadow-sm">
-                            <div class="small text-muted mb-1 fw-bold text-uppercase" style="font-size:0.65rem;">Employee Signature</div>
-                            <?php if (!empty($evaluation['employee_signature_data'])): ?>
-                                <img src="<?php echo e($evaluation['employee_signature_data']); ?>" alt="Employee Digital Signature" style="max-height: 70px; max-width: 250px; display: block; margin: 0 auto 5px;">
-                            <?php endif; ?>
-                            <div class="fw-bold small text-dark border-top pt-1"><?php echo e($evaluation['employee_name']); ?></div>
-                            <div class="small text-muted" style="font-size:0.75rem;">Signed on: <?php echo !empty($evaluation['employee_signed_at']) ? formatDateTime($evaluation['employee_signed_at']) : formatDateTime($evaluation['submitted_date']); ?></div>
+            <?php if (!empty($evaluation['employee_signature_data']) || !empty($evaluation['employee_consent_agreed'])): ?>
+            <h3 class="h6 fw-bold text-uppercase text-muted mb-3 <?php echo $remarks ? 'mt-4' : ''; ?>" style="letter-spacing:.5px;">
+                <i class="fas fa-file-signature me-1"></i>Employee Declaration &amp; Digital Signature
+            </h3>
+            <div class="row align-items-center g-3">
+                <div class="col-md-6">
+                    <div class="p-3 bg-light rounded border">
+                        <span class="badge bg-success mb-2"><i class="fas fa-check-circle me-1"></i>Declaration Verified</span>
+                        <div class="small text-secondary mb-0">
+                            <em>"I hereby declare and certify that the scores, self-assessment ratings, and comments provided in this form are accurate, complete, and submitted voluntarily."</em>
                         </div>
                     </div>
                 </div>
+                <div class="col-md-6 text-md-center">
+                    <div class="p-3 bg-white rounded border d-inline-block text-center shadow-sm">
+                        <div class="small text-muted mb-1 fw-bold text-uppercase" style="font-size:.65rem;">Employee Signature</div>
+                        <?php if (!empty($evaluation['employee_signature_data'])): ?>
+                            <img src="<?php echo e($evaluation['employee_signature_data']); ?>" alt="Employee Digital Signature" style="max-height:70px;max-width:250px;display:block;margin:0 auto 5px;">
+                        <?php endif; ?>
+                        <div class="fw-bold small text-dark border-top pt-1"><?php echo e($evaluation['employee_name']); ?></div>
+                        <div class="small text-muted" style="font-size:.75rem;">Signed on: <?php echo !empty($evaluation['employee_signed_at']) ? formatDateTime($evaluation['employee_signed_at']) : formatDateTime($evaluation['submitted_date']); ?></div>
+                    </div>
+                </div>
             </div>
-        </section>
-    <?php endif; ?>
+            <?php endif; ?>
+
+        </div>
+        <?php endif; ?>
+
+    </div><!-- /.eval-tabs-wrapper -->
+
+    <script>
+    (function () {
+        function switchHistoryTab(e, tabId) {
+            var wrapper = e.target.closest('.eval-tabs-wrapper');
+            wrapper.querySelectorAll('.eval-tab-btn').forEach(function(b){ b.classList.remove('active'); b.setAttribute('aria-selected','false'); });
+            wrapper.querySelectorAll('.eval-tab-content').forEach(function(c){ c.classList.remove('active'); });
+            e.target.classList.add('active');
+            e.target.setAttribute('aria-selected','true');
+            var panel = wrapper.querySelector('#' + tabId);
+            if (panel) panel.classList.add('active');
+        }
+        window.switchHistoryTab = switchHistoryTab;
+    })();
+    </script>
+
 </main>
 <?php require_once '../includes/footer.php'; ?>
+
