@@ -127,7 +127,36 @@ $kra_w = (float)($evaluation['kra_weight'] ?? 80);
 $beh_w = (float)($evaluation['behavior_weight'] ?? 20);
 $shared_beh = $evaluation['shared_behavior_score'] !== null ? (float)$evaluation['shared_behavior_score'] : (float)$evaluation['behavior_average'];
 $beh_val = (float)$evaluation['behavior_average'];
-$est_final_score = calculateEvalTotal((float)$evaluation['kra_subtotal'], $beh_val, $kra_w, $beh_w);
+
+$self_kra_subtotal = 0.0;
+$adj_kra_subtotal = 0.0;
+$kra_total_weight = 0.0;
+
+$self_beh_total = 0.0;
+$adj_beh_total = 0.0;
+$beh_count = 0;
+
+foreach ($criteria as $criterion) {
+    $self_score = (float)$criterion['score_value'];
+    $adj_score = $criterion['supervisor_override_score'] !== null ? (float)$criterion['supervisor_override_score'] : (float)$criterion['score_value'];
+    $weight = (float)$criterion['weight'];
+
+    if ($criterion['section'] === 'KRA') {
+        $kra_total_weight += $weight;
+        $self_kra_subtotal += ($weight / 100.0) * $self_score;
+        $adj_kra_subtotal += ($weight / 100.0) * $adj_score;
+    } else {
+        $beh_count++;
+        $self_beh_total += $self_score;
+        $adj_beh_total += $adj_score;
+    }
+}
+$self_kra_subtotal = round($self_kra_subtotal, 2);
+$adj_kra_subtotal = round($adj_kra_subtotal, 2);
+$self_beh_avg = $beh_count > 0 ? round($self_beh_total / $beh_count, 2) : 0.0;
+$adj_beh_avg = $beh_count > 0 ? round($adj_beh_total / $beh_count, 2) : 0.0;
+
+$est_final_score = calculateEvalTotal($adj_kra_subtotal, $shared_beh, $kra_w, $beh_w);
 $est_perf_level = getPerformanceLevel($est_final_score);
 ?>
 <main class="evaluation-packages container-fluid py-4">
@@ -254,6 +283,39 @@ $est_perf_level = getPerformanceLevel($est_final_score);
                         </tbody>
                     </table>
                 </div>
+
+                <!-- Section Total Score Lookup Below Table -->
+                <?php if ($section === 'KRA'): ?>
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 px-3 py-2 rounded-3 border mb-4 shadow-sm" style="background:#F8FAFC; border-color:#E2E8F0 !important;">
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="fas fa-chart-pie text-success fa-lg"></i>
+                            <span class="fw-bold text-dark" style="font-size: 1.05rem;">Key Result Areas (KRA) Total:</span>
+                        </div>
+                        <div class="d-flex align-items-center gap-3">
+                            <span class="text-muted small fw-semibold">Self-Rating: <strong class="text-secondary tabular-nums"><?php echo number_format($self_kra_subtotal, 2); ?></strong></span>
+                            <div class="d-flex align-items-center gap-1 bg-white px-3 py-1 rounded-2 border" style="border-color:#0f5132 !important;">
+                                <span class="text-muted small me-1">Total Score:</span>
+                                <strong class="text-success tabular-nums fs-5" id="lookup-kra-subtotal"><?php echo number_format($adj_kra_subtotal, 2); ?></strong>
+                                <span class="text-muted small fw-bold">/ 4.00</span>
+                            </div>
+                        </div>
+                    </div>
+                <?php else: ?>
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 px-3 py-2 rounded-3 border mb-4 shadow-sm" style="background:#F8FAFC; border-color:#E2E8F0 !important;">
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="fas fa-users text-primary fa-lg"></i>
+                            <span class="fw-bold text-dark" style="font-size: 1.05rem;">Core Behaviors &amp; Values Total:</span>
+                        </div>
+                        <div class="d-flex align-items-center gap-3">
+                            <span class="text-muted small fw-semibold">Self-Rating: <strong class="text-secondary tabular-nums"><?php echo number_format($self_beh_avg, 2); ?></strong></span>
+                            <div class="d-flex align-items-center gap-1 bg-white px-3 py-1 rounded-2 border" style="border-color:#0f5132 !important;">
+                                <span class="text-muted small me-1">Total Score:</span>
+                                <strong class="text-success tabular-nums fs-5" id="lookup-beh-indiv"><?php echo number_format($adj_beh_avg, 2); ?></strong>
+                                <span class="text-muted small fw-bold">/ 4.00</span>
+                            </div>
+                        </div>
+                    </div>
+                <?php endif; ?>
             <?php endforeach; ?>
 
             <!-- F6: Developmental Plan Section -->
@@ -340,21 +402,41 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function recalcLiveScore() {
         let kraSubtotal = 0;
+        let behTotal = 0;
+        let behCount = 0;
+
         ratingInputs.forEach(function (inp) {
+            const val = parseFloat(inp.value) || 0;
             if (inp.dataset.section === 'KRA') {
-                const val = parseFloat(inp.value) || 0;
                 const weight = parseFloat(inp.dataset.weight) || 0;
                 kraSubtotal += (weight / 100) * val;
+            } else if (inp.dataset.section === 'Behavior') {
+                behTotal += val;
+                behCount++;
             }
         });
 
-        const estTotal = (kraSubtotal * (kraWeightPct / 100)) + (sharedBehVal * (behWeightPct / 100));
+        const behAverage = behCount > 0 ? (behTotal / behCount) : 0;
+        const kraWeighted = kraSubtotal * (kraWeightPct / 100);
+        const behWeighted = sharedBehVal * (behWeightPct / 100);
+        const estTotal = kraWeighted + behWeighted;
         const estTotalRounded = estTotal.toFixed(2);
         const level = getPerfLevel(estTotal);
 
+        // Update Top Score Stat Cards
         if (statKraSubtotal) statKraSubtotal.textContent = kraSubtotal.toFixed(2);
+        const statBehAverage = document.getElementById('stat-beh-average');
+        if (statBehAverage) statBehAverage.textContent = behAverage.toFixed(2);
         if (statEstTotal) statEstTotal.textContent = estTotalRounded;
         if (statPerfLevel) statPerfLevel.textContent = level;
+
+        // Update KRA Section Lookup Total
+        const lookupKraSub = document.getElementById('lookup-kra-subtotal');
+        if (lookupKraSub) lookupKraSub.textContent = kraSubtotal.toFixed(2);
+
+        // Update Behavior Section Lookup Total
+        const lookupBehIndiv = document.getElementById('lookup-beh-indiv');
+        if (lookupBehIndiv) lookupBehIndiv.textContent = behAverage.toFixed(2);
     }
 
     ratingInputs.forEach(function (inp) {

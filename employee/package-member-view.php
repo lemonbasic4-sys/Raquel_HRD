@@ -64,6 +64,32 @@ $criteria_stmt->close();
 $kra = array_values(array_filter($criteria, static fn($criterion) => $criterion['section'] === 'KRA'));
 $behavior = array_values(array_filter($criteria, static fn($criterion) => $criterion['section'] !== 'KRA'));
 
+$kra_w = (float)($evaluation['kra_weight'] ?? 80);
+$beh_w = (float)($evaluation['behavior_weight'] ?? 20);
+$shared_beh = $evaluation['shared_behavior_score'] !== null ? (float)$evaluation['shared_behavior_score'] : (float)$evaluation['behavior_average'];
+
+$self_kra_subtotal = 0.0;
+$rev_kra_subtotal = 0.0;
+$kra_total_weight = 0.0;
+foreach ($kra as $k) {
+    $w = (float)$k['weight'];
+    $kra_total_weight += $w;
+    $self_kra_subtotal += ($w / 100.0) * (float)$k['score_value'];
+    $rev_kra_subtotal += ($w / 100.0) * (float)$k['reviewed_score'];
+}
+$self_kra_subtotal = round($self_kra_subtotal, 2);
+$rev_kra_subtotal = round($rev_kra_subtotal, 2);
+
+$self_beh_total = 0.0;
+$rev_beh_total = 0.0;
+$beh_count = count($behavior);
+foreach ($behavior as $b) {
+    $self_beh_total += (float)$b['score_value'];
+    $rev_beh_total += (float)$b['reviewed_score'];
+}
+$self_beh_avg = $beh_count > 0 ? round($self_beh_total / $beh_count, 2) : 0.0;
+$rev_beh_avg = $beh_count > 0 ? round($rev_beh_total / $beh_count, 2) : 0.0;
+
 require_once '../includes/header.php';
 ?>
 <main class="evaluation-packages container-fluid py-4">
@@ -169,6 +195,39 @@ require_once '../includes/header.php';
                             </tbody>
                         </table>
                     </div>
+
+                    <!-- Section Total Score Lookup Below Table -->
+                    <?php if ($sec_key === 'KRA'): ?>
+                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 px-3 py-2 rounded-3 border mt-3 shadow-sm" style="background:#F8FAFC; border-color:#E2E8F0 !important;">
+                            <div class="d-flex align-items-center gap-2">
+                                <i class="fas fa-chart-pie text-success fa-lg"></i>
+                                <span class="fw-bold text-dark" style="font-size: 1.05rem;">Key Result Areas (KRA) Total:</span>
+                            </div>
+                            <div class="d-flex align-items-center gap-3">
+                                <span class="text-muted small fw-semibold">Self-Rating: <strong class="text-secondary tabular-nums"><?php echo number_format($self_kra_subtotal, 2); ?></strong></span>
+                                <div class="d-flex align-items-center gap-1 bg-white px-3 py-1 rounded-2 border" style="border-color:#0f5132 !important;">
+                                    <span class="text-muted small me-1">Total Score:</span>
+                                    <strong class="text-success tabular-nums fs-5"><?php echo number_format($rev_kra_subtotal, 2); ?></strong>
+                                    <span class="text-muted small fw-bold">/ 4.00</span>
+                                </div>
+                            </div>
+                        </div>
+                    <?php else: ?>
+                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 px-3 py-2 rounded-3 border mt-3 shadow-sm" style="background:#F8FAFC; border-color:#E2E8F0 !important;">
+                            <div class="d-flex align-items-center gap-2">
+                                <i class="fas fa-users text-primary fa-lg"></i>
+                                <span class="fw-bold text-dark" style="font-size: 1.05rem;">Core Behaviors &amp; Values Total:</span>
+                            </div>
+                            <div class="d-flex align-items-center gap-3">
+                                <span class="text-muted small fw-semibold">Self-Rating: <strong class="text-secondary tabular-nums"><?php echo number_format($self_beh_avg, 2); ?></strong></span>
+                                <div class="d-flex align-items-center gap-1 bg-white px-3 py-1 rounded-2 border" style="border-color:#0f5132 !important;">
+                                    <span class="text-muted small me-1">Total Score:</span>
+                                    <strong class="text-success tabular-nums fs-5"><?php echo number_format($rev_beh_avg, 2); ?></strong>
+                                    <span class="text-muted small fw-bold">/ 4.00</span>
+                                </div>
+                            </div>
+                        </div>
+                    <?php endif; ?>
                 </div>
             </section>
         <?php endif; ?>
