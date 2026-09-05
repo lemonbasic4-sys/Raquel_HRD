@@ -213,7 +213,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $next = $next_stmt->get_result()->fetch_assoc();
     $next_stmt->close();
 
-    if ($next) {
+    $is_final_board = ($step['step_type'] === 'Governance') && (stripos($step['step_label'], 'Board') !== false);
+
+    if ($next && !$is_final_board) {
         $next_update = $conn->prepare("UPDATE evaluation_package_route_steps SET action_status = 'Pending' WHERE package_route_step_id = ?");
         $next_update->bind_param('i', $next['package_route_step_id']);
         $next_update->execute();
@@ -236,7 +238,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'success', 'Evaluation package successfully adjusted and forwarded to ' . $next_name . ' (' . $next['step_label'] . ').');
     } else {
         // Final governance step (Board of Directors) locks and applies.
-        $is_final_board = ($step['step_type'] === 'Governance') && (stripos($step['step_label'], 'Board') !== false);
         if (!$is_final_board) {
             redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'Final application requires Board of Directors approval. Assign a Board approver under Evaluation Governance.');
         }
@@ -320,14 +321,19 @@ $waiting_stmt->close();
         <p class="mb-3">
             Review and adjust consolidated department evaluations assigned to you. Individual KRA remains employee-specific; Core Behaviors &amp; Values is consolidated as a shared team result.
         </p>
-        <div class="d-flex flex-wrap gap-2">
-            <a class="btn btn-sm btn-outline-light px-3 py-2 fw-semibold" href="<?php echo BASE_URL; ?>/employee/evaluation-history.php">
-                <i class="fas fa-history me-1"></i>My Evaluation History
-            </a>
-            <a class="btn btn-sm btn-outline-light px-3 py-2 fw-semibold" href="<?php echo BASE_URL; ?>/employee/team-evaluation-history.php">
-                <i class="fas fa-users me-1"></i>Team Evaluation History
-            </a>
-        </div>
+        <?php
+        $is_hris_user = in_array($_SESSION['role'] ?? '', ['Admin', 'HR Manager', 'HR Supervisor', 'HR Staff']);
+        ?>
+        <?php if (!$is_hris_user): ?>
+            <div class="d-flex flex-wrap gap-2">
+                <a class="btn btn-sm btn-outline-light px-3 py-2 fw-semibold" href="<?php echo BASE_URL; ?>/employee/evaluation-history.php">
+                    <i class="fas fa-history me-1"></i>My Evaluation History
+                </a>
+                <a class="btn btn-sm btn-outline-light px-3 py-2 fw-semibold" href="<?php echo BASE_URL; ?>/employee/team-evaluation-history.php">
+                    <i class="fas fa-users me-1"></i>Team Evaluation History
+                </a>
+            </div>
+        <?php endif; ?>
     </section>
 
     <?php if (!$packages && !$waiting_packages): ?>
@@ -351,39 +357,46 @@ $waiting_stmt->close();
                     <h2 class="h5 mb-1 fw-bold"><?php echo e($package['department_name']); ?> &mdash; <?php echo e($package['template_name']); ?></h2>
                     <p class="mb-0 text-muted small"><i class="fas fa-calendar-alt me-1"></i>Cycle: <?php echo e($package['period_start']); ?> to <?php echo e($package['period_end']); ?></p>
                 </div>
-                <span class="pipeline-badge pipeline-badge--waiting">
-                    <i class="fas fa-user-clock me-1"></i>Waiting for Team Self-Ratings (<?php echo $summary['submitted']; ?>/<?php echo $summary['required']; ?>)
-                </span>
-            </header>
-            <div class="package-card__body">
-                <div class="alert alert-warning py-2 px-3 small mb-3">
-                    <i class="fas fa-exclamation-triangle me-1"></i><strong>Consolidation Pending:</strong> All team members must submit their self-ratings before you can consolidate and forward this package.
+                <div class="d-flex align-items-center gap-2">
+                    <span class="pipeline-badge pipeline-badge--waiting">
+                        <i class="fas fa-user-clock me-1"></i>Waiting for Team Self-Ratings (<?php echo $summary['submitted']; ?>/<?php echo $summary['required']; ?>)
+                    </span>
+                    <button class="btn btn-sm btn-package-collapse" type="button" data-bs-toggle="collapse" data-bs-target="#pkgBody-wait-<?php echo (int)$package['package_id']; ?>" aria-expanded="true" aria-controls="pkgBody-wait-<?php echo (int)$package['package_id']; ?>" title="Minimize / Expand Package">
+                        <i class="fas fa-chevron-up collapse-icon"></i> <span class="d-none d-sm-inline">Minimize</span>
+                    </button>
                 </div>
-                <div class="table-responsive">
-                    <table class="package-table table align-middle mb-0">
-                        <thead>
-                            <tr>
-                                <th>Team Member</th>
-                                <th>Position</th>
-                                <th>Status</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ($summary['members'] as $m): ?>
+            </header>
+            <div class="collapse show" id="pkgBody-wait-<?php echo (int)$package['package_id']; ?>">
+                <div class="package-card__body">
+                    <div class="alert alert-warning py-2 px-3 small mb-3">
+                        <i class="fas fa-exclamation-triangle me-1"></i><strong>Consolidation Pending:</strong> All team members must submit their self-ratings before you can consolidate and forward this package.
+                    </div>
+                    <div class="table-responsive">
+                        <table class="package-table table align-middle mb-0">
+                            <thead>
                                 <tr>
-                                    <td class="fw-bold"><?php echo e($m['employee_name']); ?></td>
-                                    <td><?php echo e($m['job_title']); ?></td>
-                                    <td>
-                                        <?php if ($m['is_submitted']): ?>
-                                            <span class="badge bg-success"><i class="fas fa-check me-1"></i>Submitted Self-Rating</span>
-                                        <?php else: ?>
-                                            <span class="badge bg-warning text-dark"><i class="fas fa-clock me-1"></i>Pending Self-Rating</span>
-                                        <?php endif; ?>
-                                    </td>
+                                    <th>Team Member</th>
+                                    <th>Position</th>
+                                    <th>Status</th>
                                 </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($summary['members'] as $m): ?>
+                                    <tr>
+                                        <td class="fw-bold"><?php echo e($m['employee_name']); ?></td>
+                                        <td><?php echo e($m['job_title']); ?></td>
+                                        <td>
+                                            <?php if ($m['is_submitted']): ?>
+                                                <span class="badge bg-success"><i class="fas fa-check me-1"></i>Submitted Self-Rating</span>
+                                            <?php else: ?>
+                                                <span class="badge bg-warning text-dark"><i class="fas fa-clock me-1"></i>Pending Self-Rating</span>
+                                            <?php endif; ?>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </article>
@@ -392,7 +405,7 @@ $waiting_stmt->close();
     <!-- Active Packages Awaiting Action -->
     <?php foreach ($packages as $package): ?>
         <?php
-        $can_adjust = ($package['step_type'] !== 'Governance');
+        $can_adjust = !isOrganizationPackageLocked($conn, (int)$package['package_id']);
         $is_board_step = ($package['step_type'] === 'Governance') && (stripos($package['step_label'], 'Board') !== false);
         $members_stmt = $conn->prepare("SELECT e.evaluation_id, emp.first_name, emp.last_name, emp.job_title,
                 e.kra_subtotal, e.behavior_average, e.total_score, e.status,
@@ -428,11 +441,15 @@ $waiting_stmt->close();
                     <h2 class="h5 mb-1 fw-bold"><?php echo e($package['department_name']); ?> &mdash; <?php echo e($package['template_name']); ?></h2>
                     <p class="mb-0 text-muted small"><i class="fas fa-calendar-alt me-1"></i>Period: <?php echo e($package['period_start']); ?> to <?php echo e($package['period_end']); ?></p>
                 </div>
-                <div>
+                <div class="d-flex align-items-center gap-2">
                     <?php echo renderOrganizationPipelineBadge($conn, (int)$package['package_id']); ?>
+                    <button class="btn btn-sm btn-package-collapse" type="button" data-bs-toggle="collapse" data-bs-target="#pkgBody-act-<?php echo (int)$package['package_id']; ?>" aria-expanded="true" aria-controls="pkgBody-act-<?php echo (int)$package['package_id']; ?>" title="Minimize / Expand Package">
+                        <i class="fas fa-chevron-up collapse-icon"></i> <span class="d-none d-sm-inline">Minimize</span>
+                    </button>
                 </div>
             </header>
-            <div class="package-card__body">
+            <div class="collapse show" id="pkgBody-act-<?php echo (int)$package['package_id']; ?>">
+                <div class="package-card__body">
                 <div class="row g-3 mb-4">
                     <div class="col-sm-6">
                         <div class="package-stat">
@@ -457,6 +474,7 @@ $waiting_stmt->close();
                                 <th class="text-end">Individual KRA</th>
                                 <th class="text-end">Self Behavior</th>
                                 <th class="text-end">Total Score</th>
+                                <th class="text-end">Final Score</th>
                                 <th>Status</th>
                                 <th class="text-end">Action</th>
                             </tr>
@@ -468,6 +486,8 @@ $waiting_stmt->close();
                                 $beh_w = isset($package['behavior_weight']) && (float)$package['behavior_weight'] > 0 ? (float)$package['behavior_weight'] : 20;
                                 $beh_val = (float)$member['behavior_average'];
                                 $total_score_val = calculateEvalTotal((float)$member['kra_subtotal'], $beh_val, $kra_w, $beh_w);
+                                $shared_beh_val = $package['shared_behavior_score'] !== null ? (float)$package['shared_behavior_score'] : $beh_val;
+                                $final_score_val = calculateEvalTotal((float)$member['kra_subtotal'], $shared_beh_val, $kra_w, $beh_w);
                                 ?>
                                 <tr>
                                     <td>
@@ -481,7 +501,8 @@ $waiting_stmt->close();
                                     <td><?php echo e($member['job_title']); ?></td>
                                     <td class="text-end tabular-nums fw-semibold"><?php echo number_format((float)$member['kra_subtotal'], 2); ?></td>
                                     <td class="text-end tabular-nums fw-semibold"><?php echo number_format((float)$member['behavior_average'], 2); ?></td>
-                                    <td class="text-end tabular-nums fw-bold text-success" style="font-size: 1.05rem;"><?php echo number_format($total_score_val, 2); ?></td>
+                                    <td class="text-end tabular-nums fw-semibold text-muted"><?php echo number_format($total_score_val, 2); ?></td>
+                                    <td class="text-end tabular-nums fw-bold text-success" style="font-size: 1.05rem;"><?php echo number_format($final_score_val, 2); ?></td>
                                     <td>
                                         <span class="badge bg-secondary"><?php echo e($member['status']); ?></span>
                                     </td>
@@ -502,8 +523,6 @@ $waiting_stmt->close();
                                                 </form>
                                             <?php endif; ?>
                                         <?php else: ?>
-                                            <!-- F4: Governance Read-Only Badge -->
-                                            <span class="badge bg-light text-muted border me-1"><i class="fas fa-lock me-1"></i>Read-Only</span>
                                             <a class="btn-action-view btn btn-sm" href="<?php echo BASE_URL; ?>/employee/package-member-view.php?package_id=<?php echo (int)$package['package_id']; ?>&evaluation_id=<?php echo (int)$member['evaluation_id']; ?>" title="View read-only evaluation">
                                                 <i class="fas fa-eye me-1"></i>View
                                             </a>
@@ -520,23 +539,57 @@ $waiting_stmt->close();
                     <h3 class="h6 fw-bold text-uppercase text-muted" style="letter-spacing:0.5px;">Approval Timeline &amp; History</h3>
                     <ol class="package-timeline">
                         <?php foreach ($timeline as $entry): ?>
-                            <li class="<?php echo $entry['action_status'] === 'Approved' ? 'is-approved' : ($entry['action_status'] === 'Returned' ? 'is-returned' : ''); ?>">
-                                <div class="fw-bold text-dark"><?php echo e($entry['step_label']); ?></div>
-                                <div class="small text-muted">
-                                    <span class="badge <?php echo $entry['action_status'] === 'Approved' ? 'bg-success' : ($entry['action_status'] === 'Returned' ? 'bg-danger' : 'bg-warning text-dark'); ?>">
+                            <?php
+                            $act_status = $entry['action_status'];
+                            $status_class = match($act_status) {
+                                'Approved' => 'is-approved',
+                                'Returned' => 'is-returned',
+                                'Pending'  => 'is-pending',
+                                default    => 'is-waiting'
+                            };
+                            $badge_class = match($act_status) {
+                                'Approved' => 'bg-success text-white',
+                                'Returned' => 'bg-danger text-white',
+                                'Pending'  => 'bg-warning text-dark border border-warning',
+                                default    => 'bg-secondary text-white'
+                            };
+                            $icon_class = match($act_status) {
+                                'Approved' => 'fa-check-circle text-success',
+                                'Returned' => 'fa-undo-alt text-danger',
+                                'Pending'  => 'fa-clock text-warning',
+                                default    => 'fa-hourglass-start text-muted'
+                            };
+                            ?>
+                            <li class="<?php echo $status_class; ?>">
+                                <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                                    <div class="fw-bold text-dark fs-6">
+                                        <i class="fas <?php echo $icon_class; ?> me-1"></i> <?php echo e($entry['step_label']); ?>
+                                    </div>
+                                    <span class="badge <?php echo $badge_class; ?> px-2 py-1">
                                         <?php echo e($entry['action_status']); ?>
                                     </span>
-                                    <?php if (!empty($entry['acted_at'])): ?> &bull; <?php echo e(date('M d, Y h:i A', strtotime($entry['acted_at']))); ?><?php endif; ?>
+                                </div>
+                                <div class="small text-muted mt-1">
+                                    <?php if (!empty($entry['acted_at'])): ?>
+                                        <i class="far fa-calendar-check me-1"></i> <?php echo e(date('M d, Y h:i A', strtotime($entry['acted_at']))); ?>
+                                    <?php else: ?>
+                                        <span class="fst-italic"><?php echo $act_status === 'Pending' ? 'Currently Under Review' : 'Waiting for prior stage approval'; ?></span>
+                                    <?php endif; ?>
                                 </div>
                                 <?php if (!empty($entry['comments'])): ?>
-                                    <div class="small p-2 bg-light rounded mt-1 border">
-                                        <i class="fas fa-comment-dots text-muted me-1"></i>Remarks: <em><?php echo e($entry['comments']); ?></em>
+                                    <div class="small p-2 mt-2 rounded border" style="background:#FFFBF0; border-color:#FDE68A !important;">
+                                        <i class="fas fa-comment-dots text-warning me-1"></i><strong>Remarks:</strong> <em><?php echo e($entry['comments']); ?></em>
                                     </div>
                                 <?php endif; ?>
                             </li>
                         <?php endforeach; ?>
                     </ol>
                 </section>
+
+                <!-- Package Audit Trail & Revision History -->
+                <div class="mb-4">
+                    <?php echo renderOrganizationPackageAuditTrail($conn, (int)$package['package_id']); ?>
+                </div>
 
                 <!-- Action Panel with descriptive hand-off copy & F3 Pre-Submission Modal -->
                 <form method="post" class="package-action-panel" id="pkgForm-<?php echo (int)$package['package_id']; ?>">
@@ -554,7 +607,7 @@ $waiting_stmt->close();
                         </div>
                     <?php elseif ($package['step_type'] === 'Governance'): ?>
                         <div class="alert alert-secondary py-2 px-3 small mb-3">
-                            <i class="fas fa-balance-scale me-1"></i>Audit Committee review stage. Ratings are read-only.
+                            <i class="fas fa-balance-scale me-1"></i>Governance review stage. Review and adjust scores if necessary before forwarding or approving.
                         </div>
                     <?php endif; ?>
 
@@ -659,8 +712,9 @@ $waiting_stmt->close();
                     </div>
                 </form>
             </div>
-        </article>
-    <?php endforeach; ?>
+        </div>
+    </article>
+<?php endforeach; ?>
 </main>
 
 <script>

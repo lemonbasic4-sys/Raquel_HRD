@@ -29,7 +29,7 @@ $reviewer_match = organizationPackageReviewerMatchSql('rs');
 // 2. The package is fully finalized (ep.status = 'Approved and Applied')
 // Current working packages pending action belong on Team Evaluation Packages (team-evaluation-packages.php).
 $packages_stmt = $conn->prepare("SELECT DISTINCT ep.package_id, ep.status, ep.period_start, ep.period_end, ep.shared_behavior_score,
-        ep.department_id, ep.template_id, d.department_name, et.template_name
+        ep.department_id, ep.template_id, d.department_name, et.template_name, et.kra_weight, et.behavior_weight
     FROM evaluation_packages ep
     JOIN evaluation_package_route_steps rs ON rs.package_id = ep.package_id
     JOIN departments d ON d.department_id = ep.department_id
@@ -99,70 +99,90 @@ require_once '../includes/header.php';
                         <i class="fas fa-calendar-alt me-1"></i>Cycle Period: <?php echo e($package['period_start']); ?> to <?php echo e($package['period_end']); ?>
                     </p>
                 </div>
-                <div>
+                <div class="d-flex align-items-center gap-2">
                     <?php echo renderOrganizationPipelineBadge($conn, $package_id); ?>
+                    <button class="btn btn-sm btn-package-collapse" type="button" data-bs-toggle="collapse" data-bs-target="#pkgHistBody-<?php echo $package_id; ?>" aria-expanded="true" aria-controls="pkgHistBody-<?php echo $package_id; ?>" title="Minimize / Expand Package">
+                        <i class="fas fa-chevron-up collapse-icon"></i> <span class="d-none d-sm-inline">Minimize</span>
+                    </button>
                 </div>
             </header>
-            <div class="package-card__body">
-                <div class="shared-behavior-banner d-flex flex-wrap align-items-center justify-content-between gap-3">
-                    <div>
-                        <i class="fas fa-users-cog me-2"></i>
-                        Shared Core Behaviors &amp; Values Score:
-                        <strong><?php echo $package['shared_behavior_score'] !== null ? number_format((float) $package['shared_behavior_score'], 2) : 'Pending Consolidation'; ?></strong>
+            <div class="collapse show" id="pkgHistBody-<?php echo $package_id; ?>">
+                <div class="package-card__body">
+                    <div class="shared-behavior-banner d-flex flex-wrap align-items-center justify-content-between gap-3">
+                        <div>
+                            <i class="fas fa-users-cog me-2"></i>
+                            Shared Core Behaviors &amp; Values Score:
+                            <strong><?php echo $package['shared_behavior_score'] !== null ? number_format((float) $package['shared_behavior_score'], 2) : 'Pending Consolidation'; ?></strong>
+                        </div>
+                        <div class="small text-muted">
+                            Applied across all <?php echo count($members); ?> package members upon Board approval.
+                        </div>
                     </div>
-                    <div class="small text-muted">
-                        Applied across all <?php echo count($members); ?> package members upon Board approval.
-                    </div>
-                </div>
 
-                <div class="table-responsive">
-                    <table class="package-table table align-middle mb-0">
-                        <thead>
-                            <tr>
-                                <th>Employee</th>
-                                <th>Position</th>
-                                <th class="text-end">Individual KRA</th>
-                                <th class="text-end">Behavior Rating</th>
-                                <th class="text-end">Total Score</th>
-                                <th>Status</th>
-                                <th class="text-end">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ($members as $member): ?>
+                    <div class="table-responsive">
+                        <table class="package-table table align-middle mb-0">
+                            <thead>
                                 <tr>
-                                    <td>
-                                        <div class="fw-bold"><?php echo e($member['first_name'] . ' ' . $member['last_name']); ?></div>
-                                        <?php if (!empty($member['has_adjustments'])): ?>
-                                            <span class="audit-chip audit-chip--adjusted">
-                                                <i class="fas fa-pen-fancy me-1"></i>Scores Adjusted by Evaluator
-                                            </span>
-                                        <?php endif; ?>
-                                    </td>
-                                    <td><?php echo e($member['job_title']); ?></td>
-                                    <td class="text-end fw-semibold tabular-nums">
-                                        <?php echo $member['kra_subtotal'] !== null ? number_format((float) $member['kra_subtotal'], 2) : '&mdash;'; ?>
-                                    </td>
-                                    <td class="text-end fw-semibold tabular-nums">
-                                        <?php echo $member['behavior_average'] !== null ? number_format((float) $member['behavior_average'], 2) : '&mdash;'; ?>
-                                    </td>
-                                    <td class="text-end fw-bold text-dark tabular-nums">
-                                        <?php echo $member['total_score'] !== null ? number_format((float) $member['total_score'], 2) : '&mdash;'; ?>
-                                    </td>
-                                    <td>
-                                        <span class="badge <?php echo $member['status'] === 'Approved' ? 'bg-success' : 'bg-secondary'; ?>">
-                                            <?php echo e($member['status']); ?>
-                                        </span>
-                                    </td>
-                                    <td class="text-end">
-                                        <a class="btn-action-view btn btn-sm" href="<?php echo BASE_URL; ?>/employee/package-member-view.php?package_id=<?php echo $package_id; ?>&evaluation_id=<?php echo (int) $member['evaluation_id']; ?>">
-                                            <i class="fas fa-file-signature me-1"></i>View Details
-                                        </a>
-                                    </td>
+                                    <th>Employee</th>
+                                    <th>Position</th>
+                                    <th class="text-end">Individual KRA</th>
+                                    <th class="text-end">Self Behavior</th>
+                                    <th class="text-end">Total Score</th>
+                                    <th class="text-end">Final Score</th>
+                                    <th>Status</th>
+                                    <th class="text-end">Action</th>
                                 </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($members as $member): ?>
+                                    <?php
+                                    $kra_w = isset($package['kra_weight']) && (float)$package['kra_weight'] > 0 ? (float)$package['kra_weight'] : 80;
+                                    $beh_w = isset($package['behavior_weight']) && (float)$package['behavior_weight'] > 0 ? (float)$package['behavior_weight'] : 20;
+                                    $beh_val = (float)$member['behavior_average'];
+                                    $total_score_val = calculateEvalTotal((float)$member['kra_subtotal'], $beh_val, $kra_w, $beh_w);
+                                    $shared_beh_val = $package['shared_behavior_score'] !== null ? (float)$package['shared_behavior_score'] : $beh_val;
+                                    $final_score_val = calculateEvalTotal((float)$member['kra_subtotal'], $shared_beh_val, $kra_w, $beh_w);
+                                    ?>
+                                    <tr>
+                                        <td>
+                                            <div class="fw-bold"><?php echo e($member['first_name'] . ' ' . $member['last_name']); ?></div>
+                                            <?php if (!empty($member['has_adjustments'])): ?>
+                                                <span class="audit-chip audit-chip--adjusted">
+                                                    <i class="fas fa-pen-fancy me-1"></i>Scores Adjusted by Evaluator
+                                                </span>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td><?php echo e($member['job_title']); ?></td>
+                                        <td class="text-end fw-semibold tabular-nums">
+                                            <?php echo $member['kra_subtotal'] !== null ? number_format((float) $member['kra_subtotal'], 2) : '&mdash;'; ?>
+                                        </td>
+                                        <td class="text-end fw-semibold tabular-nums">
+                                            <?php echo $member['behavior_average'] !== null ? number_format((float) $member['behavior_average'], 2) : '&mdash;'; ?>
+                                        </td>
+                                        <td class="text-end fw-semibold text-muted tabular-nums">
+                                            <?php echo number_format($total_score_val, 2); ?>
+                                        </td>
+                                        <td class="text-end fw-bold text-success tabular-nums" style="font-size: 1.05rem;">
+                                            <?php echo number_format($final_score_val, 2); ?>
+                                        </td>
+                                        <td>
+                                            <span class="badge <?php echo $member['status'] === 'Approved' ? 'bg-success' : 'bg-secondary'; ?>">
+                                                <?php echo e($member['status']); ?>
+                                            </span>
+                                        </td>
+                                        <td class="text-end">
+                                            <a class="btn-action-view btn btn-sm" href="<?php echo BASE_URL; ?>/employee/package-member-view.php?package_id=<?php echo $package_id; ?>&evaluation_id=<?php echo (int) $member['evaluation_id']; ?>">
+                                                <i class="fas fa-file-signature me-1"></i>View Details
+                                            </a>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Bottom Audit Trail & Revision History Section -->
+                    <?php echo renderOrganizationPackageAuditTrail($conn, $package_id); ?>
                 </div>
             </div>
         </section>

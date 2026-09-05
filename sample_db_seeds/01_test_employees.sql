@@ -1,10 +1,7 @@
 -- ============================================================================
--- EVALUATION-FLOW TEST EMPLOYEES (lean roster)
--- Import AFTER 3rd_seed_HR_accounts_.sql and BEFORE xPortal_accounts.sql
--- so portal usernames are created from employee_code automatically.
---
--- Do NOT import AP_seed.sql / HR_seed.sql / other full department seeds.
--- Password for every Employee portal account created by xPortal: password
+-- 01_test_employees.sql — Lean test roster + VP roles for Evaluation Routing & Governance
+-- Import AFTER 3rd_seed_HR_accounts_.sql and BEFORE xPortal_accounts.sql.
+-- Password for every Employee portal account: password
 -- ============================================================================
 USE raquel_hris;
 SET FOREIGN_KEY_CHECKS = 0;
@@ -19,6 +16,12 @@ UPDATE employees SET reports_to = NULL WHERE employee_id = 101;
 -- Mini teams: Staff -> Supervisor -> Manager (and AP also has a VP).
 -- Board / Audit sit outside every department so they are not package members
 -- and are not in any reports_to chain (required for governance assignment).
+-- VP roles added per the organizational chart for Division VP governance step:
+--   OPS-VP  → VP for Operations        (covers HR, Operations, IT, Marketing, BD)
+--   GS-VP   → VP for General Services
+--   FIN-VP  → VP for Finance
+--   AP VP already exists as AP-T04 (Eduardo Aquino — VP for Acquired Properties)
+--   President already exists as OP-T02 (Gabriel Mendoza — President & CEO)
 -- ============================================================================
 REPLACE INTO employees (
     employee_id, employee_code, first_name, last_name, middle_name,
@@ -50,22 +53,26 @@ REPLACE INTO employees (
 -- Finance (dept 5)
 (90501, 'FIN-T01', 'Julia', 'Castillo', 'Perez', '2023-08-14', '1998-06-16', 'Lucena City', 'Female', 'Single', 512, 'Accounting Staff I', 5, 5, 102, 'Regular', 'Full-time', 90502, 1),
 (90502, 'FIN-T02', 'Oscar', 'Dela Cruz', 'Reyes', '2020-03-09', '1991-10-05', 'Lucena City', 'Male', 'Married', 502, 'Accounting Supervisor I', 5, 4, 102, 'Regular', 'Full-time', 90503, 1),
-(90503, 'FIN-T03', 'Bea', 'Soriano', 'Lim', '2015-05-18', '1983-04-11', 'Lucena City', 'Female', 'Married', 501, 'Accounting Manager I', 5, 3, 102, 'Regular', 'Full-time', NULL, 1),
+(90503, 'FIN-T03', 'Bea', 'Soriano', 'Lim', '2015-05-18', '1983-04-11', 'Lucena City', 'Female', 'Married', 501, 'Accounting Manager I', 5, 3, 102, 'Regular', 'Full-time', 92003, 1),
+-- VP Finance (new for routing) — department_id = 5 (Finance), rank Executives
+(92003, 'FIN-VP', 'Teresa', 'Reyes', 'Santos', '2010-04-01', '1975-06-15', 'Lucena City', 'Female', 'Married', 500, 'VP for Finance', 5, 1, 102, 'Regular', 'Full-time', NULL, 1),
 
 -- General Services (dept 6)
 (90601, 'GS-T01', 'Noel', 'Hernandez', 'Cruz', '2022-12-01', '1995-01-30', 'Lucena City', 'Male', 'Single', 609, 'Driver I', 6, 5, 102, 'Regular', 'Full-time', 90602, 1),
 (90602, 'GS-T02', 'Liza', 'Morales', 'Santos', '2019-04-22', '1990-08-14', 'Lucena City', 'Female', 'Married', 605, 'GS Supervisor I', 6, 4, 102, 'Regular', 'Full-time', 90603, 1),
-(90603, 'GS-T03', 'Victor', 'Pascual', 'Gomez', '2014-07-07', '1981-12-19', 'Lucena City', 'Male', 'Married', 601, 'GS Manager I', 6, 3, 102, 'Regular', 'Full-time', NULL, 1),
+(90603, 'GS-T03', 'Victor', 'Pascual', 'Gomez', '2014-07-07', '1981-12-19', 'Lucena City', 'Male', 'Married', 601, 'GS Manager I', 6, 3, 102, 'Regular', 'Full-time', 92002, 1),
+-- VP General Service (new for routing) — department_id = 6 (General Services), rank Executives
+(92002, 'GS-VP', 'Ricardo', 'Buenaventura', 'Cruz', '2009-01-10', '1973-09-22', 'Lucena City', 'Male', 'Married', 600, 'VP for General Services', 6, 1, 102, 'Regular', 'Full-time', NULL, 1),
 
 -- Information Technology (dept 8)
 (90801, 'IT-T01', 'Ken', 'Alonzo', 'Rivera', '2024-02-15', '2000-03-08', 'Lucena City', 'Male', 'Single', 811, 'Technical Support Staff I', 8, 5, 102, 'Regular', 'Full-time', 90802, 1),
 (90802, 'IT-T02', 'Dana', 'Flores', 'Aquino', '2021-01-19', '1994-11-21', 'Lucena City', 'Female', 'Single', 804, 'IT Supervisor I', 8, 4, 102, 'Regular', 'Full-time', 90803, 1),
-(90803, 'IT-T03', 'Marco', 'Santiago', 'Tan', '2016-09-05', '1987-06-02', 'Lucena City', 'Male', 'Married', 800, 'IT Manager I', 8, 3, 102, 'Regular', 'Full-time', NULL, 1),
+(90803, 'IT-T03', 'Marco', 'Santiago', 'Tan', '2016-09-05', '1987-06-02', 'Lucena City', 'Male', 'Married', 800, 'IT Manager I', 8, 3, 102, 'Regular', 'Full-time', 92001, 1),
 
 -- Marketing (dept 9)
 (90901, 'MKT-T01', 'Ella', 'Domingo', 'Cruz', '2023-10-02', '1999-02-14', 'Lucena City', 'Female', 'Single', 905, 'Marketing Staff I', 9, 5, 102, 'Regular', 'Full-time', 90902, 1),
 (90902, 'MKT-T02', 'Ryan', 'Chua', 'Gomez', '2020-08-17', '1992-05-27', 'Lucena City', 'Male', 'Single', 902, 'Marketing Supervisor I', 9, 4, 102, 'Regular', 'Full-time', 90903, 1),
-(90903, 'MKT-T03', 'Patricia', 'Lim', 'Santos', '2017-03-13', '1986-09-09', 'Lucena City', 'Female', 'Married', 900, 'Marketing Manager I', 9, 3, 102, 'Regular', 'Full-time', NULL, 1),
+(90903, 'MKT-T03', 'Patricia', 'Lim', 'Santos', '2017-03-13', '1986-09-09', 'Lucena City', 'Female', 'Married', 900, 'Marketing Manager I', 9, 3, 102, 'Regular', 'Full-time', 92001, 1),
 
 -- Office of the President (dept 10)
 (91001, 'OP-T01', 'Sofia', 'Reyes', 'Villanueva', '2022-06-01', '1996-07-23', 'Lucena City', 'Female', 'Single', 1101, 'Executive Assistant I', 10, 5, 102, 'Regular', 'Full-time', 91002, 1),
@@ -73,8 +80,11 @@ REPLACE INTO employees (
 
 -- Operations (dept 11)
 (91101, 'OPS-T01', 'Jon', 'Mercado', 'Perez', '2023-11-20', '1998-08-08', 'Lucena City', 'Male', 'Single', 1013, 'Branch Staff I', 11, 5, 102, 'Regular', 'Full-time', 91102, 1),
-(91102, 'OPS-T02', 'Katrina', 'Lopez', 'Diaz', '2019-02-25', '1991-01-19', 'Lucena City', 'Female', 'Married', 1004, 'Area Coordinator I', 11, 4, 102, 'Regular', 'Full-time', 91103, 1),
-(91103, 'OPS-T03', 'Alvin', 'Torres', 'Cruz', '2015-08-30', '1984-10-03', 'Lucena City', 'Male', 'Married', 1001, 'Regional Manager I', 11, 3, 102, 'Regular', 'Full-time', NULL, 1),
+(91102, 'OPS-T02', 'Katrina', 'Lopez', 'Diaz', '2019-02-25', '1991-01-19', 'Lucena City', 'Female', 'Married', 1004, 'Area Supervisor I', 11, 4, 102, 'Regular', 'Full-time', 91103, 1),
+(91103, 'OPS-T03', 'Alvin', 'Torres', 'Cruz', '2015-08-30', '1984-10-03', 'Lucena City', 'Male', 'Married', 1001, 'Regional Manager I', 11, 3, 102, 'Regular', 'Full-time', 92001, 1),
+-- VP Operations (new for routing) — covers HR, IT, Operations, Marketing, BD, dept_id=11 for self
+-- The VP is assigned per-department in governance; this is the employee record.
+(92001, 'OPS-VP', 'Rodrigo', 'Castillo', 'Lim', '2008-03-15', '1971-04-18', 'Lucena City', 'Male', 'Married', 1000, 'VP for Operations', 11, 1, 102, 'Regular', 'Full-time', NULL, 1),
 
 -- Purchasing (dept 12)
 (91201, 'PUR-T01', 'Hannah', 'Go', 'Santos', '2024-03-04', '2001-04-22', 'Lucena City', 'Female', 'Single', 1202, 'Purchasing Staff I', 12, 5, 102, 'Regular', 'Full-time', 91203, 1),
@@ -102,61 +112,66 @@ REPLACE INTO employee_contacts (employee_id, personal_email, mobile_number, tele
 (90501, 'fin.t01@test.local', '09170000041', '888-5001'),
 (90502, 'fin.t02@test.local', '09170000042', '888-5002'),
 (90503, 'fin.t03@test.local', '09170000043', '888-5003'),
-(90601, 'gs.t01@test.local', '09170000051', '888-6001'),
-(90602, 'gs.t02@test.local', '09170000052', '888-6002'),
-(90603, 'gs.t03@test.local', '09170000053', '888-6003'),
-(90801, 'it.t01@test.local', '09170000061', '888-8001'),
-(90802, 'it.t02@test.local', '09170000062', '888-8002'),
-(90803, 'it.t03@test.local', '09170000063', '888-8003'),
-(90901, 'mkt.t01@test.local', '09170000071', '888-9001'),
-(90902, 'mkt.t02@test.local', '09170000072', '888-9002'),
-(90903, 'mkt.t03@test.local', '09170000073', '888-9003'),
-(91001, 'op.t01@test.local', '09170000081', '888-0011'),
-(91002, 'op.t02@test.local', '09170000082', '888-0012'),
-(91101, 'ops.t01@test.local', '09170000091', '888-1101'),
-(91102, 'ops.t02@test.local', '09170000092', '888-1102'),
-(91103, 'ops.t03@test.local', '09170000093', '888-1103'),
-(91201, 'pur.t01@test.local', '09170000101', '888-1201'),
-(91202, 'pur.t02@test.local', '09170000102', '888-1202'),
-(91203, 'pur.t03@test.local', '09170000103', '888-1203'),
-(99001, 'gov.bod@test.local', '09170000901', '888-0001'),
-(99002, 'gov.aud@test.local', '09170000902', '888-0002');
+(92003, 'fin.vp@test.local',  '09170000049', '888-5009'),
+(90601, 'gs.t01@test.local',  '09170000051', '888-6001'),
+(90602, 'gs.t02@test.local',  '09170000052', '888-6002'),
+(90603, 'gs.t03@test.local',  '09170000053', '888-6003'),
+(92002, 'gs.vp@test.local',   '09170000059', '888-6009'),
+(90801, 'it.t01@test.local',  '09170000071', '888-8001'),
+(90802, 'it.t02@test.local',  '09170000072', '888-8002'),
+(90803, 'it.t03@test.local',  '09170000073', '888-8003'),
+(90901, 'mkt.t01@test.local', '09170000081', '888-9001'),
+(90902, 'mkt.t02@test.local', '09170000082', '888-9002'),
+(90903, 'mkt.t03@test.local', '09170000083', '888-9003'),
+(91001, 'op.t01@test.local',  '09170000091', '888-0001'),
+(91002, 'op.t02@test.local',  '09170000092', '888-0002'),
+(91101, 'ops.t01@test.local', '09170000101', '888-1101'),
+(91102, 'ops.t02@test.local', '09170000102', '888-1102'),
+(91103, 'ops.t03@test.local', '09170000103', '888-1103'),
+(92001, 'ops.vp@test.local',  '09170000109', '888-1109'),
+(91201, 'pur.t01@test.local', '09170000111', '888-1201'),
+(91202, 'pur.t02@test.local', '09170000112', '888-1202'),
+(91203, 'pur.t03@test.local', '09170000113', '888-1203'),
+(99001, 'gov.bod@test.local', '09170000201', '888-9901'),
+(99002, 'gov.aud@test.local', '09170000202', '888-9902');
 
-REPLACE INTO employee_details (employee_id, height_m, weight_kg, blood_type, citizenship) VALUES
-(90101, 1.58, 52.0, 'O+', 'Filipino'),
-(90102, 1.72, 70.0, 'A+', 'Filipino'),
-(90103, 1.75, 74.0, 'B+', 'Filipino'),
-(90104, 1.78, 80.0, 'O+', 'Filipino'),
-(90201, 1.70, 68.0, 'A+', 'Filipino'),
-(90202, 1.60, 54.0, 'B+', 'Filipino'),
-(90203, 1.74, 76.0, 'O+', 'Filipino'),
-(90301, 1.71, 69.0, 'O+', 'Filipino'),
-(90302, 1.57, 50.0, 'A+', 'Filipino'),
-(90303, 1.63, 56.0, 'AB+', 'Filipino'),
-(90401, 1.69, 67.0, 'O+', 'Filipino'),
-(90402, 1.59, 53.0, 'A+', 'Filipino'),
-(90403, 1.73, 72.0, 'B+', 'Filipino'),
-(90501, 1.61, 55.0, 'O+', 'Filipino'),
-(90502, 1.74, 73.0, 'A+', 'Filipino'),
-(90503, 1.62, 57.0, 'B+', 'Filipino'),
-(90601, 1.70, 71.0, 'O+', 'Filipino'),
-(90602, 1.58, 52.0, 'A+', 'Filipino'),
-(90603, 1.76, 78.0, 'O+', 'Filipino'),
-(90801, 1.72, 70.0, 'O+', 'Filipino'),
-(90802, 1.60, 54.0, 'A+', 'Filipino'),
-(90803, 1.75, 75.0, 'B+', 'Filipino'),
-(90901, 1.57, 51.0, 'O+', 'Filipino'),
-(90902, 1.73, 72.0, 'A+', 'Filipino'),
-(90903, 1.64, 58.0, 'B+', 'Filipino'),
-(91001, 1.59, 53.0, 'O+', 'Filipino'),
-(91002, 1.77, 79.0, 'A+', 'Filipino'),
-(91101, 1.70, 69.0, 'O+', 'Filipino'),
-(91102, 1.61, 55.0, 'A+', 'Filipino'),
-(91103, 1.74, 74.0, 'B+', 'Filipino'),
-(91201, 1.58, 52.0, 'O+', 'Filipino'),
-(91202, 1.71, 70.0, 'A+', 'Filipino'),
-(91203, 1.63, 56.0, 'B+', 'Filipino'),
-(99001, 1.76, 78.0, 'O+', 'Filipino'),
-(99002, 1.62, 58.0, 'A+', 'Filipino');
+-- Create Employee portal accounts for all test employees (password: password)
+-- $2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi = bcrypt('password')
+INSERT INTO users (employee_id, username, email, password_hash, full_name, role, branch_id, is_active, first_login_completed)
+SELECT e.employee_id, e.employee_code,
+    CONCAT(LOWER(e.employee_code), '@test.local'),
+    '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi',
+    TRIM(CONCAT_WS(' ', e.first_name, e.middle_name, e.last_name)),
+    'Employee', e.branch_id, 1, 1
+FROM employees e
+WHERE e.employee_id IN (
+    90101,90102,90103,90104,
+    90201,90202,90203,
+    90301,90302,90303,
+    90401,90402,90403,
+    90501,90502,90503,92003,
+    90601,90602,90603,92002,
+    90801,90802,90803,
+    90901,90902,90903,
+    91001,91002,
+    91101,91102,91103,92001,
+    91201,91202,91203,
+    99001,99002
+)
+AND NOT EXISTS (
+    SELECT 1 FROM users u WHERE u.employee_id = e.employee_id AND u.role = 'Employee'
+);
+
+-- Mark all test portal accounts first-login complete (skip PDS gate)
+UPDATE users u
+JOIN employees e ON e.employee_id = u.employee_id
+SET u.first_login_completed = 1
+WHERE u.role = 'Employee'
+  AND (
+      e.employee_code LIKE '%-T0%'
+      OR e.employee_code LIKE '%-VP'
+      OR e.employee_code LIKE 'GOV-%'
+      OR e.employee_id IN (101, 301, 302)
+  );
 
 SET FOREIGN_KEY_CHECKS = 1;

@@ -45,16 +45,21 @@ $criteria_stmt->close();
 $kra_weight = (float)($evaluation['kra_weight'] ?? 80);
 $beh_weight = (float)($evaluation['behavior_weight'] ?? 20);
 
+$is_package_completed = ($evaluation['package_status'] === 'Approved and Applied' || $evaluation['status'] === 'Approved');
+
 // Calculate original self totals vs reviewed totals
 $orig_kra_subtotal = 0.0;
 $orig_beh_total = 0.0;
 $orig_beh_count = 0;
 $has_any_adjustment = false;
 
-foreach ($criteria as $c) {
+foreach ($criteria as &$c) {
     $val = (float)$c['score_value'];
+    if (!$is_package_completed) {
+        $c['reviewed_score'] = $val;
+    }
     $rev = (float)$c['reviewed_score'];
-    if (abs($rev - $val) > 0.001) {
+    if ($is_package_completed && abs($rev - $val) > 0.001) {
         $has_any_adjustment = true;
     }
     if ($c['section'] === 'KRA') {
@@ -65,6 +70,8 @@ foreach ($criteria as $c) {
         $orig_beh_count++;
     }
 }
+unset($c);
+
 $orig_kra_subtotal = round($orig_kra_subtotal, 2);
 $orig_beh_average = $orig_beh_count > 0 ? round($orig_beh_total / $orig_beh_count, 2) : 0.0;
 $orig_total_score = calculateEvalTotal($orig_kra_subtotal, $orig_beh_average, $kra_weight, $beh_weight);
@@ -100,8 +107,13 @@ require_once '../includes/header.php';
     <section class="package-card" aria-label="Original vs Modified Score Comparison">
         <header class="package-card__header">
             <div>
-                <h2 class="h5 mb-0 fw-bold"><i class="fas fa-balance-scale me-2"></i>Original Self-Rating vs. Final / Reviewed Rating</h2>
-                <div class="small text-muted mt-1">Audit comparison between your submitted rating and officer adjustments.</div>
+                <h2 class="h5 mb-0 fw-bold">
+                    <i class="fas fa-balance-scale me-2"></i>
+                    <?php echo $is_package_completed ? 'Original Self-Rating vs. Final / Reviewed Rating' : 'Submitted Self-Rating Summary'; ?>
+                </h2>
+                <div class="small text-muted mt-1">
+                    <?php echo $is_package_completed ? 'Audit comparison between your submitted rating and officer adjustments.' : 'Your submitted self-ratings are shown below while the evaluation package is in progress.'; ?>
+                </div>
             </div>
             <div>
                 <?php if (!empty($evaluation['package_id'])): ?>
@@ -114,11 +126,20 @@ require_once '../includes/header.php';
             </div>
         </header>
         <div class="package-card__body">
+            <?php if (!$is_package_completed): ?>
+                <div class="alert alert-info d-flex align-items-center gap-2 p-3 mb-3 rounded-3">
+                    <i class="fas fa-info-circle fa-lg text-primary"></i>
+                    <div class="small">
+                        <strong>Consolidation &amp; Management Review in Progress:</strong> Your self-evaluation is currently undergoing departmental consolidation and governance routing. Official final scores, shared behavior metrics, and officer endorsements will be unlocked here once the Board of Directors approves the cycle.
+                    </div>
+                </div>
+            <?php endif; ?>
+
             <div class="row g-3">
                 <div class="col-sm-6">
                     <?php
-                    $ts_val   = $evaluation['total_score'] !== null ? (float)$evaluation['total_score'] : null;
-                    if ($ts_val !== null) {
+                    $ts_val = $is_package_completed && $evaluation['total_score'] !== null ? (float)$evaluation['total_score'] : (float)$orig_total_score;
+                    if ($is_package_completed && $ts_val !== null) {
                         if ($ts_val >= 3.60)     { $score_bg = 'linear-gradient(135deg,#146c43,#198754)'; $score_border = '#146c43'; }
                         elseif ($ts_val >= 2.60) { $score_bg = 'linear-gradient(135deg,#087990,#0dcaf0)'; $score_border = '#087990'; }
                         elseif ($ts_val >= 2.00) { $score_bg = 'linear-gradient(135deg,#cc8800,#ffc107)'; $score_border = '#cc8800'; }
@@ -128,34 +149,39 @@ require_once '../includes/header.php';
                         $score_value_style = 'font-size:1.8rem;color:#fff;';
                         $score_sub_style   = 'color:rgba(255,255,255,.8)';
                     } else {
-                        $score_card_style  = 'border:2px solid var(--bs-border-color,#dee2e6);border-radius:10px;padding:14px 18px;';
+                        $score_card_style  = 'border:2px solid var(--bs-border-color,#dee2e6);border-radius:10px;padding:14px 18px;background:#F8FAFC;';
                         $score_label_style = 'color:#6c757d';
-                        $score_value_style = 'font-size:1.8rem;color:#6c757d;';
+                        $score_value_style = 'font-size:1.8rem;color:#0F172A;';
                         $score_sub_style   = 'color:#6c757d';
                     }
                     ?>
                     <div class="package-stat h-100 d-flex flex-column justify-content-between" style="<?php echo $score_card_style; ?>">
-                        <span class="small text-uppercase fw-bold" style="<?php echo $score_label_style; ?>">Overall Score</span>
+                        <span class="small text-uppercase fw-bold" style="<?php echo $score_label_style; ?>">
+                            <?php echo $is_package_completed ? 'Overall Score' : 'Submitted Self Total'; ?>
+                        </span>
                         <div class="d-flex align-items-baseline gap-2 mt-1">
-                            <strong class="tabular-nums" style="<?php echo $score_value_style; ?>"><?php echo $ts_val !== null ? number_format($ts_val, 2) : '&mdash;'; ?></strong>
-                            <?php if ($ts_val !== null && abs($ts_val - $orig_total_score) > 0.001): ?>
+                            <strong class="tabular-nums" style="<?php echo $score_value_style; ?>"><?php echo number_format($ts_val, 2); ?></strong>
+                            <?php if ($is_package_completed && abs($ts_val - $orig_total_score) > 0.001): ?>
                                 <span class="badge bg-light text-dark border small" title="Original Self Total: <?php echo number_format($orig_total_score, 2); ?>">
                                     Orig: <?php echo number_format($orig_total_score, 2); ?>
                                 </span>
                             <?php endif; ?>
                         </div>
-                        <div class="small mt-1" style="<?php echo $score_sub_style; ?>">Performance Level: <strong><?php echo e($evaluation['performance_level'] ?: '&mdash;'); ?></strong></div>
+                        <div class="small mt-1" style="<?php echo $score_sub_style; ?>">
+                            Performance Level: <strong><?php echo e($is_package_completed ? ($evaluation['performance_level'] ?: getPerformanceLevel($ts_val)) : 'Pending Final Approval'); ?></strong>
+                        </div>
                     </div>
                 </div>
-
 
                 <div class="col-sm-6">
                     <div class="package-stat h-100 d-flex flex-column justify-content-between" style="border:2px solid var(--bs-border-color,#dee2e6);border-radius:10px;padding:14px 18px;">
                         <span class="text-muted small text-uppercase fw-bold">Shared Team Behavior</span>
                         <strong class="tabular-nums mt-1" style="color:var(--rp-primary-gold-dark);font-size:1.8rem;">
-                            <?php echo $evaluation['shared_behavior_score'] !== null ? number_format((float)$evaluation['shared_behavior_score'], 2) : 'Pending'; ?>
+                            <?php echo ($is_package_completed && $evaluation['shared_behavior_score'] !== null) ? number_format((float)$evaluation['shared_behavior_score'], 2) : 'Pending'; ?>
                         </strong>
-                        <div class="small text-muted mt-1">Applied at Board approval</div>
+                        <div class="small text-muted mt-1">
+                            <?php echo $is_package_completed ? 'Finalized department shared score' : 'Calculated and applied at final Board approval'; ?>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -201,15 +227,15 @@ require_once '../includes/header.php';
             $hist_dev_plans = $dev_plan_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
             $dev_plan_stmt->close();
             ?>
-            <?php if (!empty($hist_dev_plans)): ?>
             <button class="eval-tab-btn"        role="tab" aria-selected="false" onclick="switchHistoryTab(event,'tab-devplan')" id="htab-devplan">
                 <i class="fas fa-seedling me-1"></i>Developmental Plan
-                <span class="eval-tab-badge"><?php echo count($hist_dev_plans); ?></span>
+                <?php if ($is_package_completed && !empty($hist_dev_plans)): ?>
+                    <span class="eval-tab-badge"><?php echo count($hist_dev_plans); ?></span>
+                <?php endif; ?>
             </button>
-            <?php endif; ?>
-            <?php if ($remarks || !empty($evaluation['employee_signature_data']) || !empty($evaluation['employee_consent_agreed'])): ?>
+            <?php if (($is_package_completed && $remarks) || !empty($evaluation['employee_signature_data']) || !empty($evaluation['employee_consent_agreed'])): ?>
             <button class="eval-tab-btn"        role="tab" aria-selected="false" onclick="switchHistoryTab(event,'tab-remarks')" id="htab-remarks">
-                <i class="fas fa-comments me-1"></i>Remarks &amp; Signature
+                <i class="fas fa-comments me-1"></i><?php echo $is_package_completed && $remarks ? 'Remarks & Signature' : 'Digital Signature'; ?>
             </button>
             <?php endif; ?>
         </nav>
@@ -221,11 +247,15 @@ require_once '../includes/header.php';
                 <table class="package-table table align-middle mb-0">
                     <thead>
                         <tr>
-                            <th style="width:40%;">Criterion</th>
-                            <th class="text-end" style="width:10%;">Weight</th>
-                            <th class="text-end" style="width:18%;">Original Self-Rating</th>
-                            <th class="text-end" style="width:18%;">Reviewed / Adjusted</th>
-                            <th class="text-center" style="width:14%;">Variance</th>
+                            <th style="<?php echo $is_package_completed ? 'width:40%;' : 'width:60%;'; ?>">Criterion</th>
+                            <th class="text-end" style="<?php echo $is_package_completed ? 'width:10%;' : 'width:20%;'; ?>">Weight</th>
+                            <th class="text-end" style="<?php echo $is_package_completed ? 'width:18%;' : 'width:20%;'; ?>">
+                                <?php echo $is_package_completed ? 'Original Self-Rating' : 'Submitted Rating'; ?>
+                            </th>
+                            <?php if ($is_package_completed): ?>
+                                <th class="text-end" style="width:18%;">Reviewed / Adjusted</th>
+                                <th class="text-center" style="width:14%;">Variance</th>
+                            <?php endif; ?>
                         </tr>
                     </thead>
                     <tbody>
@@ -245,16 +275,18 @@ require_once '../includes/header.php';
                             </td>
                             <td class="text-end tabular-nums fw-bold text-muted"><?php echo number_format((float)$criterion['weight'], 2); ?>%</td>
                             <td class="text-end tabular-nums fw-semibold" style="font-size:1.05rem;"><?php echo number_format($orig, 2); ?></td>
-                            <td class="text-end tabular-nums fw-bold text-dark" style="font-size:1.1rem;"><?php echo number_format($rev, 2); ?></td>
-                            <td class="text-center">
-                                <?php if ($is_adj): ?>
-                                    <span class="badge <?php echo $diff > 0 ? 'bg-success' : 'bg-danger'; ?> px-2 py-1" style="font-size:.85rem;">
-                                        <?php echo ($diff > 0 ? '+' : '') . number_format($diff, 2); ?>
-                                    </span>
-                                <?php else: ?>
-                                    <span class="text-muted small">&mdash;</span>
-                                <?php endif; ?>
-                            </td>
+                            <?php if ($is_package_completed): ?>
+                                <td class="text-end tabular-nums fw-bold text-dark" style="font-size:1.1rem;"><?php echo number_format($rev, 2); ?></td>
+                                <td class="text-center">
+                                    <?php if ($is_adj): ?>
+                                        <span class="badge <?php echo $diff > 0 ? 'bg-success' : 'bg-danger'; ?> px-2 py-1" style="font-size:.85rem;">
+                                            <?php echo ($diff > 0 ? '+' : '') . number_format($diff, 2); ?>
+                                        </span>
+                                    <?php else: ?>
+                                        <span class="text-muted small">&mdash;</span>
+                                    <?php endif; ?>
+                                </td>
+                            <?php endif; ?>
                         </tr>
                         <?php endforeach; ?>
                     </tbody>
@@ -262,8 +294,9 @@ require_once '../includes/header.php';
             </div>
             <div class="d-flex justify-content-end align-items-center gap-3 mt-3 pt-3 border-top">
                 <span class="text-muted small text-uppercase fw-bold">Key Result Areas (KRA) Total:</span>
-                <span class="fw-bold tabular-nums" style="font-size:1.15rem;"><?php echo number_format((float)$evaluation['kra_subtotal'], 2); ?>
-                    <?php if (abs((float)$evaluation['kra_subtotal'] - $orig_kra_subtotal) > 0.001): ?>
+                <span class="fw-bold tabular-nums" style="font-size:1.15rem;">
+                    <?php echo number_format($is_package_completed ? (float)$evaluation['kra_subtotal'] : $orig_kra_subtotal, 2); ?>
+                    <?php if ($is_package_completed && abs((float)$evaluation['kra_subtotal'] - $orig_kra_subtotal) > 0.001): ?>
                         <span class="badge bg-warning text-dark ms-1" title="Original: <?php echo number_format($orig_kra_subtotal, 2); ?>">Self: <?php echo number_format($orig_kra_subtotal, 2); ?></span>
                     <?php endif; ?>
                 </span>
@@ -281,10 +314,14 @@ require_once '../includes/header.php';
                 <table class="package-table table align-middle mb-0">
                     <thead>
                         <tr>
-                            <th style="width:40%;">Criterion</th>
-                            <th class="text-end" style="width:20%;">Original Self-Rating</th>
-                            <th class="text-end" style="width:20%;">Reviewed / Adjusted</th>
-                            <th class="text-center" style="width:20%;">Variance</th>
+                            <th style="<?php echo $is_package_completed ? 'width:40%;' : 'width:70%;'; ?>">Criterion</th>
+                            <th class="text-end" style="<?php echo $is_package_completed ? 'width:20%;' : 'width:30%;'; ?>">
+                                <?php echo $is_package_completed ? 'Original Self-Rating' : 'Submitted Rating'; ?>
+                            </th>
+                            <?php if ($is_package_completed): ?>
+                                <th class="text-end" style="width:20%;">Reviewed / Adjusted</th>
+                                <th class="text-center" style="width:20%;">Variance</th>
+                            <?php endif; ?>
                         </tr>
                     </thead>
                     <tbody>
@@ -303,16 +340,18 @@ require_once '../includes/header.php';
                                 <?php endif; ?>
                             </td>
                             <td class="text-end tabular-nums fw-semibold" style="font-size:1.05rem;"><?php echo number_format($orig, 2); ?></td>
-                            <td class="text-end tabular-nums fw-bold text-dark" style="font-size:1.1rem;"><?php echo number_format($rev, 2); ?></td>
-                            <td class="text-center">
-                                <?php if ($is_adj): ?>
-                                    <span class="badge <?php echo $diff > 0 ? 'bg-success' : 'bg-danger'; ?> px-2 py-1" style="font-size:.85rem;">
-                                        <?php echo ($diff > 0 ? '+' : '') . number_format($diff, 2); ?>
-                                    </span>
-                                <?php else: ?>
-                                    <span class="text-muted small">&mdash;</span>
-                                <?php endif; ?>
-                            </td>
+                            <?php if ($is_package_completed): ?>
+                                <td class="text-end tabular-nums fw-bold text-dark" style="font-size:1.1rem;"><?php echo number_format($rev, 2); ?></td>
+                                <td class="text-center">
+                                    <?php if ($is_adj): ?>
+                                        <span class="badge <?php echo $diff > 0 ? 'bg-success' : 'bg-danger'; ?> px-2 py-1" style="font-size:.85rem;">
+                                            <?php echo ($diff > 0 ? '+' : '') . number_format($diff, 2); ?>
+                                        </span>
+                                    <?php else: ?>
+                                        <span class="text-muted small">&mdash;</span>
+                                    <?php endif; ?>
+                                </td>
+                            <?php endif; ?>
                         </tr>
                         <?php endforeach; ?>
                     </tbody>
@@ -320,8 +359,9 @@ require_once '../includes/header.php';
             </div>
             <div class="d-flex justify-content-end align-items-center gap-3 mt-3 pt-3 border-top">
                 <span class="text-muted small text-uppercase fw-bold">Core Behaviors &amp; Values Total:</span>
-                <span class="fw-bold tabular-nums" style="font-size:1.15rem;"><?php echo number_format((float)$evaluation['behavior_average'], 2); ?>
-                    <?php if (abs((float)$evaluation['behavior_average'] - $orig_beh_average) > 0.001): ?>
+                <span class="fw-bold tabular-nums" style="font-size:1.15rem;">
+                    <?php echo number_format($is_package_completed ? (float)$evaluation['behavior_average'] : $orig_beh_average, 2); ?>
+                    <?php if ($is_package_completed && abs((float)$evaluation['behavior_average'] - $orig_beh_average) > 0.001): ?>
                         <span class="badge bg-warning text-dark ms-1" title="Original: <?php echo number_format($orig_beh_average, 2); ?>">Self: <?php echo number_format($orig_beh_average, 2); ?></span>
                     <?php endif; ?>
                 </span>
@@ -332,37 +372,54 @@ require_once '../includes/header.php';
             <?php endif; ?>
         </div>
 
-        <!-- Tab 3: Developmental Plan (conditionally rendered) -->
-        <?php if (!empty($hist_dev_plans)): ?>
+        <!-- Tab 3: Developmental Plan -->
         <div class="eval-tab-content" id="tab-devplan" role="tabpanel">
-            <div class="table-responsive">
-                <table class="table table-bordered align-middle mb-0">
-                    <thead class="table-light">
-                        <tr>
-                            <th>Area for Improvement / Development</th>
-                            <th>Support Needed / Action Plan</th>
-                            <th>Target Time Frame</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($hist_dev_plans as $dp): ?>
-                        <tr>
-                            <td class="fw-semibold text-dark"><?php echo e($dp['improvement_area'] ?: '—'); ?></td>
-                            <td><?php echo e($dp['support_needed'] ?: '—'); ?></td>
-                            <td><span class="badge bg-light text-dark border"><?php echo e($dp['time_frame'] ?: '—'); ?></span></td>
-                        </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
-            </div>
+            <?php if ($is_package_completed): ?>
+                <?php if (!empty($hist_dev_plans)): ?>
+                    <div class="table-responsive">
+                        <table class="table table-bordered align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Area for Improvement / Development</th>
+                                    <th>Support Needed / Action Plan</th>
+                                    <th>Target Time Frame</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($hist_dev_plans as $dp): ?>
+                                <tr>
+                                    <td class="fw-semibold text-dark"><?php echo e($dp['improvement_area'] ?: '—'); ?></td>
+                                    <td><?php echo e($dp['support_needed'] ?: '—'); ?></td>
+                                    <td><span class="badge bg-light text-dark border"><?php echo e($dp['time_frame'] ?: '—'); ?></span></td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php else: ?>
+                    <div class="alert alert-light border text-muted py-4 text-center mb-0 rounded-3">
+                        <i class="fas fa-seedling fa-2x mb-2 text-secondary" style="opacity:0.5;"></i>
+                        <p class="mb-0">No developmental plan items were recorded for this evaluation cycle.</p>
+                    </div>
+                <?php endif; ?>
+            <?php else: ?>
+                <div class="alert alert-info border d-flex align-items-center gap-3 p-4 mb-0 rounded-3 shadow-sm" style="background-color: #f0fdf4; border-color: #86efac !important; color: #166534;">
+                    <i class="fas fa-lock fa-2x text-success"></i>
+                    <div>
+                        <h6 class="fw-bold mb-1" style="color: #14532d;">Developmental Plan &amp; Recommendations Under Review</h6>
+                        <p class="mb-0 small" style="color: #15803d; line-height: 1.5;">
+                            Supervisory guidance, developmental recommendations, and support action plans are currently being formulated during the consolidation review. Official developmental goals will be published here upon final Board approval.
+                        </p>
+                    </div>
+                </div>
+            <?php endif; ?>
         </div>
-        <?php endif; ?>
 
         <!-- Tab 4: Remarks & Signature -->
-        <?php if ($remarks || !empty($evaluation['employee_signature_data']) || !empty($evaluation['employee_consent_agreed'])): ?>
+        <?php if (($is_package_completed && $remarks) || !empty($evaluation['employee_signature_data']) || !empty($evaluation['employee_consent_agreed'])): ?>
         <div class="eval-tab-content" id="tab-remarks" role="tabpanel">
 
-            <?php if ($remarks): ?>
+            <?php if ($is_package_completed && $remarks): ?>
             <h3 class="h6 fw-bold text-uppercase text-muted mb-3" style="letter-spacing:.5px;">
                 <i class="fas fa-comments me-1"></i>Evaluator Comments &amp; Review Remarks
             </h3>

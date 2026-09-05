@@ -2082,13 +2082,25 @@ function ensureOrganizationEvaluationPackageSchema($conn)
     try {
         $conn->query("CREATE TABLE IF NOT EXISTS evaluation_governance_approvers (
             governance_approver_id INT AUTO_INCREMENT PRIMARY KEY,
-            governance_type ENUM('Board of Directors','Audit Committee') NOT NULL,
+            governance_type ENUM('Board of Directors','Audit Committee','President','Division VP') NOT NULL,
+            department_id INT NULL,
             user_id INT NOT NULL,
             is_active TINYINT(1) NOT NULL DEFAULT 1,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE KEY uq_governance_user (governance_type, user_id),
-            CONSTRAINT fk_governance_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+            UNIQUE KEY uq_governance_user (governance_type, department_id, user_id),
+            CONSTRAINT fk_governance_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+            CONSTRAINT fk_governance_department FOREIGN KEY (department_id) REFERENCES departments(department_id) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        // Migrate existing installs: add department_id column and expand governance_type enum.
+        try {
+            $conn->query("ALTER TABLE evaluation_governance_approvers
+                ADD COLUMN IF NOT EXISTS department_id INT NULL AFTER governance_type,
+                MODIFY governance_type ENUM('Board of Directors','Audit Committee','President','Division VP') NOT NULL");
+        } catch (mysqli_sql_exception $e) { /* Already migrated or unsupported — safe to ignore. */ }
+        try {
+            $conn->query("ALTER TABLE evaluation_governance_approvers DROP KEY uq_governance_user");
+            $conn->query("ALTER TABLE evaluation_governance_approvers ADD UNIQUE KEY uq_governance_user (governance_type, department_id, user_id)");
+        } catch (mysqli_sql_exception $e) { /* Key already updated. */ }
         $conn->query("CREATE TABLE IF NOT EXISTS evaluation_packages (
             package_id INT AUTO_INCREMENT PRIMARY KEY,
             department_id INT NOT NULL,
@@ -2191,19 +2203,33 @@ function getOrganizationPackageConsolidator($conn, $department_id)
 }
 
 /**
- * Append one governance step (Audit or Board) to a package route.
- * Returns the next step_order after a successful insert.
+ * Append one governance step to a package route.
+ * Supports 'Board of Directors', 'Audit Committee', 'President', and 'Division VP' (department-specific).
+ * Returns the next step_order after a successful insert, or the same order if no approver is found.
  */
-function appendOrganizationGovernanceRouteStep($conn, $package_id, $order, $governance_type, $step_label)
+function appendOrganizationGovernanceRouteStep($conn, $package_id, $order, $governance_type, $step_label, $department_id = null)
 {
     $package_id = (int) $package_id;
     $order = (int) $order;
-    $stmt = $conn->prepare("SELECT ega.user_id, u.employee_id
-        FROM evaluation_governance_approvers ega
-        JOIN users u ON u.user_id = ega.user_id AND u.is_active = 1
-        WHERE ega.governance_type = ? AND ega.is_active = 1
-        ORDER BY ega.governance_approver_id LIMIT 1");
-    $stmt->bind_param('s', $governance_type);
+    $department_id = $department_id ? (int) $department_id : null;
+
+    // For Division VP: match by governance_type + department_id.
+    // For all others (Board, Audit, President): department_id is NULL (company-wide).
+    if ($department_id !== null) {
+        $stmt = $conn->prepare("SELECT ega.user_id, u.employee_id
+            FROM evaluation_governance_approvers ega
+            JOIN users u ON u.user_id = ega.user_id AND u.is_active = 1
+            WHERE ega.governance_type = ? AND ega.department_id = ? AND ega.is_active = 1
+            ORDER BY ega.governance_approver_id LIMIT 1");
+        $stmt->bind_param('si', $governance_type, $department_id);
+    } else {
+        $stmt = $conn->prepare("SELECT ega.user_id, u.employee_id
+            FROM evaluation_governance_approvers ega
+            JOIN users u ON u.user_id = ega.user_id AND u.is_active = 1
+            WHERE ega.governance_type = ? AND ega.department_id IS NULL AND ega.is_active = 1
+            ORDER BY ega.governance_approver_id LIMIT 1");
+        $stmt->bind_param('s', $governance_type);
+    }
     $stmt->execute();
     $row = $stmt->get_result()->fetch_assoc();
     $stmt->close();
@@ -2223,6 +2249,36 @@ function appendOrganizationGovernanceRouteStep($conn, $package_id, $order, $gove
 }
 
 /**
+ * Fetch the designated official for a given governance role and department.
+ * Returns ['user_id' => int, 'employee_id' => int|null, 'job_title' => string, 'full_name' => string] or null.
+ */
+function getDepartmentDesignatedOfficial($conn, $governance_type, $department_id = null)
+{
+    $department_id = $department_id ? (int) $department_id : null;
+    if ($department_id !== null) {
+        $stmt = $conn->prepare("SELECT ega.user_id, u.employee_id, u.full_name, COALESCE(e.job_title, u.role) AS job_title
+            FROM evaluation_governance_approvers ega
+            JOIN users u ON u.user_id = ega.user_id AND u.is_active = 1
+            LEFT JOIN employees e ON e.employee_id = u.employee_id AND e.is_active = 1
+            WHERE ega.governance_type = ? AND ega.department_id = ? AND ega.is_active = 1
+            ORDER BY ega.governance_approver_id LIMIT 1");
+        $stmt->bind_param('si', $governance_type, $department_id);
+    } else {
+        $stmt = $conn->prepare("SELECT ega.user_id, u.employee_id, u.full_name, COALESCE(e.job_title, u.role) AS job_title
+            FROM evaluation_governance_approvers ega
+            JOIN users u ON u.user_id = ega.user_id AND u.is_active = 1
+            LEFT JOIN employees e ON e.employee_id = u.employee_id AND e.is_active = 1
+            WHERE ega.governance_type = ? AND ega.department_id IS NULL AND ega.is_active = 1
+            ORDER BY ega.governance_approver_id LIMIT 1");
+        $stmt->bind_param('s', $governance_type);
+    }
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    return $row ?: null;
+}
+
+/**
  * Map a route step to the package status shown while that step is active.
  */
 function getOrganizationPackageStatusForStep(array $step)
@@ -2236,7 +2292,11 @@ function getOrganizationPackageStatusForStep(array $step)
         if (stripos($label, 'Audit') !== false) {
             return 'Pending Audit Approval';
         }
-        return 'Pending Board Approval';
+        // Division VP and President steps are shown as Pending Review
+        if (stripos($label, 'Board') !== false) {
+            return 'Pending Board Approval';
+        }
+        return 'Pending Review';
     }
     return 'Pending Review';
 }
@@ -2405,6 +2465,146 @@ function renderOrganizationPipelineBadge($conn, $package_id, $extra_classes = ''
     return '<span class="pipeline-badge pipeline-badge--pending ' . e($extra_classes) . '"><i class="fas fa-hourglass-half me-1"></i>Pending ' . e($label) . ' &mdash; <strong>' . e($name) . '</strong></span>';
 }
 
+function renderOrganizationPackageAuditTrail($conn, $package_id)
+{
+    $package_id = (int) $package_id;
+    if ($package_id <= 0) return '';
+
+    $audit_stmt = $conn->prepare("SELECT pa.*,
+            u.full_name, u.role, u.username,
+            emp.first_name, emp.last_name, emp.job_title
+        FROM evaluation_package_audit pa
+        LEFT JOIN users u ON u.user_id = pa.user_id
+        LEFT JOIN employees emp ON emp.employee_id = u.employee_id
+        WHERE pa.package_id = ?
+        ORDER BY pa.created_at ASC, pa.package_audit_id ASC");
+    $audit_stmt->bind_param('i', $package_id);
+    $audit_stmt->execute();
+    $audits = $audit_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $audit_stmt->close();
+
+    if (empty($audits)) {
+        return '<div class="package-audit-section mt-4 pt-3 border-top">
+            <h3 class="h6 fw-bold text-uppercase text-muted mb-2" style="letter-spacing:0.5px;">
+                <i class="fas fa-history text-primary me-1"></i> Package Audit Trail &amp; Revision Log
+            </h3>
+            <p class="text-muted small mb-0"><i class="fas fa-info-circle me-1"></i>No audit records or score modifications logged for this package yet.</p>
+        </div>';
+    }
+
+    $count_label = count($audits) . ' event' . (count($audits) === 1 ? '' : 's');
+    $html = '<div class="package-audit-section mt-4 pt-3 border-top">
+        <div class="d-flex align-items-center justify-content-between mb-3">
+            <h3 class="h6 fw-bold text-uppercase text-muted mb-0" style="letter-spacing:0.5px;">
+                <i class="fas fa-history text-primary me-1"></i> Package Audit Trail &amp; Revision History
+            </h3>
+            <span class="badge bg-light text-secondary border">
+                ' . $count_label . '
+            </span>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-sm align-middle table-bordered mb-0 bg-white" style="font-size:0.88rem; border-color:#E2E8F0;">
+                <thead style="background:#F8FAFC; color:#475569;">
+                    <tr>
+                        <th style="width: 170px;">Date &amp; Time</th>
+                        <th style="width: 220px;">Official / Actor</th>
+                        <th style="width: 180px;">Action</th>
+                        <th>Details &amp; Alterations</th>
+                    </tr>
+                </thead>
+                <tbody>';
+
+    foreach ($audits as $a) {
+        $time_formatted = date('M d, Y h:i A', strtotime($a['created_at']));
+        $actor_name = !empty($a['full_name']) ? $a['full_name'] : (trim(($a['first_name'] ?? '') . ' ' . ($a['last_name'] ?? '')) ?: ($a['username'] ?? 'System / Automated'));
+        $actor_role = !empty($a['job_title']) ? $a['job_title'] : ($a['role'] ?? 'Official');
+
+        $action_badge = '';
+        switch ($a['action']) {
+            case 'MEMBER_SCORES_ADJUSTED':
+                $action_badge = '<span class="badge" style="background:#FEF3C7; color:#92400E; border:1px solid #F59E0B;"><i class="fas fa-sliders-h me-1"></i>Score Adjusted</span>';
+                break;
+            case 'DEV_PLAN_UPDATED':
+                $action_badge = '<span class="badge" style="background:#E0E7FF; color:#3730A3; border:1px solid #C7D2FE;"><i class="fas fa-clipboard-list me-1"></i>Dev Plan Updated</span>';
+                break;
+            case 'APPROVED':
+                $action_badge = '<span class="badge" style="background:#DCFCE7; color:#065F46; border:1px solid #86EFAC;"><i class="fas fa-check-circle me-1"></i>Step Approved</span>';
+                break;
+            case 'RETURNED':
+                $action_badge = '<span class="badge" style="background:#FEE2E2; color:#991B1B; border:1px solid #FCA5A5;"><i class="fas fa-undo me-1"></i>Returned for Revision</span>';
+                break;
+            case 'MEMBER_RETURNED':
+                $action_badge = '<span class="badge" style="background:#FEE2E2; color:#991B1B; border:1px solid #FCA5A5;"><i class="fas fa-user-times me-1"></i>Member Returned</span>';
+                break;
+            case 'LOCKED_AND_APPLIED':
+                $action_badge = '<span class="badge" style="background:#DBEAFE; color:#1E40AF; border:1px solid #93C5FD;"><i class="fas fa-lock me-1"></i>Board Approved &amp; Locked</span>';
+                break;
+            case 'CANCELLED':
+                $action_badge = '<span class="badge bg-secondary"><i class="fas fa-ban me-1"></i>Package Dropped</span>';
+                break;
+            case 'CREATED':
+                $action_badge = '<span class="badge bg-light text-muted border"><i class="fas fa-plus-circle me-1"></i>Package Created</span>';
+                break;
+            default:
+                $action_badge = '<span class="badge bg-light text-dark border">' . e($a['action']) . '</span>';
+                break;
+        }
+
+        $remark_text = (string)($a['remarks'] ?? '');
+        $details_html = '';
+
+        if ($a['action'] === 'MEMBER_SCORES_ADJUSTED' && strpos($remark_text, '→') !== false) {
+            $prefix = '';
+            $changes_str = $remark_text;
+            if (strpos($remark_text, ' — ') !== false) {
+                list($prefix, $changes_str) = explode(' — ', $remark_text, 2);
+            } elseif (strpos($remark_text, 'Adjusted ') === 0) {
+                $changes_str = preg_replace('/^Adjusted\s+/', '', $remark_text);
+            }
+            
+            $items = explode(';', $changes_str);
+            $chips = [];
+            foreach ($items as $item) {
+                $item = trim($item);
+                if (!$item) continue;
+                if (strpos($item, '→') !== false && strpos($item, ':') !== false) {
+                    list($crit_name, $vals) = explode(':', $item, 2);
+                    list($old_v, $new_v) = explode('→', $vals, 2);
+                    $chips[] = '<div class="d-inline-flex align-items-center me-2 mb-1 p-1 px-2 rounded border bg-light" style="font-size:0.83rem;">'
+                        . '<strong class="me-1 text-dark">' . e(trim($crit_name)) . ':</strong> '
+                        . '<span class="text-muted text-decoration-line-through me-1">' . e(trim($old_v)) . '</span>'
+                        . '<i class="fas fa-arrow-right text-warning mx-1" style="font-size:0.75rem;"></i>'
+                        . '<span class="fw-bold text-success">' . e(trim($new_v)) . '</span>'
+                        . '</div>';
+                } else {
+                    $chips[] = '<span class="badge bg-light text-dark border me-1 mb-1">' . e($item) . '</span>';
+                }
+            }
+            if ($prefix) {
+                $details_html .= '<div class="fw-semibold text-primary mb-1"><i class="fas fa-user-edit me-1"></i>' . e($prefix) . '</div>';
+            }
+            $details_html .= '<div class="d-flex flex-wrap align-items-center">' . implode('', $chips) . '</div>';
+        } else {
+            $details_html = '<div class="text-dark">' . nl2br(e($remark_text)) . '</div>';
+        }
+
+        $html .= '<tr>
+            <td class="text-muted small align-top tabular-nums">
+                <i class="fas fa-clock text-secondary me-1"></i>' . $time_formatted . '
+            </td>
+            <td class="align-top">
+                <div class="fw-bold text-dark"><i class="fas fa-user-tie text-secondary me-1"></i>' . e($actor_name) . '</div>
+                <div class="text-muted" style="font-size:0.78rem;">' . e($actor_role) . '</div>
+            </td>
+            <td class="align-top">' . $action_badge . '</td>
+            <td class="align-top">' . $details_html . '</td>
+        </tr>';
+    }
+
+    $html .= '</tbody></table></div></div>';
+    return $html;
+}
+
 function countPendingOrganizationPackagesForUser($conn, $user_id)
 {
     $user_id = (int) $user_id;
@@ -2452,6 +2652,20 @@ function createOrganizationPackageRoute($conn, $package_id, $consolidator_employ
     $employee_id = (int) $consolidator_employee_id;
     $order = 1;
     $seen = [];
+    $package_department_id = null;
+
+    // Fetch the package department_id so we can pull the right Division VP.
+    $pkg_stmt = $conn->prepare('SELECT department_id FROM evaluation_packages WHERE package_id = ? LIMIT 1');
+    $pkg_stmt->bind_param('i', $package_id);
+    $pkg_stmt->execute();
+    $pkg_row = $pkg_stmt->get_result()->fetch_assoc();
+    $pkg_stmt->close();
+    if ($pkg_row) $package_department_id = (int) $pkg_row['department_id'];
+
+    // Track which employee_ids already appear in the internal chain so we don't
+    // duplicate them if the designated VP also sits in the reports_to chain.
+    $chain_employee_ids = [];
+
     while ($employee_id > 0 && !isset($seen[$employee_id]) && $order <= 12) {
         $seen[$employee_id] = true;
         $stmt = $conn->prepare("SELECT e.employee_id, e.reports_to, e.job_title, e.rank_category_id, e.department_id, u.user_id
@@ -2480,6 +2694,7 @@ function createOrganizationPackageRoute($conn, $package_id, $consolidator_employ
         $route->bind_param('iiiisss', $package_id, $order, $employee_id, $user_id, $label, $type, $state);
         $route->execute();
         $route->close();
+        $chain_employee_ids[] = $employee_id;
 
         $next_employee_id = !empty($person['reports_to']) ? (int) $person['reports_to'] : 0;
         if ($next_employee_id <= 0 && (int)$person['rank_category_id'] === 4) {
@@ -2495,8 +2710,28 @@ function createOrganizationPackageRoute($conn, $package_id, $consolidator_employ
         $employee_id = $next_employee_id;
         $order++;
     }
-    // Audit (optional) comes before Board so Board remains the final lock/apply step.
+
+    // --- Division VP step (department-specific, from Evaluation Routing & Governance) ---
+    // Only appended if: a Division VP is configured for this department AND
+    // the VP is not already a step in the internal chain (avoids duplicates).
+    if ($package_department_id) {
+        $div_vp = getDepartmentDesignatedOfficial($conn, 'Division VP', $package_department_id);
+        if ($div_vp) {
+            $vp_employee_id = !empty($div_vp['employee_id']) ? (int) $div_vp['employee_id'] : null;
+            $already_in_chain = $vp_employee_id && in_array($vp_employee_id, $chain_employee_ids, true);
+            if (!$already_in_chain) {
+                $order = appendOrganizationGovernanceRouteStep($conn, $package_id, $order, 'Division VP', 'Division VP Review — ' . $div_vp['job_title'], $package_department_id);
+            }
+        }
+    }
+
+    // --- President step (company-wide) ---
+    $order = appendOrganizationGovernanceRouteStep($conn, $package_id, $order, 'President', 'Executive Approval — President & CEO');
+
+    // --- Audit Committee (optional, before Board) ---
     $order = appendOrganizationGovernanceRouteStep($conn, $package_id, $order, 'Audit Committee', 'Audit Committee approval');
+
+    // --- Board of Directors (Final lock & apply) ---
     appendOrganizationGovernanceRouteStep($conn, $package_id, $order, 'Board of Directors', 'Board of Directors approval');
 }
 
@@ -2686,29 +2921,93 @@ function ensureOrganizationPackageGovernanceSteps($conn, $package_id)
     $package_id = (int) $package_id;
     if ($package_id <= 0) return false;
 
+    // Fetch package department for Division VP lookup.
+    $pkg = $conn->query("SELECT department_id, current_step_order, status FROM evaluation_packages WHERE package_id = $package_id")->fetch_assoc();
+    $package_department_id = $pkg ? (int)($pkg['department_id'] ?? 0) : 0;
+
+    // 0. Clean up any invalid steps placed AFTER Board of Directors (Board is always the final step).
+    $board_step = $conn->query("SELECT step_order, action_status FROM evaluation_package_route_steps WHERE package_id = $package_id AND step_label LIKE '%Board%' LIMIT 1")->fetch_assoc();
+    if ($board_step) {
+        $board_order = (int) $board_step['step_order'];
+        $conn->query("DELETE FROM evaluation_package_route_steps WHERE package_id = $package_id AND step_order > $board_order");
+
+        // If Board of Directors is already approved, finalize the package immediately.
+        if (($board_step['action_status'] ?? '') === 'Approved') {
+            applyOrganizationPackageResults($conn, $package_id);
+            $conn->query("UPDATE evaluation_packages SET status = 'Approved and Applied', current_step_order = NULL WHERE package_id = $package_id");
+            return true;
+        }
+    }
+
+    // Check if the department's designated Division VP is already an internal hierarchy reviewer in the route.
+    if ($package_department_id > 0) {
+        $div_vp = getDepartmentDesignatedOfficial($conn, 'Division VP', $package_department_id);
+        if ($div_vp) {
+            $vp_user_id = (int)($div_vp['user_id'] ?? 0);
+            $vp_emp_id  = !empty($div_vp['employee_id']) ? (int)$div_vp['employee_id'] : 0;
+
+            $internal_vp_count = (int)($conn->query("SELECT COUNT(*) AS c FROM evaluation_package_route_steps 
+                WHERE package_id = $package_id 
+                  AND step_type = 'Review'
+                  AND (($vp_user_id > 0 AND reviewer_user_id = $vp_user_id) OR ($vp_emp_id > 0 AND reviewer_employee_id = $vp_emp_id))")->fetch_assoc()['c'] ?? 0);
+
+            if ($internal_vp_count > 0) {
+                // Already in reporting chain — purge any extraneous duplicate Governance Division VP step
+                $conn->query("DELETE FROM evaluation_package_route_steps WHERE package_id = $package_id AND step_label LIKE 'Division VP Review%'");
+            }
+        }
+    }
+
     // 1. Get current max step_order
     $res = $conn->query("SELECT MAX(step_order) AS max_order FROM evaluation_package_route_steps WHERE package_id = $package_id");
     $max_order = (int)($res->fetch_assoc()['max_order'] ?? 0);
 
-    // 2. Append Audit Committee step if missing
+    // 2. Append Division VP step only if configured for this department, not already in chain,
+    // and only if global governance steps (President, Audit, Board) have not been appended yet.
+    $has_gov_pres = (int)($conn->query("SELECT COUNT(*) AS c FROM evaluation_package_route_steps WHERE package_id = $package_id AND step_label LIKE '%President%'")->fetch_assoc()['c'] ?? 0);
+    if ($package_department_id > 0 && !$has_gov_pres) {
+        $div_vp = getDepartmentDesignatedOfficial($conn, 'Division VP', $package_department_id);
+        if ($div_vp) {
+            $vp_user_id = (int)($div_vp['user_id'] ?? 0);
+            $vp_emp_id  = !empty($div_vp['employee_id']) ? (int)$div_vp['employee_id'] : 0;
+            $has_vp_step = (int)($conn->query("SELECT COUNT(*) AS c FROM evaluation_package_route_steps 
+                WHERE package_id = $package_id 
+                  AND (step_label LIKE 'Division VP%' OR ($vp_user_id > 0 AND reviewer_user_id = $vp_user_id) OR ($vp_emp_id > 0 AND reviewer_employee_id = $vp_emp_id))")->fetch_assoc()['c'] ?? 0);
+
+            if (!$has_vp_step) {
+                $max_order++;
+                $new_order = appendOrganizationGovernanceRouteStep($conn, $package_id, $max_order, 'Division VP', 'Division VP Review — ' . $div_vp['job_title'], $package_department_id);
+                if ($new_order > $max_order) $max_order = $new_order - 1;
+            }
+        }
+    }
+
+    // 3. Append President step if missing.
+    $has_president = (int)($conn->query("SELECT COUNT(*) AS c FROM evaluation_package_route_steps WHERE package_id = $package_id AND step_label LIKE '%President%'")->fetch_assoc()['c'] ?? 0);
+    if (!$has_president) {
+        $max_order++;
+        $new_order = appendOrganizationGovernanceRouteStep($conn, $package_id, $max_order, 'President', 'Executive Approval — President & CEO');
+        if ($new_order > $max_order) $max_order = $new_order - 1;
+    }
+
+    // 4. Append Audit Committee step if missing.
     $has_audit = (int)($conn->query("SELECT COUNT(*) AS c FROM evaluation_package_route_steps WHERE package_id = $package_id AND step_label LIKE '%Audit%'")->fetch_assoc()['c'] ?? 0);
     if (!$has_audit) {
         $max_order++;
-        $max_order = appendOrganizationGovernanceRouteStep($conn, $package_id, $max_order, 'Audit Committee', 'Audit Committee approval');
-        $max_order--;
+        $new_order = appendOrganizationGovernanceRouteStep($conn, $package_id, $max_order, 'Audit Committee', 'Audit Committee approval');
+        if ($new_order > $max_order) $max_order = $new_order - 1;
     }
 
-    // 3. Append Board of Directors step if missing
+    // 5. Append Board of Directors step if missing.
     $has_board = (int)($conn->query("SELECT COUNT(*) AS c FROM evaluation_package_route_steps WHERE package_id = $package_id AND step_label LIKE '%Board%'")->fetch_assoc()['c'] ?? 0);
     if (!$has_board) {
         $max_order++;
         appendOrganizationGovernanceRouteStep($conn, $package_id, $max_order, 'Board of Directors', 'Board of Directors approval');
     }
 
-    // 4. Advance step if previous step was approved but next step was stuck in Waiting
-    $current_pkg = $conn->query("SELECT current_step_order, status FROM evaluation_packages WHERE package_id = $package_id")->fetch_assoc();
-    if ($current_pkg) {
-        $curr_order = (int)($current_pkg['current_step_order'] ?? 0);
+    // 6. Advance step if previous step was approved but next step was stuck in Waiting.
+    if ($pkg) {
+        $curr_order = (int)($pkg['current_step_order'] ?? 0);
         if ($curr_order > 0) {
             $curr_step = $conn->query("SELECT action_status FROM evaluation_package_route_steps WHERE package_id = $package_id AND step_order = $curr_order")->fetch_assoc();
             if ($curr_step && $curr_step['action_status'] === 'Approved') {
@@ -2738,34 +3037,39 @@ function syncPendingOrganizationPackageGovernanceApprovers($conn)
     }
 
     $updated = 0;
-    $groups = [
+
+    // Sync company-wide governance roles (Board, Audit, President) — department_id IS NULL.
+    $global_groups = [
         'Board of Directors' => [
             'label_match' => 'Board of Directors approval',
             'notify_title' => 'Board approval assignment updated',
-            'notify_body' => 'You are now the Board approver for a team evaluation package.',
+            'notify_body'  => 'You are now the Board of Directors approver for a team evaluation package.',
         ],
         'Audit Committee' => [
             'label_match' => 'Audit Committee approval',
             'notify_title' => 'Audit approval assignment updated',
-            'notify_body' => 'You are now the Audit Committee approver for a team evaluation package.',
+            'notify_body'  => 'You are now the Audit Committee approver for a team evaluation package.',
+        ],
+        'President' => [
+            'label_match' => 'Executive Approval — President & CEO',
+            'notify_title' => 'Executive approval assignment updated',
+            'notify_body'  => 'You are now the President & CEO approver for a team evaluation package.',
         ],
     ];
 
-    foreach ($groups as $governance_type => $meta) {
+    foreach ($global_groups as $governance_type => $meta) {
         $approver_stmt = $conn->prepare("SELECT ega.user_id, u.employee_id
             FROM evaluation_governance_approvers ega
             JOIN users u ON u.user_id = ega.user_id AND u.is_active = 1
-            WHERE ega.governance_type = ? AND ega.is_active = 1
+            WHERE ega.governance_type = ? AND ega.department_id IS NULL AND ega.is_active = 1
             ORDER BY ega.governance_approver_id LIMIT 1");
         $approver_stmt->bind_param('s', $governance_type);
         $approver_stmt->execute();
         $approver = $approver_stmt->get_result()->fetch_assoc();
         $approver_stmt->close();
-        if (!$approver) {
-            continue;
-        }
+        if (!$approver) continue;
 
-        $user_id = (int) $approver['user_id'];
+        $user_id    = (int) $approver['user_id'];
         $employee_id = !empty($approver['employee_id']) ? (int) $approver['employee_id'] : null;
         $label = $meta['label_match'];
         $steps_stmt = $conn->prepare("SELECT rs.package_route_step_id, rs.package_id
@@ -2775,14 +3079,12 @@ function syncPendingOrganizationPackageGovernanceApprovers($conn)
               AND rs.step_label = ?
               AND rs.action_status IN ('Waiting', 'Pending')
               AND ep.status <> 'Approved and Applied'
-              AND rs.reviewer_user_id <> ?");
+              AND (rs.reviewer_user_id IS NULL OR rs.reviewer_user_id <> ?)");
         $steps_stmt->bind_param('si', $label, $user_id);
         $steps_stmt->execute();
         $steps = $steps_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
         $steps_stmt->close();
-        if (!$steps) {
-            continue;
-        }
+        if (!$steps) continue;
 
         $update = $conn->prepare('UPDATE evaluation_package_route_steps SET reviewer_user_id = ?, reviewer_employee_id = ? WHERE package_route_step_id = ?');
         foreach ($steps as $step) {
@@ -2795,6 +3097,45 @@ function syncPendingOrganizationPackageGovernanceApprovers($conn)
             }
         }
         $update->close();
+    }
+
+    // Sync Division VP steps — one approver per department.
+    $vp_stmt = $conn->query("SELECT DISTINCT ega.department_id FROM evaluation_governance_approvers ega WHERE ega.governance_type = 'Division VP' AND ega.is_active = 1 AND ega.department_id IS NOT NULL");
+    if ($vp_stmt) {
+        while ($vp_dept = $vp_stmt->fetch_assoc()) {
+            $dept_id = (int) $vp_dept['department_id'];
+            $official = getDepartmentDesignatedOfficial($conn, 'Division VP', $dept_id);
+            if (!$official) continue;
+            $user_id    = (int) $official['user_id'];
+            $employee_id = !empty($official['employee_id']) ? (int) $official['employee_id'] : null;
+
+            $steps_stmt = $conn->prepare("SELECT rs.package_route_step_id
+                FROM evaluation_package_route_steps rs
+                JOIN evaluation_packages ep ON ep.package_id = rs.package_id
+                WHERE rs.step_type = 'Governance'
+                  AND rs.step_label LIKE 'Division VP Review%'
+                  AND ep.department_id = ?
+                  AND rs.action_status IN ('Waiting', 'Pending')
+                  AND ep.status <> 'Approved and Applied'
+                  AND (rs.reviewer_user_id IS NULL OR rs.reviewer_user_id <> ?)");
+            $steps_stmt->bind_param('ii', $dept_id, $user_id);
+            $steps_stmt->execute();
+            $steps = $steps_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+            $steps_stmt->close();
+            if (!$steps) continue;
+
+            $update = $conn->prepare('UPDATE evaluation_package_route_steps SET reviewer_user_id = ?, reviewer_employee_id = ? WHERE package_route_step_id = ?');
+            foreach ($steps as $step) {
+                $step_id = (int) $step['package_route_step_id'];
+                $update->bind_param('iii', $user_id, $employee_id, $step_id);
+                $update->execute();
+                if ($update->affected_rows > 0) {
+                    $updated++;
+                    createNotification($conn, $user_id, 'Division VP approval assignment updated', 'You are now the Division VP approver for a department evaluation package.', BASE_URL . '/employee/team-evaluation-packages.php');
+                }
+            }
+            $update->close();
+        }
     }
 
     return $updated;

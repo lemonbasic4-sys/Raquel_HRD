@@ -688,6 +688,8 @@ $allowed_eval_types = $is_non_regular ? ['Initial', 'Final'] : ['Annual', 'Quart
 $in_clause = "'" . implode("','", $allowed_eval_types) . "'";
 
 // Filter templates: show if matches employee's department (with 'All' fallbacks) and matches allowed evaluation types
+// Only exclude a template if the employee already has a submitted/in-review/approved evaluation for it
+// (Do NOT exclude if the evaluation is still editable: Draft, Returned, Pending Self-Rating)
 $templates_stmt = $conn->prepare("
     SELECT template_id, template_name, kra_weight, behavior_weight, evaluation_type, target_department
     FROM evaluation_templates et
@@ -700,7 +702,7 @@ $templates_stmt = $conn->prepare("
           WHERE ev.employee_id = ?
             AND ev.template_id = et.template_id
             AND ev.deleted_at IS NULL
-            AND ev.status != 'Rejected'
+            AND ev.status NOT IN ('Draft', 'Returned', 'Rejected', 'Pending Self-Rating')
       )
     ORDER BY template_name
 ");
@@ -1235,9 +1237,10 @@ require_once '../includes/header.php';
                                         <?php
                                         $score_data = $view_scores[(int) $criterion['criterion_id']] ?? null;
                                         $original_score = $score_data ? (float)$score_data['score_value'] : 0.00;
-                                        $dept_mgr_override = $score_data && $score_data['dept_manager_override_score'] !== null ? (float)$score_data['dept_manager_override_score'] : null;
-                                        $supervisor_override = $score_data && $score_data['supervisor_override_score'] !== null ? (float)$score_data['supervisor_override_score'] : null;
-                                        $manager_override = $score_data && $score_data['manager_override_score'] !== null ? (float)$score_data['manager_override_score'] : null;
+                                        $is_eval_approved = (($view_eval['status'] ?? '') === 'Approved');
+                                        $dept_mgr_override = ($is_eval_approved && $score_data && $score_data['dept_manager_override_score'] !== null) ? (float)$score_data['dept_manager_override_score'] : null;
+                                        $supervisor_override = ($is_eval_approved && $score_data && $score_data['supervisor_override_score'] !== null) ? (float)$score_data['supervisor_override_score'] : null;
+                                        $manager_override = ($is_eval_approved && $score_data && $score_data['manager_override_score'] !== null) ? (float)$score_data['manager_override_score'] : null;
                                         
                                         $effective_score = $original_score;
                                         $badge_html = '';
@@ -1292,9 +1295,10 @@ require_once '../includes/header.php';
                                         <?php
                                         $score_data = $view_scores[(int) $criterion['criterion_id']] ?? null;
                                         $original_score = $score_data ? (float)$score_data['score_value'] : 0.00;
-                                        $dept_mgr_override = $score_data && $score_data['dept_manager_override_score'] !== null ? (float)$score_data['dept_manager_override_score'] : null;
-                                        $supervisor_override = $score_data && $score_data['supervisor_override_score'] !== null ? (float)$score_data['supervisor_override_score'] : null;
-                                        $manager_override = $score_data && $score_data['manager_override_score'] !== null ? (float)$score_data['manager_override_score'] : null;
+                                        $is_eval_approved = (($view_eval['status'] ?? '') === 'Approved');
+                                        $dept_mgr_override = ($is_eval_approved && $score_data && $score_data['dept_manager_override_score'] !== null) ? (float)$score_data['dept_manager_override_score'] : null;
+                                        $supervisor_override = ($is_eval_approved && $score_data && $score_data['supervisor_override_score'] !== null) ? (float)$score_data['supervisor_override_score'] : null;
+                                        $manager_override = ($is_eval_approved && $score_data && $score_data['manager_override_score'] !== null) ? (float)$score_data['manager_override_score'] : null;
                                         
                                         $effective_score = $original_score;
                                         $badge_html = '';
@@ -1334,88 +1338,103 @@ require_once '../includes/header.php';
                     <div class="section-premium-label mb-3 mt-4">
                         <i class="fas fa-seedling"></i>Developmental Plan
                     </div>
-                    <div class="table-responsive mb-4 self-rating-result-table-wrap">
-                        <table class="table table-sm table-hover align-middle border-start self-rating-result-table">
-                            <thead class="small text-muted bg-light">
-                                <tr>
-                                    <th class="ps-3">Area of Improvement</th>
-                                    <th>Support Needed</th>
-                                    <th>Time Frame</th>
-                                </tr>
-                            </thead>
-                            <tbody class="small">
-                                <?php if (!empty($view_dev_plans)): ?>
-                                    <?php foreach ($view_dev_plans as $plan): ?>
-                                        <tr>
-                                            <td class="ps-3"><?php echo e($plan['improvement_area']); ?></td>
-                                            <td data-label="Support Needed"><?php echo e($plan['support_needed']); ?></td>
-                                            <td data-label="Time Frame"><?php echo e($plan['time_frame']); ?></td>
-                                        </tr>
-                                    <?php endforeach; ?>
-                                <?php else: ?>
+                    <?php if (($view_eval['status'] ?? '') === 'Approved'): ?>
+                        <div class="table-responsive mb-4 self-rating-result-table-wrap">
+                            <table class="table table-sm table-hover align-middle border-start self-rating-result-table">
+                                <thead class="small text-muted bg-light">
                                     <tr>
-                                        <td colspan="3" class="text-center text-muted small py-3">No developmental plan recorded.</td>
+                                        <th class="ps-3">Area of Improvement</th>
+                                        <th>Support Needed</th>
+                                        <th>Time Frame</th>
                                     </tr>
-                                <?php endif; ?>
-                            </tbody>
-                        </table>
-                    </div>
+                                </thead>
+                                <tbody class="small">
+                                    <?php if (!empty($view_dev_plans)): ?>
+                                        <?php foreach ($view_dev_plans as $plan): ?>
+                                            <tr>
+                                                <td class="ps-3"><?php echo e($plan['improvement_area']); ?></td>
+                                                <td data-label="Support Needed"><?php echo e($plan['support_needed']); ?></td>
+                                                <td data-label="Time Frame"><?php echo e($plan['time_frame']); ?></td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    <?php else: ?>
+                                        <tr>
+                                            <td colspan="3" class="text-center text-muted small py-3">No developmental plan recorded.</td>
+                                        </tr>
+                                    <?php endif; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    <?php else: ?>
+                        <div class="alert alert-info border d-flex align-items-center gap-3 p-3 mb-4 rounded-3 shadow-sm" style="background-color: #f0fdf4; border-color: #86efac !important; color: #166534;">
+                            <i class="fas fa-lock fa-2x text-success"></i>
+                            <div class="small">
+                                <strong class="d-block mb-1" style="color: #14532d;">Developmental Plan Under Review:</strong>
+                                Supervisor action plans and developmental recommendations are currently being formulated and will be published once the evaluation cycle receives final approval.
+                            </div>
+                        </div>
+                    <?php endif; ?>
 
-                    <?php if (!empty($view_eval['supervisor_comments']) || !empty($view_eval['dept_manager_comments']) || !empty($view_eval['evaluator_comments']) || !empty($view_eval['manager_comments'])): ?>
-                        <div class="section-premium-label mb-3 mt-4">
-                            <i class="fas fa-comments"></i>Management Remarks & Justifications
-                        </div>
-                        <div class="row g-3 mb-4">
-                            <?php if (!empty($view_eval['supervisor_comments'])): ?>
-                                <div class="col-md-6">
-                                    <div class="p-3 bg-light rounded-3 border-start border-warning border-4 shadow-sm">
-                                        <div class="fw-bold text-warning small mb-1">
-                                            <i class="fas fa-user-shield me-1"></i>Department Supervisor Feedback
+                    <?php if (($view_eval['status'] ?? '') === 'Approved'): ?>
+                        <?php if (!empty($view_eval['supervisor_comments']) || !empty($view_eval['dept_manager_comments']) || !empty($view_eval['evaluator_comments']) || !empty($view_eval['manager_comments'])): ?>
+                            <div class="section-premium-label mb-3 mt-4">
+                                <i class="fas fa-comments"></i>Management Remarks & Justifications
+                            </div>
+                            <div class="row g-3 mb-4">
+                                <?php if (!empty($view_eval['supervisor_comments'])): ?>
+                                    <div class="col-md-6">
+                                        <div class="p-3 bg-light rounded-3 border-start border-warning border-4 shadow-sm">
+                                            <div class="fw-bold text-warning small mb-1">
+                                                <i class="fas fa-user-shield me-1"></i>Department Supervisor Feedback
+                                            </div>
+                                            <p class="mb-0 small text-dark" style="white-space: pre-wrap;"><?php echo e($view_eval['supervisor_comments']); ?></p>
                                         </div>
-                                        <p class="mb-0 small text-dark" style="white-space: pre-wrap;"><?php echo e($view_eval['supervisor_comments']); ?></p>
                                     </div>
-                                </div>
-                            <?php endif; ?>
-                            <?php if (!empty($view_eval['dept_manager_comments'])): ?>
-                                <div class="col-md-6">
-                                    <div class="p-3 bg-light rounded-3 border-start border-info border-4 shadow-sm">
-                                        <div class="fw-bold text-info small mb-1">
-                                            <i class="fas fa-user-shield me-1"></i>Department Manager Remarks
+                                <?php endif; ?>
+                                <?php if (!empty($view_eval['dept_manager_comments'])): ?>
+                                    <div class="col-md-6">
+                                        <div class="p-3 bg-light rounded-3 border-start border-info border-4 shadow-sm">
+                                            <div class="fw-bold text-info small mb-1">
+                                                <i class="fas fa-user-shield me-1"></i>Department Manager Remarks
+                                            </div>
+                                            <p class="mb-0 small text-dark" style="white-space: pre-wrap;"><?php echo e($view_eval['dept_manager_comments']); ?></p>
                                         </div>
-                                        <p class="mb-0 small text-dark" style="white-space: pre-wrap;"><?php echo e($view_eval['dept_manager_comments']); ?></p>
                                     </div>
-                                </div>
-                            <?php endif; ?>
-                            <?php if (!empty($view_eval['evaluator_comments'])): ?>
-                                <div class="col-md-6">
-                                    <div class="p-3 bg-light rounded-3 border-start border-primary border-4 shadow-sm">
-                                           <div class="fw-bold text-primary small mb-1">
-                                            <i class="fas fa-user-tie me-1"></i>HR Supervisor Remarks
+                                <?php endif; ?>
+                                <?php if (!empty($view_eval['evaluator_comments'])): ?>
+                                    <div class="col-md-6">
+                                        <div class="p-3 bg-light rounded-3 border-start border-primary border-4 shadow-sm">
+                                               <div class="fw-bold text-primary small mb-1">
+                                                <i class="fas fa-user-tie me-1"></i>HR Supervisor Remarks
+                                            </div>
+                                            <p class="mb-0 small text-dark" style="white-space: pre-wrap;"><?php echo e($view_eval['evaluator_comments']); ?></p>
                                         </div>
-                                        <p class="mb-0 small text-dark" style="white-space: pre-wrap;"><?php echo e($view_eval['evaluator_comments']); ?></p>
                                     </div>
-                                </div>
-                            <?php endif; ?>
-                            <?php if (!empty($view_eval['manager_comments'])): ?>
-                                <div class="col-md-6">
-                                    <div class="p-3 bg-light rounded-3 border-start border-success border-4 shadow-sm">
-                                        <div class="fw-bold text-success small mb-1">
-                                            <i class="fas fa-user-check me-1"></i>HR Manager Remarks / Justification
+                                <?php endif; ?>
+                                <?php if (!empty($view_eval['manager_comments'])): ?>
+                                    <div class="col-md-6">
+                                        <div class="p-3 bg-light rounded-3 border-start border-success border-4 shadow-sm">
+                                            <div class="fw-bold text-success small mb-1">
+                                                <i class="fas fa-user-check me-1"></i>HR Manager Remarks / Justification
+                                            </div>
+                                            <p class="mb-0 small text-dark" style="white-space: pre-wrap;"><?php echo e($view_eval['manager_comments']); ?></p>
                                         </div>
-                                        <p class="mb-0 small text-dark" style="white-space: pre-wrap;"><?php echo e($view_eval['manager_comments']); ?></p>
                                     </div>
-                                </div>
-                            <?php endif; ?>
-                        </div>
+                                <?php endif; ?>
+                            </div>
+                        <?php endif; ?>
                     <?php endif; ?>
 
                     <div class="alert alert-info mb-4 self-rating-score-summary">
                         <div class="d-flex justify-content-between align-items-center">
                             <div>
                                 <div class="small text-muted">Total Score</div>
-                                <div class="h4 mb-0"><?php echo e($view_eval['total_score'] ?? '0.00'); ?>
-                                    <span
-                                        class="badge bg-primary"><?php echo e($view_eval['performance_level'] ?? '—'); ?></span>
+                                <div class="h4 mb-0"><?php echo (($view_eval['status'] ?? '') === 'Approved') ? e($view_eval['total_score'] ?? '0.00') : 'Pending Final Approval'; ?>
+                                    <?php if (($view_eval['status'] ?? '') === 'Approved'): ?>
+                                        <span class="badge bg-primary"><?php echo e($view_eval['performance_level'] ?? '—'); ?></span>
+                                    <?php else: ?>
+                                        <span class="badge bg-warning text-dark">Under Review</span>
+                                    <?php endif; ?>
                                 </div>
                             </div>
                             <div class="text-end">

@@ -164,6 +164,7 @@ while ($row = $age_dist_q->fetch_assoc()) {
         $age_counts[$age_map[$row['age_group']]] = (int)$row['count'];
     }
 }
+$total_age_tracked = array_sum($age_counts);
 
 // ── Non-Regular Watchlist ────────────────────────────────────────────────────
 $watchlist_departments = $conn->query("SELECT department_id, department_name FROM departments WHERE is_active = 1 AND deleted_at IS NULL ORDER BY department_name");
@@ -1068,12 +1069,44 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
     <div class="col-12">
         <div class="chart-card">
             <div class="cc-header d-flex justify-content-between align-items-center">
-                <h5><i class="fas fa-birthday-cake me-2 text-danger"></i>Employee Age Distribution</h5>
+                <h5><i class="fas fa-chart-pie me-2 text-danger"></i>Employee Age Distribution</h5>
                 <span class="badge bg-light text-dark fw-normal" style="font-size: 0.7rem;">Workforce Demographics</span>
             </div>
             <div class="cc-body">
-                <div style="height: 300px;">
-                    <canvas id="ageDistChart"></canvas>
+                <div class="row align-items-center g-4">
+                    <div class="col-lg-7 col-md-12">
+                        <div style="height: 320px; position: relative;">
+                            <canvas id="ageDistChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="col-lg-5 col-md-12">
+                        <div class="p-3 bg-light rounded-3 border">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <span class="text-muted small fw-semibold text-uppercase" style="letter-spacing: 0.5px;">Active Headcount</span>
+                                <span class="badge bg-danger rounded-pill px-3 py-1 fw-bold fs-6"><?php echo $total_age_tracked; ?></span>
+                            </div>
+                            <div class="d-flex flex-column gap-2">
+                                <?php 
+                                $age_palette = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
+                                foreach ($age_labels as $idx => $label): 
+                                    $c = $age_counts[$idx];
+                                    $pct = $total_age_tracked > 0 ? round(($c / $total_age_tracked) * 100, 1) : 0;
+                                    $dot_color = $age_palette[$idx];
+                                ?>
+                                <div class="d-flex align-items-center justify-content-between py-1 border-bottom border-light">
+                                    <div class="d-flex align-items-center">
+                                        <span class="d-inline-block rounded-circle me-2" style="width: 10px; height: 10px; background-color: <?php echo $dot_color; ?>;"></span>
+                                        <span class="small fw-semibold text-secondary"><?php echo $label; ?> yrs</span>
+                                    </div>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="small fw-bold text-dark"><?php echo $c; ?></span>
+                                        <span class="badge bg-white text-muted border px-2 py-1" style="font-size: 0.72rem; min-width: 48px; text-align: right;"><?php echo $pct; ?>%</span>
+                                    </div>
+                                </div>
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1379,51 +1412,49 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
             }
         });
 
-        // 5. Age Distribution (Vertical Bar Chart)
+        // 5. Age Distribution (Pie Chart)
         new Chart(document.getElementById('ageDistChart'), {
-            type: 'bar',
+            type: 'pie',
             data: {
                 labels: <?php echo json_encode($age_labels); ?>,
                 datasets: [{
-                    label: 'Number of Employees',
+                    label: 'Employees',
                     data: <?php echo json_encode($age_counts); ?>,
-                    backgroundColor: 'rgba(220, 53, 69, 0.7)',
-                    borderColor: '#dc3545',
-                    borderWidth: 1,
-                    borderRadius: 8,
-                    barThickness: 40
+                    backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'],
+                    borderColor: '#ffffff',
+                    borderWidth: 2,
+                    hoverOffset: 10
                 }]
             },
             options: {
                 ...commonOptions,
                 plugins: {
                     ...commonOptions.plugins,
-                    legend: { display: false },
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            usePointStyle: true,
+                            padding: 16,
+                            font: { size: 12 }
+                        }
+                    },
                     tooltip: {
                         callbacks: {
                             label: function(context) {
-                                return context.raw + ' Employees';
+                                const dataset = context.dataset;
+                                const total = dataset.data.reduce((a, b) => a + b, 0);
+                                const value = context.raw || 0;
+                                const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                                return ` ${context.label} yrs: ${value} Employees (${percentage}%)`;
                             }
                         }
                     }
                 },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        grid: { color: '#f0f0f0', drawBorder: false },
-                        ticks: { precision: 0 }
-                    },
-                    x: {
-                        grid: { display: false }
-                    }
-                },
                 animation: {
-                    duration: 1600,
-                    easing: 'easeInOutQuart',
-                    delay: (context) => {
-                        // Stagger animation for each bar
-                        return context.dataIndex * 80;
-                    }
+                    animateRotate: true,
+                    animateScale: true,
+                    duration: 1500,
+                    easing: 'easeInOutQuart'
                 }
             }
         });

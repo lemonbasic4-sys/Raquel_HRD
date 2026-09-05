@@ -18,6 +18,18 @@ if ($employee_id > 0) {
     $history_stmt = $conn->prepare("SELECT ev.evaluation_id, ev.evaluation_type, ev.evaluation_period_start, ev.evaluation_period_end,
             ev.kra_subtotal, ev.behavior_average, ev.total_score, ev.performance_level, ev.status, ev.submitted_date,
             et.template_name, ep.package_id, ep.status AS package_status, ep.shared_behavior_score,
+            (
+                SELECT ROUND(SUM((ec.weight / 100.0) * es.score_value), 2)
+                FROM evaluation_scores es
+                JOIN evaluation_criteria ec ON ec.criterion_id = es.criterion_id
+                WHERE es.evaluation_id = ev.evaluation_id AND ec.section = 'KRA'
+            ) AS orig_kra_subtotal,
+            (
+                SELECT ROUND(AVG(es.score_value), 2)
+                FROM evaluation_scores es
+                JOIN evaluation_criteria ec ON ec.criterion_id = es.criterion_id
+                WHERE es.evaluation_id = ev.evaluation_id AND ec.section != 'KRA'
+            ) AS orig_behavior_average,
             EXISTS(SELECT 1 FROM evaluation_scores es WHERE es.evaluation_id = ev.evaluation_id AND (es.supervisor_override_score IS NOT NULL OR es.dept_manager_override_score IS NOT NULL OR es.manager_override_score IS NOT NULL)) AS has_adjustments
         FROM evaluations ev
         JOIN evaluation_templates et ON et.template_id = ev.template_id
@@ -144,9 +156,12 @@ require_once '../includes/header.php';
                 <div class="eh-list">
                     <?php foreach ($evaluations as $ev): ?>
                     <?php
-                        $has_total = $ev['total_score'] !== null;
-                        $level     = $ev['performance_level'] ?: null;
-                        $submitted = !empty($ev['submitted_date']) ? date('M d, Y', strtotime($ev['submitted_date'])) : null;
+                        $is_completed = ($ev['package_status'] === 'Approved and Applied' || $ev['status'] === 'Approved');
+                        $has_total    = $is_completed && ($ev['total_score'] !== null);
+                        $level        = $is_completed ? ($ev['performance_level'] ?: null) : null;
+                        $submitted    = !empty($ev['submitted_date']) ? date('M d, Y', strtotime($ev['submitted_date'])) : null;
+                        $show_adjustments = $is_completed && !empty($ev['has_adjustments']);
+                        
                         // Derive score-tier pill class
                         if ($has_total) {
                             $ts = (float)$ev['total_score'];
@@ -175,7 +190,7 @@ require_once '../includes/header.php';
                                 <?php else: ?>
                                     <span class="badge <?php echo $ev['status'] === 'Approved' ? 'bg-success' : 'bg-secondary'; ?>"><?php echo e($ev['status']); ?></span>
                                 <?php endif; ?>
-                                <?php if (!empty($ev['has_adjustments'])): ?>
+                                <?php if ($show_adjustments): ?>
                                     <span class="eh-adj-chip"><i class="fas fa-pen-fancy"></i>Score Adjustments Recorded</span>
                                 <?php endif; ?>
                                 <?php if ($level): ?>
@@ -183,14 +198,18 @@ require_once '../includes/header.php';
                                 <?php endif; ?>
                             </div>
                         </div>
+                        <?php
+                        $display_kra = $is_completed ? (float)$ev['kra_subtotal'] : (float)($ev['orig_kra_subtotal'] ?? $ev['kra_subtotal']);
+                        $display_beh = $is_completed ? (float)$ev['behavior_average'] : (float)($ev['orig_behavior_average'] ?? $ev['behavior_average']);
+                        ?>
                         <div class="eh-card__scores">
                             <div class="eh-score-pill">
                                 <span class="eh-score-pill__label">KRA</span>
-                                <span class="eh-score-pill__value"><?php echo $ev['kra_subtotal'] !== null ? number_format((float)$ev['kra_subtotal'], 2) : '&mdash;'; ?></span>
+                                <span class="eh-score-pill__value"><?php echo number_format($display_kra, 2); ?></span>
                             </div>
                             <div class="eh-score-pill">
                                 <span class="eh-score-pill__label">Behavior</span>
-                                <span class="eh-score-pill__value"><?php echo $ev['behavior_average'] !== null ? number_format((float)$ev['behavior_average'], 2) : '&mdash;'; ?></span>
+                                <span class="eh-score-pill__value"><?php echo number_format($display_beh, 2); ?></span>
                             </div>
                             <div class="eh-score-pill <?php echo $pill_class; ?>">
                                 <span class="eh-score-pill__label">Total</span>

@@ -89,7 +89,7 @@ switch ($effective_role) {
                 ['icon' => 'fas fa-building', 'label' => 'Branches', 'url' => BASE_URL . '/manager/branches.php', 'page' => 'branches.php'],
                 ['icon' => 'fas fa-sitemap', 'label' => 'Departments', 'url' => BASE_URL . '/manager/departments.php', 'page' => 'departments.php'],
                 ['icon' => 'fas fa-briefcase', 'label' => 'Positions', 'url' => BASE_URL . '/manager/positions.php', 'page' => 'positions.php'],
-                ['icon' => 'fas fa-landmark', 'label' => 'Evaluation Governance', 'url' => BASE_URL . '/manager/evaluation-governance.php', 'page' => 'evaluation-governance.php'],
+                ['icon' => 'fas fa-route', 'label' => 'Evaluation Routing & Governance', 'url' => BASE_URL . '/manager/evaluation-governance.php', 'page' => 'evaluation-governance.php'],
                 // ['icon' => 'fas fa-project-diagram', 'label' => 'Operation Management', 'url' => BASE_URL . '/manager/operation-management.php', 'page' => 'operation-management.php'],
             ],
             'EVALUATIONS' => [

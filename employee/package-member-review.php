@@ -26,9 +26,6 @@ if (!$review_step) {
 if (($review_step['status'] ?? '') === 'Approved and Applied' || isOrganizationPackageLocked($conn, $package_id)) {
     redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'This package is locked after Board approval. Ratings can no longer be adjusted.');
 }
-if (($review_step['step_type'] ?? '') === 'Governance') {
-    redirectWith(BASE_URL . '/employee/package-member-view.php?package_id=' . $package_id . '&evaluation_id=' . $evaluation_id, 'info', 'Governance steps are read-only. Use View for member details, then Approve or Return on the package.');
-}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verifyCsrfToken();
@@ -79,16 +76,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $ins_plan->close();
     }
 
+    $emp_q = $conn->prepare("SELECT emp.first_name, emp.last_name FROM evaluations ev JOIN employees emp ON emp.employee_id = ev.employee_id WHERE ev.evaluation_id = ? LIMIT 1");
+    $emp_q->bind_param('i', $evaluation_id);
+    $emp_q->execute();
+    $target_emp = $emp_q->get_result()->fetch_assoc();
+    $emp_q->close();
+    $target_emp_name = $target_emp ? ($target_emp['first_name'] . ' ' . $target_emp['last_name']) : 'Employee #' . $evaluation_id;
+
     if ($changes) {
         recalculateEvaluationScores($conn, $evaluation_id);
         recalculateOrganizationPackageBehaviorScore($conn, $package_id);
-        $remarks = 'Adjusted ' . implode('; ', $changes);
+        $remarks = 'Adjusted scores for ' . $target_emp_name . ' — ' . implode('; ', $changes);
         $audit = $conn->prepare("INSERT INTO evaluation_package_audit (package_id, user_id, action, remarks) VALUES (?, ?, 'MEMBER_SCORES_ADJUSTED', ?)");
         $audit->bind_param('iis', $package_id, $user_id, $remarks);
         $audit->execute();
         $audit->close();
         redirectWith(BASE_URL . '/employee/package-member-review.php?package_id=' . $package_id . '&evaluation_id=' . $evaluation_id, 'success', 'Individual ratings, shared Behavior score, and Developmental Plan were saved successfully.');
     }
+
+    if ($sort_idx > 0) {
+        $plan_remark = 'Updated Developmental Plan (' . $sort_idx . ' item' . ($sort_idx === 1 ? '' : 's') . ') for ' . $target_emp_name . '.';
+        $audit = $conn->prepare("INSERT INTO evaluation_package_audit (package_id, user_id, action, remarks) VALUES (?, ?, 'DEV_PLAN_UPDATED', ?)");
+        $audit->bind_param('iis', $package_id, $user_id, $plan_remark);
+        $audit->execute();
+        $audit->close();
+    }
+
     redirectWith(BASE_URL . '/employee/package-member-review.php?package_id=' . $package_id . '&evaluation_id=' . $evaluation_id, 'success', 'Developmental plan and adjustments saved successfully.');
 }
 

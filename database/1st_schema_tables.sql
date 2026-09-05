@@ -776,6 +776,95 @@ CREATE TABLE login_attempts (
     INDEX idx_identifier_time (identifier, attempt_time)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- ============================================
+-- 40. Evaluation Governance Approvers
+-- ============================================
+DROP TABLE IF EXISTS evaluation_governance_approvers;
+CREATE TABLE evaluation_governance_approvers (
+    governance_approver_id INT AUTO_INCREMENT PRIMARY KEY,
+    governance_type ENUM('Board of Directors','Audit Committee','President','Division VP') NOT NULL,
+    department_id INT NULL,
+    user_id INT NOT NULL,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_governance_user (governance_type, department_id, user_id),
+    CONSTRAINT fk_governance_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    CONSTRAINT fk_governance_department FOREIGN KEY (department_id) REFERENCES departments(department_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ============================================
+-- 41. Evaluation Packages
+-- ============================================
+DROP TABLE IF EXISTS evaluation_packages;
+CREATE TABLE evaluation_packages (
+    package_id INT AUTO_INCREMENT PRIMARY KEY,
+    department_id INT NOT NULL,
+    template_id INT NOT NULL,
+    evaluation_type ENUM('Initial','Final','Quarterly','Annual') NOT NULL DEFAULT 'Annual',
+    period_start DATE NOT NULL,
+    period_end DATE NOT NULL,
+    consolidator_employee_id INT NULL,
+    shared_behavior_score DECIMAL(5,2) NULL,
+    current_step_order INT NULL,
+    status ENUM('Pending Self-Ratings','Pending Consolidation','Pending Review','Pending Audit Approval','Pending Board Approval','Approved and Applied','Returned','Cancelled') NOT NULL DEFAULT 'Pending Self-Ratings',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_evaluation_package (department_id, template_id, period_start, period_end),
+    INDEX idx_package_status (status, current_step_order),
+    CONSTRAINT fk_package_department FOREIGN KEY (department_id) REFERENCES departments(department_id),
+    CONSTRAINT fk_package_template FOREIGN KEY (template_id) REFERENCES evaluation_templates(template_id),
+    CONSTRAINT fk_package_consolidator FOREIGN KEY (consolidator_employee_id) REFERENCES employees(employee_id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ============================================
+-- 42. Evaluation Package Members
+-- ============================================
+DROP TABLE IF EXISTS evaluation_package_members;
+CREATE TABLE evaluation_package_members (
+    package_id INT NOT NULL,
+    evaluation_id INT NOT NULL,
+    PRIMARY KEY (package_id, evaluation_id),
+    CONSTRAINT fk_package_member_package FOREIGN KEY (package_id) REFERENCES evaluation_packages(package_id) ON DELETE CASCADE,
+    CONSTRAINT fk_package_member_evaluation FOREIGN KEY (evaluation_id) REFERENCES evaluations(evaluation_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ============================================
+-- 43. Evaluation Package Route Steps
+-- ============================================
+DROP TABLE IF EXISTS evaluation_package_route_steps;
+CREATE TABLE evaluation_package_route_steps (
+    package_route_step_id INT AUTO_INCREMENT PRIMARY KEY,
+    package_id INT NOT NULL,
+    step_order INT NOT NULL,
+    reviewer_employee_id INT NULL,
+    reviewer_user_id INT NULL,
+    step_label VARCHAR(160) NOT NULL,
+    step_type ENUM('Consolidation','Review','Governance') NOT NULL DEFAULT 'Review',
+    action_status ENUM('Waiting','Pending','Approved','Returned','Skipped') NOT NULL DEFAULT 'Waiting',
+    acted_at DATETIME NULL,
+    comments TEXT NULL,
+    UNIQUE KEY uq_package_route_step (package_id, step_order),
+    INDEX idx_route_reviewer (reviewer_user_id, action_status),
+    CONSTRAINT fk_route_package FOREIGN KEY (package_id) REFERENCES evaluation_packages(package_id) ON DELETE CASCADE,
+    CONSTRAINT fk_route_employee FOREIGN KEY (reviewer_employee_id) REFERENCES employees(employee_id) ON DELETE SET NULL,
+    CONSTRAINT fk_route_user FOREIGN KEY (reviewer_user_id) REFERENCES users(user_id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ============================================
+-- 44. Evaluation Package Audit
+-- ============================================
+DROP TABLE IF EXISTS evaluation_package_audit;
+CREATE TABLE evaluation_package_audit (
+    package_audit_id INT AUTO_INCREMENT PRIMARY KEY,
+    package_id INT NOT NULL,
+    user_id INT NULL,
+    action VARCHAR(80) NOT NULL,
+    remarks TEXT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_package_audit (package_id, created_at),
+    CONSTRAINT fk_pkg_audit_pkg FOREIGN KEY (package_id) REFERENCES evaluation_packages(package_id) ON DELETE CASCADE,
+    CONSTRAINT fk_pkg_audit_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 SET FOREIGN_KEY_CHECKS = 1;
 
