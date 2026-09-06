@@ -1,107 +1,71 @@
-# Evaluation-flow test seeds (HRD & Acquired Properties Only)
+# Evaluation-Flow Test Seeds & Playbook
 
-Use this folder **instead of** the full department seeds (`AP_seed.sql`, `HR_seed.sql`, and the rest). Those files load too many employees for package testing: a department package waits until **every** active employee with a user account has submitted.
+This seed setup is optimized for testing the complete end-to-end evaluation lifecycle with a lean, clean employee roster without waiting on dozens of extraneous department accounts.
 
-All Employee portal passwords below: `password`
-
-### HRIS Management Accounts:
-
-| Login           | Password   | Use for                                              |
-| --------------- | ---------- | ---------------------------------------------------- |
-| `admin`         | `password` | Admin                                                |
-| `elena.delgado` | `password` | HR Manager — templates, governance UI, Team Packages |
-
-Patricia / Miguel also have HRIS accounts (`patricia.gomez`, `miguel.torres`); for **self-rating** use their portal codes (`HRD-002`, `HRD-003`).
+All Employee portal passwords: `password`
 
 ---
 
-## Import order (fresh database)
+## HRIS Administrative Logins:
 
-Drop `raquel_hris_test_db`, recreate it, then import **in this order**:
-
-1. `database/1st_schema_tables.sql`
-2. `database/2nd_seed_organization.sql`
-3. `database/3rd_seed_HR_accounts_.sql`
-4. `sample_db_seeds/01_test_employees.sql` ← Lean test roster (HRD & AP only)
-5. `database/xPortal_accounts.sql`
-6. `database/data/seed_templates.sql`
-7. `sample_db_seeds/02_test_hrd_portal_accounts.sql`
-8. `sample_db_seeds/03_test_governance_approvers.sql`
-
-Do **not** import `testing_seed.sql` and do **not** import the large `*_seed.sql` department files.
+| Login | Password | Role | Usage |
+|---|---|---|---|
+| `admin` | `password` | Admin | Full System Administration |
+| `elena.delgado` | `password` | HR Manager | Templates, Routing & Governance UI, HRIS Packages |
 
 ---
 
-## Active Test Roster
+## Active Employee & Portal Roster:
 
-Each department in this lean test setup has a frozen `reports_to` chain:
-
-| Dept | Portal logins (staff → … → head) | Consolidator | Annual template to pick |
-| --- | --- | --- | --- |
-| **Acquired Properties (Pilot)** | `AP-T01` → `AP-T02` → `AP-T03` → `AP-T04` | `AP-T02` (Supervisor) | Acquired Properties **Annual** |
-| **Human Resources (HRD)** | `HRD-003` → `HRD-002` → `HRD-001` | `HRD-002` (Patricia) | Human Resources **Annual** |
-
-### Executive & Governance Roster
-
-All employee portal passwords: `password`
-
-| Portal login | Name & Title | Assigned Role on Package |
-| ------------ | ------------ | ------------------------- |
-| `AP-T04`     | Eduardo Aquino (VP for Acquired Properties) | Step 4: Division VP for Acquired Properties |
-| `OP-T02`     | Gabriel Mendoza (President & CEO) | Step 5: Corporate Executive Sign-off (President) |
-| `GOV-AUD`    | Manuel Ramos (Audit Committee Chair) | Step 6: Corporate Compliance & Audit Check |
-| `GOV-BOD`    | Antonio Raquel (Chairman of the Board) | Step 7: **Final Ratification, Lock & Apply** |
-
-*Note: HRD reports directly to the President & CEO and automatically bypasses Step 4 (Division VP).*
+| Department | Portal Login | Name | Job Title | Reports To |
+|---|---|---|---|---|
+| **Human Resources** | `HRD-003` | Miguel Torres | HR Staff I | `HRD-002` (Patricia Gomez) |
+| **Human Resources** | `HRD-002` | Patricia Gomez | HR Supervisor I | `HRD-001` (Elena Delgado) |
+| **Human Resources** | `HRD-001` | Elena Delgado | HR Manager I | *(Direct to President)* |
+| **Acquired Properties** | `AP-T01` | Leonora Gomez | AP Staff I | `AP-T02` (Ronald Lopez) |
+| **Acquired Properties** | `AP-T02` | Ronald Lopez | AP Supervisor I | `AP-T03` (Christopher Tolentino) |
+| **Acquired Properties** | `AP-T03` | Christopher Tolentino | AP Manager I | `AP-T04` (Eduardo Aquino) |
+| **Acquired Properties** | `AP-T04` | Eduardo Aquino | VP for Acquired Properties | *(Executive)* |
+| **Audit** | `AUD-S01` | Isabel Mendoza | Audit Supervisor I | `AUD-M01` (Manuel Ramos) |
+| **Audit** | `AUD-M01` | Manuel Ramos | Audit Manager I | *(Department Head)* |
+| **Office of President** | `OP-T02` | Gabriel Mendoza | President and CEO | *(Company Head)* |
 
 ---
 
-## The Corporate Evaluation Routing Chain
+## Configured Corporate Governance Approvers:
 
-When an evaluation package is generated, it automatically follows the company hierarchy:
+| Step | Governance Level | Assigned Official | Portal Login | Scope |
+|---|---|---|---|---|
+| **Step 4** | **Division VP** | Eduardo Villanueva Aquino (VP for Acquired Properties) | `AP-T04` | Acquired Properties (Dept 1) |
+| **Step 5** | **President & CEO** | Gabriel Santos Mendoza (President & CEO) | `OP-T02` | Company-Wide |
+| **Step 6** | **Audit Committee** | Isabel Reyes Mendoza (Audit Supervisor I) | `AUD-S01` | Company-Wide |
+| **Step 7** | **Board of Directors** | Manuel Rivera Ramos (Audit Manager I) | `AUD-M01` | **Company-Wide (Final Lock & Apply)** |
 
-$$\text{Supervisor (Consolidator)} \longrightarrow \text{Manager (Review)} \longrightarrow \mathbf{Division\ VP\ (AP\ only)} \longrightarrow \mathbf{President} \longrightarrow \mathbf{Audit\ Committee} \longrightarrow \mathbf{Board\ of\ Directors\ [Final\ Lock]}$$
+*Note: Human Resources routes directly to President (Step 5) and automatically bypasses Step 4 (Division VP).*
 
 ---
 
-## Tests in Order
+## Complete Reset & Seed Batch Script:
 
-### Test 1 — Verify Routing Matrix in HRIS
+Run this directly in PowerShell to reset and load the entire setup in one go:
 
-1. Login to HRIS as `elena.delgado` / `password`.
-2. Go to **Performance & Appraisal** &rarr; **Evaluation Routing & Governance** (`manager/evaluation-governance.php`).
-3. Confirm the **Department Division VP Matrix**:
-   - **Acquired Properties** &rarr; `Eduardo Villanueva Aquino (VP for Acquired Properties)`
-   - **Human Resources** &rarr; Direct to President & CEO (No Division VP needed)
-4. Confirm **Corporate Governance Officials**:
-   - **President** &rarr; `Gabriel Santos Mendoza (President and CEO)`
-   - **Audit Committee** &rarr; `Manuel Rivera Ramos (Audit Committee Chair)`
-   - **Board of Directors** &rarr; `Antonio Velasco Raquel (Chairman of the Board)`
+```powershell
+# Set working directory to project root
+cd C:\xampp\htdocs\Raquel_HRD_Test
 
-### Test 2 — Full Human Resources Flow (Direct to President)
+# 1. Drop and recreate the database
+& "C:\xampp\mysql\bin\mysql.exe" -u root -e "DROP DATABASE IF EXISTS raquel_hris_test_db; CREATE DATABASE raquel_hris_test_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 
-1. Portal self-rate HR Annual as all 3 HR members:
-   - Login `HRD-003` (Miguel / Staff) &rarr; Self-Rating &rarr; Human Resources Annual &rarr; Submit.
-   - Login `HRD-002` (Patricia / Supervisor) &rarr; Self-Rating &rarr; Human Resources Annual &rarr; Submit.
-   - Login `HRD-001` (Elena / Manager) &rarr; Self-Rating &rarr; Human Resources Annual &rarr; Submit.
-2. Step 1 (Consolidation): Login `HRD-002` &rarr; Team Packages &rarr; Approve and advance package.
-3. Step 2 (Department Review): Login `HRD-001` &rarr; Team Packages &rarr; Approve.
-4. Step 5 (President Sign-off): Login `OP-T02` (President) &rarr; Team Packages &rarr; Notice package from HRD &rarr; Approve.
-5. Step 6 (Audit Check): Login `GOV-AUD` &rarr; Team Packages &rarr; Approve.
-6. Step 7 (Final Lock): Login `GOV-BOD` &rarr; Team Packages &rarr; **Approve, lock, and apply results**.
-7. **Pass:** Status changes to **Approved and Applied**; final results locked and applied to employee records.
+# 2. Run imports in chronological order
+& "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris_test_db -e "source database/1st_schema_tables.sql;"
+& "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris_test_db -e "source database/2nd_seed_organization.sql;"
+& "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris_test_db -e "source database/3rd_seed_HR_accounts_.sql;"
+& "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris_test_db -e "source sample_db_seeds/01_test_employees.sql;"
+& "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris_test_db -e "source database/xPortal_accounts.sql;"
+& "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris_test_db -e "source database/data/seed_templates.sql;"
+& "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris_test_db -e "source sample_db_seeds/02_test_hrd_portal_accounts.sql;"
+& "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris_test_db -e "source sample_db_seeds/03_test_governance_approvers.sql;"
+& "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris_test_db -e "source database/zLAST_performance_indexes.sql;"
 
-### Test 3 — Full Acquired Properties Flow (With Division VP Step)
-
-1. Portal self-rate AP Annual as:
-   - `AP-T01` (Leonora Gomez / Staff)
-   - `AP-T02` (Ronald Lopez / Supervisor)
-   - `AP-T03` (Christopher Tolentino / Manager)
-   - `AP-T04` (Eduardo Aquino / VP for Acquired Properties)
-2. Step 1 (Consolidation): `AP-T02` &rarr; Consolidate & Approve.
-3. Step 2 (Manager Review): `AP-T03` &rarr; Approve.
-4. Step 4 (Division VP): `AP-T04` &rarr; Approve.
-5. Step 5 (President): `OP-T02` &rarr; Approve.
-6. Step 6 (Audit Committee): `GOV-AUD` &rarr; Approve.
-7. Step 7 (Board of Directors): `GOV-BOD` &rarr; Approve, lock, and apply results.
-8. **Pass:** Successfully completes full route through designated VP for Acquired Properties.
+Write-Host "Database reset and seeded successfully!" -ForegroundColor Green
+```

@@ -3,7 +3,7 @@
 -- 1) Give Elena / Patricia / Miguel Employee-portal logins so they can
 --    self-rate (HRIS roles cannot open employee/self-rating.php).
 -- 2) Skip first-login PDS friction for test accounts.
--- Portal password for these three: password
+-- Portal password for these accounts: password
 -- ============================================================================
 USE raquel_hris_test_db;
 
@@ -34,5 +34,7 @@ SET u.first_login_completed = 1
 WHERE u.role = 'Employee'
   AND (
       e.employee_code LIKE 'AP-T%'
+      OR e.employee_code LIKE 'AUD-%'
+      OR e.employee_code = 'OP-T02'
       OR e.employee_id IN (101, 301, 302)
   );
