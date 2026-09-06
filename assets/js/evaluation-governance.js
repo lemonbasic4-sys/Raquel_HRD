@@ -88,8 +88,15 @@ document.addEventListener('DOMContentLoaded', function () {
             var deptId         = parseInt(opt.getAttribute('data-department-id'), 10) || 0;
             var deptName       = (opt.getAttribute('data-department-name') || '').toLowerCase();
             var jobTitle       = (opt.getAttribute('data-job-title') || '').toLowerCase();
+            var rankName       = (opt.getAttribute('data-rank-name') || '').toLowerCase();
             var rankCategoryId = parseInt(opt.getAttribute('data-rank-category-id'), 10) || 0;
             var currentRoleLow = role.toLowerCase();
+
+            // Rank & File (R&F) check
+            var isRankAndFile = (rankCategoryId === 5)
+                || (rankName.indexOf('rank and file') !== -1)
+                || (rankName.indexOf('rank & file') !== -1)
+                || (jobTitle.indexOf('staff') !== -1 && jobTitle.indexOf('chief of staff') === -1);
 
             // 1. Corporate single-person conflict check:
             // Skip employees already in a DIFFERENT corporate role
@@ -128,21 +135,15 @@ document.addEventListener('DOMContentLoaded', function () {
                         || (rankCategoryId === 3);
                 }
             } else if (role === 'Audit Committee') {
-                // Step 6: Filter to Audit department or Audit Committee chair/members
-                isMatch = (suggestedRole === 'audit committee')
-                    || deptName.indexOf('audit') !== -1
-                    || deptId === 2
-                    || jobTitle.indexOf('audit') !== -1
-                    || jobTitle.indexOf('auditor') !== -1;
+                // Step 6: Exclusively Audit Department leadership / members (excluding R&F)
+                isMatch = !isRankAndFile && (
+                    (deptId === 2)
+                    || (deptName.indexOf('audit') !== -1)
+                    || (suggestedRole === 'audit committee')
+                );
             } else if (role === 'Board of Directors') {
-                // Step 7: Filter to Board of Directors / Chairman / Executive Trustees
-                isMatch = (suggestedRole === 'board of directors')
-                    || jobTitle.indexOf('board') !== -1
-                    || jobTitle.indexOf('chair') !== -1
-                    || jobTitle.indexOf('director') !== -1
-                    || jobTitle.indexOf('trustee') !== -1
-                    || (rankCategoryId === 1)
-                    || (deptId === 0);
+                // Step 7: All available leadership personnel (Supervisors, Managers, VPs, Executives, Board Members) EXCEPT Rank & File (R&F)
+                isMatch = !isRankAndFile;
             }
 
             if (isMatch) {
@@ -150,11 +151,15 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
 
-        // Fallback: If no candidate matched the strict filter, show all non-conflicting options
-        if (validOptions.length === 0 && role) {
+        // Fallback: Only for roles without strict exclusivity when no candidates are found
+        if (validOptions.length === 0 && role && role !== 'Audit Committee' && role !== 'President' && role !== 'Board of Directors') {
             rawOptions.forEach(function (opt) {
                 if (!opt.value) return;
                 var assignedRole = (opt.getAttribute('data-assigned-role') || '').toLowerCase();
+                var rankCategoryId = parseInt(opt.getAttribute('data-rank-category-id'), 10) || 0;
+                var rankName = (opt.getAttribute('data-rank-name') || '').toLowerCase();
+                var isRF = (rankCategoryId === 5) || (rankName.indexOf('rank and file') !== -1) || (rankName.indexOf('rank & file') !== -1);
+                if (isCorporate && isRF) return;
                 if (isCorporate && assignedRole && assignedRole !== role.toLowerCase()) return;
                 validOptions.push(opt);
             });
@@ -166,7 +171,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
         tomEmp.refreshOptions(false);
 
-        // Auto-select best matching candidate
+        // Auto-select ONLY when an explicit matching title exists
         var bestCandidateValue = null;
         validOptions.forEach(function (opt) {
             if (bestCandidateValue) return;
@@ -183,11 +188,12 @@ document.addEventListener('DOMContentLoaded', function () {
                     bestCandidateValue = opt.value;
                 }
             } else if (role === 'Audit Committee') {
-                if (suggestedRole === 'audit committee' || jobTitle.indexOf('audit') !== -1) {
+                if (suggestedRole === 'audit committee' || jobTitle.indexOf('audit chair') !== -1 || jobTitle.indexOf('audit manager') !== -1 || jobTitle.indexOf('audit supervisor') !== -1) {
                     bestCandidateValue = opt.value;
                 }
             } else if (role === 'Board of Directors') {
-                if (suggestedRole === 'board of directors' || jobTitle.indexOf('board') !== -1 || jobTitle.indexOf('chair') !== -1) {
+                // Only auto-select if explicitly a Board of Directors / Chairman title
+                if (suggestedRole === 'board of directors' || jobTitle.indexOf('board of director') !== -1 || jobTitle.indexOf('chairman') !== -1 || jobTitle.indexOf('board chair') !== -1) {
                     bestCandidateValue = opt.value;
                 }
             }
