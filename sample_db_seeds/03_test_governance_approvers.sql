@@ -1,13 +1,10 @@
 -- ============================================================================
 -- 03_test_governance_approvers.sql
--- Evaluation Routing & Governance — Full Department Routing Seed
+-- Evaluation Routing & Governance — HRD & Acquired Properties Routing Seed
 -- Run AFTER 01_test_employees.sql and 02_test_hrd_portal_accounts.sql.
 --
 -- Assigns:
---   Division VP  per department  → from org chart
---   President    (company-wide)  → Gabriel Mendoza (OP-T02)
---   Audit Committee (company-wide) → GOV-AUD
---   Board of Directors (company-wide, Final Lock) → GOV-BOD
+--   Division VP for Acquired Properties → Eduardo Aquino (AP-T04)
 -- ============================================================================
 USE raquel_hris_test_db;
 
@@ -34,97 +31,13 @@ ALTER TABLE evaluation_governance_approvers
 TRUNCATE TABLE evaluation_governance_approvers;
 
 -- ============================================================================
--- TIER 1: Division VP per Department
--- Each department gets one designated Division VP sign-off from the org chart.
--- ============================================================================
-
+-- Division VP per Department
 -- Acquired Properties (dept 1) → VP for Acquired Properties = AP-T04 (Eduardo Aquino)
+-- ============================================================================
 INSERT INTO evaluation_governance_approvers (governance_type, department_id, user_id, is_active)
 SELECT 'Division VP', 1, u.user_id, 1
 FROM users u JOIN employees e ON e.employee_id = u.employee_id
 WHERE e.employee_code = 'AP-T04' AND u.role = 'Employee' AND u.is_active = 1 LIMIT 1;
-
--- Audit (dept 2) → VP Operations = OPS-VP (Rodrigo Castillo)
-INSERT INTO evaluation_governance_approvers (governance_type, department_id, user_id, is_active)
-SELECT 'Division VP', 2, u.user_id, 1
-FROM users u JOIN employees e ON e.employee_id = u.employee_id
-WHERE e.employee_code = 'OPS-VP' AND u.role = 'Employee' AND u.is_active = 1 LIMIT 1;
-
--- Business Development (dept 3) → VP Operations = OPS-VP
-INSERT INTO evaluation_governance_approvers (governance_type, department_id, user_id, is_active)
-SELECT 'Division VP', 3, u.user_id, 1
-FROM users u JOIN employees e ON e.employee_id = u.employee_id
-WHERE e.employee_code = 'OPS-VP' AND u.role = 'Employee' AND u.is_active = 1 LIMIT 1;
-
--- Compliance (dept 4) → VP Operations = OPS-VP
-INSERT INTO evaluation_governance_approvers (governance_type, department_id, user_id, is_active)
-SELECT 'Division VP', 4, u.user_id, 1
-FROM users u JOIN employees e ON e.employee_id = u.employee_id
-WHERE e.employee_code = 'OPS-VP' AND u.role = 'Employee' AND u.is_active = 1 LIMIT 1;
-
--- Finance (dept 5) → VP Finance = FIN-VP (Teresa Reyes)
-INSERT INTO evaluation_governance_approvers (governance_type, department_id, user_id, is_active)
-SELECT 'Division VP', 5, u.user_id, 1
-FROM users u JOIN employees e ON e.employee_id = u.employee_id
-WHERE e.employee_code = 'FIN-VP' AND u.role = 'Employee' AND u.is_active = 1 LIMIT 1;
-
--- General Services (dept 6) → VP General Services = GS-VP (Ricardo Buenaventura)
-INSERT INTO evaluation_governance_approvers (governance_type, department_id, user_id, is_active)
-SELECT 'Division VP', 6, u.user_id, 1
-FROM users u JOIN employees e ON e.employee_id = u.employee_id
-WHERE e.employee_code = 'GS-VP' AND u.role = 'Employee' AND u.is_active = 1 LIMIT 1;
-
--- Human Resources (dept 7) reports directly to President & CEO — no Division VP assigned.
-
--- Information Technology (dept 8) → VP Operations = OPS-VP
-INSERT INTO evaluation_governance_approvers (governance_type, department_id, user_id, is_active)
-SELECT 'Division VP', 8, u.user_id, 1
-FROM users u JOIN employees e ON e.employee_id = u.employee_id
-WHERE e.employee_code = 'OPS-VP' AND u.role = 'Employee' AND u.is_active = 1 LIMIT 1;
-
--- Marketing (dept 9) → VP Operations = OPS-VP
-INSERT INTO evaluation_governance_approvers (governance_type, department_id, user_id, is_active)
-SELECT 'Division VP', 9, u.user_id, 1
-FROM users u JOIN employees e ON e.employee_id = u.employee_id
-WHERE e.employee_code = 'OPS-VP' AND u.role = 'Employee' AND u.is_active = 1 LIMIT 1;
-
--- Operations (dept 11) → VP Operations = OPS-VP
-INSERT INTO evaluation_governance_approvers (governance_type, department_id, user_id, is_active)
-SELECT 'Division VP', 11, u.user_id, 1
-FROM users u JOIN employees e ON e.employee_id = u.employee_id
-WHERE e.employee_code = 'OPS-VP' AND u.role = 'Employee' AND u.is_active = 1 LIMIT 1;
-
--- Purchasing (dept 12) → VP Operations = OPS-VP
-INSERT INTO evaluation_governance_approvers (governance_type, department_id, user_id, is_active)
-SELECT 'Division VP', 12, u.user_id, 1
-FROM users u JOIN employees e ON e.employee_id = u.employee_id
-WHERE e.employee_code = 'OPS-VP' AND u.role = 'Employee' AND u.is_active = 1 LIMIT 1;
-
--- Note: Human Resources (dept 7) reports directly to the President & CEO and has no Division VP.
-
--- ============================================================================
--- TIER 2: Executive — President & CEO (company-wide, department_id = NULL)
--- ============================================================================
-INSERT INTO evaluation_governance_approvers (governance_type, department_id, user_id, is_active)
-SELECT 'President', NULL, u.user_id, 1
-FROM users u JOIN employees e ON e.employee_id = u.employee_id
-WHERE e.employee_code = 'OP-T02' AND u.role = 'Employee' AND u.is_active = 1 LIMIT 1;
-
--- ============================================================================
--- TIER 3: Independent Governance Bodies (company-wide, department_id = NULL)
--- ============================================================================
-
--- Audit Committee → GOV-AUD (Manuel Ramos - Audit Committee Chair)
-INSERT INTO evaluation_governance_approvers (governance_type, department_id, user_id, is_active)
-SELECT 'Audit Committee', NULL, u.user_id, 1
-FROM users u JOIN employees e ON e.employee_id = u.employee_id
-WHERE e.employee_code = 'GOV-AUD' AND u.is_active = 1 LIMIT 1;
-
--- Board of Directors → GOV-BOD (Antonio Raquel - Chairman of the Board) — Final Lock & Apply
-INSERT INTO evaluation_governance_approvers (governance_type, department_id, user_id, is_active)
-SELECT 'Board of Directors', NULL, u.user_id, 1
-FROM users u JOIN employees e ON e.employee_id = u.employee_id
-WHERE e.employee_code = 'GOV-BOD' AND u.is_active = 1 LIMIT 1;
 
 -- ============================================================================
 -- Verify: show what was seeded

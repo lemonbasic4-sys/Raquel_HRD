@@ -1,23 +1,19 @@
-# Evaluation-flow test seeds
+# Evaluation-flow test seeds (HRD & Acquired Properties Only)
 
 Use this folder **instead of** the full department seeds (`AP_seed.sql`, `HR_seed.sql`, and the rest). Those files load too many employees for package testing: a department package waits until **every** active employee with a user account has submitted.
 
 All Employee portal passwords below: `password`
 
-HRIS:
-
+### HRIS Management Accounts:
 
 | Login           | Password   | Use for                                              |
 | --------------- | ---------- | ---------------------------------------------------- |
 | `admin`         | `password` | Admin                                                |
 | `elena.delgado` | `password` | HR Manager — templates, governance UI, Team Packages |
 
-
-Patricia / Miguel also have HRIS accounts from `xPortal_accounts.sql`; for **self-rating** use their portal codes (`HRD-002`, `HRD-003`).
+Patricia / Miguel also have HRIS accounts (`patricia.gomez`, `miguel.torres`); for **self-rating** use their portal codes (`HRD-002`, `HRD-003`).
 
 ---
-
-
 
 ## Import order (fresh database)
 
@@ -26,43 +22,24 @@ Drop `raquel_hris_test_db`, recreate it, then import **in this order**:
 1. `database/1st_schema_tables.sql`
 2. `database/2nd_seed_organization.sql`
 3. `database/3rd_seed_HR_accounts_.sql`
-4. `sample_db_seeds/01_test_employees.sql` ← before portal accounts
+4. `sample_db_seeds/01_test_employees.sql` ← Lean test roster (HRD & AP only)
 5. `database/xPortal_accounts.sql`
 6. `database/data/seed_templates.sql`
 7. `sample_db_seeds/02_test_hrd_portal_accounts.sql`
 8. `sample_db_seeds/03_test_governance_approvers.sql`
 
-Do **not** import `testing_seed.sql` (it is not in the repo) and do **not** import the large `*_seed.sql` department files.
-
-Smoke-check:
-
-- HRIS: `http://localhost/Raquel_HRD/` → `elena.delgado` / `password`
-- Portal: `http://localhost/Raquel_HRD/employee/` → `AP-T01` / `password`
+Do **not** import `testing_seed.sql` and do **not** import the large `*_seed.sql` department files.
 
 ---
 
+## Active Test Roster
 
+Each department in this lean test setup has a frozen `reports_to` chain:
 
-## Who is in the roster
-
-Each operational department has **2–4** people and a frozen `reports_to` chain.
-
-
-| Dept                            | Portal logins (staff → … → head)          | Consolidator        | Annual template to pick        |
-| ------------------------------- | ----------------------------------------- | ------------------- | ------------------------------ |
-| **Acquired Properties (pilot)** | `AP-T01` → `AP-T02` → `AP-T03` → `AP-T04` | `AP-T02` Supervisor | Acquired Properties **Annual** |
-| Human Resources                 | `HRD-003` → `HRD-002` → `HRD-001`         | `HRD-002` Patricia  | Human Resources **Annual**     |
-| Audit                           | `AUD-T01` → `AUD-T02` → `AUD-T03`         | `AUD-T02`           | Audit Annual                   |
-| Business Development            | `BD-T01`, `BD-T02` → `BD-T03`             | `BD-T03` Officer    | BD Annual                      |
-| Compliance                      | `COM-T01` → `COM-T02` → `COM-T03`         | `COM-T02`           | Compliance Annual              |
-| Finance                         | `FIN-T01` → `FIN-T02` → `FIN-T03`         | `FIN-T02`           | Finance Annual                 |
-| General Services                | `GS-T01` → `GS-T02` → `GS-T03`            | `GS-T02`            | GS Annual                      |
-| Information Technology          | `IT-T01` → `IT-T02` → `IT-T03`            | `IT-T02`            | IT Annual                      |
-| Marketing                       | `MKT-T01` → `MKT-T02` → `MKT-T03`         | `MKT-T02`           | Marketing Annual               |
-| Office of the President         | `OP-T01` → `OP-T02`                       | `OP-T02` President  | OP Annual                      |
-| Operations                      | `OPS-T01` → `OPS-T02` → `OPS-T03`         | `OPS-T02`           | Operations Annual              |
-| Purchasing                      | `PUR-T01`, `PUR-T02` → `PUR-T03`          | `PUR-T03`           | Purchasing Annual              |
-
+| Dept | Portal logins (staff → … → head) | Consolidator | Annual template to pick |
+| --- | --- | --- | --- |
+| **Acquired Properties (Pilot)** | `AP-T01` → `AP-T02` → `AP-T03` → `AP-T04` | `AP-T02` (Supervisor) | Acquired Properties **Annual** |
+| **Human Resources (HRD)** | `HRD-003` → `HRD-002` → `HRD-001` | `HRD-002` (Patricia) | Human Resources **Annual** |
 
 ### Executive & Governance Roster
 
@@ -70,15 +47,12 @@ All employee portal passwords: `password`
 
 | Portal login | Name & Title | Assigned Role on Package |
 | ------------ | ------------ | ------------------------- |
-| `OPS-VP`     | Rodrigo Castillo (VP for Operations) | Division VP for HR, IT, OPS, BD, COM, MKT, PUR, AUD |
-| `AP-T04`     | Eduardo Aquino (VP for Acquired Properties) | Division VP for Acquired Properties |
-| `FIN-VP`     | Teresa Reyes (VP for Finance) | Division VP for Finance |
-| `GS-VP`      | Ricardo Buenaventura (VP for General Services) | Division VP for General Services |
-| `OP-T02`     | Gabriel Mendoza (President & CEO) | Corporate Executive Sign-off (President) |
-| `GOV-AUD`    | Manuel Ramos (Audit Committee Chair) | Corporate Compliance & Audit Check |
-| `GOV-BOD`    | Antonio Raquel (Chairman of the Board) | **Final Ratification, Lock & Apply** |
+| `AP-T04`     | Eduardo Aquino (VP for Acquired Properties) | Step 4: Division VP for Acquired Properties |
+| `OP-T02`     | Gabriel Mendoza (President & CEO) | Step 5: Corporate Executive Sign-off (President) |
+| `GOV-AUD`    | Manuel Ramos (Audit Committee Chair) | Step 6: Corporate Compliance & Audit Check |
+| `GOV-BOD`    | Antonio Raquel (Chairman of the Board) | Step 7: **Final Ratification, Lock & Apply** |
 
-HRD dual login: Elena uses `elena.delgado` on HRIS (manager view) and `HRD-001` on the Employee portal (self-rating / package review).
+*Note: HRD reports directly to the President & CEO and automatically bypasses Step 4 (Division VP).*
 
 ---
 
@@ -86,30 +60,25 @@ HRD dual login: Elena uses `elena.delgado` on HRIS (manager view) and `HRD-001` 
 
 When an evaluation package is generated, it automatically follows the company hierarchy:
 
-$$\text{Supervisor (Consolidator)} \longrightarrow \text{Manager (Review)} \longrightarrow \mathbf{Division\ VP} \longrightarrow \mathbf{President} \longrightarrow \mathbf{Audit\ (if\ active)} \longrightarrow \mathbf{Board\ of\ Directors\ [Final\ Lock]}$$
+$$\text{Supervisor (Consolidator)} \longrightarrow \text{Manager (Review)} \longrightarrow \mathbf{Division\ VP\ (AP\ only)} \longrightarrow \mathbf{President} \longrightarrow \mathbf{Audit\ Committee} \longrightarrow \mathbf{Board\ of\ Directors\ [Final\ Lock]}$$
 
 ---
 
 ## Tests in Order
 
-Use **one department at a time**. A package only waits on **that** department’s active members.
-Always use the **same Annual template** and the **same period** (Jan 1–Dec 31 of the current year). Submit — do not leave drafts.
-
 ### Test 1 — Verify Routing Matrix in HRIS
 
 1. Login to HRIS as `elena.delgado` / `password`.
 2. Go to **Performance & Appraisal** &rarr; **Evaluation Routing & Governance** (`manager/evaluation-governance.php`).
-3. Confirm the **Department Governance Matrix** displays all departments with their assigned Division VPs:
-   - **Human Resources** &rarr; `Rodrigo Lim Castillo (VP for Operations)`
+3. Confirm the **Department Division VP Matrix**:
    - **Acquired Properties** &rarr; `Eduardo Villanueva Aquino (VP for Acquired Properties)`
-   - **Finance** &rarr; `Teresa Santos Reyes (VP for Finance)`
-   - **General Services** &rarr; `Ricardo Cruz Buenaventura (VP for General Services)`
+   - **Human Resources** &rarr; Direct to President & CEO (No Division VP needed)
+4. Confirm **Corporate Governance Officials**:
    - **President** &rarr; `Gabriel Santos Mendoza (President and CEO)`
-   - **Board of Directors** &rarr; `Board Test Approver`
-   - **Audit Committee** &rarr; `Audit Test Approver`
-4. Test editing or adding an official if needed using the smart dropdowns.
+   - **Audit Committee** &rarr; `Manuel Rivera Ramos (Audit Committee Chair)`
+   - **Board of Directors** &rarr; `Antonio Velasco Raquel (Chairman of the Board)`
 
-### Test 2 — Full Human Resources Flow (HR Supervisor → Manager → VP Ops → President → Board Lock)
+### Test 2 — Full Human Resources Flow (Direct to President)
 
 1. Portal self-rate HR Annual as all 3 HR members:
    - Login `HRD-003` (Miguel / Staff) &rarr; Self-Rating &rarr; Human Resources Annual &rarr; Submit.
@@ -117,42 +86,22 @@ Always use the **same Annual template** and the **same period** (Jan 1–Dec 31 
    - Login `HRD-001` (Elena / Manager) &rarr; Self-Rating &rarr; Human Resources Annual &rarr; Submit.
 2. Step 1 (Consolidation): Login `HRD-002` &rarr; Team Packages &rarr; Approve and advance package.
 3. Step 2 (Department Review): Login `HRD-001` &rarr; Team Packages &rarr; Approve.
-4. Step 3 (Division VP): Login `OPS-VP` &rarr; Team Packages &rarr; Notice package from Human Resources &rarr; Approve.
-5. Step 4 (Executive Sign-off): Login `OP-T02` (President) &rarr; Team Packages &rarr; Approve.
-6. Step 5 (Audit Check): Login `GOV-AUD` &rarr; Team Packages &rarr; Approve.
-7. Step 6 (Final Lock): Login `GOV-BOD` &rarr; Team Packages &rarr; **Approve, lock, and apply results**.
-8. **Pass:** Status changes to **Approved and Applied**; final results locked and applied to employee records.
+4. Step 5 (President Sign-off): Login `OP-T02` (President) &rarr; Team Packages &rarr; Notice package from HRD &rarr; Approve.
+5. Step 6 (Audit Check): Login `GOV-AUD` &rarr; Team Packages &rarr; Approve.
+6. Step 7 (Final Lock): Login `GOV-BOD` &rarr; Team Packages &rarr; **Approve, lock, and apply results**.
+7. **Pass:** Status changes to **Approved and Applied**; final results locked and applied to employee records.
 
-### Test 3 — Full Acquired Properties Flow (AP Supervisor → AP Manager → VP AP → President → Board Lock)
+### Test 3 — Full Acquired Properties Flow (With Division VP Step)
 
 1. Portal self-rate AP Annual as:
-   - `AP-T01` (Staff)
-   - `AP-T02` (Supervisor)
-   - `AP-T03` (Manager)
-   - `AP-T04` (VP for Acquired Properties)
-2. `AP-T02` &rarr; Consolidate & Approve.
-3. `AP-T03` (Manager) &rarr; Approve.
-4. `AP-T04` (VP for Acquired Properties) &rarr; Approve.
-5. `OP-T02` (President) &rarr; Approve.
-6. `GOV-AUD` &rarr; Approve.
-7. `GOV-BOD` &rarr; Approve, lock, and apply results.
+   - `AP-T01` (Leonora Gomez / Staff)
+   - `AP-T02` (Ronald Lopez / Supervisor)
+   - `AP-T03` (Christopher Tolentino / Manager)
+   - `AP-T04` (Eduardo Aquino / VP for Acquired Properties)
+2. Step 1 (Consolidation): `AP-T02` &rarr; Consolidate & Approve.
+3. Step 2 (Manager Review): `AP-T03` &rarr; Approve.
+4. Step 4 (Division VP): `AP-T04` &rarr; Approve.
+5. Step 5 (President): `OP-T02` &rarr; Approve.
+6. Step 6 (Audit Committee): `GOV-AUD` &rarr; Approve.
+7. Step 7 (Board of Directors): `GOV-BOD` &rarr; Approve, lock, and apply results.
 8. **Pass:** Successfully completes full route through designated VP for Acquired Properties.
-
-### Test 4 — Return for Revision at Executive Level
-
-1. When package reaches `OPS-VP` or `OP-T02` (President), click **Return for revision** with a note (e.g., "Please adjust scoring justification").
-2. **Pass:** Package returns to Consolidator (`HRD-002` or `AP-T02`) with status marked returned and comments visible.
-3. Consolidator adjusts, re-approves, and package moves forward along the route again.
-
----
-
-## Common Blockers & Tips
-
-| Symptom | Cause & Solution |
-| --- | --- |
-| Waiting forever for submissions | Someone in that dept still active did not submit, or used a different template/period. |
-| Division VP or President missing on route | Department official was configured *after* package was generated. Re-create package or sync approvers. |
-| Inability to assign VP in governance UI | Ensure the user is an active employee or user account; use the updated "Evaluation Routing & Governance" page. |
-| Elena cannot open Self Rating on HRIS | Use Employee portal `HRD-001`, not `elena.delgado`. |
-
-

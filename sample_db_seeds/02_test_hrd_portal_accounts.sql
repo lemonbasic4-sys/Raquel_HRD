@@ -1,5 +1,5 @@
 -- ============================================================================
--- After xPortal_accounts.sql
+-- 02_test_hrd_portal_accounts.sql
 -- 1) Give Elena / Patricia / Miguel Employee-portal logins so they can
 --    self-rate (HRIS roles cannot open employee/self-rating.php).
 -- 2) Skip first-login PDS friction for test accounts.
@@ -33,7 +33,6 @@ JOIN employees e ON e.employee_id = u.employee_id
 SET u.first_login_completed = 1
 WHERE u.role = 'Employee'
   AND (
-      e.employee_code LIKE '%-T0%'
-      OR e.employee_code LIKE 'GOV-%'
+      e.employee_code LIKE 'AP-T%'
       OR e.employee_id IN (101, 301, 302)
   );
