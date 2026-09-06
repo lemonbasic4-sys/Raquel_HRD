@@ -359,6 +359,45 @@ foreach ($approvers as $a) {
     #tab-assign {
         overflow: visible !important;
     }
+
+    /* Governance Role Badges (High-Contrast & Vibrant Design) */
+    .badge-gov {
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 0.45rem !important;
+        font-size: 0.78rem !important;
+        font-weight: 700 !important;
+        letter-spacing: 0.03em !important;
+        padding: 0.4rem 0.85rem !important;
+        border-radius: 9999px !important;
+        border: 1.5px solid transparent !important;
+        white-space: nowrap !important;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06) !important;
+        text-transform: uppercase !important;
+    }
+    .badge-gov i {
+        font-size: 0.82rem !important;
+    }
+    .badge-gov-vp {
+        background-color: #dbeafe !important;
+        color: #1e40af !important;
+        border-color: #93c5fd !important;
+    }
+    .badge-gov-president {
+        background-color: #ede9fe !important;
+        color: #5b21b6 !important;
+        border-color: #c4b5fd !important;
+    }
+    .badge-gov-audit {
+        background-color: #fef3c7 !important;
+        color: #92400e !important;
+        border-color: #fcd34d !important;
+    }
+    .badge-gov-board {
+        background-color: #dcfce7 !important;
+        color: #166534 !important;
+        border-color: #86efac !important;
+    }
 </style>
 
 <main class="evaluation-packages container-fluid py-4">
@@ -732,20 +771,20 @@ foreach ($approvers as $a) {
                                         <?php
                                         // Role badge styles
                                         $role_styles = [
-                                            'Division VP'       => ['bg-primary-subtle text-primary border-primary-subtle', 'fa-sitemap'],
-                                            'President'         => ['bg-purple-subtle text-purple border-purple-subtle', 'fa-user-tie'],
-                                            'Audit Committee'   => ['bg-warning-subtle text-warning border-warning-subtle', 'fa-search-dollar'],
-                                            'Board of Directors'=> ['bg-success-subtle text-success border-success-subtle', 'fa-gavel'],
+                                            'Division VP'        => ['badge-gov badge-gov-vp', 'fa-sitemap'],
+                                            'President'          => ['badge-gov badge-gov-president', 'fa-crown'],
+                                            'Audit Committee'    => ['badge-gov badge-gov-audit', 'fa-search-dollar'],
+                                            'Board of Directors' => ['badge-gov badge-gov-board', 'fa-gavel'],
                                         ];
                                         $prev_type = null;
                                         foreach ($approvers as $approver):
-                                            $style = $role_styles[$approver['governance_type']] ?? ['bg-secondary-subtle text-secondary border-secondary-subtle', 'fa-user'];
+                                            $style = $role_styles[$approver['governance_type']] ?? ['badge-gov badge-gov-vp', 'fa-user-shield'];
                                             if ($approver['governance_type'] !== $prev_type):
                                                 $prev_type = $approver['governance_type'];
                                         ?>
                                         <tr class="table-light">
-                                            <td colspan="7" class="fw-bold text-uppercase small py-2 ps-3" style="font-size:.7rem;letter-spacing:1px;color:#64748b;">
-                                                <?php echo e($approver['governance_type']); ?> Officials
+                                            <td colspan="7" class="fw-bold text-uppercase small py-2 ps-3" style="font-size:.72rem;letter-spacing:1px;color:#475569;background:#f8fafc;border-top:2px solid #e2e8f0;">
+                                                <i class="fas <?php echo $style[1]; ?> me-2 text-secondary"></i><?php echo e($approver['governance_type']); ?> Officials
                                             </td>
                                         </tr>
                                         <?php endif; ?>
@@ -754,8 +793,8 @@ foreach ($approvers as $a) {
                                                 <input type="checkbox" class="form-check-input approver-checkbox" name="approver_ids[]" value="<?php echo (int)$approver['governance_approver_id']; ?>">
                                             </td>
                                             <td>
-                                                <span class="badge <?php echo $style[0]; ?> border px-2 py-1">
-                                                    <i class="fas <?php echo $style[1]; ?> me-1"></i><?php echo e($approver['governance_type']); ?>
+                                                <span class="<?php echo $style[0]; ?>">
+                                                    <i class="fas <?php echo $style[1]; ?>"></i><?php echo e($approver['governance_type']); ?>
                                                 </span>
                                             </td>
                                             <td class="small text-muted"><?php echo e($approver['department_name']); ?></td>
