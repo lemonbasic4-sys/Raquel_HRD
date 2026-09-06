@@ -246,6 +246,14 @@ foreach ($approvers as $a) {
         if ($a['governance_type'] === 'Board of Directors' && !$board_row)    $board_row     = $a;
     }
 }
+
+// Build map of employee_id => governance_type for active corporate assignments (used by JS to filter dropdown)
+$assigned_corporate = [];
+foreach ($approvers as $a) {
+    if ($a['is_active'] && in_array($a['governance_type'], ['President','Audit Committee','Board of Directors'], true)) {
+        $assigned_corporate[(int)$a['employee_id']] = $a['governance_type'];
+    }
+}
 ?>
 <style>
     /* Checkboxes */
@@ -323,6 +331,33 @@ foreach ($approvers as $a) {
         background: rgba(255, 255, 255, 0.2) !important;
         color: #ffffff !important;
         border-color: rgba(255, 255, 255, 0.3) !important;
+    }
+
+    /* Tom Select Dropdown visibility & layering */
+    .ts-dropdown {
+        z-index: 99999 !important;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15) !important;
+        border-radius: 8px !important;
+        border: 1px solid #cbd5e1 !important;
+    }
+    .ts-dropdown .ts-dropdown-content {
+        max-height: 280px !important;
+    }
+    .ts-wrapper .ts-control {
+        border-radius: 0.375rem !important;
+        min-height: 38px !important;
+        padding: 0.375rem 0.75rem !important;
+        font-size: 0.9rem !important;
+        border-color: #dee2e6 !important;
+    }
+    .ts-wrapper.focus .ts-control {
+        border-color: #86b7fe !important;
+        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25) !important;
+    }
+    #assignSection,
+    #assignSection .package-card__body,
+    #tab-assign {
+        overflow: visible !important;
     }
 </style>
 
@@ -558,77 +593,76 @@ foreach ($approvers as $a) {
                     <span class="badge bg-warning-subtle text-warning border border-warning-subtle px-3 py-1">Role Assignment</span>
                 </header>
                 <div class="package-card__body p-4">
+
                     <form method="post" class="row g-3 align-items-end" id="assignForm">
                         <?php echo csrfField(); ?>
 
                         <!-- Step 1: Governance Role -->
-                        <div class="col-md-3">
-                            <label class="form-label fw-bold small text-uppercase text-secondary" for="governance-type">
+                        <div class="col-md-3" id="govRoleCol">
+                            <label class="form-label fw-bold small text-uppercase text-secondary mb-1" for="governance-type">
                                 <span class="badge bg-secondary me-1">1</span> Governance Role <span class="text-danger">*</span>
                             </label>
                             <select class="form-select" id="governance-type" name="governance_type" required>
-                                <option value="">-- Select Governance Step --</option>
+                                <option value="">-- Select Role --</option>
                                 <optgroup label="— Department Level (Step 4) —">
                                     <option value="Division VP">Division VP / Executive Sign-off</option>
                                 </optgroup>
                                 <optgroup label="— Corporate Governance (Steps 5–7) —">
-                                    <option value="President">Step 5: President & CEO</option>
+                                    <option value="President">Step 5: President &amp; CEO</option>
                                     <option value="Audit Committee">Step 6: Audit Committee</option>
                                     <option value="Board of Directors">Step 7: Board of Directors (Final Lock)</option>
                                 </optgroup>
                             </select>
                         </div>
 
-                        <!-- Step 2: Department (shown only for Division VP) -->
-                        <div class="col-md-3" id="departmentCol">
-                            <label class="form-label fw-bold small text-uppercase text-secondary" for="governance-department">
+                        <!-- Step 2: Department (Division VP only) -->
+                        <div class="col-md-3 d-none" id="departmentCol">
+                            <label class="form-label fw-bold small text-uppercase text-secondary mb-1" for="governance-department">
                                 <span class="badge bg-secondary me-1">2</span> Department <span class="text-danger" id="deptRequired">*</span>
                             </label>
                             <select class="form-select" id="governance-department" name="department_id">
-                                <option value="0">All Departments / Corporate (Company-wide)</option>
+                                <option value="0">All Depts / Corporate</option>
                                 <?php foreach ($departments as $dept): ?>
                                     <option value="<?php echo (int)$dept['department_id']; ?>"><?php echo e($dept['department_name']); ?></option>
                                 <?php endforeach; ?>
                             </select>
-                            <div class="form-text text-muted small" id="deptHint">Select department for Division VP.</div>
                         </div>
 
-                        <!-- Step 3: User Selector -->
-                        <div class="col-md-4">
-                            <label class="form-label fw-bold small text-uppercase text-secondary" for="governance-user">
-                                <span class="badge bg-secondary me-1">3</span> Employee / Official <span class="text-danger">*</span>
+                        <!-- Step 3: Employee Selector (enhanced by Tom Select) -->
+                        <div class="col" id="employeeCol">
+                            <label class="form-label fw-bold small text-uppercase text-secondary mb-1" for="governance-user">
+                                <span class="badge bg-secondary me-1" id="employeeStepBadge">2</span> Employee / Official <span class="text-danger">*</span>
                             </label>
                             <select class="form-select" id="governance-user" name="reviewer_employee_id" required>
                                 <option value="">-- Select Employee / Official --</option>
-                                
-
-
                                 <?php
                                 $prevRank = null;
                                 foreach ($users as $user):
-                                    $rankLabel = $user['rank_name'] ?? 'Unclassified';
+                                    $rankLabel    = $user['rank_name'] ?? 'Unclassified';
+                                    $assignedRole = $assigned_corporate[(int)$user['employee_id']] ?? '';
                                     if ($rankLabel !== $prevRank):
-                                ?>
-                                    <optgroup label="── <?php echo e($rankLabel); ?> ──">
-                                <?php
+                                        if ($prevRank !== null) echo '</optgroup>';
+                                        echo '<optgroup label="── ' . e($rankLabel) . ' ──">';
                                         $prevRank = $rankLabel;
                                     endif;
                                 ?>
                                     <option value="<?php echo (int)$user['employee_id']; ?>"
                                         data-department-id="<?php echo (int)$user['department_id']; ?>"
                                         data-suggested-role="<?php echo e($user['detected_role'] ?? ''); ?>"
-                                        data-job-title="<?php echo e($user['job_title'] ?? ''); ?>"
-                                        data-username="<?php echo e($user['username'] ?? $user['employee_code'] ?? ''); ?>"
-                                        data-rank="<?php echo e($rankLabel); ?>">
-                                        <?php echo e($user['full_name'] . ' — ' . ($user['job_title'] ?: ($user['role'] ?? 'Official'))); ?> (@<?php echo e(!empty($user['username']) ? $user['username'] : $user['employee_code']); ?>)
+                                        data-assigned-role="<?php echo e($assignedRole); ?>"
+                                        <?php if ($assignedRole) echo 'data-already="1"'; ?>>
+                                        <?php
+                                            echo e($user['full_name'] . ' — ' . ($user['job_title'] ?: ($user['role'] ?? 'Official')));
+                                            if ($assignedRole) echo ' ⚠ [' . e($assignedRole) . ']';
+                                        ?>
                                     </option>
-                                <?php endforeach; ?>
+                                <?php endforeach; if ($prevRank !== null) echo '</optgroup>'; ?>
                             </select>
                         </div>
 
                         <!-- Submit Button -->
-                        <div class="col-md-2">
-                            <button class="btn btn-primary w-100 rounded-pill shadow-sm fw-semibold" type="submit" style="padding-top:.6rem;padding-bottom:.6rem;">
+                        <div class="col-auto">
+                            <button class="btn btn-primary rounded-pill shadow-sm fw-semibold px-4" type="submit" style="padding-top:.6rem;padding-bottom:.6rem;white-space:nowrap;">
                                 <i class="fas fa-check-circle me-1"></i>Save Routing
                             </button>
                         </div>
@@ -767,6 +801,8 @@ foreach ($approvers as $a) {
 
 </main>
 
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.min.css">
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
 <script src="<?php echo BASE_URL; ?>/assets/js/evaluation-governance.js"></script>
 
 <script>
