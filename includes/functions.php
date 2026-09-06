@@ -1422,7 +1422,7 @@ function renderFlashPopup($type, $message)
     echo '<div class="flash-message-copy">';
     echo '<span class="flash-message-app">Raquel HRIS</span>';
     echo '<strong class="flash-message-title">' . e($title) . '</strong>';
-    echo '<span class="flash-message-text">' . e($message) . '</span>';
+    echo '<span class="flash-message-text">' . $message . '</span>';
     echo '</div>';
     echo '<button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>';
     echo '</div>';
