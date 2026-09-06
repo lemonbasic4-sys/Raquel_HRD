@@ -33,6 +33,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $employee_username = trim((string)($employee_row['employee_code'] ?? ''));
     }
 
+    // For Employee-role portal accounts with no email, auto-generate a placeholder
+    if ($role === 'Employee' && !$email && $employee_id) {
+        $email = 'employee-' . $employee_id . '@portal.raquel.local';
+    }
+
     // Validate
     $errors = [];
     if (empty($username)) $errors[] = 'Username is required.';
@@ -42,6 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($role !== 'Admin' && empty($employee_id)) $errors[] = 'Employee selection is required.';
     if (strlen($password) < 6) $errors[] = 'Password must be at least 6 characters.';
     if ($role !== 'Employee' && $employee_username !== '' && $username === $employee_username) $errors[] = 'HR and admin usernames must be custom and must not use the Employee ID.';
+
 
     // Check for duplicate username
     if (empty($errors)) {
@@ -75,10 +81,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 } else {
                     $email = strtolower(str_replace(' ', '.', $full_name)) . '-' . $employee_id . '@hr.raquel.local';
                 }
+            } elseif ($role === 'Employee') {
+                // Different employee shares same email (e.g. governance officials) — generate unique placeholder
+                $email = 'employee-' . $employee_id . '@portal.raquel.local';
             } else {
                 $errors[] = 'Email is already used by another account.';
             }
         }
+
     }
 
     if (!empty($errors)) {

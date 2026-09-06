@@ -20,16 +20,46 @@ $access->execute();
 $review_step = $access->get_result()->fetch_assoc();
 $access->close();
 
+$is_catchup_review = false;
+if (!$review_step) {
+    $catchup_check = $conn->prepare("SELECT pm.member_status, ep.consolidator_employee_id, ep.department_id, ep.status
+        FROM evaluation_package_members pm
+        JOIN evaluation_packages ep ON ep.package_id = pm.package_id
+        WHERE pm.package_id = ? AND pm.evaluation_id = ? LIMIT 1");
+    $catchup_check->bind_param('ii', $package_id, $evaluation_id);
+    $catchup_check->execute();
+    $cm_info = $catchup_check->get_result()->fetch_assoc();
+    $catchup_check->close();
+
+    $user_emp_id = (int)($_SESSION['employee_id'] ?? 0);
+    $user_role   = $_SESSION['role'] ?? '';
+
+    if ($cm_info) {
+        $is_sup_catchup = ($cm_info['member_status'] === 'Pending Supervisor Catchup' && (int)$cm_info['consolidator_employee_id'] === $user_emp_id);
+        $is_hr_catchup  = ($cm_info['member_status'] === 'Pending HR Catchup' && in_array($user_role, ['HR Manager', 'HR Supervisor', 'Admin'], true));
+
+        if ($is_sup_catchup || $is_hr_catchup) {
+            $is_catchup_review = true;
+            $review_step = [
+                'step_label'    => $is_sup_catchup ? 'Supervisor Catch-Up Review' : 'HR Manager Catch-Up Review',
+                'step_type'     => 'Consolidation',
+                'department_id' => $cm_info['department_id'],
+                'status'        => $cm_info['status']
+            ];
+        }
+    }
+}
+
 if (!$review_step) {
     redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'This team-member evaluation is not currently assigned to you for review.');
 }
-if (($review_step['status'] ?? '') === 'Approved and Applied' || isOrganizationPackageLocked($conn, $package_id)) {
+if (!$is_catchup_review && (($review_step['status'] ?? '') === 'Approved and Applied' || isOrganizationPackageLocked($conn, $package_id))) {
     redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'This package is locked after Board approval. Ratings can no longer be adjusted.');
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verifyCsrfToken();
-    if (isOrganizationPackageLocked($conn, $package_id)) {
+    if (!$is_catchup_review && isOrganizationPackageLocked($conn, $package_id)) {
         redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'This package is locked after Board approval. Ratings can no longer be adjusted.');
     }
     $ratings = $_POST['rating'] ?? [];

@@ -12,9 +12,9 @@
 -- ============================================
 
 SET FOREIGN_KEY_CHECKS = 0;
-DROP DATABASE IF EXISTS raquel_hris;
-CREATE DATABASE IF NOT EXISTS raquel_hris;
-USE raquel_hris;
+DROP DATABASE IF EXISTS raquel_hris_test_db;
+CREATE DATABASE IF NOT EXISTS raquel_hris_test_db;
+USE raquel_hris_test_db;
 
 -- ============================================
 -- 1. Setup Database
@@ -823,6 +823,8 @@ DROP TABLE IF EXISTS evaluation_package_members;
 CREATE TABLE evaluation_package_members (
     package_id INT NOT NULL,
     evaluation_id INT NOT NULL,
+    member_status ENUM('Normal','Pending Supervisor Catchup','Pending HR Catchup','Catchup Endorsed','Catchup Complete') NOT NULL DEFAULT 'Normal',
+    joined_at_step INT NULL,
     PRIMARY KEY (package_id, evaluation_id),
     CONSTRAINT fk_package_member_package FOREIGN KEY (package_id) REFERENCES evaluation_packages(package_id) ON DELETE CASCADE,
     CONSTRAINT fk_package_member_evaluation FOREIGN KEY (evaluation_id) REFERENCES evaluations(evaluation_id) ON DELETE CASCADE

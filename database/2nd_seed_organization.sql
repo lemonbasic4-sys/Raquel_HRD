@@ -3,7 +3,7 @@
 -- (Branches, Rank Categories, Departments, Job Titles)
 -- ============================================
 
-USE raquel_hris;
+USE raquel_hris_test_db;
 SET FOREIGN_KEY_CHECKS = 0;
 
 -- ============================================

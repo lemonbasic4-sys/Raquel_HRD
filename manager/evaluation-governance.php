@@ -9,6 +9,13 @@ ensureOrganizationEvaluationPackageSchema($conn);
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verifyCsrfToken();
 
+    // Auto-Detect & Sync All Governance Roles (DO NOT auto-generate user accounts)
+    if (isset($_POST['action']) && $_POST['action'] === 'auto_detect_all') {
+        $linked = autoDetectAndSyncAllGovernanceApprovers($conn);
+        logAudit($conn, (int)$_SESSION['user_id'], 'UPDATE', 'Evaluation Governance', 0, "Auto-detected and synced $linked governance approver(s)");
+        redirectWith(BASE_URL . '/manager/evaluation-governance.php', 'success', "Smart Detection complete: $linked governance official(s) auto-assigned from employee job titles.");
+    }
+
     // Batch Actions (Enable, Disable, Delete)
     if (isset($_POST['action']) && !empty($_POST['action'])) {
         $action      = $_POST['action'];
@@ -40,13 +47,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     // Assign Single Approver
-    $type           = $_POST['governance_type']   ?? '';
-    $reviewer_user_id = (int)($_POST['reviewer_user_id'] ?? 0);
-    $department_id  = isset($_POST['department_id']) && is_numeric($_POST['department_id']) ? (int)$_POST['department_id'] : null;
+    $type                 = $_POST['governance_type'] ?? '';
+    $reviewer_employee_id = (int)($_POST['reviewer_employee_id'] ?? $_POST['reviewer_user_id'] ?? 0);
+    $department_id        = isset($_POST['department_id']) && is_numeric($_POST['department_id']) ? (int)$_POST['department_id'] : null;
 
     $valid_types = ['Board of Directors', 'Audit Committee', 'President', 'Division VP'];
-    if (!in_array($type, $valid_types, true) || $reviewer_user_id <= 0) {
-        redirectWith(BASE_URL . '/manager/evaluation-governance.php', 'danger', 'Choose a governance role and an active user.');
+    if (!in_array($type, $valid_types, true) || $reviewer_employee_id <= 0) {
+        redirectWith(BASE_URL . '/manager/evaluation-governance.php', 'danger', 'Choose a governance role and an employee.');
     }
 
     // Division VP requires a specific department; Board/Audit/President are company-wide (NULL).
@@ -57,50 +64,73 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $department_id = null;
     }
 
-    // Verify user is active
-    $eligible_stmt = $conn->prepare("SELECT u.user_id FROM users u
-        LEFT JOIN employees e ON e.employee_id = u.employee_id
-        WHERE u.user_id = ? AND u.is_active = 1 AND (e.is_active = 1 OR e.employee_id IS NULL) LIMIT 1");
-    $eligible_stmt->bind_param('i', $reviewer_user_id);
+    // Verify employee is active
+    $eligible_stmt = $conn->prepare("SELECT employee_id, first_name, last_name FROM employees WHERE employee_id = ? AND is_active = 1 AND deleted_at IS NULL LIMIT 1");
+    $eligible_stmt->bind_param('i', $reviewer_employee_id);
     $eligible_stmt->execute();
     $eligible = $eligible_stmt->get_result()->fetch_assoc();
     $eligible_stmt->close();
 
     if (!$eligible) {
-        redirectWith(BASE_URL . '/manager/evaluation-governance.php', 'danger', 'Selected user is not found or not active.');
+        redirectWith(BASE_URL . '/manager/evaluation-governance.php', 'danger', 'Selected employee is not found or not active.');
     }
+
+    // Resolve user_id if already provisioned by Administrator (DO NOT auto-generate accounts)
+    $u_stmt = $conn->prepare("SELECT user_id FROM users WHERE employee_id = ? AND is_active = 1 AND deleted_at IS NULL ORDER BY (role != 'Employee') DESC LIMIT 1");
+    $u_stmt->bind_param('i', $reviewer_employee_id);
+    $u_stmt->execute();
+    $user_row = $u_stmt->get_result()->fetch_assoc();
+    $u_stmt->close();
+    $reviewer_user_id = $user_row ? (int)$user_row['user_id'] : null;
 
     $null_dept = is_null($department_id) ? null : $department_id;
 
+    // ── Prevent same employee from holding two different corporate governance roles ──
+    $corporate_roles = ['President', 'Audit Committee', 'Board of Directors'];
+    if (in_array($type, $corporate_roles, true)) {
+        $conflict_chk = $conn->prepare("
+            SELECT governance_type FROM evaluation_governance_approvers
+            WHERE employee_id = ? AND governance_type != ? AND governance_type IN ('President','Audit Committee','Board of Directors') AND is_active = 1
+            LIMIT 1
+        ");
+        $conflict_chk->bind_param('is', $reviewer_employee_id, $type);
+        $conflict_chk->execute();
+        $conflict = $conflict_chk->get_result()->fetch_assoc();
+        $conflict_chk->close();
+        if ($conflict) {
+            redirectWith(BASE_URL . '/manager/evaluation-governance.php', 'danger',
+                "This employee is already assigned as <strong>{$conflict['governance_type']}</strong>. Corporate governance roles (President, Audit Committee, Board of Directors) must each be a <strong>different person</strong>.");
+        }
+    }
+
     // Deactivate previous active official for this slot so the newly assigned one takes effect
+
     if (is_null($null_dept)) {
         $deact = $conn->prepare('UPDATE evaluation_governance_approvers SET is_active = 0 WHERE governance_type = ? AND department_id IS NULL');
         $deact->bind_param('s', $type);
         $deact->execute();
         $deact->close();
+
+        $stmt = $conn->prepare('INSERT INTO evaluation_governance_approvers (governance_type, department_id, employee_id, user_id, is_active)
+            VALUES (?, NULL, ?, ?, 1)
+            ON DUPLICATE KEY UPDATE employee_id = VALUES(employee_id), user_id = VALUES(user_id), is_active = 1');
+        $stmt->bind_param('sii', $type, $reviewer_employee_id, $reviewer_user_id);
     } else {
         $deact = $conn->prepare('UPDATE evaluation_governance_approvers SET is_active = 0 WHERE governance_type = ? AND department_id = ?');
         $deact->bind_param('si', $type, $null_dept);
         $deact->execute();
         $deact->close();
-    }
 
-    if (is_null($null_dept)) {
-        $stmt = $conn->prepare('INSERT INTO evaluation_governance_approvers (governance_type, department_id, user_id, is_active)
-            VALUES (?, NULL, ?, 1)
-            ON DUPLICATE KEY UPDATE is_active = 1');
-        $stmt->bind_param('si', $type, $reviewer_user_id);
-    } else {
-        $stmt = $conn->prepare('INSERT INTO evaluation_governance_approvers (governance_type, department_id, user_id, is_active)
-            VALUES (?, ?, ?, 1)
-            ON DUPLICATE KEY UPDATE is_active = 1');
-        $stmt->bind_param('sii', $type, $null_dept, $reviewer_user_id);
+        $stmt = $conn->prepare('INSERT INTO evaluation_governance_approvers (governance_type, department_id, employee_id, user_id, is_active)
+            VALUES (?, ?, ?, ?, 1)
+            ON DUPLICATE KEY UPDATE employee_id = VALUES(employee_id), user_id = VALUES(user_id), is_active = 1');
+        $stmt->bind_param('siii', $type, $null_dept, $reviewer_employee_id, $reviewer_user_id);
     }
     $stmt->execute();
     $stmt->close();
 
     syncPendingOrganizationPackageGovernanceApprovers($conn);
-    logAudit($conn, (int)$_SESSION['user_id'], 'CREATE', 'Evaluation Governance', $reviewer_user_id, "Assigned $type approver" . ($department_id ? " for dept $department_id" : " (company-wide)"));
+    logAudit($conn, (int)$_SESSION['user_id'], 'CREATE', 'Evaluation Governance', $reviewer_employee_id, "Assigned $type approver: " . $eligible['first_name'] . ' ' . $eligible['last_name'] . ($department_id ? " for dept $department_id" : " (company-wide)"));
     redirectWith(BASE_URL . '/manager/evaluation-governance.php', 'success', 'Routing official assigned and active packages synced.');
 }
 
@@ -134,26 +164,58 @@ require_once '../includes/header.php';
 
 // ─── Data Queries ─────────────────────────────────────────────────────────────
 
-// All active users for selector
-$users = $conn->query("SELECT u.user_id, u.full_name, u.role, e.job_title, e.rank_category_id,
-    e.department_id, rc.rank_name, rc.level_order
-    FROM users u
-    JOIN employees e ON e.employee_id = u.employee_id
+// All active employees for selector with metadata (deduplicated by employee)
+$all_raw_employees = $conn->query("SELECT e.employee_id, e.employee_code,
+    TRIM(CONCAT(e.first_name, ' ', IFNULL(CONCAT(e.middle_name, ' '), ''), e.last_name, IFNULL(CONCAT(' ', e.name_extension), ''))) AS full_name,
+    e.job_title, e.rank_category_id, e.department_id, d.department_name, rc.rank_name, rc.level_order,
+    u.user_id, u.username, u.role
+    FROM employees e
+    LEFT JOIN departments d ON d.department_id = e.department_id
     LEFT JOIN rank_categories rc ON rc.rank_category_id = e.rank_category_id
-    WHERE u.is_active = 1 AND e.is_active = 1 AND e.deleted_at IS NULL
-    ORDER BY COALESCE(rc.level_order, 99), u.full_name")->fetch_all(MYSQLI_ASSOC);
+    LEFT JOIN users u ON u.employee_id = e.employee_id AND u.is_active = 1 AND u.deleted_at IS NULL
+    WHERE e.is_active = 1 AND e.deleted_at IS NULL
+    ORDER BY COALESCE(rc.level_order, 99), e.last_name, e.first_name, (u.role != 'Employee') DESC")->fetch_all(MYSQLI_ASSOC);
+
+$deduped_map = [];
+foreach ($all_raw_employees as $row) {
+    $eid = (int)$row['employee_id'];
+    if (!isset($deduped_map[$eid])) {
+        $deduped_map[$eid] = $row;
+    } else {
+        // If an employee has multiple user accounts provisioned by Admin, prioritize administrative roles
+        if (!empty($row['role']) && $row['role'] !== 'Employee') {
+            $deduped_map[$eid] = $row;
+        }
+    }
+}
+$raw_users = array_values($deduped_map);
+
+$users = [];
+$recommended_users = [];
+foreach ($raw_users as $user) {
+    $detected = autoDetectGovernanceRoleFromJobTitle($user['job_title'] ?? '');
+    $user['detected_role'] = $detected;
+    $users[] = $user;
+    if ($detected) {
+        $recommended_users[] = $user;
+    }
+}
 
 $departments = $conn->query("SELECT department_id, department_name FROM departments WHERE is_active = 1 ORDER BY department_name")->fetch_all(MYSQLI_ASSOC);
 
-// All approvers with department name
-$approvers = $conn->query("SELECT ega.*, u.full_name, u.role, e.job_title,
+// All approvers with department name and employee info
+$approvers = $conn->query("SELECT ega.*, 
+    e.employee_code,
+    TRIM(CONCAT(e.first_name, ' ', IFNULL(CONCAT(e.middle_name, ' '), ''), e.last_name)) AS full_name,
+    e.job_title,
+    u.username, u.role,
     IFNULL(d.department_name, '(All Departments / Corporate)') AS department_name
     FROM evaluation_governance_approvers ega
-    JOIN users u ON u.user_id = ega.user_id
-    LEFT JOIN employees e ON e.employee_id = u.employee_id
+    JOIN employees e ON e.employee_id = ega.employee_id
+    LEFT JOIN users u ON u.user_id = ega.user_id AND u.is_active = 1
     LEFT JOIN departments d ON d.department_id = ega.department_id
     ORDER BY FIELD(ega.governance_type,'Division VP','President','Audit Committee','Board of Directors'),
-             ega.department_id, u.full_name")->fetch_all(MYSQLI_ASSOC);
+             ega.department_id, e.last_name")->fetch_all(MYSQLI_ASSOC);
 
 // Department Matrix: for each dept, show assigned Division VP
 $dept_matrix = [];
@@ -168,7 +230,7 @@ foreach ($approvers as $a) {
     if ($a['governance_type'] === 'Division VP' && $a['department_id']) {
         $dept_id = (int)$a['department_id'];
         if (isset($dept_matrix[$dept_id]) && $a['is_active']) {
-            $dept_matrix[$dept_id]['division_vp'] = $a['full_name'] . ' — ' . ($a['job_title'] ?: $a['role']);
+            $dept_matrix[$dept_id]['division_vp'] = $a['full_name'] . ' — ' . ($a['job_title'] ?: ($a['role'] ?? 'Division VP'));
         }
     }
 }
@@ -222,295 +284,486 @@ foreach ($approvers as $a) {
     .corp-card.board      .corp-label { color: #065f46; }
     .corp-card .corp-name  { font-weight: 700; font-size: .88rem; color: #1e293b; }
     .corp-card .corp-title { font-size: .78rem; color: #64748b; }
+    /* Tab Navigation */
+    .eval-gov-tabs-wrapper {
+        margin-top: -8px;
+    }
+    .custom-eval-tabs {
+        background: #ffffff;
+        border-radius: 14px !important;
+        border: 1px solid #e2e8f0 !important;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.04);
+        gap: 0.5rem;
+    }
+    .custom-eval-tabs .nav-link {
+        color: #475569 !important;
+        background: transparent !important;
+        border-radius: 10px !important;
+        font-weight: 600;
+        font-size: 0.88rem;
+        padding: 0.75rem 1.1rem !important;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        border: 1px solid transparent !important;
+    }
+    .custom-eval-tabs .nav-link:hover {
+        background: #f8fafc !important;
+        color: #0f172a !important;
+        border-color: #e2e8f0 !important;
+    }
+    .custom-eval-tabs .nav-link.active {
+        background: var(--rp-forest-green, #082E06) !important;
+        color: #ffffff !important;
+        box-shadow: 0 4px 12px rgba(8, 46, 6, 0.25);
+        border-color: var(--rp-forest-green, #082E06) !important;
+    }
+    .custom-eval-tabs .nav-link.active i {
+        color: #facc15 !important;
+    }
+    .custom-eval-tabs .nav-link.active .badge {
+        background: rgba(255, 255, 255, 0.2) !important;
+        color: #ffffff !important;
+        border-color: rgba(255, 255, 255, 0.3) !important;
+    }
 </style>
 
 <main class="evaluation-packages container-fluid py-4">
 
     <!-- Hero Header -->
     <section class="package-hero fadeup">
-        <p class="mb-1 small text-uppercase tracking-wider opacity-75">Organizational approval flow configuration</p>
-        <h1 class="h4 mb-2 fw-bold"><i class="fas fa-route me-2 text-warning"></i>Evaluation Routing & Governance</h1>
-        <p class="mb-0">Configure the evaluation approval route per department. Packages flow: <strong>Supervisor → Manager → Division VP → President → Audit Committee → Board of Directors (Final Lock).</strong></p>
-    </section>
-
-    <!-- Corporate Governance Strip -->
-    <section class="package-card fadeup-1 mb-3">
-        <header class="package-card__header">
-            <h2 class="h5 mb-0 fw-bold"><i class="fas fa-globe me-2 text-success"></i>Corporate Governance Officials</h2>
-        </header>
-        <div class="package-card__body p-4">
-            <div class="corp-strip">
-                <!-- President -->
-                <div class="corp-card president">
-                    <div class="corp-label"><i class="fas fa-user-tie me-1"></i>President & CEO</div>
-                    <?php if ($president_row): ?>
-                        <div class="corp-name"><?php echo e($president_row['full_name']); ?></div>
-                        <div class="corp-title"><?php echo e($president_row['job_title'] ?: $president_row['role']); ?></div>
-                    <?php else: ?>
-                        <div class="missing text-danger small"><i class="fas fa-exclamation-circle me-1"></i>Not assigned</div>
-                    <?php endif; ?>
-                </div>
-                <!-- Audit Committee -->
-                <div class="corp-card audit">
-                    <div class="corp-label"><i class="fas fa-search-dollar me-1"></i>Audit Committee</div>
-                    <?php if ($audit_row): ?>
-                        <div class="corp-name"><?php echo e($audit_row['full_name']); ?></div>
-                        <div class="corp-title"><?php echo e($audit_row['job_title'] ?: $audit_row['role']); ?></div>
-                    <?php else: ?>
-                        <div class="missing text-danger small"><i class="fas fa-exclamation-circle me-1"></i>Not assigned</div>
-                    <?php endif; ?>
-                </div>
-                <!-- Board of Directors -->
-                <div class="corp-card board">
-                    <div class="corp-label"><i class="fas fa-gavel me-1"></i>Board of Directors <span class="badge bg-success ms-1" style="font-size:.6rem;">Final Lock</span></div>
-                    <?php if ($board_row): ?>
-                        <div class="corp-name"><?php echo e($board_row['full_name']); ?></div>
-                        <div class="corp-title"><?php echo e($board_row['job_title'] ?: $board_row['role']); ?></div>
-                    <?php else: ?>
-                        <div class="missing text-danger small"><i class="fas fa-exclamation-circle me-1"></i>Not assigned</div>
-                    <?php endif; ?>
-                </div>
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+            <div>
+                <p class="mb-1 small text-uppercase tracking-wider opacity-75"><i class="fas fa-shield-alt me-1"></i>Approval Flow & Governance Matrix</p>
+                <h1 class="h4 mb-1 fw-bold"><i class="fas fa-route me-2 text-warning"></i>Evaluation Routing & Governance</h1>
+                <p class="mb-0 text-white-50 small">Configure sign-off authorities for each step of evaluation packages: <strong>Consolidation → Manager → Division VP → President & CEO → Audit Committee → Board of Directors (Final Lock).</strong></p>
             </div>
-        </div>
-    </section>
-
-    <!-- Department Routing Matrix -->
-    <section class="package-card fadeup-2 mb-3">
-        <header class="package-card__header">
-            <h2 class="h5 mb-0 fw-bold"><i class="fas fa-sitemap me-2 text-primary"></i>Department Division VP Matrix</h2>
-        </header>
-        <div class="package-card__body p-4">
-            <p class="text-muted small mb-3">Each department's evaluation package will automatically include a Division VP sign-off step (after Manager, before President).</p>
-            <div class="dept-matrix-grid">
-                <?php foreach ($dept_matrix as $dept_id => $info): ?>
-                <div class="dept-matrix-card">
-                    <div class="dept-name"><i class="fas fa-building me-1 text-secondary"></i><?php echo e($info['department_name']); ?></div>
-                    <?php if ($info['division_vp']): ?>
-                        <div class="official-name"><i class="fas fa-check-circle me-1 text-success"></i><?php echo e($info['division_vp']); ?></div>
-                    <?php else: ?>
-                        <div class="missing"><i class="fas fa-exclamation-circle me-1"></i>Division VP not assigned</div>
-                    <?php endif; ?>
-                </div>
-                <?php endforeach; ?>
-            </div>
-        </div>
-    </section>
-
-    <!-- Assign Official Form -->
-    <section class="package-card fadeup-3">
-        <header class="package-card__header">
-            <h2 class="h5 mb-0 fw-bold"><i class="fas fa-user-plus me-2 text-primary"></i>Assign Routing Official</h2>
-        </header>
-        <div class="package-card__body p-4">
-            <form method="post" class="row g-3 align-items-end" id="assignForm">
-                <?php echo csrfField(); ?>
-
-                <!-- Governance Role -->
-                <div class="col-md-3">
-                    <label class="form-label fw-semibold" for="governance-type">Governance Role <span class="text-danger">*</span></label>
-                    <select class="form-select" id="governance-type" name="governance_type" required>
-                        <option value="">Select role</option>
-                        <optgroup label="— Department Level —">
-                            <option value="Division VP">Division VP / Executive Sign-off</option>
-                        </optgroup>
-                        <optgroup label="— Corporate Level —">
-                            <option value="President">President & CEO</option>
-                            <option value="Audit Committee">Audit Committee</option>
-                            <option value="Board of Directors">Board of Directors</option>
-                        </optgroup>
-                    </select>
-                </div>
-
-                <!-- Department (shown only for Division VP) -->
-                <div class="col-md-3" id="departmentCol">
-                    <label class="form-label fw-semibold" for="governance-department">Department <span class="text-danger" id="deptRequired">*</span></label>
-                    <select class="form-select" id="governance-department" name="department_id">
-                        <option value="0">All Departments / Corporate</option>
-                        <?php foreach ($departments as $dept): ?>
-                            <option value="<?php echo (int)$dept['department_id']; ?>"><?php echo e($dept['department_name']); ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                    <div class="form-text text-muted" id="deptHint">Required for Division VP roles.</div>
-                </div>
-
-                <!-- User Selector -->
-                <div class="col-md-4">
-                    <label class="form-label fw-semibold" for="governance-user">Authorized Official <span class="text-danger">*</span></label>
-                    <select class="form-select" id="governance-user" name="reviewer_user_id" required>
-                        <option value="">Select official</option>
-                        <?php
-                        $prevRank = null;
-                        foreach ($users as $user):
-                            $rankLabel = $user['rank_name'] ?? 'Unclassified';
-                            if ($rankLabel !== $prevRank):
-                        ?>
-                            <option disabled style="font-weight:600;color:#6c757d;background:#f8f9fa;">── <?php echo e($rankLabel); ?> ──</option>
-                        <?php
-                                $prevRank = $rankLabel;
-                            endif;
-                        ?>
-                            <option value="<?php echo (int)$user['user_id']; ?>"
-                                data-department-id="<?php echo (int)$user['department_id']; ?>"
-                                data-rank="<?php echo e($rankLabel); ?>">
-                                <?php echo e($user['full_name'] . ' — ' . ($user['job_title'] ?: $user['role'])); ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-
-                <!-- Submit -->
-                <div class="col-md-2">
-                    <button class="btn btn-primary w-100 rounded-pill shadow-sm" type="submit">
-                        <i class="fas fa-check me-1"></i>Assign Official
+            <div class="d-flex flex-wrap gap-2">
+                <form method="post" action="" class="m-0">
+                    <?php echo csrfField(); ?>
+                    <input type="hidden" name="action" value="auto_detect_all">
+                    <button type="submit" class="btn btn-warning rounded-pill shadow-sm px-3 fw-bold text-dark" title="Scan all employee job titles and automatically assign matching governance roles">
+                        <i class="fas fa-bolt me-1 text-danger"></i>Auto-Detect & Sync Governance
                     </button>
-                </div>
-            </form>
+                </form>
+            </div>
         </div>
     </section>
 
-    <!-- Configured Officials Table -->
-    <section class="package-card fadeup-4 mt-3">
-        <header class="package-card__header d-flex flex-wrap justify-content-between align-items-center gap-3">
-            <div class="d-flex align-items-center gap-2">
-                <h2 class="h5 mb-0 fw-bold"><i class="fas fa-user-shield me-2 text-primary"></i>Configured Routing Officials</h2>
-                <span class="badge bg-secondary-subtle text-secondary border px-3 py-1"><?php echo count($approvers); ?> Total</span>
-            </div>
-            <!-- Batch Action Toolbar -->
-            <div id="batchActionToolbar" class="d-flex align-items-center gap-2 d-none">
-                <span class="small fw-semibold text-dark me-2" id="selectedCountText">0 selected</span>
-                <button type="button" class="btn btn-sm btn-outline-success rounded-pill px-3" onclick="submitBatchForm('batch_enable')">
-                    <i class="fas fa-check-circle me-1"></i>Enable Selected
+    <!-- Tab Navigation Bar -->
+    <div class="eval-gov-tabs-wrapper mb-4">
+        <ul class="nav nav-pills custom-eval-tabs p-2 bg-white rounded-4 shadow-sm border" id="govTabs" role="tablist">
+            <li class="nav-item flex-fill" role="presentation">
+                <button class="nav-link active w-100 py-2 px-3 text-start d-flex align-items-center justify-content-between" id="tab-corp-btn" data-bs-toggle="tab" data-bs-target="#tab-corp" type="button" role="tab" aria-controls="tab-corp" aria-selected="true">
+                    <span><i class="fas fa-globe me-2 text-success"></i><strong>Corporate Governance Officials (Company-Wide)</strong></span>
+                    <span class="badge bg-success-subtle text-success border border-success-subtle ms-2">Steps 5–7</span>
                 </button>
-                <button type="button" class="btn btn-sm btn-outline-warning rounded-pill px-3" onclick="submitBatchForm('batch_disable')">
-                    <i class="fas fa-ban me-1"></i>Disable Selected
+            </li>
+            <li class="nav-item flex-fill" role="presentation">
+                <button class="nav-link w-100 py-2 px-3 text-start d-flex align-items-center justify-content-between" id="tab-matrix-btn" data-bs-toggle="tab" data-bs-target="#tab-matrix" type="button" role="tab" aria-controls="tab-matrix" aria-selected="false">
+                    <span><i class="fas fa-sitemap me-2 text-primary"></i><strong>Department Division VP Matrix</strong></span>
+                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle ms-2"><?php echo count($departments); ?> Depts</span>
                 </button>
-                <button type="button" class="btn btn-sm btn-danger rounded-pill px-3 shadow-sm" onclick="submitBatchForm('batch_delete')">
-                    <i class="fas fa-trash-alt me-1"></i>Delete Selected
+            </li>
+            <li class="nav-item flex-fill" role="presentation">
+                <button class="nav-link w-100 py-2 px-3 text-start d-flex align-items-center justify-content-between" id="tab-assign-btn" data-bs-toggle="tab" data-bs-target="#tab-assign" type="button" role="tab" aria-controls="tab-assign" aria-selected="false">
+                    <span><i class="fas fa-user-plus me-2 text-warning"></i><strong>Assign Routing Official</strong></span>
+                    <span class="badge bg-warning-subtle text-warning border border-warning-subtle ms-2">Setup</span>
                 </button>
-            </div>
-        </header>
+            </li>
+            <li class="nav-item flex-fill" role="presentation">
+                <button class="nav-link w-100 py-2 px-3 text-start d-flex align-items-center justify-content-between" id="tab-configured-btn" data-bs-toggle="tab" data-bs-target="#tab-configured" type="button" role="tab" aria-controls="tab-configured" aria-selected="false">
+                    <span><i class="fas fa-user-shield me-2 text-info"></i><strong>Configured Routing Officials</strong></span>
+                    <span class="badge bg-secondary-subtle text-secondary border ms-2"><?php echo count($approvers); ?> Total</span>
+                </button>
+            </li>
+        </ul>
+    </div>
 
-        <div class="package-card__body p-0">
-            <form method="post" action="" id="batchApproversForm">
-                <?php echo csrfField(); ?>
-                <input type="hidden" name="action" id="batchActionInput" value="">
-                <div class="table-responsive">
-                    <table class="table package-table align-middle mb-0">
-                        <thead class="table-light small text-uppercase">
-                            <tr>
-                                <th style="width:44px;" class="text-center">
-                                    <input type="checkbox" class="form-check-input" id="selectAllApprovers" title="Select All">
-                                </th>
-                                <th style="width:20%;">Governance Role</th>
-                                <th style="width:22%;">Department</th>
-                                <th style="width:22%;">Official</th>
-                                <th>Position / Role</th>
-                                <th style="width:120px;">Status</th>
-                                <th style="width:190px;" class="text-end">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php if (empty($approvers)): ?>
-                                <tr>
-                                    <td colspan="7" class="text-center text-muted py-5">
-                                        <i class="fas fa-user-slash fa-2x mb-2 d-block text-black-50"></i>
-                                        No routing officials configured yet. Use the form above to assign.
-                                    </td>
-                                </tr>
-                            <?php else: ?>
-                                <?php
-                                // Role badge styles
-                                $role_styles = [
-                                    'Division VP'       => ['bg-primary-subtle text-primary border-primary-subtle', 'fa-sitemap'],
-                                    'President'         => ['bg-purple-subtle text-purple border-purple-subtle', 'fa-user-tie'],
-                                    'Audit Committee'   => ['bg-warning-subtle text-warning border-warning-subtle', 'fa-search-dollar'],
-                                    'Board of Directors'=> ['bg-success-subtle text-success border-success-subtle', 'fa-gavel'],
-                                ];
-                                $prev_type = null;
-                                foreach ($approvers as $approver):
-                                    $style = $role_styles[$approver['governance_type']] ?? ['bg-secondary-subtle text-secondary border-secondary-subtle', 'fa-user'];
-                                    if ($approver['governance_type'] !== $prev_type):
-                                        $prev_type = $approver['governance_type'];
-                                ?>
-                                <tr class="table-light">
-                                    <td colspan="7" class="fw-bold text-uppercase small py-2 ps-3" style="font-size:.7rem;letter-spacing:1px;color:#64748b;">
-                                        <?php echo e($approver['governance_type']); ?> Officials
-                                    </td>
-                                </tr>
+    <!-- Tab Content Panes -->
+    <div class="tab-content" id="govTabsContent">
+
+        <!-- ================================================================= -->
+        <!-- TAB 1: Corporate Governance Officials (Company-Wide)             -->
+        <!-- ================================================================= -->
+        <div class="tab-pane fade show active" id="tab-corp" role="tabpanel" aria-labelledby="tab-corp-btn">
+            <section class="package-card fadeup-1 mb-4">
+                <header class="package-card__header d-flex justify-content-between align-items-center">
+                    <div>
+                        <h2 class="h5 mb-0 fw-bold"><i class="fas fa-globe me-2 text-success"></i>Corporate Governance Officials (Company-Wide)</h2>
+                        <span class="small text-muted">Approval steps 4 to 6 that apply to all departments company-wide</span>
+                    </div>
+                    <span class="badge bg-success-subtle text-success border border-success-subtle px-3 py-1">Steps 4–6</span>
+                </header>
+                <div class="package-card__body p-4">
+                    <div class="corp-strip mb-4">
+                        <!-- President -->
+                        <div class="corp-card president d-flex flex-column justify-content-between shadow-sm">
+                            <div>
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <div class="corp-label mb-0"><i class="fas fa-user-tie me-1"></i>President & CEO</div>
+                                    <?php if ($president_row): ?>
+                                        <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1" style="font-size:.68rem;"><i class="fas fa-check-circle me-1"></i>Assigned</span>
+                                    <?php else: ?>
+                                        <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-1" style="font-size:.68rem;"><i class="fas fa-exclamation-triangle me-1"></i>Unassigned</span>
+                                    <?php endif; ?>
+                                </div>
+                                <?php if ($president_row): ?>
+                                    <div class="corp-name"><?php echo e($president_row['full_name']); ?></div>
+                                    <div class="corp-title mb-1"><?php echo e($president_row['job_title'] ?: $president_row['role']); ?></div>
+                                    <div class="small text-muted font-monospace"><i class="fas fa-user-circle me-1"></i>@<?php echo e(!empty($president_row['username']) ? $president_row['username'] : ($president_row['employee_code'] ?? '')); ?></div>
+                                <?php else: ?>
+                                    <div class="missing text-danger small mb-2"><i class="fas fa-times-circle me-1"></i>No President assigned.</div>
                                 <?php endif; ?>
-                                <tr>
-                                    <td class="text-center">
-                                        <input type="checkbox" class="form-check-input approver-checkbox" name="approver_ids[]" value="<?php echo (int)$approver['governance_approver_id']; ?>">
-                                    </td>
-                                    <td>
-                                        <span class="badge <?php echo $style[0]; ?> border px-2 py-1">
-                                            <i class="fas <?php echo $style[1]; ?> me-1"></i><?php echo e($approver['governance_type']); ?>
-                                        </span>
-                                    </td>
-                                    <td class="small text-muted"><?php echo e($approver['department_name']); ?></td>
-                                    <td class="fw-bold text-dark"><?php echo e($approver['full_name']); ?></td>
-                                    <td class="text-muted small"><?php echo e($approver['job_title'] ?: $approver['role']); ?></td>
-                                    <td>
-                                        <?php if ($approver['is_active']): ?>
-                                            <span class="badge bg-success-subtle text-success border border-success-subtle px-3 py-1">
-                                                <i class="fas fa-check-circle me-1"></i>Active
-                                            </span>
-                                        <?php else: ?>
-                                            <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle px-3 py-1">
-                                                <i class="fas fa-ban me-1"></i>Disabled
-                                            </span>
-                                        <?php endif; ?>
-                                    </td>
-                                    <td class="text-end">
-                                        <div class="d-inline-flex gap-1">
-                                            <?php if ($approver['is_active']): ?>
-                                                <a class="btn btn-sm btn-outline-warning rounded-pill px-3" href="?disable=<?php echo (int)$approver['governance_approver_id']; ?>" title="Disable">
-                                                    <i class="fas fa-ban me-1"></i>Disable
-                                                </a>
-                                                <a class="btn btn-sm btn-outline-danger rounded-pill px-2" href="?delete=<?php echo (int)$approver['governance_approver_id']; ?>" onclick="return confirm('Delete this routing official?');" title="Delete">
-                                                    <i class="fas fa-trash-alt"></i>
-                                                </a>
-                                            <?php else: ?>
-                                                <a class="btn btn-sm btn-outline-success rounded-pill px-3" href="?enable=<?php echo (int)$approver['governance_approver_id']; ?>" title="Enable">
-                                                    <i class="fas fa-check-circle me-1"></i>Enable
-                                                </a>
-                                                <a class="btn btn-sm btn-outline-danger rounded-pill px-3" href="?delete=<?php echo (int)$approver['governance_approver_id']; ?>" onclick="return confirm('Delete this disabled routing official?');" title="Delete">
-                                                    <i class="fas fa-trash-alt me-1"></i>Delete
-                                                </a>
-                                            <?php endif; ?>
-                                        </div>
-                                    </td>
-                                </tr>
-                                <?php endforeach; ?>
-                            <?php endif; ?>
-                        </tbody>
-                    </table>
-                </div>
-            </form>
-        </div>
-    </section>
+                            </div>
+                            <div class="mt-3 pt-2 border-top border-light-subtle">
+                                <button type="button" class="btn btn-sm btn-outline-primary w-100 rounded-pill" onclick="selectGovernanceRole('President')">
+                                    <i class="fas fa-user-edit me-1"></i><?php echo $president_row ? 'Change President' : 'Assign President'; ?>
+                                </button>
+                            </div>
+                        </div>
 
-    <!-- Route Diagram Legend -->
-    <section class="package-card fadeup-5 mt-3">
-        <div class="package-card__body p-4">
-            <p class="fw-semibold mb-3 text-muted small text-uppercase" style="letter-spacing:1px;"><i class="fas fa-info-circle me-1"></i>Standard Evaluation Flow</p>
-            <div class="d-flex flex-wrap align-items-center gap-2" style="font-size:.85rem;">
-                <span class="badge bg-light text-dark border px-3 py-2"><i class="fas fa-users me-1 text-secondary"></i>Team Self-Ratings</span>
-                <i class="fas fa-arrow-right text-muted"></i>
-                <span class="badge bg-light text-dark border px-3 py-2"><i class="fas fa-clipboard-check me-1 text-secondary"></i>Supervisor Consolidation</span>
-                <i class="fas fa-arrow-right text-muted"></i>
-                <span class="badge bg-light text-dark border px-3 py-2"><i class="fas fa-user-check me-1 text-secondary"></i>Manager Review</span>
-                <i class="fas fa-arrow-right text-muted"></i>
-                <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-2"><i class="fas fa-sitemap me-1"></i>Division VP</span>
-                <i class="fas fa-arrow-right text-muted"></i>
-                <span class="badge bg-purple-subtle border px-3 py-2" style="background:#eef2ff;color:#4f46e5;border-color:#a5b4fc!important;"><i class="fas fa-user-tie me-1"></i>President</span>
-                <i class="fas fa-arrow-right text-muted"></i>
-                <span class="badge bg-warning-subtle text-warning border border-warning-subtle px-3 py-2"><i class="fas fa-search-dollar me-1"></i>Audit Committee</span>
-                <i class="fas fa-arrow-right text-muted"></i>
-                <span class="badge bg-success-subtle text-success border border-success-subtle px-3 py-2"><i class="fas fa-gavel me-1"></i>Board of Directors <i class="fas fa-lock ms-1"></i></span>
-            </div>
+                        <!-- Audit Committee -->
+                        <div class="corp-card audit d-flex flex-column justify-content-between shadow-sm">
+                            <div>
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <div class="corp-label mb-0"><i class="fas fa-search-dollar me-1"></i>Audit Committee</div>
+                                    <?php if ($audit_row): ?>
+                                        <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1" style="font-size:.68rem;"><i class="fas fa-check-circle me-1"></i>Assigned</span>
+                                    <?php else: ?>
+                                        <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-1" style="font-size:.68rem;"><i class="fas fa-exclamation-triangle me-1"></i>Unassigned</span>
+                                    <?php endif; ?>
+                                </div>
+                                <?php if ($audit_row): ?>
+                                    <div class="corp-name"><?php echo e($audit_row['full_name']); ?></div>
+                                    <div class="corp-title mb-1"><?php echo e($audit_row['job_title'] ?: $audit_row['role']); ?></div>
+                                    <div class="small text-muted font-monospace"><i class="fas fa-user-circle me-1"></i>@<?php echo e(!empty($audit_row['username']) ? $audit_row['username'] : ($audit_row['employee_code'] ?? '')); ?></div>
+                                <?php else: ?>
+                                    <div class="missing text-danger small mb-2"><i class="fas fa-times-circle me-1"></i>No Audit official assigned.</div>
+                                <?php endif; ?>
+                            </div>
+                            <div class="mt-3 pt-2 border-top border-light-subtle">
+                                <button type="button" class="btn btn-sm btn-outline-warning w-100 rounded-pill text-dark" onclick="selectGovernanceRole('Audit Committee')">
+                                    <i class="fas fa-user-edit me-1"></i><?php echo $audit_row ? 'Change Audit' : 'Assign Audit'; ?>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Board of Directors -->
+                        <div class="corp-card board d-flex flex-column justify-content-between shadow-sm">
+                            <div>
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <div class="corp-label mb-0"><i class="fas fa-gavel me-1"></i>Board of Directors <span class="badge bg-success ms-1" style="font-size:.6rem;">Final Lock</span></div>
+                                    <?php if ($board_row): ?>
+                                        <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1" style="font-size:.68rem;"><i class="fas fa-check-circle me-1"></i>Assigned</span>
+                                    <?php else: ?>
+                                        <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-1" style="font-size:.68rem;"><i class="fas fa-exclamation-triangle me-1"></i>Unassigned</span>
+                                    <?php endif; ?>
+                                </div>
+                                <?php if ($board_row): ?>
+                                    <div class="corp-name"><?php echo e($board_row['full_name']); ?></div>
+                                    <div class="corp-title mb-1"><?php echo e($board_row['job_title'] ?: $board_row['role']); ?></div>
+                                    <div class="small text-muted font-monospace"><i class="fas fa-user-circle me-1"></i>@<?php echo e(!empty($board_row['username']) ? $board_row['username'] : ($board_row['employee_code'] ?? '')); ?></div>
+                                <?php else: ?>
+                                    <div class="missing text-danger small mb-2"><i class="fas fa-times-circle me-1"></i>No Board approver assigned.</div>
+                                <?php endif; ?>
+                            </div>
+                            <div class="mt-3 pt-2 border-top border-light-subtle">
+                                <button type="button" class="btn btn-sm btn-outline-success w-100 rounded-pill" onclick="selectGovernanceRole('Board of Directors')">
+                                    <i class="fas fa-user-edit me-1"></i><?php echo $board_row ? 'Change Board' : 'Assign Board'; ?>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Flow Diagram Legend -->
+                    <div class="p-3 bg-light rounded-3 border">
+                        <p class="fw-bold mb-2 text-secondary small text-uppercase" style="letter-spacing:1px;"><i class="fas fa-project-diagram me-1"></i>Complete Organizational Approval Route</p>
+                        <div class="d-flex flex-wrap align-items-center gap-2" style="font-size:.85rem;">
+                            <span class="badge bg-white text-dark border px-3 py-2 shadow-sm"><i class="fas fa-users me-1 text-secondary"></i>1. Team Self-Ratings</span>
+                            <i class="fas fa-arrow-right text-muted"></i>
+                            <span class="badge bg-white text-dark border px-3 py-2 shadow-sm"><i class="fas fa-clipboard-check me-1 text-secondary"></i>2. Supervisor Consolidation</span>
+                            <i class="fas fa-arrow-right text-muted"></i>
+                            <span class="badge bg-white text-dark border px-3 py-2 shadow-sm"><i class="fas fa-user-check me-1 text-secondary"></i>3. Manager Review</span>
+                            <i class="fas fa-arrow-right text-muted"></i>
+                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-2" title="Skipped for departments without a Division VP (e.g. Human Resources)"><i class="fas fa-sitemap me-1"></i>4. Division VP <span class="text-muted small">(if applicable)</span></span>
+                            <i class="fas fa-arrow-right text-muted"></i>
+                            <span class="badge bg-purple-subtle border px-3 py-2" style="background:#eef2ff;color:#4f46e5;border-color:#a5b4fc!important;"><i class="fas fa-user-tie me-1"></i>5. President &amp; CEO</span>
+                            <i class="fas fa-arrow-right text-muted"></i>
+                            <span class="badge bg-warning-subtle text-warning border border-warning-subtle px-3 py-2"><i class="fas fa-search-dollar me-1"></i>6. Audit Committee</span>
+                            <i class="fas fa-arrow-right text-muted"></i>
+                            <span class="badge bg-success-subtle text-success border border-success-subtle px-3 py-2"><i class="fas fa-gavel me-1"></i>7. Board of Directors <i class="fas fa-lock ms-1"></i></span>
+                        </div>
+                        <div class="small text-muted mt-2 pt-2 border-top">
+                            <i class="fas fa-info-circle me-1 text-primary"></i><strong>Direct to President:</strong> Departments reporting directly to the President (e.g. <strong>Human Resources</strong>, <strong>Marketing</strong>, <strong>Business Development</strong>) automatically skip Step 4 and advance directly from Department Manager to Step 5 (President &amp; CEO).
+                        </div>
+                    </div>
+                </div>
+            </section>
         </div>
-    </section>
+
+        <!-- ================================================================= -->
+        <!-- TAB 2: Department Division VP Matrix                             -->
+        <!-- ================================================================= -->
+        <div class="tab-pane fade" id="tab-matrix" role="tabpanel" aria-labelledby="tab-matrix-btn">
+            <section class="package-card fadeup-2 mb-4">
+                <header class="package-card__header d-flex justify-content-between align-items-center">
+                    <div>
+                        <h2 class="h5 mb-0 fw-bold"><i class="fas fa-sitemap me-2 text-primary"></i>Department Division VP Matrix</h2>
+                        <span class="small text-muted">Configure designated Division VPs for departments that have an executive VP tier</span>
+                    </div>
+                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-1"><?php echo count($departments); ?> Departments</span>
+                </header>
+                <div class="package-card__body p-4">
+                    <div class="alert alert-info py-2 px-3 small mb-3 border-info">
+                        <i class="fas fa-info-circle me-1 text-primary"></i><strong>Routing Policy:</strong> Division VP sign-off is department-specific. Departments with a Division VP (e.g. <em>Operations</em>, <em>Finance</em>, <em>General Services</em>, <em>Acquired Properties</em>) route through their VP. Departments reporting directly to the President (e.g. <strong>Human Resources</strong>) do <strong>not</strong> require a VP and automatically route directly to the President &amp; CEO.
+                    </div>
+                    <div class="dept-matrix-grid">
+                        <?php foreach ($dept_matrix as $dept_id => $info): ?>
+                        <div class="dept-matrix-card d-flex flex-column justify-content-between">
+                            <div>
+                                <div class="dept-name"><i class="fas fa-building me-1 text-secondary"></i><?php echo e($info['department_name']); ?></div>
+                                <?php if ($info['division_vp']): ?>
+                                    <div class="official-name mb-1"><i class="fas fa-check-circle me-1 text-success"></i><?php echo e($info['division_vp']); ?></div>
+                                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-0 small" style="font-size:0.72rem;">Step 4: Division VP Active</span>
+                                <?php else: ?>
+                                    <div class="d-flex align-items-center gap-1 mb-1">
+                                        <span class="badge bg-light text-dark border px-2 py-1 small" style="font-size:0.78rem;">
+                                            <i class="fas fa-level-up-alt me-1 text-primary"></i>Direct to President &amp; CEO
+                                        </span>
+                                    </div>
+                                    <div class="text-muted small fst-italic">No Division VP (bypasses Step 4)</div>
+                                <?php endif; ?>
+                            </div>
+                            <div class="mt-3 pt-2 text-end border-top border-light-subtle">
+                                <button type="button" class="btn btn-xs btn-outline-primary rounded-pill px-3 py-1" onclick="selectGovernanceRole('Division VP', <?php echo (int)$dept_id; ?>)">
+                                    <i class="fas fa-edit me-1"></i><?php echo $info['division_vp'] ? 'Change VP' : 'Assign VP (Optional)'; ?>
+                                </button>
+                            </div>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- ================================================================= -->
+        <!-- TAB 3: Assign Routing Official                                   -->
+        <!-- ================================================================= -->
+        <div class="tab-pane fade" id="tab-assign" role="tabpanel" aria-labelledby="tab-assign-btn">
+            <section class="package-card fadeup-3 mb-4" id="assignSection">
+                <header class="package-card__header d-flex justify-content-between align-items-center">
+                    <div>
+                        <h2 class="h5 mb-0 fw-bold"><i class="fas fa-user-plus me-2 text-primary"></i>Assign Routing Official</h2>
+                        <span class="small text-muted">Bind an active employee account to a specific governance role or department</span>
+                    </div>
+                    <span class="badge bg-warning-subtle text-warning border border-warning-subtle px-3 py-1">Role Assignment</span>
+                </header>
+                <div class="package-card__body p-4">
+                    <form method="post" class="row g-3 align-items-end" id="assignForm">
+                        <?php echo csrfField(); ?>
+
+                        <!-- Step 1: Governance Role -->
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold small text-uppercase text-secondary" for="governance-type">
+                                <span class="badge bg-secondary me-1">1</span> Governance Role <span class="text-danger">*</span>
+                            </label>
+                            <select class="form-select" id="governance-type" name="governance_type" required>
+                                <option value="">-- Select Governance Step --</option>
+                                <optgroup label="— Department Level (Step 4) —">
+                                    <option value="Division VP">Division VP / Executive Sign-off</option>
+                                </optgroup>
+                                <optgroup label="— Corporate Governance (Steps 5–7) —">
+                                    <option value="President">Step 5: President & CEO</option>
+                                    <option value="Audit Committee">Step 6: Audit Committee</option>
+                                    <option value="Board of Directors">Step 7: Board of Directors (Final Lock)</option>
+                                </optgroup>
+                            </select>
+                        </div>
+
+                        <!-- Step 2: Department (shown only for Division VP) -->
+                        <div class="col-md-3" id="departmentCol">
+                            <label class="form-label fw-bold small text-uppercase text-secondary" for="governance-department">
+                                <span class="badge bg-secondary me-1">2</span> Department <span class="text-danger" id="deptRequired">*</span>
+                            </label>
+                            <select class="form-select" id="governance-department" name="department_id">
+                                <option value="0">All Departments / Corporate (Company-wide)</option>
+                                <?php foreach ($departments as $dept): ?>
+                                    <option value="<?php echo (int)$dept['department_id']; ?>"><?php echo e($dept['department_name']); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <div class="form-text text-muted small" id="deptHint">Select department for Division VP.</div>
+                        </div>
+
+                        <!-- Step 3: User Selector -->
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold small text-uppercase text-secondary" for="governance-user">
+                                <span class="badge bg-secondary me-1">3</span> Employee / Official <span class="text-danger">*</span>
+                            </label>
+                            <select class="form-select" id="governance-user" name="reviewer_employee_id" required>
+                                <option value="">-- Select Employee / Official --</option>
+                                
+
+
+                                <?php
+                                $prevRank = null;
+                                foreach ($users as $user):
+                                    $rankLabel = $user['rank_name'] ?? 'Unclassified';
+                                    if ($rankLabel !== $prevRank):
+                                ?>
+                                    <optgroup label="── <?php echo e($rankLabel); ?> ──">
+                                <?php
+                                        $prevRank = $rankLabel;
+                                    endif;
+                                ?>
+                                    <option value="<?php echo (int)$user['employee_id']; ?>"
+                                        data-department-id="<?php echo (int)$user['department_id']; ?>"
+                                        data-suggested-role="<?php echo e($user['detected_role'] ?? ''); ?>"
+                                        data-job-title="<?php echo e($user['job_title'] ?? ''); ?>"
+                                        data-username="<?php echo e($user['username'] ?? $user['employee_code'] ?? ''); ?>"
+                                        data-rank="<?php echo e($rankLabel); ?>">
+                                        <?php echo e($user['full_name'] . ' — ' . ($user['job_title'] ?: ($user['role'] ?? 'Official'))); ?> (@<?php echo e(!empty($user['username']) ? $user['username'] : $user['employee_code']); ?>)
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+
+                        <!-- Submit Button -->
+                        <div class="col-md-2">
+                            <button class="btn btn-primary w-100 rounded-pill shadow-sm fw-semibold" type="submit" style="padding-top:.6rem;padding-bottom:.6rem;">
+                                <i class="fas fa-check-circle me-1"></i>Save Routing
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </section>
+        </div>
+
+        <!-- ================================================================= -->
+        <!-- TAB 4: Configured Routing Officials                              -->
+        <!-- ================================================================= -->
+        <div class="tab-pane fade" id="tab-configured" role="tabpanel" aria-labelledby="tab-configured-btn">
+            <section class="package-card fadeup-4 mb-4">
+                <header class="package-card__header d-flex flex-wrap justify-content-between align-items-center gap-3">
+                    <div class="d-flex align-items-center gap-2">
+                        <h2 class="h5 mb-0 fw-bold"><i class="fas fa-user-shield me-2 text-primary"></i>Configured Routing Officials</h2>
+                        <span class="badge bg-secondary-subtle text-secondary border px-3 py-1"><?php echo count($approvers); ?> Total</span>
+                    </div>
+                    <!-- Batch Action Toolbar -->
+                    <div id="batchActionToolbar" class="d-flex align-items-center gap-2 d-none">
+                        <span class="small fw-semibold text-dark me-2" id="selectedCountText">0 selected</span>
+                        <button type="button" class="btn btn-sm btn-outline-success rounded-pill px-3" onclick="submitBatchForm('batch_enable')">
+                            <i class="fas fa-check-circle me-1"></i>Enable Selected
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-warning rounded-pill px-3" onclick="submitBatchForm('batch_disable')">
+                            <i class="fas fa-ban me-1"></i>Disable Selected
+                        </button>
+                        <button type="button" class="btn btn-sm btn-danger rounded-pill px-3 shadow-sm" onclick="submitBatchForm('batch_delete')">
+                            <i class="fas fa-trash-alt me-1"></i>Delete Selected
+                        </button>
+                    </div>
+                </header>
+
+                <div class="package-card__body p-0">
+                    <form method="post" action="" id="batchApproversForm">
+                        <?php echo csrfField(); ?>
+                        <input type="hidden" name="action" id="batchActionInput" value="">
+                        <div class="table-responsive">
+                            <table class="table package-table align-middle mb-0">
+                                <thead class="table-light small text-uppercase">
+                                    <tr>
+                                        <th style="width:44px;" class="text-center">
+                                            <input type="checkbox" class="form-check-input" id="selectAllApprovers" title="Select All">
+                                        </th>
+                                        <th style="width:20%;">Governance Role</th>
+                                        <th style="width:22%;">Department</th>
+                                        <th style="width:22%;">Official</th>
+                                        <th>Position / Role</th>
+                                        <th style="width:120px;">Status</th>
+                                        <th style="width:190px;" class="text-end">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php if (empty($approvers)): ?>
+                                        <tr>
+                                            <td colspan="7" class="text-center text-muted py-5">
+                                                <i class="fas fa-user-slash fa-2x mb-2 d-block text-black-50"></i>
+                                                No routing officials configured yet. Use the <strong>Assign Routing Official</strong> tab to assign.
+                                            </td>
+                                        </tr>
+                                    <?php else: ?>
+                                        <?php
+                                        // Role badge styles
+                                        $role_styles = [
+                                            'Division VP'       => ['bg-primary-subtle text-primary border-primary-subtle', 'fa-sitemap'],
+                                            'President'         => ['bg-purple-subtle text-purple border-purple-subtle', 'fa-user-tie'],
+                                            'Audit Committee'   => ['bg-warning-subtle text-warning border-warning-subtle', 'fa-search-dollar'],
+                                            'Board of Directors'=> ['bg-success-subtle text-success border-success-subtle', 'fa-gavel'],
+                                        ];
+                                        $prev_type = null;
+                                        foreach ($approvers as $approver):
+                                            $style = $role_styles[$approver['governance_type']] ?? ['bg-secondary-subtle text-secondary border-secondary-subtle', 'fa-user'];
+                                            if ($approver['governance_type'] !== $prev_type):
+                                                $prev_type = $approver['governance_type'];
+                                        ?>
+                                        <tr class="table-light">
+                                            <td colspan="7" class="fw-bold text-uppercase small py-2 ps-3" style="font-size:.7rem;letter-spacing:1px;color:#64748b;">
+                                                <?php echo e($approver['governance_type']); ?> Officials
+                                            </td>
+                                        </tr>
+                                        <?php endif; ?>
+                                        <tr>
+                                            <td class="text-center">
+                                                <input type="checkbox" class="form-check-input approver-checkbox" name="approver_ids[]" value="<?php echo (int)$approver['governance_approver_id']; ?>">
+                                            </td>
+                                            <td>
+                                                <span class="badge <?php echo $style[0]; ?> border px-2 py-1">
+                                                    <i class="fas <?php echo $style[1]; ?> me-1"></i><?php echo e($approver['governance_type']); ?>
+                                                </span>
+                                            </td>
+                                            <td class="small text-muted"><?php echo e($approver['department_name']); ?></td>
+                                            <td class="fw-bold text-dark"><?php echo e($approver['full_name']); ?></td>
+                                            <td class="text-muted small"><?php echo e($approver['job_title'] ?: $approver['role']); ?></td>
+                                            <td>
+                                                <?php if ($approver['is_active']): ?>
+                                                    <span class="badge bg-success-subtle text-success border border-success-subtle px-3 py-1">
+                                                        <i class="fas fa-check-circle me-1"></i>Active
+                                                    </span>
+                                                <?php else: ?>
+                                                    <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle px-3 py-1">
+                                                        <i class="fas fa-ban me-1"></i>Disabled
+                                                    </span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td class="text-end">
+                                                <div class="d-inline-flex gap-1">
+                                                    <?php if ($approver['is_active']): ?>
+                                                        <a class="btn btn-sm btn-outline-warning rounded-pill px-3" href="?disable=<?php echo (int)$approver['governance_approver_id']; ?>" title="Disable">
+                                                            <i class="fas fa-ban me-1"></i>Disable
+                                                        </a>
+                                                        <a class="btn btn-sm btn-outline-danger rounded-pill px-2" href="?delete=<?php echo (int)$approver['governance_approver_id']; ?>" onclick="return confirm('Delete this routing official?');" title="Delete">
+                                                            <i class="fas fa-trash-alt"></i>
+                                                        </a>
+                                                    <?php else: ?>
+                                                        <a class="btn btn-sm btn-outline-success rounded-pill px-3" href="?enable=<?php echo (int)$approver['governance_approver_id']; ?>" title="Enable">
+                                                            <i class="fas fa-check-circle me-1"></i>Enable
+                                                        </a>
+                                                        <a class="btn btn-sm btn-outline-danger rounded-pill px-3" href="?delete=<?php echo (int)$approver['governance_approver_id']; ?>" onclick="return confirm('Delete this disabled routing official?');" title="Delete">
+                                                            <i class="fas fa-trash-alt me-1"></i>Delete
+                                                        </a>
+                                                    <?php endif; ?>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        <?php endforeach; ?>
+                                    <?php endif; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </form>
+                </div>
+            </section>
+        </div>
+
+    </div><!-- /.tab-content -->
 
 </main>
 

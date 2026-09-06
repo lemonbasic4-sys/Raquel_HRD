@@ -2041,9 +2041,20 @@ function initPhAddresses() {
     var regSelects = document.querySelectorAll('.ph-region-select');
     if (!regSelects.length) return;
 
-    var basePath = (typeof BASE_URL !== 'undefined') ? BASE_URL : '';
-    if (!basePath && window.location.pathname.includes('/FINAL_RAQUEL_PAWNSHOP_HRD')) {
-        basePath = '/FINAL_RAQUEL_PAWNSHOP_HRD';
+    var basePath = '';
+    if (typeof window.APP_BASE_URL !== 'undefined' && window.APP_BASE_URL) {
+        basePath = window.APP_BASE_URL;
+    } else if (typeof window.BASE_URL !== 'undefined' && window.BASE_URL) {
+        basePath = window.BASE_URL;
+    } else if (typeof BASE_URL !== 'undefined' && BASE_URL) {
+        basePath = BASE_URL;
+    } else {
+        var parts = window.location.pathname.split('/').filter(Boolean);
+        if (parts.length > 0 && ['manager', 'supervisor', 'admin', 'employee', 'staff'].includes(parts[0])) {
+            basePath = '';
+        } else if (parts.length > 1 && ['manager', 'supervisor', 'admin', 'employee', 'staff'].includes(parts[1])) {
+            basePath = '/' + parts[0];
+        }
     }
 
     var locUrl = basePath + '/assets/data/ph_locations.json';

@@ -3,7 +3,7 @@
 -- Import AFTER 3rd_seed_HR_accounts_.sql and BEFORE xPortal_accounts.sql.
 -- Password for every Employee portal account: password
 -- ============================================================================
-USE raquel_hris;
+USE raquel_hris_test_db;
 SET FOREIGN_KEY_CHECKS = 0;
 
 -- Wire the 3 existing HRD HRIS people into one reporting chain:

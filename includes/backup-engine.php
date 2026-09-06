@@ -9,7 +9,7 @@ function backup_get_type_meta($type) {
     if ($type === 'schema') {
         return [
             'type' => 'schema',
-            'prefix' => 'raquel_hris_schema_',
+            'prefix' => 'raquel_hris_test_db_schema_',
             'label' => 'Schema Only',
             'mysqldump_flags' => '--no-data',
         ];
@@ -18,7 +18,7 @@ function backup_get_type_meta($type) {
     if ($type === 'data') {
         return [
             'type' => 'data',
-            'prefix' => 'raquel_hris_data_',
+            'prefix' => 'raquel_hris_test_db_data_',
             'label' => 'Data Only',
             'mysqldump_flags' => '--no-create-info',
         ];
@@ -26,7 +26,7 @@ function backup_get_type_meta($type) {
 
     return [
         'type' => 'full',
-        'prefix' => 'raquel_hris_backup_',
+        'prefix' => 'raquel_hris_test_db_backup_',
         'label' => 'Full Backup',
         'mysqldump_flags' => '',
     ];

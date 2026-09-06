@@ -451,6 +451,7 @@ switch ($effective_role) {
         }
         // Expose app base URL for shared JS utilities.
         window.APP_BASE_URL = <?php echo json_encode(BASE_URL); ?>;
+        window.BASE_URL = window.APP_BASE_URL;
         window.NOTIF_CONTEXT = <?php echo json_encode($notif_context === 'employee' ? 'employee' : 'hr'); ?>;
     </script>
 </head>

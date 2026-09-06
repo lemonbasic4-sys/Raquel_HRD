@@ -28,6 +28,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['package_action'] ?? '';
     $comments = trim($_POST['comments'] ?? '');
 
+    // Late Member Catch-Up Endorsement (Supervisor -> HR Manager -> Active Pipeline)
+    if ($action === 'endorse_catchup') {
+        $catchup_pkg_id  = (int)($_POST['catchup_package_id'] ?? 0);
+        $catchup_eval_id = (int)($_POST['catchup_evaluation_id'] ?? 0);
+        $catchup_remarks = trim($_POST['catchup_comments'] ?? '');
+        $current_role    = $_SESSION['role'] ?? '';
+        $current_emp_id  = (int)($_SESSION['employee_id'] ?? 0);
+
+        $endorser_role = in_array($current_role, ['HR Manager', 'HR Supervisor'], true) ? 'hr_manager' : 'supervisor';
+
+        $res = endorseLatePackageMember($conn, $catchup_pkg_id, $catchup_eval_id, $endorser_role, $current_emp_id, $catchup_remarks);
+        if ($res['ok']) {
+            redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'success', $res['message']);
+        } else {
+            redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', $res['message']);
+        }
+    }
+
     if (isOrganizationPackageLocked($conn, $package_id)) {
         redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'This package is locked after Board approval. Scores and route actions can no longer be changed.');
     }
@@ -132,7 +150,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'warning', 'Evaluation package dropped. All ' . count($member_users) . ' team member(s) have been notified and their self-ratings reset.');
     }
 
+    // Catch-Up Endorsement: Supervisor -> HR Manager, or HR Manager -> Endorsed
+    if ($action === 'endorse_catchup') {
+        $catchup_eval_id  = (int) ($_POST['catchup_evaluation_id'] ?? 0);
+        $catchup_pkg_id   = (int) ($_POST['catchup_package_id'] ?? 0);
+        $catchup_comments = trim($_POST['catchup_comments'] ?? '');
+        $endorser_emp_id  = (int) ($_SESSION['employee_id'] ?? 0);
+
+        if ($catchup_eval_id <= 0 || $catchup_pkg_id <= 0) {
+            redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'Invalid catch-up endorsement request.');
+        }
+
+        // Determine endorser role
+        $session_role = $_SESSION['role'] ?? '';
+        if (in_array($session_role, ['HR Manager', 'HR Supervisor'], true)) {
+            $endorser_role = 'hr_manager';
+        } else {
+            // Must be the package consolidator (supervisor)
+            $is_consolidator = (bool)$conn->query("SELECT package_id FROM evaluation_packages WHERE package_id = $catchup_pkg_id AND consolidator_employee_id = $endorser_emp_id LIMIT 1")->fetch_assoc();
+            if (!$is_consolidator) {
+                redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'You are not authorized to endorse this catch-up member.');
+            }
+            $endorser_role = 'supervisor';
+        }
+
+        $result = endorseLatePackageMember($conn, $catchup_pkg_id, $catchup_eval_id, $endorser_role, $endorser_emp_id, $catchup_comments);
+        $type = $result['ok'] ? 'success' : 'danger';
+        redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', $type, $result['message']);
+    }
+
     if ($action === 'return') {
+
         if ($comments === '') {
             redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'A return reason is required.');
         }
@@ -199,6 +247,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', "Consolidation is blocked: $submitted of $expected required team self-ratings are submitted.");
         }
         recalculateOrganizationPackageBehaviorScore($conn, $package_id);
+    }
+
+    // 🔒 Prevention: verify next consolidator/reviewer exists and is assigned before advancing
+    $next_check = checkNextPackageStepIsAssigned($conn, $package_id, (int)$step['step_order']);
+    if (!$next_check['ok']) {
+        redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', $next_check['message']);
     }
 
     $approve = $conn->prepare("UPDATE evaluation_package_route_steps SET action_status = 'Approved', acted_at = NOW(), comments = ? WHERE package_route_step_id = ?");
@@ -311,6 +365,17 @@ $waiting_stmt->bind_param('ii', $user_id, $user_id);
 $waiting_stmt->execute();
 $waiting_packages = $waiting_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $waiting_stmt->close();
+
+// Catch-Up Members: load based on role
+$current_employee_id = (int) ($_SESSION['employee_id'] ?? 0);
+$session_role = $_SESSION['role'] ?? '';
+$catchup_supervisor_members = [];
+$catchup_hr_members = [];
+if (in_array($session_role, ['HR Manager', 'HR Supervisor'], true)) {
+    $catchup_hr_members = getLatePackageMembersForHRManager($conn);
+} elseif ($current_employee_id > 0) {
+    $catchup_supervisor_members = getLatePackageMembersForSupervisor($conn, $current_employee_id);
+}
 ?>
 <main class="evaluation-packages container-fluid py-4">
     <section class="package-hero">
@@ -336,13 +401,105 @@ $waiting_stmt->close();
         <?php endif; ?>
     </section>
 
-    <?php if (!$packages && !$waiting_packages): ?>
+
+    <?php if (!$packages && !$waiting_packages && !$catchup_supervisor_members && !$catchup_hr_members): ?>
         <section class="package-empty">
             <i class="fas fa-layer-group fa-3x text-muted mb-3" style="opacity:0.4;"></i>
             <h2 class="h5 fw-bold">No team package is currently waiting for your review</h2>
             <p class="mb-0 text-muted">
                 When all department members submit their self-ratings, the standing supervisor receives the package here. Higher reviewers will be notified when earlier evaluators complete their turn.
             </p>
+        </section>
+    <?php endif; ?>
+
+    <!-- ── Catch-Up Reviews: Supervisor Endorsement Queue ─────────────────── -->
+    <?php if ($catchup_supervisor_members): ?>
+        <section class="mb-4">
+            <div class="d-flex align-items-center gap-2 mb-3">
+                <i class="fas fa-user-clock fa-lg text-warning"></i>
+                <h2 class="h5 fw-bold mb-0 text-warning">Late Member Catch-Up — Supervisor Review Required</h2>
+            </div>
+            <p class="small text-muted mb-3">
+                The following employees submitted their self-evaluations after the main department package had already advanced. Please review each one individually and endorse them so they can be added to the active evaluation pipeline.
+            </p>
+            <?php foreach ($catchup_supervisor_members as $cm): ?>
+                <div class="package-card mb-3" style="border-left: 4px solid #f59e0b;">
+                    <div class="package-card__body">
+                        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
+                            <div>
+                                <div class="fw-bold fs-6"><?php echo e($cm['member_name']); ?> <span class="badge bg-warning text-dark ms-1">Late Joiner</span></div>
+                                <div class="small text-muted"><?php echo e($cm['job_title']); ?> &bull; <?php echo e($cm['department_name']); ?> &bull; <?php echo e($cm['template_name']); ?></div>
+                                <div class="small text-muted">Period: <?php echo e($cm['period_start']); ?> to <?php echo e($cm['period_end']); ?></div>
+                            </div>
+                            <a class="btn btn-sm btn-outline-secondary" href="<?php echo BASE_URL; ?>/employee/package-member-review.php?package_id=<?php echo (int)$cm['package_id']; ?>&evaluation_id=<?php echo (int)$cm['evaluation_id']; ?>">
+                                <i class="fas fa-eye me-1"></i>Review Scores
+                            </a>
+                        </div>
+                        <form method="post" class="d-flex flex-wrap gap-2 align-items-end">
+                            <input type="hidden" name="package_id" value="<?php echo (int)$cm['package_id']; ?>">
+                            <input type="hidden" name="package_action" value="endorse_catchup">
+                            <input type="hidden" name="catchup_package_id" value="<?php echo (int)$cm['package_id']; ?>">
+                            <input type="hidden" name="catchup_evaluation_id" value="<?php echo (int)$cm['evaluation_id']; ?>">
+                            <?php echo csrfField(); ?>
+                            <div class="flex-grow-1">
+                                <label class="form-label small fw-bold mb-1">Remarks (optional)</label>
+                                <input type="text" name="catchup_comments" class="form-control form-control-sm" placeholder="Add endorsement remarks…">
+                            </div>
+                            <button type="submit" class="btn btn-warning fw-bold px-4" style="min-height:38px;">
+                                <i class="fas fa-check-circle me-1"></i>Endorse — Forward to HR Manager
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            <?php endforeach; ?>
+        </section>
+    <?php endif; ?>
+
+    <!-- ── Catch-Up Reviews: HR Manager Endorsement Queue ────────────────── -->
+    <?php if ($catchup_hr_members): ?>
+        <section class="mb-4">
+            <div class="d-flex align-items-center gap-2 mb-3">
+                <i class="fas fa-user-shield fa-lg text-info"></i>
+                <h2 class="h5 fw-bold mb-0 text-info">Late Member Catch-Up — HR Manager Endorsement Required</h2>
+            </div>
+            <p class="small text-muted mb-3">
+                The following employees have been endorsed by their Team Supervisor and are now pending your HR endorsement before they join the active evaluation package.
+            </p>
+            <?php foreach ($catchup_hr_members as $cm): ?>
+                <div class="package-card mb-3" style="border-left: 4px solid #06b6d4;">
+                    <div class="package-card__body">
+                        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
+                            <div>
+                                <div class="fw-bold fs-6">
+                                    <?php echo e($cm['member_name']); ?>
+                                    <span class="badge bg-success ms-1"><i class="fas fa-check me-1"></i>Supervisor Endorsed</span>
+                                </div>
+                                <div class="small text-muted"><?php echo e($cm['job_title']); ?> &bull; <?php echo e($cm['department_name']); ?> &bull; <?php echo e($cm['template_name']); ?></div>
+                                <div class="small text-muted">Period: <?php echo e($cm['period_start']); ?> to <?php echo e($cm['period_end']); ?>
+                                    &bull; Supervisor: <?php echo e($cm['supervisor_name'] ?? '—'); ?>
+                                </div>
+                            </div>
+                            <a class="btn btn-sm btn-outline-secondary" href="<?php echo BASE_URL; ?>/employee/package-member-review.php?package_id=<?php echo (int)$cm['package_id']; ?>&evaluation_id=<?php echo (int)$cm['evaluation_id']; ?>">
+                                <i class="fas fa-eye me-1"></i>Review Scores
+                            </a>
+                        </div>
+                        <form method="post" class="d-flex flex-wrap gap-2 align-items-end">
+                            <input type="hidden" name="package_id" value="<?php echo (int)$cm['package_id']; ?>">
+                            <input type="hidden" name="package_action" value="endorse_catchup">
+                            <input type="hidden" name="catchup_package_id" value="<?php echo (int)$cm['package_id']; ?>">
+                            <input type="hidden" name="catchup_evaluation_id" value="<?php echo (int)$cm['evaluation_id']; ?>">
+                            <?php echo csrfField(); ?>
+                            <div class="flex-grow-1">
+                                <label class="form-label small fw-bold mb-1">HR Endorsement Remarks (optional)</label>
+                                <input type="text" name="catchup_comments" class="form-control form-control-sm" placeholder="Add HR endorsement remarks…">
+                            </div>
+                            <button type="submit" class="btn btn-info fw-bold text-white px-4" style="min-height:38px;">
+                                <i class="fas fa-shield-alt me-1"></i>HR Endorse — Add to Active Package
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            <?php endforeach; ?>
         </section>
     <?php endif; ?>
 
@@ -408,12 +565,12 @@ $waiting_stmt->close();
         $can_adjust = !isOrganizationPackageLocked($conn, (int)$package['package_id']);
         $is_board_step = ($package['step_type'] === 'Governance') && (stripos($package['step_label'], 'Board') !== false);
         $members_stmt = $conn->prepare("SELECT e.evaluation_id, emp.first_name, emp.last_name, emp.job_title,
-                e.kra_subtotal, e.behavior_average, e.total_score, e.status,
+                e.kra_subtotal, e.behavior_average, e.total_score, e.status, pm.member_status,
                 EXISTS(SELECT 1 FROM evaluation_scores es WHERE es.evaluation_id = e.evaluation_id AND (es.supervisor_override_score IS NOT NULL OR es.dept_manager_override_score IS NOT NULL OR es.manager_override_score IS NOT NULL)) AS has_adjustments
             FROM evaluation_package_members pm
             JOIN evaluations e ON e.evaluation_id = pm.evaluation_id
             JOIN employees emp ON emp.employee_id = e.employee_id
-            WHERE pm.package_id = ?
+            WHERE pm.package_id = ? AND pm.member_status IN ('Normal', 'Catchup Endorsed', 'Catchup Complete')
             ORDER BY emp.last_name, emp.first_name");
         $members_stmt->bind_param('i', $package['package_id']);
         $members_stmt->execute();
@@ -434,6 +591,7 @@ $waiting_stmt->close();
         $next_rev_info = $next_rev_stmt->get_result()->fetch_assoc();
         $next_rev_stmt->close();
         $next_reviewer_name = $next_rev_info ? getOrganizationPackageReviewerDisplayName($conn, (int)($next_rev_info['reviewer_user_id'] ?? 0), (int)($next_rev_info['reviewer_employee_id'] ?? 0)) : 'Board of Directors';
+        $package_next_check = checkNextPackageStepIsAssigned($conn, (int)$package['package_id'], (int)$package['current_step_order']);
         ?>
         <article class="package-card" role="region" aria-label="<?php echo e($package['department_name']); ?> Evaluation Action Package">
             <header class="package-card__header">
@@ -492,6 +650,15 @@ $waiting_stmt->close();
                                 <tr>
                                     <td>
                                         <div class="fw-bold"><?php echo e($member['first_name'] . ' ' . $member['last_name']); ?></div>
+                                        <?php if (($member['member_status'] ?? 'Normal') === 'Catchup Endorsed'): ?>
+                                            <span class="badge bg-success text-white py-1 px-2" style="font-size: 0.72rem;" title="Joined late; verified by Supervisor and HR Manager">
+                                                <i class="fas fa-user-check me-1"></i>Late Addition &mdash; HR Verified
+                                            </span>
+                                        <?php elseif (($member['member_status'] ?? 'Normal') === 'Catchup Complete'): ?>
+                                            <span class="badge bg-primary text-white py-1 px-2" style="font-size: 0.72rem;">
+                                                <i class="fas fa-check-double me-1"></i>Late Catch-Up Complete
+                                            </span>
+                                        <?php endif; ?>
                                         <?php if (!empty($member['has_adjustments'])): ?>
                                             <span class="audit-chip audit-chip--adjusted">
                                                 <i class="fas fa-pen-fancy me-1"></i>Adjusted by Evaluator
@@ -597,6 +764,12 @@ $waiting_stmt->close();
                     <input type="hidden" name="package_action" id="actionInput-<?php echo (int)$package['package_id']; ?>" value="approve">
                     <?php echo csrfField(); ?>
                     
+                    <?php if (!$package_next_check['ok']): ?>
+                        <div class="alert alert-danger py-2 px-3 small mb-3 border-danger shadow-sm">
+                            <i class="fas fa-exclamation-triangle me-1"></i><?php echo $package_next_check['message']; ?>
+                        </div>
+                    <?php endif; ?>
+
                     <?php if ($package['step_type'] === 'Consolidation'): ?>
                         <div class="alert alert-info py-2 px-3 small mb-3">
                             <i class="fas fa-info-circle me-1"></i><strong>Consolidation step:</strong> Shared Core Behaviors &amp; Values is calculated automatically from all team members. Use <strong>Adjust</strong> to adjust any member's score before submitting.
@@ -619,14 +792,21 @@ $waiting_stmt->close();
                     </div>
 
                     <div class="d-flex flex-wrap gap-2 align-items-center">
-                        <!-- F3: Trigger Pre-Submission Confirmation Modal -->
-                        <button class="btn-action-primary btn" type="button" data-bs-toggle="modal" data-bs-target="#confirmApproveModal-<?php echo (int)$package['package_id']; ?>">
-                            <?php if ($is_board_step): ?>
-                                <i class="fas fa-lock me-1"></i>Approve, Lock, and Apply Results
-                            <?php else: ?>
-                                <i class="fas fa-check-circle me-1"></i>Approve &amp; Forward to Next Reviewer
-                            <?php endif; ?>
-                        </button>
+                        <?php if (!$package_next_check['ok']): ?>
+                            <!-- Blocked Action Button with direct modal to explain reason and route to config -->
+                            <button class="btn btn-warning px-4 py-2 fw-bold text-dark" type="button" data-bs-toggle="modal" data-bs-target="#confirmApproveModal-<?php echo (int)$package['package_id']; ?>" style="min-height:46px; border-radius:8px;">
+                                <i class="fas fa-exclamation-triangle me-1"></i>Consolidation Blocked &mdash; Check Next Reviewer
+                            </button>
+                        <?php else: ?>
+                            <!-- F3: Trigger Pre-Submission Confirmation Modal -->
+                            <button class="btn-action-primary btn" type="button" data-bs-toggle="modal" data-bs-target="#confirmApproveModal-<?php echo (int)$package['package_id']; ?>">
+                                <?php if ($is_board_step): ?>
+                                    <i class="fas fa-lock me-1"></i>Approve, Lock, and Apply Results
+                                <?php else: ?>
+                                    <i class="fas fa-check-circle me-1"></i>Approve &amp; Forward to Next Reviewer
+                                <?php endif; ?>
+                            </button>
+                        <?php endif; ?>
 
                         <?php if ($package['step_type'] !== 'Consolidation'): ?>
                             <button class="btn btn-outline-danger px-4 py-2 fw-bold" type="submit" onclick="document.getElementById('actionInput-<?php echo (int)$package['package_id']; ?>').value='return';" style="min-height:46px; border-radius:8px;">
@@ -653,6 +833,12 @@ $waiting_stmt->close();
                                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                                 </div>
                                 <div class="modal-body p-4">
+                                    <?php if (!$package_next_check['ok']): ?>
+                                        <div class="alert alert-danger py-3 px-3 small mb-3 border-danger shadow-sm">
+                                            <i class="fas fa-exclamation-triangle me-2 fa-lg text-danger"></i><strong>Forwarding Blocked:</strong> <?php echo $package_next_check['message']; ?>
+                                        </div>
+                                    <?php endif; ?>
+
                                     <div class="alert alert-info py-2 px-3 small mb-3">
                                         <strong>Department:</strong> <?php echo e($package['department_name']); ?> &bull; 
                                         <strong>Cycle:</strong> <?php echo e($package['period_start']); ?> to <?php echo e($package['period_end']); ?><br>
@@ -693,7 +879,7 @@ $waiting_stmt->close();
 
                                     <div class="p-3 mb-3 rounded-3 shadow-sm" style="background-color: #fffbeb !important; border: 2px solid #f59e0b !important;">
                                         <div class="form-check d-flex align-items-start gap-3 ps-2">
-                                            <input class="form-check-input flex-shrink-0 mt-1" type="checkbox" id="chkConfirm-<?php echo (int)$package['package_id']; ?>" style="width: 26px; height: 26px; cursor: pointer; border: 2px solid #d97706 !important;">
+                                            <input class="form-check-input flex-shrink-0 mt-1" type="checkbox" id="chkConfirm-<?php echo (int)$package['package_id']; ?>" style="width: 26px; height: 26px; cursor: pointer; border: 2px solid #d97706 !important;" <?php echo !$package_next_check['ok'] ? 'disabled' : ''; ?>>
                                             <label class="form-check-label fw-bold text-dark mb-0 ms-2" for="chkConfirm-<?php echo (int)$package['package_id']; ?>" style="font-size: 0.98rem; line-height: 1.4; cursor: pointer;">
                                                 <i class="fas fa-check-square me-1 text-warning fa-lg"></i>
                                                 I confirm that I have thoroughly reviewed all member ratings, evaluator adjustments, and developmental plans for this department before forwarding to <span class="text-decoration-underline text-primary"><?php echo e($next_reviewer_name); ?></span>.
@@ -703,9 +889,15 @@ $waiting_stmt->close();
                                 </div>
                                 <div class="modal-footer bg-light">
                                     <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">Cancel</button>
-                                    <button type="button" class="btn btn-success px-4 fw-bold" onclick="submitPackageForm(<?php echo (int)$package['package_id']; ?>);">
-                                        <i class="fas fa-paper-plane me-1"></i>Confirm &amp; Forward Package
-                                    </button>
+                                    <?php if ($package_next_check['ok']): ?>
+                                        <button type="button" class="btn btn-success px-4 fw-bold" onclick="submitPackageForm(<?php echo (int)$package['package_id']; ?>);">
+                                            <i class="fas fa-paper-plane me-1"></i>Confirm &amp; Forward Package
+                                        </button>
+                                    <?php else: ?>
+                                        <a href="<?php echo BASE_URL; ?>/manager/evaluation-governance.php" class="btn btn-danger px-4 fw-bold">
+                                            <i class="fas fa-sliders-h me-1"></i>Configure Routing &amp; Governance
+                                        </a>
+                                    <?php endif; ?>
                                 </div>
                             </div>
                         </div>

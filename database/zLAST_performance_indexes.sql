@@ -1,9 +1,9 @@
 -- Performance Indexes Migration
--- Run this once on the live raquel_hris database to speed up:
+-- Run this once on the live raquel_hris_test_db database to speed up:
 --   admin/members.php, admin/employee-accounts.php, admin/users.php
 -- Compatible with MySQL 5.x / MariaDB
 
-USE raquel_hris;
+USE raquel_hris_test_db;
 
 -- users.employee_id: used in every LEFT JOIN on listing pages
 SET @index_exists := (

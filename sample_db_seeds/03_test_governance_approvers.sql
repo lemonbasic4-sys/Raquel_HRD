@@ -9,7 +9,7 @@
 --   Audit Committee (company-wide) → GOV-AUD
 --   Board of Directors (company-wide, Final Lock) → GOV-BOD
 -- ============================================================================
-USE raquel_hris;
+USE raquel_hris_test_db;
 
 -- Ensure table exists before seeding (safe for fresh DB or existing DB)
 CREATE TABLE IF NOT EXISTS evaluation_governance_approvers (

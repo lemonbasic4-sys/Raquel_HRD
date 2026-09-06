@@ -752,6 +752,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $submitted_fields['profile_picture'] = $new_filename;
         }
 
+        // Auto-provision portal account and check for governance title linkage
+        autoDetectAndLinkGovernanceApprover($conn, $eid);
+
         logEmployeeProfileEdit($conn, $eid, (int)$_SESSION['user_id'], $step, $currentStepName, $emp, $submitted_fields);
         if (isset($_POST['quick_save'])) {
             redirectWith(BASE_URL . "/supervisor/edit-employee.php?id=$eid&step=$step$return_param", 'success', "Changes saved successfully.");

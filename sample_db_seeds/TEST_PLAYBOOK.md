@@ -21,7 +21,7 @@ Patricia / Miguel also have HRIS accounts from `xPortal_accounts.sql`; for **sel
 
 ## Import order (fresh database)
 
-Drop `raquel_hris`, recreate it, then import **in this order**:
+Drop `raquel_hris_test_db`, recreate it, then import **in this order**:
 
 1. `database/1st_schema_tables.sql`
 2. `database/2nd_seed_organization.sql`

@@ -587,6 +587,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['import_csv'])) {
             }
             // ─────────────────────────────────────────────────────────────────
 
+            // Auto-provision portal account and check for governance title linkage
+            autoDetectAndLinkGovernanceApprover($conn, $eid);
+
             logAudit($conn, $_SESSION['user_id'], ($existing_id ? 'UPDATE' : 'CREATE'), 'Employee', $eid, "Imported/Updated via CSV: $first_name $last_name");
         } catch (Exception $e) {
             $conn->rollback();
@@ -1161,6 +1164,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['import_csv'])) {
             }
             $rfstmt->close();
         }
+
+        // Check for governance title linkage (DO NOT auto-provision user accounts - that is Admin's job)
+        autoDetectAndLinkGovernanceApprover($conn, $new_id);
 
         logAudit($conn, $_SESSION['user_id'], 'CREATE', 'Employee', $new_id, "Added employee: $first_name $last_name");
         redirectWith($employee_portal_base . '/employees.php', 'success', "Employee '$first_name $last_name' added successfully.");
