@@ -647,12 +647,17 @@ foreach ($approvers as $a) {
                                     endif;
                                 ?>
                                     <option value="<?php echo (int)$user['employee_id']; ?>"
-                                        data-department-id="<?php echo (int)$user['department_id']; ?>"
+                                        data-department-id="<?php echo (int)($user['department_id'] ?? 0); ?>"
+                                        data-department-name="<?php echo e(htmlspecialchars($user['department_name'] ?? '')); ?>"
+                                        data-job-title="<?php echo e(htmlspecialchars($user['job_title'] ?? '')); ?>"
+                                        data-rank-category-id="<?php echo (int)($user['rank_category_id'] ?? 0); ?>"
+                                        data-rank-name="<?php echo e(htmlspecialchars($rankLabel)); ?>"
                                         data-suggested-role="<?php echo e($user['detected_role'] ?? ''); ?>"
                                         data-assigned-role="<?php echo e($assignedRole); ?>"
                                         <?php if ($assignedRole) echo 'data-already="1"'; ?>>
                                         <?php
                                             echo e($user['full_name'] . ' — ' . ($user['job_title'] ?: ($user['role'] ?? 'Official')));
+                                            if (!empty($user['department_name'])) echo ' (' . e($user['department_name']) . ')';
                                             if ($assignedRole) echo ' ⚠ [' . e($assignedRole) . ']';
                                         ?>
                                     </option>

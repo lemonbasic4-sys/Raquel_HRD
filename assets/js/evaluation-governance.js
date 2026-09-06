@@ -55,8 +55,8 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         }
         roleSelect.value = roleName;
-        onRoleChange();
         if (deptId && deptSelect) deptSelect.value = String(deptId);
+        onRoleChange();
 
         if (assignSection) {
             assignSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -66,11 +66,142 @@ document.addEventListener('DOMContentLoaded', function () {
         setTimeout(function () { tomEmp.focus(); }, 450);
     };
 
+    // ─── Filter & populate Employee options based on Role & Department ──────
+    function filterEmployeeOptions() {
+        var role         = roleSelect.value;
+        var selectedDept = parseInt(deptSelect.value, 10) || 0;
+        var isDivisionVP = role === 'Division VP';
+        var isCorporate  = ['President', 'Audit Committee', 'Board of Directors'].indexOf(role) !== -1;
+
+        // Reset employee selection
+        tomEmp.clear();
+        tomEmp.clearOptions();
+
+        var rawOptions = Array.prototype.slice.call(empSelect.querySelectorAll('option'));
+        var validOptions = [];
+
+        rawOptions.forEach(function (opt) {
+            if (!opt.value) return;
+
+            var assignedRole   = (opt.getAttribute('data-assigned-role') || '').toLowerCase();
+            var suggestedRole  = (opt.getAttribute('data-suggested-role') || '').toLowerCase();
+            var deptId         = parseInt(opt.getAttribute('data-department-id'), 10) || 0;
+            var deptName       = (opt.getAttribute('data-department-name') || '').toLowerCase();
+            var jobTitle       = (opt.getAttribute('data-job-title') || '').toLowerCase();
+            var rankCategoryId = parseInt(opt.getAttribute('data-rank-category-id'), 10) || 0;
+            var currentRoleLow = role.toLowerCase();
+
+            // 1. Corporate single-person conflict check:
+            // Skip employees already in a DIFFERENT corporate role
+            if (isCorporate && assignedRole && assignedRole !== currentRoleLow) {
+                return;
+            }
+
+            // 2. Role-specific department & candidate filtering
+            var isMatch = false;
+
+            if (!role) {
+                // No role selected yet: show all
+                isMatch = true;
+            } else if (role === 'President') {
+                // Step 5: Filter to Office of the President department, President/CEO title, or detected President role
+                isMatch = (suggestedRole === 'president')
+                    || deptName.indexOf('president') !== -1
+                    || deptId === 10
+                    || jobTitle.indexOf('president') !== -1
+                    || jobTitle.indexOf('chief executive') !== -1
+                    || jobTitle.indexOf('ceo') !== -1;
+            } else if (role === 'Division VP') {
+                // Step 4: Division VP
+                if (selectedDept > 0) {
+                    // Specific department selected: match that department OR corporate VPs
+                    isMatch = (deptId === selectedDept)
+                        || (suggestedRole === 'division vp')
+                        || (jobTitle.indexOf('vp') !== -1)
+                        || (jobTitle.indexOf('vice president') !== -1);
+                } else {
+                    // All departments / corporate VP
+                    isMatch = (suggestedRole === 'division vp')
+                        || (jobTitle.indexOf('vp') !== -1)
+                        || (jobTitle.indexOf('vice president') !== -1)
+                        || (rankCategoryId === 1)
+                        || (rankCategoryId === 3);
+                }
+            } else if (role === 'Audit Committee') {
+                // Step 6: Filter to Audit department or Audit Committee chair/members
+                isMatch = (suggestedRole === 'audit committee')
+                    || deptName.indexOf('audit') !== -1
+                    || deptId === 2
+                    || jobTitle.indexOf('audit') !== -1
+                    || jobTitle.indexOf('auditor') !== -1;
+            } else if (role === 'Board of Directors') {
+                // Step 7: Filter to Board of Directors / Chairman / Executive Trustees
+                isMatch = (suggestedRole === 'board of directors')
+                    || jobTitle.indexOf('board') !== -1
+                    || jobTitle.indexOf('chair') !== -1
+                    || jobTitle.indexOf('director') !== -1
+                    || jobTitle.indexOf('trustee') !== -1
+                    || (rankCategoryId === 1)
+                    || (deptId === 0);
+            }
+
+            if (isMatch) {
+                validOptions.push(opt);
+            }
+        });
+
+        // Fallback: If no candidate matched the strict filter, show all non-conflicting options
+        if (validOptions.length === 0 && role) {
+            rawOptions.forEach(function (opt) {
+                if (!opt.value) return;
+                var assignedRole = (opt.getAttribute('data-assigned-role') || '').toLowerCase();
+                if (isCorporate && assignedRole && assignedRole !== role.toLowerCase()) return;
+                validOptions.push(opt);
+            });
+        }
+
+        // Add filtered options to Tom Select
+        validOptions.forEach(function (opt) {
+            tomEmp.addOption({ value: opt.value, text: opt.textContent.trim(), $option: opt });
+        });
+        tomEmp.refreshOptions(false);
+
+        // Auto-select best matching candidate
+        var bestCandidateValue = null;
+        validOptions.forEach(function (opt) {
+            if (bestCandidateValue) return;
+            var suggestedRole = (opt.getAttribute('data-suggested-role') || '').toLowerCase();
+            var deptId        = parseInt(opt.getAttribute('data-department-id'), 10) || 0;
+            var jobTitle      = (opt.getAttribute('data-job-title') || '').toLowerCase();
+
+            if (role === 'President') {
+                if (suggestedRole === 'president' || jobTitle.indexOf('president') !== -1 || deptId === 10) {
+                    bestCandidateValue = opt.value;
+                }
+            } else if (role === 'Division VP' && selectedDept > 0) {
+                if (deptId === selectedDept && (suggestedRole === 'division vp' || jobTitle.indexOf('vp') !== -1)) {
+                    bestCandidateValue = opt.value;
+                }
+            } else if (role === 'Audit Committee') {
+                if (suggestedRole === 'audit committee' || jobTitle.indexOf('audit') !== -1) {
+                    bestCandidateValue = opt.value;
+                }
+            } else if (role === 'Board of Directors') {
+                if (suggestedRole === 'board of directors' || jobTitle.indexOf('board') !== -1 || jobTitle.indexOf('chair') !== -1) {
+                    bestCandidateValue = opt.value;
+                }
+            }
+        });
+
+        if (bestCandidateValue) {
+            tomEmp.setValue(bestCandidateValue, true);
+        }
+    }
+
     // ─── Role change ─────────────────────────────────────────────────────────
     function onRoleChange() {
         var role         = roleSelect.value;
         var isDivisionVP = role === 'Division VP';
-        var isCorporate  = ['President', 'Audit Committee', 'Board of Directors'].indexOf(role) !== -1;
 
         // Show / hide Department column
         if (isDivisionVP) {
@@ -84,35 +215,13 @@ document.addEventListener('DOMContentLoaded', function () {
             if (employeeStepBadge) employeeStepBadge.textContent = '2';
         }
 
-        // Reset employee selection
-        tomEmp.clear();
-        tomEmp.clearOptions();
-
-        // Rebuild options filtered by role
-        var options = Array.prototype.slice.call(empSelect.querySelectorAll('option'));
-        options.forEach(function (opt) {
-            if (!opt.value) return;
-            var assignedRole = opt.getAttribute('data-assigned-role') || '';
-            // For corporate roles: skip employees already in a DIFFERENT corporate role
-            if (isCorporate && assignedRole && assignedRole.toLowerCase() !== role.toLowerCase()) {
-                return;
-            }
-            tomEmp.addOption({ value: opt.value, text: opt.textContent.trim(), $option: opt });
-        });
-        tomEmp.refreshOptions(false);
-
-        // Auto-suggest matching candidate
-        options.forEach(function (opt) {
-            if (!opt.value) return;
-            var suggestedRole = opt.getAttribute('data-suggested-role') || '';
-            if (role && suggestedRole && suggestedRole.toLowerCase() === role.toLowerCase()) {
-                tomEmp.setValue(opt.value, true);
-                return;
-            }
-        });
+        filterEmployeeOptions();
     }
 
     roleSelect.addEventListener('change', onRoleChange);
+    if (deptSelect) {
+        deptSelect.addEventListener('change', filterEmployeeOptions);
+    }
 
     // Initialise
     onRoleChange();
