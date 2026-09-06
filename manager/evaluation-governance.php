@@ -273,16 +273,16 @@ foreach ($approvers as $a) {
     }
 
     /* Matrix table */
-    .dept-matrix-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; }
-    .dept-matrix-card { border-radius: .75rem; border: 1px solid #e2e8f0; background: #fff; padding: 1rem 1.25rem; transition: box-shadow .2s; }
+    .dept-matrix-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1rem; }
+    .dept-matrix-card { border-radius: .75rem; border: 1px solid #e2e8f0; background: #fff; padding: 1rem 1.15rem; transition: box-shadow .2s; }
     .dept-matrix-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.08); }
     .dept-matrix-card .dept-name { font-weight: 700; font-size: .85rem; color: #374151; margin-bottom: .4rem; }
     .dept-matrix-card .official-name { font-size: .82rem; color: #1d4ed8; }
     .dept-matrix-card .missing { font-size: .82rem; color: #dc2626; font-style: italic; }
 
     /* Corporate strip */
-    .corp-strip { display: flex; flex-wrap: wrap; gap: 1rem; }
-    .corp-card { flex: 1 1 200px; border-radius: .75rem; padding: .9rem 1.1rem; border: 1.5px solid; }
+    .corp-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; }
+    .corp-card { border-radius: .75rem; padding: 1rem 1.15rem; border: 1.5px solid; }
     .corp-card.president  { border-color: #6366f1; background: #eef2ff; }
     .corp-card.audit      { border-color: #f59e0b; background: #fffbeb; }
     .corp-card.board      { border-color: #10b981; background: #ecfdf5; }
@@ -292,26 +292,44 @@ foreach ($approvers as $a) {
     .corp-card.board      .corp-label { color: #065f46; }
     .corp-card .corp-name  { font-weight: 700; font-size: .88rem; color: #1e293b; }
     .corp-card .corp-title { font-size: .78rem; color: #64748b; }
-    /* Tab Navigation */
+
+    /* Tab Navigation (Responsive Scroll & Wrap) */
     .eval-gov-tabs-wrapper {
         margin-top: -8px;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: 4px;
+        scrollbar-width: thin;
     }
     .custom-eval-tabs {
         background: #ffffff;
         border-radius: 14px !important;
         border: 1px solid #e2e8f0 !important;
         box-shadow: 0 4px 20px rgba(0,0,0,0.04);
-        gap: 0.5rem;
+        gap: 0.4rem;
+        display: flex;
+        flex-wrap: nowrap;
+        min-width: max-content;
+    }
+    @media (min-width: 1200px) {
+        .custom-eval-tabs {
+            min-width: 100%;
+            flex-wrap: wrap;
+        }
+        .custom-eval-tabs .nav-item {
+            flex: 1 1 0;
+        }
     }
     .custom-eval-tabs .nav-link {
         color: #475569 !important;
         background: transparent !important;
         border-radius: 10px !important;
         font-weight: 600;
-        font-size: 0.88rem;
-        padding: 0.75rem 1.1rem !important;
+        font-size: 0.85rem;
+        padding: 0.65rem 0.95rem !important;
         transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         border: 1px solid transparent !important;
+        white-space: nowrap;
     }
     .custom-eval-tabs .nav-link:hover {
         background: #f8fafc !important;
@@ -358,6 +376,23 @@ foreach ($approvers as $a) {
     #assignSection .package-card__body,
     #tab-assign {
         overflow: visible !important;
+    }
+
+    /* Small Screen Hero and Card Optimizations */
+    @media (max-width: 768px) {
+        .package-hero {
+            padding: 1.25rem 1.25rem !important;
+            border-radius: 12px !important;
+        }
+        .package-hero h1 {
+            font-size: 1.4rem !important;
+        }
+        .package-card__header {
+            padding: 1rem 1.25rem !important;
+        }
+        .package-card__body {
+            padding: 1rem 1.25rem !important;
+        }
     }
 
     /* Governance Role Badges (High-Contrast & Vibrant Design) */
@@ -421,28 +456,28 @@ foreach ($approvers as $a) {
     <!-- Tab Navigation Bar -->
     <div class="eval-gov-tabs-wrapper mb-4">
         <ul class="nav nav-pills custom-eval-tabs p-2 bg-white rounded-4 shadow-sm border" id="govTabs" role="tablist">
-            <li class="nav-item flex-fill" role="presentation">
-                <button class="nav-link active w-100 py-2 px-3 text-start d-flex align-items-center justify-content-between" id="tab-corp-btn" data-bs-toggle="tab" data-bs-target="#tab-corp" type="button" role="tab" aria-controls="tab-corp" aria-selected="true">
-                    <span><i class="fas fa-globe me-2 text-success"></i><strong>Corporate Governance Officials (Company-Wide)</strong></span>
-                    <span class="badge bg-success-subtle text-success border border-success-subtle ms-2">Steps 5–7</span>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active py-2 px-3 text-start d-flex align-items-center justify-content-between gap-2" id="tab-corp-btn" data-bs-toggle="tab" data-bs-target="#tab-corp" type="button" role="tab" aria-controls="tab-corp" aria-selected="true">
+                    <span><i class="fas fa-globe me-2 text-success"></i><strong>Corporate Officials</strong><span class="d-none d-xl-inline text-muted fw-normal small"> (Company-Wide)</span></span>
+                    <span class="badge bg-success-subtle text-success border border-success-subtle ms-1">Steps 5–7</span>
                 </button>
             </li>
-            <li class="nav-item flex-fill" role="presentation">
-                <button class="nav-link w-100 py-2 px-3 text-start d-flex align-items-center justify-content-between" id="tab-matrix-btn" data-bs-toggle="tab" data-bs-target="#tab-matrix" type="button" role="tab" aria-controls="tab-matrix" aria-selected="false">
-                    <span><i class="fas fa-sitemap me-2 text-primary"></i><strong>Department Division VP Matrix</strong></span>
-                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle ms-2"><?php echo count($departments); ?> Depts</span>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link py-2 px-3 text-start d-flex align-items-center justify-content-between gap-2" id="tab-matrix-btn" data-bs-toggle="tab" data-bs-target="#tab-matrix" type="button" role="tab" aria-controls="tab-matrix" aria-selected="false">
+                    <span><i class="fas fa-sitemap me-2 text-primary"></i><strong>Department VP Matrix</strong></span>
+                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle ms-1"><?php echo count($departments); ?> Depts</span>
                 </button>
             </li>
-            <li class="nav-item flex-fill" role="presentation">
-                <button class="nav-link w-100 py-2 px-3 text-start d-flex align-items-center justify-content-between" id="tab-assign-btn" data-bs-toggle="tab" data-bs-target="#tab-assign" type="button" role="tab" aria-controls="tab-assign" aria-selected="false">
-                    <span><i class="fas fa-user-plus me-2 text-warning"></i><strong>Assign Routing Official</strong></span>
-                    <span class="badge bg-warning-subtle text-warning border border-warning-subtle ms-2">Setup</span>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link py-2 px-3 text-start d-flex align-items-center justify-content-between gap-2" id="tab-assign-btn" data-bs-toggle="tab" data-bs-target="#tab-assign" type="button" role="tab" aria-controls="tab-assign" aria-selected="false">
+                    <span><i class="fas fa-user-plus me-2 text-warning"></i><strong>Assign Official</strong></span>
+                    <span class="badge bg-warning-subtle text-warning border border-warning-subtle ms-1">Setup</span>
                 </button>
             </li>
-            <li class="nav-item flex-fill" role="presentation">
-                <button class="nav-link w-100 py-2 px-3 text-start d-flex align-items-center justify-content-between" id="tab-configured-btn" data-bs-toggle="tab" data-bs-target="#tab-configured" type="button" role="tab" aria-controls="tab-configured" aria-selected="false">
-                    <span><i class="fas fa-user-shield me-2 text-info"></i><strong>Configured Routing Officials</strong></span>
-                    <span class="badge bg-secondary-subtle text-secondary border ms-2"><?php echo count($approvers); ?> Total</span>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link py-2 px-3 text-start d-flex align-items-center justify-content-between gap-2" id="tab-configured-btn" data-bs-toggle="tab" data-bs-target="#tab-configured" type="button" role="tab" aria-controls="tab-configured" aria-selected="false">
+                    <span><i class="fas fa-user-shield me-2 text-info"></i><strong>Configured Officials</strong></span>
+                    <span class="badge bg-secondary-subtle text-secondary border ms-1"><?php echo count($approvers); ?> Total</span>
                 </button>
             </li>
         </ul>
@@ -549,18 +584,18 @@ foreach ($approvers as $a) {
                         <p class="fw-bold mb-2 text-secondary small text-uppercase" style="letter-spacing:1px;"><i class="fas fa-project-diagram me-1"></i>Complete Organizational Approval Route</p>
                         <div class="d-flex flex-wrap align-items-center gap-2" style="font-size:.85rem;">
                             <span class="badge bg-white text-dark border px-3 py-2 shadow-sm"><i class="fas fa-users me-1 text-secondary"></i>1. Team Self-Ratings</span>
-                            <i class="fas fa-arrow-right text-muted"></i>
+                            <i class="fas fa-arrow-right text-muted d-none d-sm-inline"></i>
                             <span class="badge bg-white text-dark border px-3 py-2 shadow-sm"><i class="fas fa-clipboard-check me-1 text-secondary"></i>2. Supervisor Consolidation</span>
-                            <i class="fas fa-arrow-right text-muted"></i>
+                            <i class="fas fa-arrow-right text-muted d-none d-sm-inline"></i>
                             <span class="badge bg-white text-dark border px-3 py-2 shadow-sm"><i class="fas fa-user-check me-1 text-secondary"></i>3. Manager Review</span>
-                            <i class="fas fa-arrow-right text-muted"></i>
-                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-2" title="Skipped for departments without a Division VP (e.g. Human Resources)"><i class="fas fa-sitemap me-1"></i>4. Division VP <span class="text-muted small">(if applicable)</span></span>
-                            <i class="fas fa-arrow-right text-muted"></i>
-                            <span class="badge bg-purple-subtle border px-3 py-2" style="background:#eef2ff;color:#4f46e5;border-color:#a5b4fc!important;"><i class="fas fa-user-tie me-1"></i>5. President &amp; CEO</span>
-                            <i class="fas fa-arrow-right text-muted"></i>
-                            <span class="badge bg-warning-subtle text-warning border border-warning-subtle px-3 py-2"><i class="fas fa-search-dollar me-1"></i>6. Audit Committee</span>
-                            <i class="fas fa-arrow-right text-muted"></i>
-                            <span class="badge bg-success-subtle text-success border border-success-subtle px-3 py-2"><i class="fas fa-gavel me-1"></i>7. Board of Directors <i class="fas fa-lock ms-1"></i></span>
+                            <i class="fas fa-arrow-right text-muted d-none d-sm-inline"></i>
+                            <span class="badge-gov badge-gov-vp" title="Skipped for departments without a Division VP (e.g. Human Resources)"><i class="fas fa-sitemap"></i>4. Division VP <span class="fw-normal small opacity-75">(if applicable)</span></span>
+                            <i class="fas fa-arrow-right text-muted d-none d-sm-inline"></i>
+                            <span class="badge-gov badge-gov-president"><i class="fas fa-crown"></i>5. President &amp; CEO</span>
+                            <i class="fas fa-arrow-right text-muted d-none d-sm-inline"></i>
+                            <span class="badge-gov badge-gov-audit"><i class="fas fa-search-dollar"></i>6. Audit Committee</span>
+                            <i class="fas fa-arrow-right text-muted d-none d-sm-inline"></i>
+                            <span class="badge-gov badge-gov-board"><i class="fas fa-gavel"></i>7. Board of Directors <i class="fas fa-lock ms-1"></i></span>
                         </div>
                         <div class="small text-muted mt-2 pt-2 border-top">
                             <i class="fas fa-info-circle me-1 text-primary"></i><strong>Direct to President:</strong> Departments reporting directly to the President (e.g. <strong>Human Resources</strong>, <strong>Marketing</strong>, <strong>Business Development</strong>) automatically skip Step 4 and advance directly from Department Manager to Step 5 (President &amp; CEO).
@@ -633,7 +668,7 @@ foreach ($approvers as $a) {
                         <?php echo csrfField(); ?>
 
                         <!-- Step 1: Governance Role -->
-                        <div class="col-md-3" id="govRoleCol">
+                        <div class="col-12 col-md-6 col-lg-3" id="govRoleCol">
                             <label class="form-label fw-bold small text-uppercase text-secondary mb-1" for="governance-type">
                                 <span class="badge bg-secondary me-1">1</span> Governance Role <span class="text-danger">*</span>
                             </label>
@@ -651,7 +686,7 @@ foreach ($approvers as $a) {
                         </div>
 
                         <!-- Step 2: Department (Division VP only) -->
-                        <div class="col-md-3 d-none" id="departmentCol">
+                        <div class="col-12 col-md-6 col-lg-3 d-none" id="departmentCol">
                             <label class="form-label fw-bold small text-uppercase text-secondary mb-1" for="governance-department">
                                 <span class="badge bg-secondary me-1">2</span> Department <span class="text-danger" id="deptRequired">*</span>
                             </label>
@@ -664,7 +699,7 @@ foreach ($approvers as $a) {
                         </div>
 
                         <!-- Step 3: Employee Selector (enhanced by Tom Select) -->
-                        <div class="col" id="employeeCol">
+                        <div class="col-12 col-lg" id="employeeCol">
                             <label class="form-label fw-bold small text-uppercase text-secondary mb-1" for="governance-user">
                                 <span class="badge bg-secondary me-1" id="employeeStepBadge">2</span> Employee / Official <span class="text-danger">*</span>
                             </label>
@@ -701,8 +736,8 @@ foreach ($approvers as $a) {
                         </div>
 
                         <!-- Submit Button -->
-                        <div class="col-auto">
-                            <button class="btn btn-primary rounded-pill shadow-sm fw-semibold px-4" type="submit" style="padding-top:.6rem;padding-bottom:.6rem;white-space:nowrap;">
+                        <div class="col-12 col-lg-auto text-end">
+                            <button class="btn btn-primary rounded-pill shadow-sm fw-semibold px-4 w-100 w-lg-auto" type="submit" style="padding-top:.6rem;padding-bottom:.6rem;white-space:nowrap;">
                                 <i class="fas fa-check-circle me-1"></i>Save Routing
                             </button>
                         </div>
