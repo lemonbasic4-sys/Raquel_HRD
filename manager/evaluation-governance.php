@@ -411,13 +411,9 @@ foreach ($approvers as $a) {
                 <p class="mb-0 text-white-50 small">Configure sign-off authorities for each step of evaluation packages: <strong>Consolidation → Manager → Division VP → President & CEO → Audit Committee → Board of Directors (Final Lock).</strong></p>
             </div>
             <div class="d-flex flex-wrap gap-2">
-                <form method="post" action="" class="m-0">
-                    <?php echo csrfField(); ?>
-                    <input type="hidden" name="action" value="auto_detect_all">
-                    <button type="submit" class="btn btn-warning rounded-pill shadow-sm px-3 fw-bold text-dark" title="Scan all employee job titles and automatically assign matching governance roles">
-                        <i class="fas fa-bolt me-1 text-danger"></i>Auto-Detect & Sync Governance
-                    </button>
-                </form>
+                <button type="button" class="btn btn-secondary rounded-pill shadow-sm px-3 fw-bold opacity-50 text-white" disabled style="cursor: not-allowed;" title="Auto-Detect & Sync Governance is temporarily disabled">
+                    <i class="fas fa-bolt me-1 text-warning"></i>Auto-Detect & Sync Governance
+                </button>
             </div>
         </div>
     </section>
