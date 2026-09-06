@@ -91,9 +91,9 @@ REPLACE INTO employees (
 (91202, 'PUR-T02', 'Leo', 'Tan', 'Villanueva', '2024-05-12', '2000-12-30', 'Lucena City', 'Male', 'Single', 1202, 'Purchasing Staff I', 12, 5, 102, 'Regular', 'Full-time', 91203, 1),
 (91203, 'PUR-T03', 'Irene', 'Yap', 'Cruz', '2018-10-08', '1989-06-17', 'Lucena City', 'Female', 'Married', 1200, 'Purchasing Supervisor I', 12, 4, 102, 'Regular', 'Full-time', NULL, 1),
 
--- Independent governance people (no department, nobody reports to them)
-(99001, 'GOV-BOD', 'Board', 'Approver', 'Test', '2012-01-01', '1970-01-01', 'Manila', 'Male', 'Married', NULL, 'Board of Directors (test)', NULL, 2, 102, 'Regular', 'Full-time', NULL, 1),
-(99002, 'GOV-AUD', 'Audit', 'Approver', 'Test', '2013-01-01', '1972-02-02', 'Manila', 'Female', 'Married', NULL, 'Audit Committee (test)', NULL, 2, 102, 'Regular', 'Full-time', NULL, 1);
+-- Independent corporate governance leaders (Board of Directors & Audit Committee)
+(99001, 'GOV-BOD', 'Antonio', 'Raquel', 'Velasco', '2005-01-01', '1965-08-15', 'Lucena City', 'Male', 'Married', NULL, 'Chairman of the Board', NULL, 1, 102, 'Regular', 'Full-time', NULL, 1),
+(99002, 'GOV-AUD', 'Manuel', 'Ramos', 'Rivera', '2012-03-01', '1973-05-20', 'Lucena City', 'Male', 'Married', NULL, 'Audit Committee Chair', 2, 1, 102, 'Regular', 'Full-time', NULL, 1);
 
 REPLACE INTO employee_contacts (employee_id, personal_email, mobile_number, telephone_number) VALUES
 (90101, 'ap.t01@test.local', '09170000001', '888-1001'),
@@ -132,8 +132,8 @@ REPLACE INTO employee_contacts (employee_id, personal_email, mobile_number, tele
 (91201, 'pur.t01@test.local', '09170000111', '888-1201'),
 (91202, 'pur.t02@test.local', '09170000112', '888-1202'),
 (91203, 'pur.t03@test.local', '09170000113', '888-1203'),
-(99001, 'gov.bod@test.local', '09170000201', '888-9901'),
-(99002, 'gov.aud@test.local', '09170000202', '888-9902');
+(99001, 'antonio.raquel@example.com', '09170000201', '888-9901'),
+(99002, 'manuel.ramos@example.com', '09170000202', '888-9902');
 
 -- Create Employee portal accounts for all test employees (password: password)
 -- $2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi = bcrypt('password')
@@ -162,10 +162,11 @@ AND NOT EXISTS (
     SELECT 1 FROM users u WHERE u.employee_id = e.employee_id AND u.role = 'Employee'
 );
 
--- Mark all test portal accounts first-login complete (skip PDS gate)
+-- Sync full_name and mark test portal accounts first-login complete (skip PDS gate)
 UPDATE users u
 JOIN employees e ON e.employee_id = u.employee_id
-SET u.first_login_completed = 1
+SET u.full_name = TRIM(CONCAT_WS(' ', e.first_name, e.middle_name, e.last_name)),
+    u.first_login_completed = 1
 WHERE u.role = 'Employee'
   AND (
       e.employee_code LIKE '%-T0%'

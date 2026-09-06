@@ -74,11 +74,7 @@ SELECT 'Division VP', 6, u.user_id, 1
 FROM users u JOIN employees e ON e.employee_id = u.employee_id
 WHERE e.employee_code = 'GS-VP' AND u.role = 'Employee' AND u.is_active = 1 LIMIT 1;
 
--- Human Resources (dept 7) → VP Operations = OPS-VP
-INSERT INTO evaluation_governance_approvers (governance_type, department_id, user_id, is_active)
-SELECT 'Division VP', 7, u.user_id, 1
-FROM users u JOIN employees e ON e.employee_id = u.employee_id
-WHERE e.employee_code = 'OPS-VP' AND u.role = 'Employee' AND u.is_active = 1 LIMIT 1;
+-- Human Resources (dept 7) reports directly to President & CEO — no Division VP assigned.
 
 -- Information Technology (dept 8) → VP Operations = OPS-VP
 INSERT INTO evaluation_governance_approvers (governance_type, department_id, user_id, is_active)
@@ -104,6 +100,8 @@ SELECT 'Division VP', 12, u.user_id, 1
 FROM users u JOIN employees e ON e.employee_id = u.employee_id
 WHERE e.employee_code = 'OPS-VP' AND u.role = 'Employee' AND u.is_active = 1 LIMIT 1;
 
+-- Note: Human Resources (dept 7) reports directly to the President & CEO and has no Division VP.
+
 -- ============================================================================
 -- TIER 2: Executive — President & CEO (company-wide, department_id = NULL)
 -- ============================================================================
@@ -116,13 +114,13 @@ WHERE e.employee_code = 'OP-T02' AND u.role = 'Employee' AND u.is_active = 1 LIM
 -- TIER 3: Independent Governance Bodies (company-wide, department_id = NULL)
 -- ============================================================================
 
--- Audit Committee → GOV-AUD (Audit Approver)
+-- Audit Committee → GOV-AUD (Manuel Ramos - Audit Committee Chair)
 INSERT INTO evaluation_governance_approvers (governance_type, department_id, user_id, is_active)
 SELECT 'Audit Committee', NULL, u.user_id, 1
 FROM users u JOIN employees e ON e.employee_id = u.employee_id
 WHERE e.employee_code = 'GOV-AUD' AND u.is_active = 1 LIMIT 1;
 
--- Board of Directors → GOV-BOD (Board Approver) — Final Lock & Apply
+-- Board of Directors → GOV-BOD (Antonio Raquel - Chairman of the Board) — Final Lock & Apply
 INSERT INTO evaluation_governance_approvers (governance_type, department_id, user_id, is_active)
 SELECT 'Board of Directors', NULL, u.user_id, 1
 FROM users u JOIN employees e ON e.employee_id = u.employee_id

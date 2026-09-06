@@ -75,8 +75,8 @@ All employee portal passwords: `password`
 | `FIN-VP`     | Teresa Reyes (VP for Finance) | Division VP for Finance |
 | `GS-VP`      | Ricardo Buenaventura (VP for General Services) | Division VP for General Services |
 | `OP-T02`     | Gabriel Mendoza (President & CEO) | Corporate Executive Sign-off (President) |
-| `GOV-AUD`    | Audit Approver (Audit Committee) | Corporate Compliance & Audit Check |
-| `GOV-BOD`    | Board Approver (Board of Directors) | **Final Ratification, Lock & Apply** |
+| `GOV-AUD`    | Manuel Ramos (Audit Committee Chair) | Corporate Compliance & Audit Check |
+| `GOV-BOD`    | Antonio Raquel (Chairman of the Board) | **Final Ratification, Lock & Apply** |
 
 HRD dual login: Elena uses `elena.delgado` on HRIS (manager view) and `HRD-001` on the Employee portal (self-rating / package review).
 
