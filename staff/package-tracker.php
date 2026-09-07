@@ -5,6 +5,8 @@ checkRole(['HR Staff']);
 require_once '../includes/functions.php';
 
 ensureOrganizationEvaluationPackageSchema($conn);
+syncPendingOrganizationPackageGovernanceApprovers($conn);
+syncWaitingOrganizationPackages($conn);
 
 // Filter params
 $status_filter = trim($_GET['status'] ?? '');

@@ -30,6 +30,10 @@
     color: var(--rp-text-main);
     font-size: 1rem;
     line-height: 1.6;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
 }
 
 .evaluation-packages .package-hero {
@@ -38,13 +42,15 @@
     border-radius: 16px;
     box-shadow: 0 8px 24px rgba(8, 46, 6, 0.18);
     color: #FFFFFF;
-    margin-bottom: 2rem;
-    padding: 2rem 2.25rem;
+    margin-bottom: 1.75rem;
+    padding: 1.75rem 2rem;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .evaluation-packages .package-hero h1 {
     color: #FFFFFF;
-    font-size: 1.85rem;
+    font-size: 1.75rem;
     font-weight: 800;
     letter-spacing: -0.02em;
     margin-bottom: 0.5rem;
@@ -52,9 +58,10 @@
 
 .evaluation-packages .package-hero p {
     color: rgba(255, 255, 255, 0.9);
-    font-size: 1.05rem;
+    font-size: 1rem;
     line-height: 1.5;
-    max-width: 900px;
+    max-width: 100%;
+    margin-bottom: 0.5rem;
 }
 
 .evaluation-packages .history-back-link {
@@ -82,6 +89,9 @@
     box-shadow: 0 4px 16px rgba(15, 23, 42, 0.05);
     margin-bottom: 1.75rem;
     overflow: hidden;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
 }
 
 .evaluation-packages .package-card__header {
@@ -90,9 +100,11 @@
     border-bottom: 1px solid var(--rp-border-color);
     display: flex;
     flex-wrap: wrap;
-    gap: 1.25rem;
+    gap: 1rem;
     justify-content: space-between;
-    padding: 1.25rem 1.75rem;
+    padding: 1.15rem 1.5rem;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .evaluation-packages .btn-package-collapse {
@@ -125,13 +137,15 @@
 
 .evaluation-packages .package-card__header h2 {
     color: var(--rp-text-main);
-    font-size: 1.35rem;
+    font-size: 1.25rem;
     font-weight: 700;
     margin-bottom: 0.25rem;
 }
 
 .evaluation-packages .package-card__body {
-    padding: 1.75rem;
+    padding: 1.5rem;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 /* ── Senior Accessibility Stats Box ────────────────────────────────────────── */
@@ -308,9 +322,21 @@
 }
 
 /* ── Tables & Accessible Data Grids ────────────────────────────────────────── */
+.evaluation-packages .table-responsive {
+    border: 1px solid #E2E8F0;
+    border-radius: 10px;
+    background: #FFFFFF;
+    margin-bottom: 1.25rem;
+    overflow-x: auto;
+    width: 100%;
+    -webkit-overflow-scrolling: touch;
+}
+
 .evaluation-packages .package-table {
     border-collapse: separate;
     border-spacing: 0;
+    margin-bottom: 0;
+    min-width: 720px;
     width: 100%;
 }
 
@@ -321,20 +347,30 @@
     font-size: 0.85rem;
     font-weight: 800;
     letter-spacing: 0.03em;
-    padding: 0.9rem 1.1rem;
+    padding: 0.85rem 1rem;
     text-transform: uppercase;
+    white-space: nowrap;
 }
 
 .evaluation-packages .package-table td {
     border-bottom: 1px solid #E2E8F0;
     color: var(--rp-text-main);
-    font-size: 1rem;
-    padding: 1rem 1.1rem;
+    font-size: 0.95rem;
+    padding: 0.85rem 1rem;
     vertical-align: middle;
+}
+
+.evaluation-packages .package-table tbody tr:last-child td {
+    border-bottom: none;
 }
 
 .evaluation-packages .package-table tbody tr:hover {
     background: #F8FAFC;
+}
+
+.evaluation-packages .package-table .tabular-nums {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
 }
 
 /* ── Side-by-Side Audit Comparison (Req 4) ─────────────────────────────────── */
@@ -365,6 +401,8 @@
     list-style: none;
     margin: 0 0 1.5rem 0;
     padding-left: 1.75rem;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .evaluation-packages .package-timeline li {
@@ -375,6 +413,8 @@
     padding: 0.85rem 1.15rem;
     position: relative;
     transition: all 0.2s ease;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .evaluation-packages .package-timeline li::before {
@@ -433,9 +473,11 @@
 /* ── Action Panel & Senior Buttons (Min 44px) ──────────────────────────────── */
 .evaluation-packages .package-action-panel {
     background: #F8FAFC;
-    border: 2px solid #CBD5E1;
+    border: 1.5px solid #CBD5E1;
     border-radius: 12px;
-    padding: 1.5rem;
+    padding: 1.35rem 1.5rem;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .evaluation-packages .btn-action-primary {
@@ -477,6 +519,7 @@
     padding: 0.55rem 1.25rem;
     text-decoration: none;
     transition: all 0.15s ease-in-out;
+    white-space: nowrap;
 }
 
 .evaluation-packages .btn-action-adjust:hover {
@@ -499,6 +542,7 @@
     padding: 0.55rem 1.25rem;
     text-decoration: none;
     transition: all 0.15s ease-in-out;
+    white-space: nowrap;
 }
 
 .evaluation-packages .btn-action-view:hover {
@@ -513,17 +557,122 @@
     color: var(--rp-text-muted);
     padding: 3rem 2rem;
     text-align: center;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* ── Tabbed Look Design for Package Detail ─────────────────────────────────── */
+.evaluation-packages .package-nav-tabs {
+    border-bottom: 2px solid #E2E8F0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    width: 100%;
+}
+
+.evaluation-packages .package-nav-tabs .nav-item {
+    margin-bottom: -2px;
+    flex-shrink: 0;
+}
+
+.evaluation-packages .package-nav-tabs .nav-link {
+    background: transparent;
+    border: none;
+    border-bottom: 3px solid transparent;
+    border-radius: 8px 8px 0 0;
+    color: var(--rp-text-muted, #475569);
+    font-size: 0.95rem;
+    font-weight: 700;
+    padding: 0.75rem 1.25rem;
+    display: inline-flex;
+    align-items: center;
+    transition: all 0.2s ease-in-out;
+    white-space: nowrap;
+}
+
+.evaluation-packages .package-nav-tabs .nav-link:hover {
+    color: var(--rp-forest-green, #082E06);
+    background: #F8FAFC;
+    border-bottom-color: #CBD5E1;
+}
+
+.evaluation-packages .package-nav-tabs .nav-link.active {
+    background: #FFFFFF;
+    color: var(--rp-forest-green, #082E06);
+    border-bottom: 3px solid var(--rp-primary-gold, #BD9414);
+    box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.02);
+}
+
+.evaluation-packages .package-nav-tabs .nav-link .badge {
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 0.25rem 0.55rem;
+    transition: all 0.2s ease;
+}
+
+.evaluation-packages .package-nav-tabs .nav-link.active .badge {
+    background-color: var(--rp-forest-green, #082E06) !important;
+    color: #FFFFFF !important;
+}
+
+.evaluation-packages .package-tab-content {
+    background: #FFFFFF;
+    padding-top: 1rem;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.evaluation-packages .package-tab-content .package-audit-section {
+    border-top: none !important;
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+}
+
+/* ── Screen & Monitor Responsive Breakpoints ───────────────────────────────── */
+@media (max-width: 992px) {
+    .evaluation-packages .package-card__header {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+    .evaluation-packages .package-nav-tabs .nav-link {
+        font-size: 0.88rem;
+        padding: 0.65rem 1rem;
+    }
 }
 
 @media (max-width: 768px) {
     .evaluation-packages .package-hero {
-        padding: 1.5rem 1.25rem;
+        padding: 1.35rem 1.15rem;
     }
-    .evaluation-packages .package-card__header {
-        align-items: flex-start;
-        flex-direction: column;
+    .evaluation-packages .package-card__body {
+        padding: 1.15rem;
     }
     .roster-card {
         padding: 1.25rem 1rem;
     }
+    .evaluation-packages .package-nav-tabs {
+        flex-direction: column;
+        border-bottom: none;
+    }
+    .evaluation-packages .package-nav-tabs .nav-item {
+        width: 100%;
+        margin-bottom: 0.25rem;
+    }
+    .evaluation-packages .package-nav-tabs .nav-link {
+        width: 100%;
+        border-radius: 8px;
+        border-bottom: none;
+        border-left: 4px solid transparent;
+        background: #F8FAFC;
+    }
+    .evaluation-packages .package-nav-tabs .nav-link.active {
+        border-left-color: var(--rp-primary-gold);
+        background: #FFFFFF;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+    }
+    .evaluation-packages .btn-action-primary {
+        width: 100%;
+    }
 }
+

@@ -34,6 +34,20 @@ while ($row = $history->fetch_assoc()) {
     elseif ($row['status'] === 'Rejected') $rejected_c++;
     elseif ($row['status'] === 'Returned') $returned_c++;
 }
+
+// Extract only existing departments & templates present in the history records
+$existing_departments = [];
+$existing_templates = [];
+foreach ($all_history as $row) {
+    if (!empty($row['department_name'])) {
+        $existing_departments[$row['department_name']] = $row['department_name'];
+    }
+    if (!empty($row['template_name'])) {
+        $existing_templates[$row['template_name']] = $row['template_name'];
+    }
+}
+ksort($existing_departments);
+ksort($existing_templates);
 ?>
 
 <div class="page-hero fadeup">
@@ -108,9 +122,29 @@ while ($row = $history->fetch_assoc()) {
                 <button type="button" class="btn btn-outline-warning" onclick="filterByStatus('Returned', this)">Returned</button>
             </div>
         </div>
-        <div class="search-box">
-            <i class="fas fa-search search-icon"></i>
-            <input type="text" class="form-control form-control-sm" id="customSearchEval" placeholder="Search employee or dept...">
+        <div class="d-flex align-items-center gap-2 flex-wrap ms-auto">
+            <div class="d-flex align-items-center gap-1">
+                <span class="text-muted small fw-semibold"><i class="fas fa-building me-1"></i>Dept:</span>
+                <select class="form-select form-select-sm" id="supervisorDeptFilter" style="min-width:150px; max-width:190px;">
+                    <option value="All">All Departments</option>
+                    <?php foreach ($existing_departments as $dept_name): ?>
+                        <option value="<?php echo e($dept_name); ?>"><?php echo e($dept_name); ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="d-flex align-items-center gap-1">
+                <span class="text-muted small fw-semibold"><i class="fas fa-file-alt me-1"></i>Template:</span>
+                <select class="form-select form-select-sm" id="supervisorTemplateFilter" style="min-width:170px; max-width:240px;">
+                    <option value="All">All Templates</option>
+                    <?php foreach ($existing_templates as $tmpl_name): ?>
+                        <option value="<?php echo e($tmpl_name); ?>"><?php echo e($tmpl_name); ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="search-box">
+                <i class="fas fa-search search-icon"></i>
+                <input type="text" class="form-control form-control-sm" id="customSearchEval" placeholder="Search employee, dept...">
+            </div>
         </div>
     </div>
     <div class="card-body p-0">
@@ -131,7 +165,11 @@ while ($row = $history->fetch_assoc()) {
                         <tr class="no-results-row text-center"><td colspan="6" class="text-muted py-5"><i class="fas fa-history fa-3x mb-3 d-block opacity-25"></i>No evaluation history found.</td></tr>
                     <?php else: ?>
                         <?php foreach ($all_history as $row): ?>
-                            <tr data-status="<?php echo $row['status']; ?>">
+                            <tr class="eval-row" 
+                                data-status="<?php echo e($row['status']); ?>"
+                                data-department="<?php echo e($row['department_name'] ?? ''); ?>"
+                                data-template="<?php echo e($row['template_name'] ?? ''); ?>"
+                                data-search="<?php echo strtolower(e($row['employee_name']) . ' ' . e($row['department_name'] ?? '') . ' ' . e($row['template_name']) . ' ' . e($row['job_title'])); ?>">
                                 <td class="ps-3">
                                     <div class="fw-bold"><?php echo e($row['employee_name']); ?></div>
                                     <div class="text-muted x-small"><?php echo e($row['job_title']); ?></div>
@@ -239,36 +277,37 @@ foreach ($all_history as $row):
 
                     <div class="eval-summary-header">
                         <div class="d-flex align-items-center gap-3">
-                            <div class="emp-avatar bg-primary text-white d-flex align-items-center justify-content-center fw-bold rounded" style="width: 55px; height: 55px; font-size: 1.2rem;"><?php echo $initials; ?></div>
+                            <div class="emp-avatar bg-primary text-white d-flex align-items-center justify-content-center fw-bold rounded-3 shadow-sm" style="width: 54px; height: 54px; font-size: 1.2rem;"><?php echo $initials; ?></div>
                             <div>
-                                <h4 class="mb-0 fw-bold"><?php echo e($row['employee_name']); ?></h4>
-                                <div class="text-muted"><?php echo e($row['job_title'] ?? 'Staff'); ?> &bull; <?php echo e($row['template_name']); ?></div>
+                                <h4 class="mb-1 fw-bold text-dark" style="font-size: 1.2rem;"><?php echo e($row['employee_name']); ?></h4>
+                                <div class="text-muted small d-flex align-items-center gap-2 flex-wrap">
+                                    <span class="badge bg-white text-secondary border fw-semibold"><?php echo e($row['job_title'] ?? 'Staff'); ?></span>
+                                    <span>&bull;</span>
+                                    <span><?php echo e($row['template_name']); ?></span>
+                                </div>
                             </div>
                         </div>
-                        <?php echo getEvaluationScoreCirclesHtml($conn, $row['evaluation_id'], $row['total_score']); ?>
-                    </div>
-
-                    <!-- Action Buttons -->
-                    <div class="d-flex justify-content-between align-items-center mb-4 gap-2 d-print-none">
-                        <div>
-                            <?php 
-                            $can_edit_rating = ((int)($row['rank_category_id'] ?? 0) === 5) || (getEmployeeHRRole($conn, (int)$row['employee_id']) === 'HR Manager');
-                            if ($can_edit_rating): ?>
-                            <button type="button" class="btn btn-sm btn-outline-warning rounded-pill px-3 fw-bold btn-edit-ratings" onclick="toggleEditRatings(<?php echo $row['evaluation_id']; ?>)">
-                                <i class="fas fa-edit me-1"></i>Edit Ratings
-                            </button>
-                            <button type="button" class="btn btn-sm btn-success rounded-pill px-3 fw-bold btn-save-ratings d-none" onclick="saveRatings(<?php echo $row['evaluation_id']; ?>)">
-                                <i class="fas fa-save me-1"></i>Save Changes
-                            </button>
-                            <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3 fw-bold btn-cancel-ratings d-none" onclick="toggleEditRatings(<?php echo $row['evaluation_id']; ?>, true)">
-                                <i class="fas fa-times me-1"></i>Cancel
-                            </button>
-                            <?php endif; ?>
-                        </div>
-                        <div class="text-end">
-                            <a href="../manager/print-evaluation.php?id=<?php echo $row['evaluation_id']; ?>" target="_blank" class="btn btn-sm btn-primary rounded-pill px-3 fw-bold">
-                                <i class="fas fa-print me-1"></i>Print Form
-                            </a>
+                        <div class="d-flex align-items-center gap-3 d-print-none">
+                            <div class="d-flex align-items-center gap-2">
+                                <?php 
+                                $can_edit_rating = ((int)($row['rank_category_id'] ?? 0) === 5) || (getEmployeeHRRole($conn, (int)$row['employee_id']) === 'HR Manager');
+                                if ($can_edit_rating): ?>
+                                <button type="button" class="btn btn-sm btn-outline-warning rounded-pill px-3 fw-bold btn-edit-ratings" onclick="toggleEditRatings(<?php echo $row['evaluation_id']; ?>)">
+                                    <i class="fas fa-edit me-1"></i>Edit Ratings
+                                </button>
+                                <button type="button" class="btn btn-sm btn-success rounded-pill px-3 fw-bold btn-save-ratings d-none" onclick="saveRatings(<?php echo $row['evaluation_id']; ?>)">
+                                    <i class="fas fa-save me-1"></i>Save Changes
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3 fw-bold btn-cancel-ratings d-none" onclick="toggleEditRatings(<?php echo $row['evaluation_id']; ?>, true)">
+                                    <i class="fas fa-times me-1"></i>Cancel
+                                </button>
+                                <?php endif; ?>
+                                <a href="../manager/print-evaluation.php?id=<?php echo $row['evaluation_id']; ?>" target="_blank" class="btn btn-sm btn-primary rounded-pill px-3 py-2 fw-bold d-inline-flex align-items-center gap-2 shadow-sm">
+                                    <i class="fas fa-print"></i>
+                                    <span>Print Form</span>
+                                </a>
+                            </div>
+                            <?php echo getEvaluationScoreCirclesHtml($conn, $row['evaluation_id'], $row['total_score']); ?>
                         </div>
                     </div>
 
@@ -791,6 +830,47 @@ function saveRatings(evalId) {
         saveBtn.innerHTML = originalBtnText;
     });
 }
+
+let supervisorActiveStatus = 'All';
+
+function filterByStatus(status, btn) {
+    supervisorActiveStatus = status;
+    const container = btn.closest('.btn-group');
+    if (container) {
+        container.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+    }
+    applySupervisorFilters();
+}
+
+function applySupervisorFilters() {
+    const q = (document.getElementById('customSearchEval')?.value || '').toLowerCase().trim();
+    const selDept = document.getElementById('supervisorDeptFilter')?.value || 'All';
+    const selTmpl = document.getElementById('supervisorTemplateFilter')?.value || 'All';
+    const rows = document.querySelectorAll('#evalTable tbody tr.eval-row');
+    let visible = 0;
+
+    rows.forEach(row => {
+        const statusMatch = supervisorActiveStatus === 'All' || row.dataset.status === supervisorActiveStatus;
+        const deptMatch = selDept === 'All' || (row.dataset.department || '') === selDept;
+        const tmplMatch = selTmpl === 'All' || (row.dataset.template || '') === selTmpl;
+        const searchMatch = !q || (row.dataset.search || '').includes(q);
+        const show = statusMatch && deptMatch && tmplMatch && searchMatch;
+        row.style.display = show ? '' : 'none';
+        if (show) visible++;
+    });
+
+    const noResRow = document.querySelector('#evalTable tbody tr.no-results-row');
+    if (noResRow) {
+        noResRow.style.display = (visible === 0) ? '' : 'none';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    document.getElementById('customSearchEval')?.addEventListener('input', applySupervisorFilters);
+    document.getElementById('supervisorDeptFilter')?.addEventListener('change', applySupervisorFilters);
+    document.getElementById('supervisorTemplateFilter')?.addEventListener('change', applySupervisorFilters);
+});
 </script>
 
 <style>

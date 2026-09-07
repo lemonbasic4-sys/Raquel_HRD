@@ -43,6 +43,19 @@ if ($history) {
         elseif ($row['status'] === 'Returned') $returned_c++;
     }
 }
+// Extract only existing departments & templates present in the history records
+$existing_departments = [];
+$existing_templates = [];
+foreach ($all_history as $row) {
+    if (!empty($row['department_name'])) {
+        $existing_departments[$row['department_name']] = $row['department_name'];
+    }
+    if (!empty($row['template_name'])) {
+        $existing_templates[$row['template_name']] = $row['template_name'];
+    }
+}
+ksort($existing_departments);
+ksort($existing_templates);
 ?>
 
 <div class="page-hero fadeup">
@@ -144,10 +157,30 @@ if ($history) {
                 <button type="button" class="btn btn-outline-secondary" onclick="filterHistory('Rejected', this)">Rejected</button>
             </div>
         </div>
-        <div class="search-box">
-            <div class="input-group input-group-sm">
-                <span class="input-group-text bg-transparent border-end-0"><i class="fas fa-search text-muted"></i></span>
-                <input type="text" id="historySearch" class="form-control border-start-0" placeholder="Search records...">
+        <div class="d-flex align-items-center gap-2 flex-wrap ms-auto">
+            <div class="d-flex align-items-center gap-1">
+                <span class="text-muted small fw-semibold"><i class="fas fa-building me-1"></i>Dept:</span>
+                <select class="form-select form-select-sm" id="staffDeptFilter" style="min-width:150px; max-width:190px;">
+                    <option value="All">All Departments</option>
+                    <?php foreach ($existing_departments as $dept_name): ?>
+                        <option value="<?php echo e($dept_name); ?>"><?php echo e($dept_name); ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="d-flex align-items-center gap-1">
+                <span class="text-muted small fw-semibold"><i class="fas fa-file-alt me-1"></i>Template:</span>
+                <select class="form-select form-select-sm" id="staffTemplateFilter" style="min-width:170px; max-width:240px;">
+                    <option value="All">All Templates</option>
+                    <?php foreach ($existing_templates as $tmpl_name): ?>
+                        <option value="<?php echo e($tmpl_name); ?>"><?php echo e($tmpl_name); ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="search-box">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-transparent border-end-0"><i class="fas fa-search text-muted"></i></span>
+                    <input type="text" id="historySearch" class="form-control border-start-0" placeholder="Search records...">
+                </div>
             </div>
         </div>
     </div>
@@ -165,13 +198,19 @@ if ($history) {
                 </thead>
                 <tbody>
                     <?php if (empty($all_history)): ?>
-                        <tr>
+                        <tr class="no-history-row">
                             <td colspan="5" class="text-center py-5 text-muted">
                                 <i class="fas fa-folder-open fa-3x mb-3 opacity-25"></i>
                                 <p class="mb-0">No historical evaluation records found.</p>
                             </td>
                         </tr>
                     <?php else: ?>
+                        <tr class="no-history-row text-center py-5 text-muted" style="display:none;">
+                            <td colspan="5" class="text-center py-5 text-muted">
+                                <i class="fas fa-search fa-3x mb-3 opacity-25"></i>
+                                <p class="mb-0">No matching evaluation records found.</p>
+                            </td>
+                        </tr>
                         <?php foreach ($all_history as $row): 
                             $initials = strtoupper(substr($row['employee_name'], 0, 1) . substr(explode(' ', $row['employee_name'])[1] ?? '', 0, 1));
                             $score = (float)$row['total_score'];
@@ -179,7 +218,11 @@ if ($history) {
                             $status_class = getStatusBadgeClass($row['status']);
                             $perf_class = getPerformanceBadgeClass($row['performance_level']);
                         ?>
-                            <tr class="history-row" data-status="<?php echo $row['status']; ?>">
+                            <tr class="history-row" 
+                                data-status="<?php echo e($row['status']); ?>"
+                                data-department="<?php echo e($row['department_name'] ?? ''); ?>"
+                                data-template="<?php echo e($row['template_name'] ?? ''); ?>"
+                                data-search="<?php echo strtolower(e($row['employee_name']) . ' ' . e($row['department_name'] ?? '') . ' ' . e($row['template_name']) . ' ' . e($row['job_title'])); ?>">
                                 <td>
                                     <div class="d-flex align-items-center">
                                         <div class="avatar-circle-sm me-3" style="width:40px; height:40px; border-radius:10px; background:rgba(41, 67, 6, 0.06); color:var(--primary-blue); display:flex; align-items:center; justify-content:center; font-weight:700;">
@@ -187,7 +230,7 @@ if ($history) {
                                         </div>
                                         <div>
                                             <div class="fw-bold text-dark"><?php echo e($row['employee_name']); ?></div>
-                                            <small class="text-muted"><?php echo e($row['template_name']); ?></small>
+                                            <small class="text-muted"><?php echo e($row['template_name']); ?><?php echo !empty($row['department_name']) ? ' &bull; ' . e($row['department_name']) : ''; ?></small>
                                         </div>
                                     </div>
                                 </td>
@@ -201,7 +244,7 @@ if ($history) {
                                     <?php else: ?>
                                         <span class="badge <?php echo $status_class; ?> px-3 py-2 rounded-pill"><?php echo e($row['status']); ?></span>
                                         <?php if ($row['approved_by_name']): ?>
-                                            <div class="small text-muted mt-1">HRM: <?php echo e($row['approved_by_name']); ?></div>
+                                             <div class="small text-muted mt-1">HRM: <?php echo e($row['approved_by_name']); ?></div>
                                         <?php endif; ?>
                                     <?php endif; ?>
                                 </td>
@@ -261,15 +304,25 @@ foreach ($all_history as $row):
                         <?php endforeach; ?>
                     </div>
 
-                    <div class="eval-summary-header d-flex justify-content-between align-items-center mb-4 p-3 bg-light rounded-4 border">
+                    <div class="eval-summary-header">
                         <div class="d-flex align-items-center gap-3">
-                            <div class="avatar-circle" style="width: 55px; height: 55px; border-radius:12px; background:rgba(41, 67, 6, 0.08); color:var(--primary-blue); display:flex; align-items:center; justify-content:center; font-size:1.2rem; font-weight:800;"><?php echo $initials; ?></div>
+                            <div class="emp-avatar bg-primary text-white d-flex align-items-center justify-content-center fw-bold rounded-3 shadow-sm" style="width: 54px; height: 54px; font-size: 1.2rem;"><?php echo $initials; ?></div>
                             <div>
-                                <h4 class="mb-0 fw-bold text-dark"><?php echo e($row['employee_name']); ?></h4>
-                                <div class="text-muted small"><?php echo e($row['job_title']); ?> &bull; <?php echo e($row['template_name']); ?></div>
+                                <h4 class="mb-1 fw-bold text-dark" style="font-size: 1.2rem;"><?php echo e($row['employee_name']); ?></h4>
+                                <div class="text-muted small d-flex align-items-center gap-2 flex-wrap">
+                                    <span class="badge bg-white text-secondary border fw-semibold"><?php echo e($row['job_title'] ?? 'Staff'); ?></span>
+                                    <span>&bull;</span>
+                                    <span><?php echo e($row['template_name']); ?></span>
+                                </div>
                             </div>
                         </div>
-                        <?php echo getEvaluationScoreCirclesHtml($conn, $row['evaluation_id'], $row['total_score']); ?>
+                        <div class="d-flex align-items-center gap-3 d-print-none">
+                            <a href="../manager/print-evaluation.php?id=<?php echo $row['evaluation_id']; ?>" target="_blank" class="btn btn-sm btn-primary rounded-pill px-3 py-2 fw-bold d-inline-flex align-items-center gap-2 shadow-sm">
+                                <i class="fas fa-print"></i>
+                                <span>Print Form</span>
+                            </a>
+                            <?php echo getEvaluationScoreCirclesHtml($conn, $row['evaluation_id'], $row['total_score']); ?>
+                        </div>
                     </div>
 
                     <!-- KRA Section -->
@@ -466,7 +519,8 @@ foreach ($all_history as $row):
     </div>
 <?php endforeach; ?>
 
-<script>
+let staffActiveStatus = 'All';
+
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize tooltips
     var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
@@ -474,36 +528,42 @@ document.addEventListener('DOMContentLoaded', function() {
         return new bootstrap.Tooltip(tooltipTriggerEl);
     });
 
-    // Search functionality
-    document.getElementById('historySearch')?.addEventListener('input', function() {
-        const filter = this.value.toLowerCase();
-        const rows = document.querySelectorAll('#historyTable tbody tr.history-row');
-        
-        rows.forEach(row => {
-            const text = row.textContent.toLowerCase();
-            row.style.display = text.includes(filter) ? '' : 'none';
-        });
-        applyZebraStriping('#historyTable');
-    });
+    document.getElementById('historySearch')?.addEventListener('input', applyStaffFilters);
+    document.getElementById('staffDeptFilter')?.addEventListener('change', applyStaffFilters);
+    document.getElementById('staffTemplateFilter')?.addEventListener('change', applyStaffFilters);
 });
 
 function filterHistory(status, btn) {
-    // Highlight active filter button
+    staffActiveStatus = status;
     const container = btn.closest('.btn-group');
-    container.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
+    if (container) {
+        container.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+    }
+    applyStaffFilters();
+}
 
-    // Filter table rows
+function applyStaffFilters() {
+    const q = (document.getElementById('historySearch')?.value || '').toLowerCase().trim();
+    const selDept = document.getElementById('staffDeptFilter')?.value || 'All';
+    const selTmpl = document.getElementById('staffTemplateFilter')?.value || 'All';
     const rows = document.querySelectorAll('#historyTable tbody tr.history-row');
+    let visible = 0;
+
     rows.forEach(row => {
-        const rowStatus = row.getAttribute('data-status');
-        if (status === 'All' || rowStatus === status) {
-            row.style.display = '';
-        } else {
-            row.style.display = 'none';
-        }
+        const statusMatch = staffActiveStatus === 'All' || row.dataset.status === staffActiveStatus;
+        const deptMatch = selDept === 'All' || (row.dataset.department || '') === selDept;
+        const tmplMatch = selTmpl === 'All' || (row.dataset.template || '') === selTmpl;
+        const searchMatch = !q || (row.dataset.search || '').includes(q);
+        const show = statusMatch && deptMatch && tmplMatch && searchMatch;
+        row.style.display = show ? '' : 'none';
+        if (show) visible++;
     });
-    applyZebraStriping('#historyTable');
+
+    const noResRow = document.querySelector('#historyTable tbody tr.no-history-row');
+    if (noResRow) {
+        noResRow.style.display = (visible === 0) ? '' : 'none';
+    }
 }
 </script>
 

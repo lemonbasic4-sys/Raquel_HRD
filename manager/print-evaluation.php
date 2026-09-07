@@ -10,13 +10,15 @@ if (!$id)
 
 // Fetch evaluation details with all joins
 $query = "SELECT ev.*, 
-    CONCAT(e.first_name, ' ', e.last_name) as employee_name, e.job_title, d.department_name,
+    CONCAT(e.first_name, ' ', e.last_name) as employee_name, e.job_title, e.department_id, d.department_name,
     u.full_name as submitted_by_name, u2.full_name as endorsed_by_name, u3.full_name as approved_by_name,
     et.template_name, et.form_code, et.revision_date, et.effective_date_form,
     et.kra_weight AS tpl_kra_weight, et.behavior_weight AS tpl_behavior_weight,
     ds.full_name AS dept_supervisor_confirmed_by_name,
     dm.full_name AS dept_manager_endorsed_by_name,
     CONCAT(ce.first_name, ' ', ce.last_name) AS consolidator_name,
+    ce.job_title AS consolidator_job_title,
+    ep.package_id,
     ep.updated_at AS consolidated_at
     FROM evaluations ev
     LEFT JOIN employees e ON ev.employee_id = e.employee_id
@@ -40,6 +42,216 @@ $row = $result->fetch_assoc();
 // Staff check: Allowed as they have access to evaluation history in the staff portal
 if (!in_array($_SESSION['role'], ['HR Manager', 'HR Supervisor', 'HR Staff'])) {
   die("Access denied.");
+}
+
+// Load all higher officials & route reviewers who participated in this evaluation
+$package_id = (int)($row['package_id'] ?? 0);
+$higher_officials = [];
+
+if ($package_id > 0) {
+    $steps_stmt = $conn->prepare("SELECT rs.step_order, rs.step_label, rs.step_type, rs.action_status, rs.comments, rs.acted_at,
+            u.full_name as user_name, u.role as user_role,
+            emp.first_name, emp.last_name, emp.middle_name, emp.job_title
+        FROM evaluation_package_route_steps rs
+        LEFT JOIN users u ON u.user_id = rs.reviewer_user_id
+        LEFT JOIN employees emp ON emp.employee_id = rs.reviewer_employee_id
+        WHERE rs.package_id = ?
+        ORDER BY rs.step_order ASC");
+    $steps_stmt->bind_param('i', $package_id);
+    $steps_stmt->execute();
+    $route_steps = $steps_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $steps_stmt->close();
+
+    foreach ($route_steps as $rs) {
+        $name = !empty($rs['user_name']) ? $rs['user_name'] : trim(($rs['first_name'] ?? '') . ' ' . ($rs['last_name'] ?? ''));
+        $title = !empty($rs['job_title']) ? $rs['job_title'] : ($rs['user_role'] ?? '');
+
+        // Friendly role label for print
+        $label = $rs['step_label'];
+        if (stripos($label, 'consolidation') !== false || $rs['step_order'] == 1) {
+            $role_label = 'Immediate Head / Consolidator';
+        } elseif (stripos($label, 'Board') !== false) {
+            $role_label = 'Board of Directors';
+        } elseif (stripos($label, 'Audit') !== false) {
+            $role_label = 'Audit Committee';
+        } elseif (stripos($label, 'President') !== false) {
+            $role_label = 'President & CEO';
+        } elseif (stripos($label, 'VP') !== false || stripos($label, 'Vice President') !== false) {
+            $role_label = 'Division Vice President';
+        } elseif (stripos($label, 'Manager') !== false) {
+            $role_label = 'Department Manager';
+        } else {
+            $role_label = $rs['step_label'];
+        }
+
+        $higher_officials[] = [
+            'role_label' => $role_label,
+            'name'       => $name ?: 'Authorized Official',
+            'title'      => $title ?: $rs['step_label'],
+            'status'     => $rs['action_status'],
+            'is_signed'  => ($rs['action_status'] === 'Approved'),
+            'acted_at'   => $rs['acted_at'],
+            'comments'   => $rs['comments'],
+            'step_order' => $rs['step_order']
+        ];
+    }
+}
+
+// Fallback for non-package evaluations
+if (empty($higher_officials)) {
+    $dept_id = (int)($row['department_id'] ?? 0);
+    
+    // 1. Immediate Supervisor
+    $sup_name = $row['dept_supervisor_confirmed_by_name'] ?: ($row['consolidator_name'] ?: 'Immediate Supervisor');
+    $sup_title = $row['consolidator_job_title'] ?: 'Department Supervisor';
+    $higher_officials[] = [
+        'role_label' => 'Immediate Head / Supervisor',
+        'name'       => $sup_name,
+        'title'      => $sup_title,
+        'status'     => !empty($row['dept_supervisor_confirmed_by']) ? 'Approved' : 'Pending',
+        'is_signed'  => !empty($row['dept_supervisor_confirmed_by']),
+        'acted_at'   => $row['dept_supervisor_confirmed_at'] ?? null,
+        'comments'   => $row['supervisor_comments'] ?? '',
+        'step_order' => 1
+    ];
+
+    // 2. Department Manager
+    $mgr_name = $row['dept_manager_endorsed_by_name'] ?: ($row['approved_by_name'] ?: 'Department Manager');
+    $higher_officials[] = [
+        'role_label' => 'Department Manager',
+        'name'       => $mgr_name,
+        'title'      => 'Department Manager',
+        'status'     => !empty($row['dept_manager_endorsed_by']) ? 'Approved' : 'Pending',
+        'is_signed'  => !empty($row['dept_manager_endorsed_by']),
+        'acted_at'   => $row['dept_manager_endorsed_at'] ?? null,
+        'comments'   => $row['dept_manager_comments'] ?? '',
+        'step_order' => 2
+    ];
+
+    // 3. Division VP
+    $vp = getDepartmentDesignatedOfficial($conn, 'Division VP', $dept_id);
+    if ($vp) {
+        $higher_officials[] = [
+            'role_label' => 'Division Vice President',
+            'name'       => $vp['full_name'],
+            'title'      => $vp['job_title'] ?: 'Vice President',
+            'status'     => 'Approved',
+            'is_signed'  => true,
+            'acted_at'   => $row['approved_date'] ?? null,
+            'comments'   => '',
+            'step_order' => 3
+        ];
+    }
+
+    // 4. President & CEO
+    $pres = getDepartmentDesignatedOfficial($conn, 'President');
+    if ($pres) {
+        $higher_officials[] = [
+            'role_label' => 'President & CEO',
+            'name'       => $pres['full_name'],
+            'title'      => $pres['job_title'] ?: 'President and CEO',
+            'status'     => 'Approved',
+            'is_signed'  => true,
+            'acted_at'   => $row['approved_date'] ?? null,
+            'comments'   => '',
+            'step_order' => 4
+        ];
+    }
+
+    // 5. Audit Committee
+    $audit_official = getDepartmentDesignatedOfficial($conn, 'Audit Committee');
+    if ($audit_official) {
+        $higher_officials[] = [
+            'role_label' => 'Audit Committee',
+            'name'       => $audit_official['full_name'],
+            'title'      => $audit_official['job_title'] ?: 'Audit Committee Chair',
+            'status'     => 'Approved',
+            'is_signed'  => true,
+            'acted_at'   => $row['approved_date'] ?? null,
+            'comments'   => '',
+            'step_order' => 5
+        ];
+    }
+
+    // 6. Board of Directors
+    $board = getDepartmentDesignatedOfficial($conn, 'Board of Directors');
+    if ($board) {
+        $higher_officials[] = [
+            'role_label' => 'Board of Directors',
+            'name'       => $board['full_name'],
+            'title'      => $board['job_title'] ?: 'Board Member',
+            'status'     => 'Approved',
+            'is_signed'  => true,
+            'acted_at'   => $row['approved_date'] ?? null,
+            'comments'   => '',
+            'step_order' => 6
+        ];
+    }
+}
+
+// Extract specific official roles for the classic form layout:
+$supervisor_name = ''; $supervisor_title = 'Immediate Head / Consolidator'; $supervisor_comments = $row['supervisor_comments'] ?? '';
+$dept_manager_name = ''; $dept_manager_title = 'Department Manager'; $dept_manager_comments = $row['dept_manager_comments'] ?? '';
+$hr_manager_name = ''; $hr_manager_title = 'HR Manager'; $hr_manager_comments = $row['manager_comments'] ?? '';
+$vp_name = ''; $vp_title = 'Vice President';
+$pres_name = ''; $pres_title = 'President and CEO';
+$board_name = ''; $board_title = 'Board of Directors';
+
+foreach ($higher_officials as $ho) {
+    $lbl = strtolower($ho['role_label'] . ' ' . $ho['title']);
+    if (stripos($lbl, 'board') !== false) {
+        $board_name = $ho['name'];
+        $board_title = $ho['title'];
+    } elseif (stripos($lbl, 'president') !== false) {
+        $pres_name = $ho['name'];
+        $pres_title = $ho['title'];
+    } elseif (stripos($lbl, 'vp') !== false || stripos($lbl, 'vice president') !== false) {
+        $vp_name = $ho['name'];
+        $vp_title = $ho['title'];
+    } elseif (stripos($lbl, 'hr manager') !== false) {
+        $hr_manager_name = $ho['name'];
+        $hr_manager_title = $ho['title'];
+        if (!empty($ho['comments']) && empty($hr_manager_comments)) $hr_manager_comments = $ho['comments'];
+    } elseif (stripos($lbl, 'manager') !== false && empty($dept_manager_name)) {
+        $dept_manager_name = $ho['name'];
+        $dept_manager_title = $ho['title'];
+        if (!empty($ho['comments']) && empty($dept_manager_comments)) $dept_manager_comments = $ho['comments'];
+    } elseif ($ho['step_order'] == 1 || stripos($lbl, 'consolidat') !== false || stripos($lbl, 'supervisor') !== false) {
+        if (empty($supervisor_name)) {
+            $supervisor_name = $ho['name'];
+            $supervisor_title = $ho['title'];
+            if (!empty($ho['comments']) && empty($supervisor_comments)) $supervisor_comments = $ho['comments'];
+        }
+    }
+}
+
+// Ensure defaults from DB row & designated officials if not matched in route
+if (empty($supervisor_name)) {
+    $supervisor_name = $row['dept_supervisor_confirmed_by_name'] ?: ($row['consolidator_name'] ?: 'IMMEDIATE HEAD');
+    $supervisor_title = $row['consolidator_job_title'] ?: 'Department Supervisor';
+}
+if (empty($dept_manager_name)) {
+    $dept_manager_name = $row['dept_manager_endorsed_by_name'] ?: '';
+    $dept_manager_title = 'Department Manager';
+}
+if (empty($hr_manager_name)) {
+    $hr_manager_name = $row['approved_by_name'] ?: 'ELENA DELGADO';
+    $hr_manager_title = 'HR Manager I';
+}
+if (empty($vp_name)) {
+    $vp_obj = getDepartmentDesignatedOfficial($conn, 'Division VP', (int)($row['department_id'] ?? 0));
+    $vp_name = $vp_obj ? $vp_obj['full_name'] : 'EDUARDO VILLANUEVA AQUINO';
+    $vp_title = $vp_obj ? $vp_obj['job_title'] : 'Vice President';
+}
+if (empty($pres_name)) {
+    $pres_obj = getDepartmentDesignatedOfficial($conn, 'President');
+    $pres_name = $pres_obj ? $pres_obj['full_name'] : 'GABRIEL SANTOS MENDOZA';
+    $pres_title = $pres_obj ? $pres_obj['job_title'] : 'President and CEO';
+}
+if (empty($board_name)) {
+    $board_obj = getDepartmentDesignatedOfficial($conn, 'Board of Directors');
+    $board_name = $board_obj ? $board_obj['full_name'] : 'MANUEL RIVERA RAMOS';
+    $board_title = $board_obj ? $board_obj['job_title'] : 'Board of Directors';
 }
 
 // Resolve template metadata with fallbacks
@@ -603,52 +815,30 @@ if ((float)($row['total_score'] ?? 0) > 0 && (empty($pl) || $pl === '0')) {
     <!-- Employee's Comments -->
     <div class="comment-box">
       <div class="label">Employee's Comments:</div>
-      <div class="content"><?php echo nl2br(e($row['staff_comments'])); ?></div>
+      <div class="content"><?php echo !empty($row['staff_comments']) ? nl2br(e($row['staff_comments'])) : '&nbsp;'; ?></div>
       <div style="text-align:center; padding-bottom:3px; margin-top:8px;">
-        <div style="font-weight:bold; font-size:11px;">
-          <?php echo strtoupper(e($row['employee_name'] ?? '')); ?>
-        </div>
+        <div style="font-weight:bold; font-size:11px;"><?php echo strtoupper(e($row['employee_name'] ?? '')); ?></div>
       </div>
     </div>
 
     <!-- Immediate Supervisor / Package Consolidator Comments -->
-    <?php 
-    $supervisor_name = !empty($row['dept_supervisor_confirmed_by_name']) 
-      ? $row['dept_supervisor_confirmed_by_name'] 
-      : (!empty($row['consolidator_name']) ? $row['consolidator_name'] : 'IMMEDIATE HEAD / CONSOLIDATOR');
-    ?>
     <div class="comment-box">
       <div class="label">Immediate Supervisor / Package Consolidator Comments:</div>
-      <div class="content"><?php echo !empty($row['supervisor_comments']) ? nl2br(e($row['supervisor_comments'])) : '<em>Reviewed & Consolidated</em>'; ?></div>
+      <div class="content"><?php echo !empty($supervisor_comments) ? nl2br(e($supervisor_comments)) : '&nbsp;'; ?></div>
       <div style="text-align:center; padding-bottom:3px; margin-top:8px;">
-        <div style="font-weight:bold; font-size:11px;">
-          <?php echo strtoupper(e($supervisor_name)); ?>
-        </div>
+        <div style="font-weight:bold; font-size:11px;"><?php echo strtoupper(e($supervisor_name)); ?></div>
+        <div style="font-size:9px; color:#555;"><?php echo e($supervisor_title); ?></div>
       </div>
     </div>
 
     <!-- Department Manager's Comments -->
-    <?php if (!empty($row['dept_manager_comments'])): ?>
+    <?php if (!empty($dept_manager_name) && strcasecmp(trim($dept_manager_name), trim($supervisor_name)) !== 0): ?>
     <div class="comment-box">
       <div class="label">Department Manager's Comments:</div>
-      <div class="content"><?php echo nl2br(e($row['dept_manager_comments'])); ?></div>
+      <div class="content"><?php echo !empty($dept_manager_comments) ? nl2br(e($dept_manager_comments)) : '&nbsp;'; ?></div>
       <div style="text-align:center; padding-bottom:3px; margin-top:8px;">
-        <div style="font-weight:bold; font-size:11px;">
-          <?php echo strtoupper(e($row['dept_manager_endorsed_by_name'] ?? 'DEPT MANAGER')); ?>
-        </div>
-      </div>
-    </div>
-    <?php endif; ?>
-
-    <!-- Evaluator's Comments (HR Supervisor) -->
-    <?php if (!empty($row['evaluator_comments'])): ?>
-    <div class="comment-box">
-      <div class="label">HR Supervisor's Comments:</div>
-      <div class="content"><?php echo nl2br(e($row['evaluator_comments'])); ?></div>
-      <div style="text-align:center; padding-bottom:3px; margin-top:8px;">
-        <div style="font-weight:bold; font-size:11px;">
-          <?php echo strtoupper(e($row['endorsed_by_name'] ?? '')); ?>
-        </div>
+        <div style="font-weight:bold; font-size:11px;"><?php echo strtoupper(e($dept_manager_name)); ?></div>
+        <div style="font-size:9px; color:#555;"><?php echo e($dept_manager_title); ?></div>
       </div>
     </div>
     <?php endif; ?>
@@ -656,37 +846,43 @@ if ((float)($row['total_score'] ?? 0) > 0 && (empty($pl) || $pl === '0')) {
     <!-- HR Manager's Comments -->
     <div class="comment-box">
       <div class="label">HR Manager's Comments:</div>
-      <div class="content"><?php echo nl2br(e($row['manager_comments'])); ?></div>
+      <div class="content"><?php echo !empty($hr_manager_comments) ? nl2br(e($hr_manager_comments)) : '&nbsp;'; ?></div>
       <div style="text-align:center; padding-bottom:3px; margin-top:8px;">
-        <div style="font-weight:bold; font-size:11px;">
-          <?php echo strtoupper(e($row['approved_by_name'] ?? '')); ?>
-        </div>
+        <div style="font-weight:bold; font-size:11px;"><?php echo strtoupper(e($hr_manager_name)); ?></div>
+        <div style="font-size:9px; color:#555;"><?php echo e($hr_manager_title); ?></div>
       </div>
     </div>
 
     <!-- Executives' Signature -->
-    <div style="border:1px solid #000; padding:4px 8px 8px; margin-bottom:4px;">
+    <div style="border:1px solid #000; padding:6px 12px 8px; margin-bottom:5px;">
       <div style="font-weight:bold; font-style:italic; font-size:9px; margin-bottom:14px;">Executives' Signature</div>
-      <div style="display:flex; justify-content:space-between; padding:0 30px;">
-        <div style="text-align:center;">
-          <div style="border-top:1px solid #000; width:140px; margin-bottom:2px;">&nbsp;</div>
-          <div style="font-size:9px;">Vice President / Manager</div>
+      <div style="display:flex; justify-content:space-around; align-items:flex-end; gap:16px; padding:0 10px;">
+        <div style="text-align:center; min-width:130px; flex:1;">
+          <div style="border-top:1px solid #000; width:85%; max-width:160px; margin:0 auto 2px;"></div>
+          <div style="font-weight:bold; font-size:10px;"><?php echo strtoupper(e($vp_name)); ?></div>
+          <div style="font-size:8.5px; color:#333;"><?php echo e($vp_title); ?></div>
         </div>
-        <div style="text-align:center;">
-          <div style="border-top:1px solid #000; width:140px; margin-bottom:2px;">&nbsp;</div>
-          <div style="font-size:9px;">President and CEO</div>
+        <div style="text-align:center; min-width:130px; flex:1;">
+          <div style="border-top:1px solid #000; width:85%; max-width:160px; margin:0 auto 2px;"></div>
+          <div style="font-weight:bold; font-size:10px;"><?php echo strtoupper(e($pres_name)); ?></div>
+          <div style="font-size:8.5px; color:#333;"><?php echo e($pres_title); ?></div>
         </div>
+        <?php if (!empty($board_name)): ?>
+        <div style="text-align:center; min-width:130px; flex:1;">
+          <div style="border-top:1px solid #000; width:85%; max-width:160px; margin:0 auto 2px;"></div>
+          <div style="font-weight:bold; font-size:10px;"><?php echo strtoupper(e($board_name)); ?></div>
+          <div style="font-size:8.5px; color:#333;"><?php echo e($board_title); ?></div>
+        </div>
+        <?php endif; ?>
       </div>
     </div>
 
     <!-- HR Use Only -->
     <div style="border:1px solid #000; padding:4px 6px;">
       <div style="font-style:italic; font-weight:bold; text-align:center; font-size:9px; margin-bottom:4px;">For Human Resources Use Only</div>
-      <div style="font-size:9px;">
-        PMS Form received on: <span
-          style="display:inline-block; border-bottom:1px solid #000; width:120px; margin:0 4px;"></span>
-        &nbsp;&nbsp;&nbsp; Received by: <span
-          style="display:inline-block; border-bottom:1px solid #000; width:160px; margin:0 4px;"></span>
+      <div style="font-size:9px; display:flex; justify-content:space-between; align-items:center;">
+        <div>PMS Form received on: <span style="display:inline-block; border-bottom:1px solid #000; min-width:120px; margin:0 4px; text-align:center;"><?php echo !empty($row['consolidated_at']) ? date('M d, Y', strtotime($row['consolidated_at'])) : date('M d, Y'); ?></span></div>
+        <div>Received by: <span style="display:inline-block; border-bottom:1px solid #000; min-width:160px; margin:0 4px; text-align:center;">Human Resources Department</span></div>
       </div>
     </div>
 

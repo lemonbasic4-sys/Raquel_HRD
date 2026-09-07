@@ -3085,10 +3085,16 @@ function syncEvaluationToOrganizationPackage($conn, $evaluation_id)
     $department_id = (int) $evaluation['department_id'];
     $template_id = (int) $evaluation['template_id'];
     $type = $evaluation['evaluation_type']; $start = $evaluation['evaluation_period_start']; $end = $evaluation['evaluation_period_end'];
-    // Look for an existing active (non-cancelled) package first
-    $find = $conn->prepare("SELECT package_id, consolidator_employee_id FROM evaluation_packages WHERE department_id = ? AND template_id = ? AND period_start = ? AND period_end = ? AND status <> 'Cancelled' LIMIT 1");
-    $find->bind_param('iiss', $department_id, $template_id, $start, $end); $find->execute();
+    // Look for an existing active (non-cancelled, non-applied) package for this department & template first
+    $find = $conn->prepare("SELECT package_id, consolidator_employee_id FROM evaluation_packages WHERE department_id = ? AND template_id = ? AND status NOT IN ('Cancelled', 'Approved and Applied') LIMIT 1");
+    $find->bind_param('ii', $department_id, $template_id); $find->execute();
     $package = $find->get_result()->fetch_assoc(); $find->close();
+    if (!$package) {
+        // Fallback: look for exact period match if not found
+        $find = $conn->prepare("SELECT package_id, consolidator_employee_id FROM evaluation_packages WHERE department_id = ? AND template_id = ? AND period_start = ? AND period_end = ? AND status <> 'Cancelled' LIMIT 1");
+        $find->bind_param('iiss', $department_id, $template_id, $start, $end); $find->execute();
+        $package = $find->get_result()->fetch_assoc(); $find->close();
+    }
     if (!$package) {
         // Check if a cancelled package exists for the same period — reactivate it instead of inserting (avoids UNIQUE KEY duplicate error)
         $find_cancelled = $conn->prepare("SELECT package_id, consolidator_employee_id FROM evaluation_packages WHERE department_id = ? AND template_id = ? AND period_start = ? AND period_end = ? AND status = 'Cancelled' LIMIT 1");
@@ -3167,7 +3173,6 @@ function syncEvaluationToOrganizationPackage($conn, $evaluation_id)
     recalculateOrganizationPackageBehaviorScore($conn, $package_id);
 
     // Trigger notification bell to the package consolidator upon member self-rating completion
-
     $emp_fullname = trim(($evaluation['first_name'] ?? '') . ' ' . ($evaluation['last_name'] ?? ''));
     $emp_job_title = $evaluation['job_title'] ?? '';
     $tmpl_name = $evaluation['template_name'] ?? 'Evaluation';
@@ -3179,12 +3184,16 @@ function syncEvaluationToOrganizationPackage($conn, $evaluation_id)
         notifyUsersForEmployee($conn, $consolidator_id, $notif_title, $notif_body, $notif_link);
     }
 
-    // Open the consolidation step only after every active department member has
-    // submitted the same template and period.
-    $expected = $conn->prepare('SELECT COUNT(DISTINCT e.employee_id) AS total FROM employees e JOIN users u ON u.employee_id = e.employee_id AND u.is_active = 1 WHERE e.department_id = ? AND e.is_active = 1 AND e.deleted_at IS NULL');
+    // Open the consolidation step only after every active department member eligible for this template has submitted
+    $non_reg_sql = "('Probationary', 'OJT', 'Trainee', 'Project Based', 'Project-Based')";
+    if ($type === 'Initial') {
+        $expected = $conn->prepare("SELECT COUNT(DISTINCT e.employee_id) AS total FROM employees e JOIN users u ON u.employee_id = e.employee_id AND u.is_active = 1 WHERE e.department_id = ? AND e.is_active = 1 AND e.deleted_at IS NULL AND e.employment_status IN $non_reg_sql");
+    } else {
+        $expected = $conn->prepare("SELECT COUNT(DISTINCT e.employee_id) AS total FROM employees e JOIN users u ON u.employee_id = e.employee_id AND u.is_active = 1 WHERE e.department_id = ? AND e.is_active = 1 AND e.deleted_at IS NULL AND (e.employment_status NOT IN $non_reg_sql OR e.employment_status IS NULL)");
+    }
     $expected->bind_param('i', $department_id); $expected->execute(); $expected_count = (int) $expected->get_result()->fetch_assoc()['total']; $expected->close();
-    $submitted = $conn->prepare("SELECT COUNT(DISTINCT ev.employee_id) AS total FROM evaluations ev JOIN employees e ON e.employee_id = ev.employee_id WHERE e.department_id = ? AND ev.template_id = ? AND ev.evaluation_period_start = ? AND ev.evaluation_period_end = ? AND ev.deleted_at IS NULL AND ev.status NOT IN ('Draft','Pending Self-Rating','Returned','Rejected')");
-    $submitted->bind_param('iiss', $department_id, $template_id, $start, $end); $submitted->execute(); $submitted_count = (int) $submitted->get_result()->fetch_assoc()['total']; $submitted->close();
+    $submitted = $conn->prepare("SELECT COUNT(DISTINCT ev.employee_id) AS total FROM evaluations ev JOIN employees e ON e.employee_id = ev.employee_id WHERE e.department_id = ? AND ev.template_id = ? AND ev.deleted_at IS NULL AND ev.status NOT IN ('Draft','Pending Self-Rating','Returned','Rejected')");
+    $submitted->bind_param('ii', $department_id, $template_id); $submitted->execute(); $submitted_count = (int) $submitted->get_result()->fetch_assoc()['total']; $submitted->close();
     if ($expected_count > 0 && $submitted_count >= $expected_count) {
         $open = $conn->prepare("UPDATE evaluation_package_route_steps SET action_status = 'Pending' WHERE package_id = ? AND step_order = 1 AND action_status = 'Waiting'");
         $open->bind_param('i', $package_id); $open->execute(); $open->close();
@@ -3200,15 +3209,43 @@ function syncEvaluationToOrganizationPackage($conn, $evaluation_id)
 
 function getOrganizationPackageSubmissionSummary($conn, array $package)
 {
+    $package_id = (int) ($package['package_id'] ?? 0);
     $department_id = (int) ($package['department_id'] ?? 0);
     $template_id = (int) ($package['template_id'] ?? 0);
     $start = $package['period_start'] ?? '';
     $end = $package['period_end'] ?? '';
-    $stmt = $conn->prepare("SELECT DISTINCT e.employee_id, CONCAT(e.first_name, ' ', e.last_name) AS employee_name, e.job_title,
-        EXISTS(SELECT 1 FROM evaluations ev WHERE ev.employee_id = e.employee_id AND ev.template_id = ? AND ev.evaluation_period_start = ? AND ev.evaluation_period_end = ? AND ev.deleted_at IS NULL AND ev.status NOT IN ('Draft','Pending Self-Rating','Returned','Rejected')) AS is_submitted
-        FROM employees e JOIN users u ON u.employee_id = e.employee_id AND u.is_active = 1
-        WHERE e.department_id = ? AND e.is_active = 1 AND e.deleted_at IS NULL ORDER BY e.last_name, e.first_name");
-    $stmt->bind_param('issi', $template_id, $start, $end, $department_id);
+
+    $eval_type = $package['evaluation_type'] ?? null;
+    if (!$eval_type && $template_id > 0) {
+        $t_stmt = $conn->prepare("SELECT evaluation_type FROM evaluation_templates WHERE template_id = ? LIMIT 1");
+        $t_stmt->bind_param('i', $template_id);
+        $t_stmt->execute();
+        $t_row = $t_stmt->get_result()->fetch_assoc();
+        $t_stmt->close();
+        $eval_type = $t_row['evaluation_type'] ?? 'Annual';
+    }
+
+    $non_reg_sql = "('Probationary', 'OJT', 'Trainee', 'Project Based', 'Project-Based')";
+    if ($eval_type === 'Initial') {
+        $stmt = $conn->prepare("SELECT DISTINCT e.employee_id, CONCAT(e.first_name, ' ', e.last_name) AS employee_name, e.job_title,
+            (EXISTS(SELECT 1 FROM evaluation_package_members pm JOIN evaluations ev ON ev.evaluation_id = pm.evaluation_id WHERE pm.package_id = ? AND ev.employee_id = e.employee_id AND ev.deleted_at IS NULL AND ev.status NOT IN ('Draft','Pending Self-Rating','Returned','Rejected'))
+             OR EXISTS(SELECT 1 FROM evaluations ev WHERE ev.employee_id = e.employee_id AND ev.template_id = ? AND ev.deleted_at IS NULL AND ev.status NOT IN ('Draft','Pending Self-Rating','Returned','Rejected'))) AS is_submitted
+            FROM employees e JOIN users u ON u.employee_id = e.employee_id AND u.is_active = 1
+            WHERE e.department_id = ? AND e.is_active = 1 AND e.deleted_at IS NULL
+              AND (e.employment_status IN $non_reg_sql OR EXISTS(SELECT 1 FROM evaluations ev2 WHERE ev2.employee_id = e.employee_id AND ev2.template_id = ? AND ev2.deleted_at IS NULL))
+            ORDER BY e.last_name, e.first_name");
+        $stmt->bind_param('iiii', $package_id, $template_id, $department_id, $template_id);
+    } else {
+        $stmt = $conn->prepare("SELECT DISTINCT e.employee_id, CONCAT(e.first_name, ' ', e.last_name) AS employee_name, e.job_title,
+            (EXISTS(SELECT 1 FROM evaluation_package_members pm JOIN evaluations ev ON ev.evaluation_id = pm.evaluation_id WHERE pm.package_id = ? AND ev.employee_id = e.employee_id AND ev.deleted_at IS NULL AND ev.status NOT IN ('Draft','Pending Self-Rating','Returned','Rejected'))
+             OR EXISTS(SELECT 1 FROM evaluations ev WHERE ev.employee_id = e.employee_id AND ev.template_id = ? AND ev.deleted_at IS NULL AND ev.status NOT IN ('Draft','Pending Self-Rating','Returned','Rejected'))) AS is_submitted
+            FROM employees e JOIN users u ON u.employee_id = e.employee_id AND u.is_active = 1
+            WHERE e.department_id = ? AND e.is_active = 1 AND e.deleted_at IS NULL
+              AND (e.employment_status NOT IN $non_reg_sql OR e.employment_status IS NULL)
+            ORDER BY e.last_name, e.first_name");
+        $stmt->bind_param('iii', $package_id, $template_id, $department_id);
+    }
+
     $stmt->execute();
     $members = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
@@ -3228,6 +3265,34 @@ function recalculateOrganizationPackageBehaviorScore($conn, $package_id)
     $update = $conn->prepare('UPDATE evaluation_packages SET shared_behavior_score = ? WHERE package_id = ?');
     $update->bind_param('di', $score, $package_id); $update->execute(); $update->close();
     return $score;
+}
+
+/**
+ * Scan all packages in 'Pending Self-Ratings' or with Step 1 'Waiting'
+ * and automatically unlock them to 'Pending Consolidation' (Step 1 'Pending')
+ * if all required department members have completed their self-ratings.
+ */
+function syncWaitingOrganizationPackages($conn)
+{
+    if (!ensureOrganizationEvaluationPackageSchema($conn)) return;
+
+    $stmt = $conn->query("SELECT package_id, department_id, template_id, evaluation_type, period_start, period_end, status, consolidator_employee_id 
+        FROM evaluation_packages 
+        WHERE status = 'Pending Self-Ratings' OR package_id IN (
+            SELECT package_id FROM evaluation_package_route_steps WHERE step_order = 1 AND action_status = 'Waiting'
+        )");
+    if (!$stmt) return;
+
+    $pkgs = $stmt->fetch_all(MYSQLI_ASSOC);
+    foreach ($pkgs as $pkg) {
+        $pkg_id = (int)$pkg['package_id'];
+        $summary = getOrganizationPackageSubmissionSummary($conn, $pkg);
+        if ($summary['required'] > 0 && $summary['submitted'] >= $summary['required']) {
+            $conn->query("UPDATE evaluation_package_route_steps SET action_status = 'Pending' WHERE package_id = $pkg_id AND step_order = 1 AND action_status = 'Waiting'");
+            $conn->query("UPDATE evaluation_packages SET status = 'Pending Consolidation', current_step_order = 1 WHERE package_id = $pkg_id AND status = 'Pending Self-Ratings'");
+            recalculateOrganizationPackageBehaviorScore($conn, $pkg_id);
+        }
+    }
 }
 
 /**
@@ -3261,7 +3326,8 @@ function getLatePackageMembersForSupervisor($conn, $consolidator_employee_id)
 }
 
 /**
- * Returns all late catch-up members pending HR Manager endorsement across all packages.
+ * Returns all late catch-up members pending HR/package-reviewer endorsement across all packages.
+ * Used by HR Managers, HR Supervisors, and Admins.
  */
 function getLatePackageMembersForHRManager($conn)
 {
@@ -3286,10 +3352,50 @@ function getLatePackageMembersForHRManager($conn)
 }
 
 /**
+ * Returns late catch-up members (Pending HR Catchup) for packages where
+ * the given employee is the CURRENT ACTIVE reviewer (i.e. they have a Pending step).
+ * This allows the AP Manager, VP, etc. to endorse catch-up members for their own package
+ * without requiring an HR role.
+ */
+function getLatePackageMembersForCurrentReviewer($conn, $reviewer_employee_id)
+{
+    $reviewer_employee_id = (int) $reviewer_employee_id;
+    if ($reviewer_employee_id <= 0) return [];
+
+    // Find packages where this employee is the current active reviewer
+    $stmt = $conn->prepare("
+        SELECT pm.package_id, pm.evaluation_id, pm.member_status, pm.joined_at_step,
+               ep.status AS package_status, d.department_name, et.template_name,
+               ep.period_start, ep.period_end,
+               CONCAT(emp.first_name, ' ', emp.last_name) AS member_name,
+               emp.job_title, emp.employee_code,
+               CONCAT(sup.first_name, ' ', sup.last_name) AS supervisor_name
+        FROM evaluation_package_members pm
+        JOIN evaluation_packages ep ON ep.package_id = pm.package_id
+        JOIN evaluations ev ON ev.evaluation_id = pm.evaluation_id
+        JOIN employees emp ON emp.employee_id = ev.employee_id
+        JOIN departments d ON d.department_id = ep.department_id
+        JOIN evaluation_templates et ON et.template_id = ep.template_id
+        LEFT JOIN employees sup ON sup.employee_id = ep.consolidator_employee_id
+        WHERE pm.member_status = 'Pending HR Catchup'
+          AND ep.package_id IN (
+              SELECT rs.package_id FROM evaluation_package_route_steps rs
+              WHERE rs.reviewer_employee_id = ? AND rs.action_status = 'Pending'
+          )
+        ORDER BY pm.package_id, emp.last_name, emp.first_name
+    ");
+    $stmt->bind_param('i', $reviewer_employee_id);
+    $stmt->execute();
+    $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+    return $rows;
+}
+
+/**
  * Advances a late catch-up member one step in the chain:
- *   Supervisor → 'Pending HR Catchup' → HR Manager → 'Catchup Endorsed' → notify current holder
+ *   Supervisor → 'Pending HR Catchup' → HR Manager (or current active package reviewer) → 'Catchup Endorsed'
  *
- * @param string $endorser_role  'supervisor' | 'hr_manager'
+ * @param string $endorser_role  'supervisor' | 'hr_manager' | 'package_reviewer'
  */
 function endorseLatePackageMember($conn, $package_id, $evaluation_id, $endorser_role, $endorser_employee_id, $comments = '')
 {
@@ -3339,7 +3445,7 @@ function endorseLatePackageMember($conn, $package_id, $evaluation_id, $endorser_
         return ['ok' => true, 'message' => "$member_name endorsed and forwarded to HR Manager for review."];
     }
 
-    if ($endorser_role === 'hr_manager' && $current_status === 'Pending HR Catchup') {
+    if (in_array($endorser_role, ['hr_manager', 'package_reviewer'], true) && $current_status === 'Pending HR Catchup') {
         // Final catch-up endorsement — member is now part of the active pipeline
         $conn->query("UPDATE evaluation_package_members SET member_status = 'Catchup Endorsed' WHERE package_id = $package_id AND evaluation_id = $evaluation_id");
 
@@ -3354,13 +3460,14 @@ function endorseLatePackageMember($conn, $package_id, $evaluation_id, $endorser_
         $active_step = $current_step_stmt ? $current_step_stmt->fetch_assoc() : null;
 
         if ($active_step) {
-            $notif_msg = "$member_name has completed Supervisor and HR Manager catch-up review for $tmpl_name ($dept_name). They have been added to your active evaluation package. The shared Behavior score has been updated.";
+            $endorser_label = $endorser_role === 'package_reviewer' ? 'Package Reviewer' : 'HR Manager';
+            $notif_msg = "$member_name has completed Supervisor and $endorser_label catch-up review for $tmpl_name ($dept_name). They have been added to your active evaluation package. The shared Behavior score has been updated.";
             if (!empty($active_step['reviewer_employee_id'])) {
                 notifyUsersForEmployee($conn, (int)$active_step['reviewer_employee_id'],
-                    'Late Member Added — HR Verified', $notif_msg, BASE_URL . '/employee/team-evaluation-packages.php');
+                    'Late Member Added — Verified', $notif_msg, BASE_URL . '/employee/team-evaluation-packages.php');
             } elseif (!empty($active_step['reviewer_user_id'])) {
                 createNotification($conn, (int)$active_step['reviewer_user_id'],
-                    'Late Member Added — HR Verified', $notif_msg, BASE_URL . '/employee/team-evaluation-packages.php');
+                    'Late Member Added — Verified', $notif_msg, BASE_URL . '/employee/team-evaluation-packages.php');
             }
         }
 
@@ -3370,9 +3477,10 @@ function endorseLatePackageMember($conn, $package_id, $evaluation_id, $endorser_
         }
 
         $audit = $conn->prepare("INSERT INTO evaluation_package_audit (package_id, action, remarks) VALUES (?, 'CATCHUP_HR_ENDORSED', ?)");
-        $remark = "HR Manager endorsed late member $member_name. Member is now part of the active evaluation package.";
+        $who = $endorser_role === 'package_reviewer' ? 'Package Reviewer (Active Holder)' : 'HR Manager';
+        $remark = "$who endorsed late member $member_name. Member is now part of the active evaluation package.";
         $audit->bind_param('is', $package_id, $remark); $audit->execute(); $audit->close();
-        return ['ok' => true, 'message' => "$member_name has been HR-endorsed and added to the active package."];
+        return ['ok' => true, 'message' => "$member_name has been endorsed and added to the active package."];
     }
 
     return ['ok' => false, 'message' => "Cannot endorse: member status '$current_status' is not valid for this endorser role."];
@@ -3456,6 +3564,68 @@ function applyOrganizationPackageResults($conn, $package_id)
 }
 
 /**
+ * Notify all HR Personnel (Admin, HR Manager, HR Supervisor, HR Staff) 
+ * when an evaluation package reaches the final stage and takes effect across the entire HR system.
+ */
+function notifyHRPersonnelPackageFinalized($conn, $package_id, $department_name = null, $template_name = null)
+{
+    $package_id = (int) $package_id;
+    if ($package_id <= 0) return 0;
+
+    if (empty($department_name) || empty($template_name)) {
+        $p_stmt = $conn->prepare("SELECT d.department_name, et.template_name 
+            FROM evaluation_packages ep
+            LEFT JOIN departments d ON d.department_id = ep.department_id
+            LEFT JOIN evaluation_templates et ON et.template_id = ep.template_id
+            WHERE ep.package_id = ? LIMIT 1");
+        $p_stmt->bind_param('i', $package_id);
+        $p_stmt->execute();
+        $p_row = $p_stmt->get_result()->fetch_assoc();
+        $p_stmt->close();
+        if ($p_row) {
+            $department_name = $p_row['department_name'] ?? 'Department';
+            $template_name   = $p_row['template_name'] ?? 'Evaluation';
+        }
+    }
+
+    $dept_label = !empty($department_name) ? $department_name : 'Department';
+    $tmpl_label = !empty($template_name) ? $template_name : 'Evaluation';
+
+    // Count members in this package
+    $m_count_stmt = $conn->prepare("SELECT COUNT(*) AS c FROM evaluation_package_members WHERE package_id = ?");
+    $m_count_stmt->bind_param('i', $package_id);
+    $m_count_stmt->execute();
+    $m_count = (int)($m_count_stmt->get_result()->fetch_assoc()['c'] ?? 0);
+    $m_count_stmt->close();
+    $members_text = $m_count > 0 ? " ($m_count team members)" : "";
+
+    $notif_title = "Evaluation Package Finalized & In Effect";
+    $notif_body  = "The $dept_label ($tmpl_label) evaluation package has completed Board approval and is now locked and applied.$members_text Final appraisals and shared behavior scores are now active across the system.";
+
+    $notified_count = 0;
+    // Fetch all active HR Personnel & Admin users
+    $hr_query = $conn->query("SELECT user_id, role FROM users WHERE role IN ('Admin', 'HR Manager', 'HR Supervisor', 'HR Staff') AND is_active = 1");
+    if ($hr_query) {
+        while ($hr_user = $hr_query->fetch_assoc()) {
+            $hr_uid = (int)$hr_user['user_id'];
+            $hr_role = $hr_user['role'] ?? '';
+            
+            // Context-appropriate landing page for each HR role
+            $link = match($hr_role) {
+                'HR Manager'    => BASE_URL . '/manager/evaluation-history.php',
+                'HR Supervisor' => BASE_URL . '/supervisor/evaluation-history.php',
+                'HR Staff'      => BASE_URL . '/staff/evaluation-history.php',
+                default         => BASE_URL . '/employee/team-evaluation-history.php'
+            };
+
+            createNotification($conn, $hr_uid, $notif_title, $notif_body, $link);
+            $notified_count++;
+        }
+    }
+    return $notified_count;
+}
+
+/**
  * Keep unacted governance steps aligned with the currently active
  * Board / Audit authorized users. Already acted steps are left unchanged.
  */
@@ -3478,6 +3648,7 @@ function ensureOrganizationPackageGovernanceSteps($conn, $package_id)
         if (($board_step['action_status'] ?? '') === 'Approved') {
             applyOrganizationPackageResults($conn, $package_id);
             $conn->query("UPDATE evaluation_packages SET status = 'Approved and Applied', current_step_order = NULL WHERE package_id = $package_id");
+            notifyHRPersonnelPackageFinalized($conn, $package_id);
             return true;
         }
     }
@@ -5118,21 +5289,21 @@ function getEvaluationScoreCirclesHtml($conn, $evaluation_id, $current_score)
     $original_score = getOriginalSelfRatingScore($conn, $evaluation_id);
     if ($original_score !== null && abs($current_score - $original_score) > 0.01) {
         return '
-        <div class="d-flex align-items-center gap-3">
-            <div class="score-circle" style="border-color:#6c757d; min-width:80px;" data-bs-toggle="tooltip" data-bs-html="true" title="<strong>Original Self-Rating</strong><br>Score: ' . number_format($original_score, 2) . '">
-                <div class="val text-secondary" style="font-size:1.15rem; color:#6c757d !important;">' . number_format($original_score, 2) . '</div>
-                <div class="lbl text-secondary" style="font-size:0.55rem; font-weight:700;">Original</div>
+        <div class="d-flex align-items-center gap-2">
+            <div class="score-circle score-circle-original" style="border-color:#94a3b8; min-width:82px; width:82px; height:82px;" data-bs-toggle="tooltip" data-bs-html="true" title="<strong>Original Self-Rating</strong><br>Score: ' . number_format($original_score, 2) . ' / 4.00">
+                <div class="val text-secondary" style="font-size:1.2rem; color:#64748b !important;">' . number_format($original_score, 2) . '</div>
+                <div class="lbl text-secondary" style="font-size:0.6rem; font-weight:700;">Original</div>
             </div>
-            <div class="score-circle" style="border-color:#198754; min-width:80px;" data-bs-toggle="tooltip" data-bs-html="true" title="<strong>Adjusted Score</strong><br>Score: ' . number_format($current_score, 2) . '">
-                <div class="val text-success total-score-val" style="font-size:1.15rem; color:#198754 !important;">' . number_format($current_score, 2) . '</div>
-                <div class="lbl text-success" style="font-size:0.55rem; font-weight:700;">Adjusted</div>
+            <div class="score-circle score-circle-adjusted" style="border-color:#16a34a; min-width:82px; width:82px; height:82px;" data-bs-toggle="tooltip" data-bs-html="true" title="<strong>Adjusted Final Rating</strong><br>Score: ' . number_format($current_score, 2) . ' / 4.00">
+                <div class="val text-success total-score-val" style="font-size:1.2rem; color:#16a34a !important;">' . number_format($current_score, 2) . '</div>
+                <div class="lbl text-success" style="font-size:0.6rem; font-weight:700;">Final / 4.00</div>
             </div>
         </div>';
     } else {
         return '
-        <div class="score-circle">
-            <div class="val total-score-val">' . number_format($current_score, 2) . '/4</div>
-            <div class="lbl">Score</div>
+        <div class="score-circle" data-bs-toggle="tooltip" data-bs-html="true" title="<strong>Total Rating</strong><br>Score: ' . number_format($current_score, 2) . ' / 4.00">
+            <div class="val total-score-val">' . number_format($current_score, 2) . '</div>
+            <div class="lbl">/ 4.00</div>
         </div>';
     }
 }

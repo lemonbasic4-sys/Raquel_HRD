@@ -86,6 +86,8 @@ $queue_preview_groups = array_slice($pending_groups, 0, 5);
 $queue_employee_count = count($pending_groups);
 
 ensureOrganizationEvaluationPackageSchema($conn);
+syncPendingOrganizationPackageGovernanceApprovers($conn);
+syncWaitingOrganizationPackages($conn);
 $user_id_pkg = (int) ($_SESSION['user_id'] ?? 0);
 $reviewer_match_pkg = organizationPackageReviewerMatchSql('rs');
 

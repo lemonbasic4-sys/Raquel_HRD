@@ -35,6 +35,20 @@ while ($row = $history->fetch_assoc()) {
     elseif ($row['status'] === 'Rejected') $rejected_c++;
     elseif ($row['status'] === 'Returned') $returned_c++;
 }
+
+// Extract only existing departments & templates present in the history records
+$existing_departments = [];
+$existing_templates = [];
+foreach ($all_history as $row) {
+    if (!empty($row['department_name'])) {
+        $existing_departments[$row['department_name']] = $row['department_name'];
+    }
+    if (!empty($row['template_name'])) {
+        $existing_templates[$row['template_name']] = $row['template_name'];
+    }
+}
+ksort($existing_departments);
+ksort($existing_templates);
 ?>
 
 <div class="page-hero fadeup">
@@ -109,7 +123,8 @@ while ($row = $history->fetch_assoc()) {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 10px;
+    justify-content: space-between;
+    gap: 12px;
 }
 .hist-status-pills {
     display: flex;
@@ -225,10 +240,28 @@ while ($row = $history->fetch_assoc()) {
             <i class="fas fa-rotate-left me-1"></i>Returned <span class="ms-1 opacity-75">(<?php echo $returned_c; ?>)</span>
         </button>
     </div>
-    <div class="ms-auto d-flex align-items-center gap-2">
-        <div class="input-group input-group-sm" style="min-width:220px;">
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+        <div class="d-flex align-items-center gap-1">
+            <span class="text-muted small fw-semibold"><i class="fas fa-building me-1"></i>Dept:</span>
+            <select class="form-select form-select-sm" id="histDeptFilter" style="min-width:160px; max-width:200px;">
+                <option value="All">All Departments</option>
+                <?php foreach ($existing_departments as $dept_name): ?>
+                    <option value="<?php echo e($dept_name); ?>"><?php echo e($dept_name); ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div class="d-flex align-items-center gap-1">
+            <span class="text-muted small fw-semibold"><i class="fas fa-file-alt me-1"></i>Template:</span>
+            <select class="form-select form-select-sm" id="histTemplateFilter" style="min-width:180px; max-width:260px;">
+                <option value="All">All Templates</option>
+                <?php foreach ($existing_templates as $tmpl_name): ?>
+                    <option value="<?php echo e($tmpl_name); ?>"><?php echo e($tmpl_name); ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div class="input-group input-group-sm" style="min-width:200px;">
             <span class="input-group-text bg-white border-end-0 text-muted"><i class="fas fa-search"></i></span>
-            <input type="search" class="form-control border-start-0 ps-0" id="histSearchInput" placeholder="Search employee, dept, template...">
+            <input type="search" class="form-control border-start-0 ps-0" id="histSearchInput" placeholder="Search employee, job...">
         </div>
     </div>
 </div>
@@ -271,6 +304,8 @@ while ($row = $history->fetch_assoc()) {
             $avatar_h = getEmployeeAvatar($row['profile_picture'] ?? '');
         ?>
         <div class="hist-card" data-status="<?php echo e($row['status']); ?>"
+             data-department="<?php echo e($row['department_name'] ?? ''); ?>"
+             data-template="<?php echo e($row['template_name'] ?? ''); ?>"
              data-search="<?php echo strtolower(e($row['employee_name']) . ' ' . e($row['department_name'] ?? '') . ' ' . e($row['template_name']) . ' ' . e($row['job_title'])); ?>">
             <!-- Avatar -->
             <div class="hist-card-avatar">
@@ -353,13 +388,17 @@ function histFilter(status, btn) {
 
 function applyHistFilters() {
     const q = (document.getElementById('histSearchInput')?.value || '').toLowerCase().trim();
+    const selDept = document.getElementById('histDeptFilter')?.value || 'All';
+    const selTmpl = document.getElementById('histTemplateFilter')?.value || 'All';
     const cards = document.querySelectorAll('#histCardList .hist-card');
     let visible = 0;
 
     cards.forEach(card => {
         const statusMatch = histActiveStatus === 'All' || card.dataset.status === histActiveStatus;
+        const deptMatch = selDept === 'All' || (card.dataset.department || '') === selDept;
+        const tmplMatch = selTmpl === 'All' || (card.dataset.template || '') === selTmpl;
         const searchMatch = !q || (card.dataset.search || '').includes(q);
-        const show = statusMatch && searchMatch;
+        const show = statusMatch && deptMatch && tmplMatch && searchMatch;
         card.style.display = show ? '' : 'none';
         if (show) visible++;
     });
@@ -372,10 +411,9 @@ function applyHistFilters() {
 }
 
 document.addEventListener('DOMContentLoaded', function () {
-    const searchInput = document.getElementById('histSearchInput');
-    if (searchInput) {
-        searchInput.addEventListener('input', applyHistFilters);
-    }
+    document.getElementById('histSearchInput')?.addEventListener('input', applyHistFilters);
+    document.getElementById('histDeptFilter')?.addEventListener('change', applyHistFilters);
+    document.getElementById('histTemplateFilter')?.addEventListener('change', applyHistFilters);
 });
 </script>
 
@@ -430,29 +468,30 @@ foreach ($all_history as $row):
 
                     <div class="eval-summary-header">
                         <div class="d-flex align-items-center gap-3">
-                            <div class="emp-avatar bg-primary text-white d-flex align-items-center justify-content-center fw-bold rounded" style="width: 55px; height: 55px; font-size: 1.2rem;"><?php echo $initials; ?></div>
+                            <div class="emp-avatar bg-primary text-white d-flex align-items-center justify-content-center fw-bold rounded-3 shadow-sm" style="width: 54px; height: 54px; font-size: 1.2rem;"><?php echo $initials; ?></div>
                             <div>
-                                <h4 class="mb-0 fw-bold"><?php echo e($row['employee_name']); ?></h4>
-                                <div class="text-muted"><?php echo e($row['job_title'] ?? 'Staff'); ?> &bull; <?php echo e($row['template_name']); ?></div>
+                                <h4 class="mb-1 fw-bold text-dark" style="font-size: 1.2rem;"><?php echo e($row['employee_name']); ?></h4>
+                                <div class="text-muted small d-flex align-items-center gap-2 flex-wrap">
+                                    <span class="badge bg-white text-secondary border fw-semibold"><?php echo e($row['job_title'] ?? 'Staff'); ?></span>
+                                    <span>&bull;</span>
+                                    <span><?php echo e($row['template_name']); ?></span>
+                                </div>
                             </div>
                         </div>
-                        <?php echo getEvaluationScoreCirclesHtml($conn, $row['evaluation_id'], $row['total_score']); ?>
-                    </div>
-
-                    <!-- Action Buttons -->
-                    <div class="d-flex justify-content-between align-items-center mb-4 gap-2 d-print-none">
-                        <div>
-                            <button type="button" class="btn btn-sm btn-success rounded-pill px-3 fw-bold btn-save-ratings d-none" onclick="saveRatings(<?php echo $row['evaluation_id']; ?>)">
-                                <i class="fas fa-save me-1"></i>Save Changes
-                            </button>
-                            <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3 fw-bold btn-cancel-ratings d-none" onclick="toggleEditRatings(<?php echo $row['evaluation_id']; ?>, true)">
-                                <i class="fas fa-times me-1"></i>Cancel
-                            </button>
-                        </div>
-                        <div class="text-end">
-                            <a href="print-evaluation.php?id=<?php echo $row['evaluation_id']; ?>" target="_blank" class="btn btn-sm btn-primary rounded-pill px-3 fw-bold">
-                                <i class="fas fa-print me-1"></i>Print Form
-                            </a>
+                        <div class="d-flex align-items-center gap-3 d-print-none">
+                            <div class="d-flex align-items-center gap-2">
+                                <button type="button" class="btn btn-sm btn-success rounded-pill px-3 fw-bold btn-save-ratings d-none" onclick="saveRatings(<?php echo $row['evaluation_id']; ?>)">
+                                    <i class="fas fa-save me-1"></i>Save Changes
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3 fw-bold btn-cancel-ratings d-none" onclick="toggleEditRatings(<?php echo $row['evaluation_id']; ?>, true)">
+                                    <i class="fas fa-times me-1"></i>Cancel
+                                </button>
+                                <a href="print-evaluation.php?id=<?php echo $row['evaluation_id']; ?>" target="_blank" class="btn btn-sm btn-primary rounded-pill px-3 py-2 fw-bold d-inline-flex align-items-center gap-2 shadow-sm">
+                                    <i class="fas fa-print"></i>
+                                    <span>Print Form</span>
+                                </a>
+                            </div>
+                            <?php echo getEvaluationScoreCirclesHtml($conn, $row['evaluation_id'], $row['total_score']); ?>
                         </div>
                     </div>
 

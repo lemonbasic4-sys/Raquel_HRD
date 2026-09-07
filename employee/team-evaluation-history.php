@@ -48,7 +48,7 @@ $packages_stmt->close();
 
 require_once '../includes/header.php';
 ?>
-<main class="evaluation-packages container-fluid py-4">
+<div class="evaluation-packages">
     <section class="package-hero">
         <a class="history-back-link" href="<?php echo BASE_URL; ?>/employee/team-evaluation-packages.php">
             <i class="fas fa-arrow-left"></i> Back to assigned packages
@@ -187,5 +187,5 @@ require_once '../includes/header.php';
             </div>
         </section>
     <?php endforeach; ?>
-</main>
+</div>
 <?php require_once '../includes/footer.php'; ?>
