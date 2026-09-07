@@ -784,11 +784,13 @@ CREATE TABLE evaluation_governance_approvers (
     governance_approver_id INT AUTO_INCREMENT PRIMARY KEY,
     governance_type ENUM('Board of Directors','Audit Committee','President','Division VP') NOT NULL,
     department_id INT NULL,
-    user_id INT NOT NULL,
+    employee_id INT NULL,
+    user_id INT NULL,
     is_active TINYINT(1) NOT NULL DEFAULT 1,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE KEY uq_governance_user (governance_type, department_id, user_id),
-    CONSTRAINT fk_governance_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    UNIQUE KEY uq_governance_employee (governance_type, department_id, employee_id),
+    CONSTRAINT fk_governance_employee FOREIGN KEY (employee_id) REFERENCES employees(employee_id) ON DELETE CASCADE,
+    CONSTRAINT fk_governance_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE SET NULL,
     CONSTRAINT fk_governance_department FOREIGN KEY (department_id) REFERENCES departments(department_id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -866,6 +868,48 @@ CREATE TABLE evaluation_package_audit (
     INDEX idx_package_audit (package_id, created_at),
     CONSTRAINT fk_pkg_audit_pkg FOREIGN KEY (package_id) REFERENCES evaluation_packages(package_id) ON DELETE CASCADE,
     CONSTRAINT fk_pkg_audit_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ============================================
+-- 45. Employee Change Requests
+-- ============================================
+DROP TABLE IF EXISTS employee_change_requests;
+CREATE TABLE employee_change_requests (
+    request_id INT AUTO_INCREMENT PRIMARY KEY,
+    employee_id INT NOT NULL,
+    submitted_by INT NOT NULL,
+    changes_json LONGTEXT NOT NULL,
+    change_summary TEXT DEFAULT NULL,
+    status ENUM('Pending','Approved','Rejected') DEFAULT 'Pending',
+    reviewed_by INT DEFAULT NULL,
+    reviewed_at DATETIME DEFAULT NULL,
+    manager_notes TEXT DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_ecr_status (status, employee_id),
+    CONSTRAINT fk_ecr_employee FOREIGN KEY (employee_id) REFERENCES employees(employee_id) ON DELETE CASCADE,
+    CONSTRAINT fk_ecr_submitter FOREIGN KEY (submitted_by) REFERENCES users(user_id) ON DELETE CASCADE,
+    CONSTRAINT fk_ecr_reviewer FOREIGN KEY (reviewed_by) REFERENCES users(user_id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ============================================
+-- 46. Employee Edit History
+-- ============================================
+DROP TABLE IF EXISTS employee_edit_history;
+CREATE TABLE employee_edit_history (
+    edit_id INT AUTO_INCREMENT PRIMARY KEY,
+    employee_id INT NOT NULL,
+    edited_by INT NOT NULL,
+    editor_name VARCHAR(150) NOT NULL,
+    editor_role VARCHAR(50) NOT NULL,
+    step_number INT DEFAULT NULL,
+    step_name VARCHAR(100) DEFAULT NULL,
+    change_summary TEXT DEFAULT NULL,
+    changes_json LONGTEXT DEFAULT NULL,
+    ip_address VARCHAR(45) DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_eeh_emp (employee_id),
+    INDEX idx_eeh_created (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 SET FOREIGN_KEY_CHECKS = 1;

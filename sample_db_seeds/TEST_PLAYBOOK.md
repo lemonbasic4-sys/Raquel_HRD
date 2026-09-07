@@ -45,9 +45,27 @@ All Employee portal passwords: `password`
 
 ---
 
-## Complete Reset & Seed Batch Script:
+## Database Reset & Seed Options:
 
-Run this directly in PowerShell to reset and load the entire setup in one go:
+### Option A — Instant 1-Step Clean Snapshot Restore (Fastest):
+Directly imports the complete, clean 45-table database snapshot (`raquel_hris_current_clean_backup.sql`):
+
+```powershell
+cd C:\xampp\htdocs\Raquel_HRD_Test
+
+# 1. Drop and recreate database
+& "C:\xampp\mysql\bin\mysql.exe" -u root -e "DROP DATABASE IF EXISTS raquel_hris_test_db; CREATE DATABASE raquel_hris_test_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+
+# 2. Source the clean backup snapshot
+& "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris_test_db -e "source sample_db_seeds/raquel_hris_current_clean_backup.sql;"
+
+Write-Host "Database snapshot restored successfully!" -ForegroundColor Green
+```
+
+---
+
+### Option B — Chronological Modular Reset & Seed Batch Script:
+Run this directly in PowerShell to reset and load from individual schema and seed modules:
 
 ```powershell
 # Set working directory to project root
