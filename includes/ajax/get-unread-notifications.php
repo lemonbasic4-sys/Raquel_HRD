@@ -21,7 +21,7 @@ $count_sql = "SELECT COUNT(*) as unread_count FROM notifications WHERE user_id =
 if ($context === 'employee') {
     $count_sql .= " AND (link LIKE '%/employee/%' OR link IS NULL OR link = '')";
 } elseif ($context === 'hr') {
-    $count_sql .= " AND (link NOT LIKE '%/employee/%' OR link IS NULL OR link = '')";
+    $count_sql .= " AND (link NOT LIKE '%/employee/%' OR link LIKE '%/employee/team-evaluation%' OR link LIKE '%/employee/package-member%' OR link IS NULL OR link = '')";
 }
 
 $count_stmt = $conn->prepare($count_sql);
@@ -39,7 +39,7 @@ if ($last_seen_id > 0) {
 if ($context === 'employee') {
     $notif_sql .= " AND (link LIKE '%/employee/%' OR link IS NULL OR link = '')";
 } elseif ($context === 'hr') {
-    $notif_sql .= " AND (link NOT LIKE '%/employee/%' OR link IS NULL OR link = '')";
+    $notif_sql .= " AND (link NOT LIKE '%/employee/%' OR link LIKE '%/employee/team-evaluation%' OR link LIKE '%/employee/package-member%' OR link IS NULL OR link = '')";
 }
 $notif_sql .= " ORDER BY notification_id ASC";
 
@@ -69,7 +69,7 @@ $recent_sql = "SELECT notification_id, title, message, link, is_read, created_at
 if ($context === 'employee') {
     $recent_sql .= " AND (link LIKE '%/employee/%' OR link IS NULL OR link = '')";
 } elseif ($context === 'hr') {
-    $recent_sql .= " AND (link NOT LIKE '%/employee/%' OR link IS NULL OR link = '')";
+    $recent_sql .= " AND (link NOT LIKE '%/employee/%' OR link LIKE '%/employee/team-evaluation%' OR link LIKE '%/employee/package-member%' OR link IS NULL OR link = '')";
 }
 $recent_sql .= " ORDER BY created_at DESC, notification_id DESC LIMIT 5";
 

@@ -2681,15 +2681,24 @@ function notifyOrganizationPackageStepAssignees($conn, $package_id, $step_order,
         return 0;
     }
     $link = BASE_URL . '/employee/team-evaluation-packages.php';
-    $sent = 0;
+    $notified_users = [];
     if (!empty($step['reviewer_employee_id'])) {
-        $sent = notifyUsersForEmployee($conn, (int) $step['reviewer_employee_id'], $title, $message, $link);
+        $u_stmt = $conn->prepare('SELECT user_id FROM users WHERE employee_id = ? AND is_active = 1');
+        $u_stmt->bind_param('i', $step['reviewer_employee_id']);
+        $u_stmt->execute();
+        $u_res = $u_stmt->get_result();
+        while ($u_row = $u_res->fetch_assoc()) {
+            $uid = (int)$u_row['user_id'];
+            createNotification($conn, $uid, $title, $message, $link);
+            $notified_users[$uid] = true;
+        }
+        $u_stmt->close();
     }
-    if ($sent === 0 && !empty($step['reviewer_user_id'])) {
-        createNotification($conn, (int) $step['reviewer_user_id'], $title, $message, $link);
-        $sent = 1;
+    if (!empty($step['reviewer_user_id']) && !isset($notified_users[(int)$step['reviewer_user_id']])) {
+        createNotification($conn, (int)$step['reviewer_user_id'], $title, $message, $link);
+        $notified_users[(int)$step['reviewer_user_id']] = true;
     }
-    return $sent;
+    return count($notified_users);
 }
 
 function getOrganizationPackagePipelineLabel($conn, $package_id)

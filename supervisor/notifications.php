@@ -12,7 +12,7 @@ $per_page = 20;
 $offset = ($page - 1) * $per_page;
 $user_id = (int)$_SESSION['user_id'];
 
-$where = "WHERE user_id = ? AND (link NOT LIKE '%/employee/%' OR link IS NULL OR link = '')";
+$where = "WHERE user_id = ? AND (link NOT LIKE '%/employee/%' OR link LIKE '%/employee/team-evaluation%' OR link LIKE '%/employee/package-member%' OR link IS NULL OR link = '')";
 $types = "i";
 $params = [$user_id];
 
@@ -27,13 +27,13 @@ if ($search !== '') {
     $params[] = $search_param;
 }
 
-$count_all_stmt = $conn->prepare("SELECT COUNT(*) as c FROM notifications WHERE user_id = ? AND (link NOT LIKE '%/employee/%' OR link IS NULL OR link = '')");
+$count_all_stmt = $conn->prepare("SELECT COUNT(*) as c FROM notifications WHERE user_id = ? AND (link NOT LIKE '%/employee/%' OR link LIKE '%/employee/team-evaluation%' OR link LIKE '%/employee/package-member%' OR link IS NULL OR link = '')");
 $count_all_stmt->bind_param("i", $user_id);
 $count_all_stmt->execute();
 $total_all = $count_all_stmt->get_result()->fetch_assoc()['c'];
 $count_all_stmt->close();
 
-$count_unread_stmt = $conn->prepare("SELECT COUNT(*) as c FROM notifications WHERE user_id = ? AND is_read = 0 AND (link NOT LIKE '%/employee/%' OR link IS NULL OR link = '')");
+$count_unread_stmt = $conn->prepare("SELECT COUNT(*) as c FROM notifications WHERE user_id = ? AND is_read = 0 AND (link NOT LIKE '%/employee/%' OR link LIKE '%/employee/team-evaluation%' OR link LIKE '%/employee/package-member%' OR link IS NULL OR link = '')");
 $count_unread_stmt->bind_param("i", $user_id);
 $count_unread_stmt->execute();
 $total_unread = $count_unread_stmt->get_result()->fetch_assoc()['c'];
