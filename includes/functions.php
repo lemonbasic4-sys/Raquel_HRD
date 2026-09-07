@@ -70,7 +70,9 @@ function verifyCsrfToken(): void
                 'message' => 'Invalid CSRF token. Please refresh the page and try again.',
             ]);
         } else {
+            $fav_logo = BASE_URL . '/assets/img/logo/logo.png';
             echo '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Security Error</title>'
+               . '<link rel="icon" type="image/png" href="' . $fav_logo . '">'
                . '<style>body{font-family:sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f8f9fa;}'
                . '.card{background:#fff;border-radius:12px;padding:2.5rem;max-width:420px;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,.1);}'
                . '.icon{font-size:3rem;margin-bottom:1rem;}.btn{display:inline-block;margin-top:1.5rem;padding:.75rem 2rem;background:#d32f2f;color:#fff;'

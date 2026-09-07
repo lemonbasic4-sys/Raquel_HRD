@@ -274,6 +274,9 @@ if ((float)($row['total_score'] ?? 0) > 0 && (empty($pl) || $pl === '0')) {
 <head>
   <meta charset="UTF-8">
   <title><?php echo e($tpl_form_code); ?> - <?php echo e($row['employee_name']); ?></title>
+  <!-- Browser Tab Icon (Favicon) -->
+  <link rel="icon" type="image/png" href="<?php echo BASE_URL . '/' . htmlspecialchars($sys_logo ?? 'assets/img/logo/logo.png'); ?>">
+  <link rel="shortcut icon" href="<?php echo BASE_URL . '/' . htmlspecialchars($sys_logo ?? 'assets/img/logo/logo.png'); ?>">
   <style>
     * {
       margin: 0;

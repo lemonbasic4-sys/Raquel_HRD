@@ -59,12 +59,16 @@ foreach ($entries as $entry) {
     }
     $grouped[$division][] = $entry;
 }
+$sys_logo = getSetting($conn, 'system_logo', 'assets/img/logo/logo.png');
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <title>Organization Structure Form</title>
+    <!-- Browser Tab Icon (Favicon) -->
+    <link rel="icon" type="image/png" href="<?php echo BASE_URL . '/' . htmlspecialchars($sys_logo); ?>">
+    <link rel="shortcut icon" href="<?php echo BASE_URL . '/' . htmlspecialchars($sys_logo); ?>">
     <style>
         * {
             box-sizing: border-box;

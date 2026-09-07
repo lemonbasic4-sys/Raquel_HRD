@@ -182,6 +182,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 render_login:
+$sys_logo = getSetting($conn, 'system_logo', 'assets/img/logo/logo.png');
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -191,6 +192,10 @@ render_login:
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Login - Raquel Pawnshop HRIS</title>
   <meta name="description" content="Login to Raquel Pawnshop Human Resource Information System">
+  <!-- Browser Tab Icon (Favicon) -->
+  <link rel="icon" type="image/png" href="<?php echo BASE_URL . '/' . htmlspecialchars($sys_logo); ?>">
+  <link rel="shortcut icon" href="<?php echo BASE_URL . '/' . htmlspecialchars($sys_logo); ?>">
+  <link rel="apple-touch-icon" href="<?php echo BASE_URL . '/' . htmlspecialchars($sys_logo); ?>">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.34.0/dist/tabler-icons.min.css">
   <link rel="stylesheet" href="<?php echo BASE_URL; ?>/assets/css/raquel-hris-login.css?v=<?php echo filemtime(__DIR__ . '/assets/css/raquel-hris-login.css'); ?>">
   <noscript>
