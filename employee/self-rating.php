@@ -1942,8 +1942,8 @@ require_once '../includes/header.php';
                                 <i class="fas fa-list-ol"></i>
                             </div>
                             <div>
-                                <h6 class="mb-1 fw-bold">1. Select Template</h6>
-                                <p class="text-muted small mb-0">Choose an active evaluation template. If one was assigned to you by HRD, it will appear here automatically.</p>
+                                <h6 class="mb-1 fw-bold">1. Select a Template</h6>
+                                <p class="text-muted small mb-0">Choose an active template available for your department, employment status, and evaluation period. Any assigned evaluation will also appear here.</p>
                             </div>
                         </div>
                         <div class="help-step d-flex gap-3 mb-4">
@@ -1951,8 +1951,8 @@ require_once '../includes/header.php';
                                 <i class="fas fa-edit"></i>
                             </div>
                             <div>
-                                <h6 class="mb-1 fw-bold">2. Rate Yourself</h6>
-                                <p class="text-muted small mb-0">Score each KRA and Behavior criterion from 1–4. You can save a draft anytime and return to finish later.</p>
+                                <h6 class="mb-1 fw-bold">2. Complete Your Self-Rating</h6>
+                                <p class="text-muted small mb-0">Score each KRA and Behavior criterion from 1–4. You can save a draft and return later before you submit.</p>
                             </div>
                         </div>
                         <div class="help-step d-flex gap-3 mb-4">
@@ -1960,8 +1960,8 @@ require_once '../includes/header.php';
                                 <i class="fas fa-paper-plane"></i>
                             </div>
                             <div>
-                                <h6 class="mb-1 fw-bold">3. Submit to Immediate Head</h6>
-                                <p class="text-muted small mb-0">Once submitted, your ratings are locked. Your Immediate Head (Branch Supervisor or Branch Manager) will be notified to review.</p>
+                                <h6 class="mb-1 fw-bold">3. Sign and Submit</h6>
+                                <p class="text-muted small mb-0">Review your ratings, agree to the declaration, and add your digital signature. Your self-rating is then submitted to your department’s evaluation package and is locked while it is under review.</p>
                             </div>
                         </div>
                         <div class="help-step d-flex gap-3 mb-4">
@@ -1969,8 +1969,8 @@ require_once '../includes/header.php';
                                 <i class="fas fa-user-check"></i>
                             </div>
                             <div>
-                                <h6 class="mb-1 fw-bold">4. Immediate Head Confirms</h6>
-                                <p class="text-muted small mb-0">Your Immediate Head reviews and may adjust your scores. They can confirm and forward it, or return it to you for revision.</p>
+                                <h6 class="mb-1 fw-bold">4. Department Package Consolidation</h6>
+                                <p class="text-muted small mb-0">The package opens for consolidation after all required team members in your department have submitted the same evaluation. The designated consolidator reviews the team package and shared behavior score.</p>
                             </div>
                         </div>
                         <div class="help-step d-flex gap-3 mb-4">
@@ -1978,8 +1978,8 @@ require_once '../includes/header.php';
                                 <i class="fas fa-user-shield"></i>
                             </div>
                             <div>
-                                <h6 class="mb-1 fw-bold">5. Department Manager Endorses <span class="badge bg-secondary" style="font-size:.65rem;">if applicable</span></h6>
-                                <p class="text-muted small mb-0">If your branch has a Department Manager, they will receive the evaluation for endorsement before it goes to HRD.</p>
+                                <h6 class="mb-1 fw-bold">5. Management Review</h6>
+                                <p class="text-muted small mb-0">The consolidated package moves through the assigned supervisor and management reporting chain. A reviewer may adjust the package or return it to an earlier reviewer for revision.</p>
                             </div>
                         </div>
                         <div class="help-step d-flex gap-3 mb-4">
@@ -1987,8 +1987,8 @@ require_once '../includes/header.php';
                                 <i class="fas fa-layer-group"></i>
                             </div>
                             <div>
-                                <h6 class="mb-1 fw-bold">6. HR Consolidation</h6>
-                                <p class="text-muted small mb-0">The HR Supervisor consolidates all submitted ratings for the period before forwarding to the HR Manager for final approval.</p>
+                                <h6 class="mb-1 fw-bold">6. Executive and Governance Review</h6>
+                                <p class="text-muted small mb-0">After management review, the package follows the configured governance route: Division VP, when applicable, then the President &amp; CEO and Audit Committee when assigned.</p>
                             </div>
                         </div>
                         <div class="help-step d-flex gap-3">
@@ -1996,8 +1996,8 @@ require_once '../includes/header.php';
                                 <i class="fas fa-check-double"></i>
                             </div>
                             <div>
-                                <h6 class="mb-1 fw-bold">7. HR Manager Approves</h6>
-                                <p class="text-muted small mb-0">The HR Manager gives final approval. You will be notified once your evaluation is officially approved and recorded.</p>
+                                <h6 class="mb-1 fw-bold">7. Board Approval and Final Results</h6>
+                                <p class="text-muted small mb-0">Board of Directors approval is the final lock. The approved package results are applied to all team members, and you will be notified when your final evaluation is available.</p>
                             </div>
                         </div>
                     </div>
