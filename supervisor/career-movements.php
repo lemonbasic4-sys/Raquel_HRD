@@ -69,16 +69,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_movement'])) {
         redirectWith(BASE_URL . '/supervisor/career-movements.php', 'danger', 'You cannot file a career movement for yourself.');
     }
 
-    // Safeguard: cannot file for HR Managers
-    $mgr_check = $conn->prepare("SELECT user_id FROM users WHERE employee_id=? AND role='HR Manager' AND is_active=1 LIMIT 1");
-    $mgr_check->bind_param("i", $employee_id);
-    $mgr_check->execute();
-    if ($mgr_check->get_result()->num_rows > 0) {
-        $mgr_check->close();
-        redirectWith(BASE_URL . '/supervisor/career-movements.php', 'danger', 'HR Managers\' career movements must be processed by an HR Manager or higher.');
-    }
-    $mgr_check->close();
-
     // Validate employee exists and is active (and within authorized branch if supervisor is branch-scoped)
     if ($sup_branch_id > 0) {
         $emp_chk = $conn->prepare("SELECT employee_id, job_title, branch_id, department_id FROM employees WHERE employee_id=? AND branch_id=? AND is_active=1 LIMIT 1");
@@ -310,7 +300,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['movement_action'])) {
                     $submitter_portal_user_id,
                     'Transfer Request Rejected',
                     "Your Transfer request for {$movement['employee_name']} has been rejected by HR Supervisor. Reason: {$hr_supervisor_comments}",
-                    BASE_URL . '/employee/career-movement-request.php'
+                    BASE_URL . '/employee/dashboard.php'
                 );
             } else {
                 error_log("Rejection notification skipped: could not resolve submitter portal user for movement_id={$movement_id}.");
@@ -386,8 +376,7 @@ while ($row = $jt_result->fetch_assoc()) {
 // We send to JS so the cascade works client-side
 $emp_sql_params = "";
 $emp_sql_where  = "e.is_active = 1
-      AND e.employee_id NOT IN (SELECT employee_id FROM users WHERE role='Admin' AND employee_id IS NOT NULL)
-      AND e.employee_id NOT IN (SELECT employee_id FROM users WHERE role='HR Manager' AND is_active=1 AND employee_id IS NOT NULL)";
+      AND e.employee_id NOT IN (SELECT employee_id FROM users WHERE role='Admin' AND employee_id IS NOT NULL)";
 if ($sup_branch_id > 0) {
     $emp_sql_where .= " AND e.branch_id = {$sup_branch_id}";
 }
@@ -456,6 +445,88 @@ function supCmTypeClass($t){return match($t){'Promotion'=>'bg-success','Transfer
 function supCmStatusClass($s){return match($s){'Approved'=>'bg-success','Rejected'=>'bg-danger',default=>'bg-warning text-dark'};}
 ?>
 
+<style>
+/* Career Movements page theme: keep HRIS green/gold consistent with the shared portal. */
+.career-movements-page .chart-card {
+    border: 1px solid rgba(8, 46, 6, .12) !important;
+    box-shadow: 0 8px 24px rgba(8, 46, 6, .08) !important;
+}
+.career-movements-page .cc-header {
+    background: #f8fbf7 !important;
+    border-bottom-color: #cba135 !important;
+}
+.career-movements-page .cc-header-tabs .nav-link {
+    color: #3d4d3a;
+    transition: background .2s ease, color .2s ease;
+}
+.career-movements-page .cc-header-tabs .nav-link:hover,
+.career-movements-page .cc-header-tabs .nav-link.active {
+    background: #082e06 !important;
+    color: #fff !important;
+}
+.career-movements-page .cc-header-tabs .nav-link:hover i,
+.career-movements-page .cc-header-tabs .nav-link.active i {
+    color: #f0c040 !important;
+}
+.career-movements-page #supMovSearch,
+.career-movements-page .form-select,
+.career-movements-page .form-control {
+    border-color: #c8d3c5 !important;
+    color: #1c271b;
+    box-shadow: 0 2px 8px rgba(8, 46, 6, .06) !important;
+}
+.career-movements-page #supMovSearch:focus,
+.career-movements-page .form-select:focus,
+.career-movements-page .form-control:focus {
+    border-color: #cba135 !important;
+    box-shadow: 0 0 0 .2rem rgba(203, 161, 53, .2) !important;
+}
+.career-movements-page .table thead th {
+    background: #082e06 !important;
+    color: #fff !important;
+}
+.career-movements-page .table tbody tr:hover {
+    background: #f4f8f2 !important;
+}
+.career-movements-page .table tbody tr:nth-child(even) {
+    background: #fbfdfb;
+}
+.career-movements-page .btn-primary,
+.career-movements-page .btn-success {
+    background: #082e06 !important;
+    border-color: #cba135 !important;
+}
+.career-movements-page .btn-primary:hover,
+.career-movements-page .btn-success:hover {
+    background: #174d12 !important;
+    border-color: #f0c040 !important;
+}
+.career-movements-page .btn-outline-primary {
+    color: #082e06 !important;
+    border-color: #082e06 !important;
+}
+.career-movements-page .btn-outline-primary:hover {
+    background: #082e06 !important;
+    color: #fff !important;
+}
+.career-movements-page .sup-form-section {
+    background: #f8fbf7 !important;
+    border-color: rgba(8, 46, 6, .16) !important;
+}
+@media (max-width: 767.98px) {
+    .career-movements-page .cc-header {
+        padding: 1rem !important;
+    }
+    .career-movements-page .search-box {
+        min-width: 100% !important;
+    }
+    .career-movements-page .page-hero {
+        padding: 1.25rem !important;
+    }
+}
+</style>
+
+<div class="career-movements-page">
 <div class="page-hero fadeup">
     <div class="d-flex flex-wrap align-items-center justify-content-between mb-4 gap-3">
         <div>
@@ -780,7 +851,7 @@ function supCmStatusClass($s){return match($s){'Approved'=>'bg-success','Rejecte
                         <input type="hidden" name="create_movement" value="1">
 
                         <!-- Step 1: Target Selection -->
-                        <div class="mb-4 p-3 rounded-3" style="background:#fafdfa;border:1px solid rgba(8,46,6,0.08);">
+                        <div class="mb-4 p-3 rounded-3 sup-form-section" style="background:#fafdfa;border:1px solid rgba(8,46,6,0.08);">
                             <div class="d-flex align-items-center gap-2 mb-3">
                                 <span class="badge rounded-circle d-inline-flex align-items-center justify-content-center shadow-sm" style="width:26px;height:26px;background:#082E06;color:#CBA135;font-size:.8rem;font-weight:700;">1</span>
                                 <h6 class="fw-bold mb-0 text-dark" style="letter-spacing:-0.2px;">Target Employee Selection</h6>
@@ -844,7 +915,7 @@ function supCmStatusClass($s){return match($s){'Approved'=>'bg-success','Rejecte
                         </div>
 
                         <!-- Step 2: Movement Details -->
-                        <div class="mb-4 p-3 rounded-3" style="background:#fafdfa;border:1px solid rgba(8,46,6,0.08);">
+                        <div class="mb-4 p-3 rounded-3 sup-form-section" style="background:#fafdfa;border:1px solid rgba(8,46,6,0.08);">
                             <div class="d-flex align-items-center gap-2 mb-3">
                                 <span class="badge rounded-circle d-inline-flex align-items-center justify-content-center shadow-sm" style="width:26px;height:26px;background:#082E06;color:#CBA135;font-size:.8rem;font-weight:700;">2</span>
                                 <h6 class="fw-bold mb-0 text-dark" style="letter-spacing:-0.2px;">Movement Action Details</h6>
@@ -997,6 +1068,8 @@ function supCmStatusClass($s){return match($s){'Approved'=>'bg-success','Rejecte
         </div>
     </div>
 </div>
+
+</div><!-- /.career-movements-page -->
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {

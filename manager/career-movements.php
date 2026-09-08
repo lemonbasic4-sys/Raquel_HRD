@@ -86,7 +86,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['movement_action'])) {
                 createNotification($conn, $logged_by,
                     'Transfer Request Fully Approved',
                     "Your Transfer request for {$movement['employee_name']} has been fully approved.",
-                    BASE_URL . '/employee/career-movement-request.php');
+                    BASE_URL . '/employee/dashboard.php');
             }
 
             logAudit($conn, $current_user_id, 'APPROVE', 'Career Movement', $movement_id,
@@ -115,7 +115,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['movement_action'])) {
                 createNotification($conn, $logged_by,
                     'Transfer Request Rejected',
                     "Your Transfer request for {$movement['employee_name']} has been rejected by HR Manager. Reason: {$comments}",
-                    BASE_URL . '/employee/career-movement-request.php');
+                    BASE_URL . '/employee/dashboard.php');
             }
 
             logAudit($conn, $current_user_id, 'REJECT', 'Career Movement', $movement_id,

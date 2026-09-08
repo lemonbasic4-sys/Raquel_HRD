@@ -12,6 +12,10 @@ require_once '../includes/session-check.php';
 checkRole(['Employee']);
 require_once '../includes/functions.php';
 
+// Career movement requests are managed from the HRIS career-movement workflow.
+header('Location: ' . BASE_URL . '/employee/dashboard.php');
+exit();
+
 $supervisor_employee_id = (int) ($_SESSION['employee_id'] ?? 0);
 $supervisor_branch_id   = (int) ($_SESSION['branch_id']   ?? 0);
 $user_id                = (int) ($_SESSION['user_id']      ?? 0);

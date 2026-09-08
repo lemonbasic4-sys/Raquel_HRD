@@ -343,10 +343,6 @@ switch ($effective_role) {
 
         // ── Section 4: Career (rank-based) ─────────────────────────────────
         $menu_career = [];
-        // Branch Supervisor (rank 4): can submit Transfer requests
-        if ($_hdr_emp_rank === 4) {
-            $menu_career[] = ['icon' => 'fas fa-route', 'label' => 'Career Movement Request', 'url' => BASE_URL . '/employee/career-movement-request.php', 'page' => 'career-movement-request.php'];
-        }
         // Branch Manager (rank 3): can approve/reject Transfer requests from their branch
         if ($_hdr_emp_rank === 3) {
             // Count pending BM approvals for badge — guarded in case schema migration hasn't run yet
@@ -799,18 +795,10 @@ switch ($effective_role) {
                                 <i class="fas fa-chart-line me-2" style="width: 18px; text-align: center;"></i>My Performance
                             </a>
                         </li>
-                        <?php
-                        // My Team & Movement Requests — for supervisors/managers
-                        if ($_g_is_sup):
-                        ?>
+                        <?php if ($_g_is_sup): ?>
                             <li>
                                 <a class="dropdown-item d-flex align-items-center" href="<?php echo BASE_URL; ?>/employee/team-list.php" style="font-size:0.82rem; padding: 6px 10px;">
                                     <i class="fas fa-users me-2" style="width: 18px; text-align: center;"></i>My Team
-                                </a>
-                            </li>
-                            <li>
-                                <a class="dropdown-item d-flex align-items-center" href="<?php echo BASE_URL; ?>/employee/career-movement-request.php" style="font-size:0.82rem; padding: 6px 10px;">
-                                    <i class="fas fa-route me-2" style="width: 18px; text-align: center;"></i>Movement Requests
                                 </a>
                             </li>
                         <?php endif; ?>

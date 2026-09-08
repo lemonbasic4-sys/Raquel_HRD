@@ -32,7 +32,6 @@ $emp_sql = "
     LEFT JOIN rank_categories rc ON e.rank_category_id = rc.rank_category_id
     WHERE e.is_active = 1
       AND e.employee_id NOT IN (SELECT employee_id FROM users WHERE role='Admin' AND employee_id IS NOT NULL)
-      AND e.employee_id NOT IN (SELECT employee_id FROM users WHERE role='HR Manager' AND is_active=1 AND employee_id IS NOT NULL)
       {$branch_filter}
     ORDER BY e.last_name, e.first_name
 ";

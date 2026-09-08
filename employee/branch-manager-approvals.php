@@ -187,7 +187,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'Transfer Request Rejected',
                 'Your Transfer request for ' . $target_emp_name .
                     ' has been rejected by the Branch Manager. Reason: ' . $comments,
-                BASE_URL . '/employee/career-movement-request.php'
+                BASE_URL . '/employee/dashboard.php'
             );
         } else {
             error_log(
