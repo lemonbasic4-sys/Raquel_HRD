@@ -45,6 +45,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['movement_action'])) {
         redirectWith(BASE_URL . '/manager/career-movements.php', 'danger', 'Career movement not found or already processed.');
     }
 
+    $target_user_stmt = $conn->prepare("SELECT user_id FROM users WHERE employee_id = ? AND user_id = ? LIMIT 1");
+    $target_user_stmt->bind_param("ii", $movement['employee_id'], $current_user_id);
+    $target_user_stmt->execute();
+    $is_self_movement = (bool)$target_user_stmt->get_result()->fetch_assoc();
+    $target_user_stmt->close();
+    if ($is_self_movement) {
+        redirectWith(BASE_URL . '/manager/career-movements.php', 'danger', 'You cannot approve or reject a career movement for your own employee record.');
+    }
+
     // Task 8.1: Detect whether this is a Portal_Request
     $is_portal_request = (
         ($movement['request_source'] ?? '') === 'Employee Portal' &&
@@ -419,7 +428,7 @@ function mgrCmStatusClass($s){ return match($s) { 'Approved' => 'bg-success', 'R
                                                     <?php echo csrfField(); ?>
                                                     <input type="hidden" name="movement_id" value="<?php echo (int)$mv['movement_id']; ?>">
                                                     <input type="hidden" name="movement_action" value="Approve">
-                                                    <button type="submit" class="btn btn-sm text-white fw-bold px-2.5 shadow-sm" style="background:linear-gradient(135deg, #082E06 0%, #163e12 100%);border:1px solid #CBA135;border-radius:6px;font-size:.72rem;" onclick="return confirm('Approve this career movement request?');">
+                                                    <button type="submit" class="btn btn-sm text-white fw-bold px-2.5 shadow-sm" style="background:linear-gradient(135deg, #082E06 0%, #163e12 100%);border:1px solid #CBA135;border-radius:6px;font-size:.72rem;" onclick="return confirm('Are you sure you want to approve the career movement for <?php echo e(addslashes($mv['employee_name'])); ?>? This approval cannot be undone. The movement will be applied on the effective date, and the employee\\'s linked accounts may be placed on hold for Admin credential review.');">
                                                         <i class="fas fa-check me-1" style="color:#CBA135;"></i>Approve
                                                     </button>
                                                 </form>

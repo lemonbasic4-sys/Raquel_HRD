@@ -3,6 +3,7 @@ $page_title = 'Edit User';
 require_once '../includes/session-check.php';
 checkRole(['Admin']);
 require_once '../includes/functions.php';   // REQUIRED for redirectWith() and logAudit()
+ensureUserAccountSecuritySchema($conn);
 
 // Validate user ID from URL
 $uid = isset($_GET['id']) ? (int)$_GET['id'] : 0;
@@ -40,6 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $role       = $_POST['role']           ?? '';
     $branch_id  = !empty($_POST['branch_id']) ? (int)$_POST['branch_id'] : null;
     $new_pass   = trim($_POST['password']  ?? '');
+    $release_hold = isset($_POST['release_hold']);
     $linked_employee_username = !empty($user['employee_code']) ? (string)$user['employee_code'] : '';
 
     if ($is_standalone_admin) {
@@ -96,6 +98,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!empty($new_pass) && strlen($new_pass) < 6) {
         redirectWith(BASE_URL . "/admin/edit-user.php?id=$uid", 'danger', 'Password must be at least 6 characters.');
     }
+    if (!empty($user['account_hold']) && $release_hold && $new_pass === '') {
+        redirectWith(BASE_URL . "/admin/edit-user.php?id=$uid", 'danger', 'Enter new credentials before releasing this account hold.');
+    }
 
     if ($is_standalone_admin && !empty($new_pass)) {
         $hash = password_hash($new_pass, PASSWORD_DEFAULT);
@@ -114,6 +119,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($stmt->execute()) {
+        if (!empty($user['account_hold']) && $release_hold) {
+            $hold_update = $conn->prepare("UPDATE users SET account_hold = 0, account_hold_reason = NULL, account_hold_at = NULL, account_hold_movement_id = NULL WHERE user_id = ?");
+            $hold_update->bind_param("i", $uid);
+            $hold_update->execute();
+            $hold_update->close();
+        }
         if ($uploaded_profile_picture_path && !empty($user['user_profile_picture'])) {
             $old_profile_picture_path = '../assets/img/users/' . $user['user_profile_picture'];
             if (file_exists($old_profile_picture_path)) {
@@ -252,6 +263,19 @@ $branches = $conn->query("SELECT * FROM branches ORDER BY branch_name");
                         &mdash; <small class="text-muted">use the power button on the Users list to toggle</small>
                     </label>
                 </div>
+                <?php if (!empty($user['account_hold'])): ?>
+                <div class="alert alert-warning d-flex align-items-start gap-2">
+                    <i class="fas fa-lock mt-1"></i>
+                    <div>
+                        <strong>Account on hold</strong>
+                        <div class="small"><?php echo e($user['account_hold_reason'] ?? 'This account requires Admin review before access can resume.'); ?></div>
+                        <div class="form-check mt-2">
+                            <input class="form-check-input" type="checkbox" name="release_hold" id="releaseHold">
+                            <label class="form-check-label" for="releaseHold">Release hold after setting a new password</label>
+                        </div>
+                    </div>
+                </div>
+                <?php endif; ?>
             </div>
 
             <div class="d-flex justify-content-between mt-3">

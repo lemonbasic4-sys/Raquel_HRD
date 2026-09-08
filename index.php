@@ -7,6 +7,7 @@ if (session_status() === PHP_SESSION_NONE) {
 // Load config early so BASE_URL is available for redirects and HTML
 require_once __DIR__ . '/config/database.php';
 require_once __DIR__ . '/includes/functions.php';
+ensureUserAccountSecuritySchema($conn);
 
 function normalizeLoginRole($role)
 {
@@ -67,7 +68,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'Please enter your password.';
     } else {
         // Query user by username
-        $stmt = $conn->prepare("SELECT user_id, employee_id, username, email, password_hash, full_name, role, branch_id, is_active, first_login_completed FROM users WHERE BINARY username = ?");
+        $stmt = $conn->prepare("SELECT user_id, employee_id, username, email, password_hash, full_name, role, branch_id, is_active, account_hold, first_login_completed FROM users WHERE BINARY username = ?");
         $stmt->bind_param("s", $username);
         $stmt->execute();
         $result = $stmt->get_result();
@@ -79,6 +80,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Check if account is active
             if (!$user['is_active']) {
                 $error = 'Your account has been deactivated. Please contact the administrator.';
+            } elseif (!empty($user['account_hold'])) {
+                $error = 'Your account is on hold after an employee movement. Please contact an administrator for new credentials.';
             } elseif (password_verify($password, $user['password_hash'])) {
                 if (($user['role'] ?? '') === 'Employee') {
                     $error = 'Employee accounts must sign in through the Employee Self-Service Portal.';

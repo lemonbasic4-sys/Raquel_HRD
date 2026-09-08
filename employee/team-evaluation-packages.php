@@ -412,6 +412,20 @@ if (in_array($session_role, ['HR Manager', 'HR Supervisor', 'Admin'], true)) {
                 </a>
             </div>
         <?php endif; ?>
+        <div class="d-flex flex-wrap gap-2 pt-2 border-top border-white-10">
+        <span class="badge" style="background:rgba(40,167,69,0.2); border:1px solid rgba(40,167,69,0.4); color:#96e0a8;">
+            <i class="fas fa-star me-1"></i> Outstanding (3.60 – 4.00)
+        </span>
+        <span class="badge" style="background:rgba(23,162,184,0.2); border:1px solid rgba(23,162,184,0.4); color:#9de0ec;">
+            <i class="fas fa-thumbs-up me-1"></i> Exceeds Expectations (2.60 – 3.59)
+        </span>
+        <span class="badge" style="background:rgba(255,193,7,0.2); border:1px solid rgba(255,193,7,0.4); color:#ffe699;">
+            <i class="fas fa-check-circle me-1"></i> Meets Expectations (2.00 – 2.59)
+        </span>
+        <span class="badge" style="background:rgba(220,53,69,0.2); border:1px solid rgba(220,53,69,0.4); color:#f5a3ab;">
+            <i class="fas fa-exclamation-triangle me-1"></i> Needs Improvement (1.00 – 1.99)
+        </span>
+    </div>
     </section>
 
 

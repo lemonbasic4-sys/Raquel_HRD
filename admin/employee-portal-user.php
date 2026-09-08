@@ -3,6 +3,7 @@ $page_title = 'Employee Portal Account';
 require_once '../includes/session-check.php';
 checkRole(['Admin']);
 require_once '../includes/functions.php';
+ensureUserAccountSecuritySchema($conn);
 
 $user_id = isset($_GET['user_id']) ? (int)$_GET['user_id'] : 0;
 $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
@@ -18,7 +19,7 @@ unset($_SESSION['new_employee_credentials']);
 // Fetch user + employee details
 $stmt = $conn->prepare("
     SELECT
-        u.user_id, u.employee_id, u.username, u.email, u.full_name, u.role, u.is_active, u.created_at,
+        u.user_id, u.employee_id, u.username, u.email, u.full_name, u.role, u.is_active, u.account_hold, u.account_hold_reason, u.created_at,
         e.employee_code, e.first_name, e.last_name, e.job_title, e.profile_picture,
         b.branch_name
     FROM users u
@@ -109,7 +110,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($new_password !== '') {
         $hash = password_hash($new_password, PASSWORD_DEFAULT);
-        $upd = $conn->prepare("UPDATE users SET username=?, is_active=?, password_hash=? WHERE user_id=?");
+        $upd = $conn->prepare("UPDATE users SET username=?, is_active=?, password_hash=?, account_hold=0, account_hold_reason=NULL, account_hold_at=NULL, account_hold_movement_id=NULL WHERE user_id=?");
         $upd->bind_param("sisi", $new_username, $is_active, $hash, $user_id);
     } else {
         $upd = $conn->prepare("UPDATE users SET username=?, is_active=? WHERE user_id=?");
@@ -262,13 +263,13 @@ document.addEventListener('DOMContentLoaded', () => new bootstrap.Modal(document
                     <div class="epu-input-group">
                         <span class="epu-input-prefix"><i class="fas fa-at"></i></span>
                         <input type="text" class="epu-form-control" name="username" id="portal_username"
-                               value="<?php echo e($user['username']); ?>" required>
+                               value="<?php echo e(getEmployeeDisplayId($user)); ?>" required>
                         <button type="button" class="epu-input-action" onclick="setUsernameToEmployeeId()"
                                 title="Use Employee ID as username">
                             <i class="fas fa-id-card"></i>
                         </button>
                     </div>
-                    <div class="epu-field-hint">Employee ID is suggested, but you can use any unique username.</div>
+                    <div class="epu-field-hint">Employee ID is autofilled. You can change it to any unique username.</div>
                 </div>
 
                 <div class="col-md-6">

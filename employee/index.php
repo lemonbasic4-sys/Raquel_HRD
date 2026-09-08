@@ -4,6 +4,7 @@
  */
 require_once '../config/database.php';
 require_once '../includes/functions.php';
+ensureUserAccountSecuritySchema($conn);
 
 // If already logged in as an Employee account, skip to dashboard
 if (isset($_SESSION['user_id']) && ($_SESSION['role'] ?? '') === 'Employee' && (int) ($_SESSION['employee_id'] ?? 0) > 0) {
@@ -25,7 +26,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'Please enter both username and password.';
     } else {
         $stmt = $conn->prepare("
-            SELECT u.user_id, u.employee_id, u.username, u.email, u.password_hash, u.full_name, u.role, u.branch_id, u.is_active, u.first_login_completed, e.is_active as emp_is_active, e.employment_status
+            SELECT u.user_id, u.employee_id, u.username, u.email, u.password_hash, u.full_name, u.role, u.branch_id, u.is_active, u.account_hold, u.first_login_completed, e.is_active as emp_is_active, e.employment_status
             FROM users u
             LEFT JOIN employees e ON u.employee_id = e.employee_id
             WHERE BINARY u.username = ? 
@@ -42,6 +43,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $is_emp_inactive = ($user['emp_is_active'] !== null && (int)$user['emp_is_active'] === 0) || (strcasecmp($user['employment_status'] ?? '', 'Inactive') === 0);
             if (!$user['is_active'] || $is_emp_inactive) {
                 $error = 'Your account has been deactivated.';
+            } elseif (!empty($user['account_hold'])) {
+                $error = 'Your account is on hold after an employee movement. Please contact an administrator for new credentials.';
                 registerLoginAttempt($conn, $username, $ip);
             } elseif (password_verify($password, $user['password_hash'])) {
                 // Clear attempts on successful login

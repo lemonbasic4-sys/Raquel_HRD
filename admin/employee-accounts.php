@@ -335,6 +335,11 @@ document.addEventListener('DOMContentLoaded', () => new bootstrap.Modal(document
                                             <a href="users.php?search=<?php echo urlencode($emp['username']); ?>" class="btn btn-sm btn-outline-warning">
                                                 <i class="fas fa-user-cog me-1"></i>Manage (HR)
                                             </a>
+                                            <button class="btn btn-sm btn-outline-success ms-1"
+                                                    onclick="openCreateAccountModal(<?php echo $emp['employee_id']; ?>, '<?php echo e(addslashes($emp['first_name'] . ' ' . $emp['last_name'])); ?>', '<?php echo e(addslashes($emp['personal_email'] ?? '')); ?>', '<?php echo e(addslashes(getEmployeeDisplayId($emp))); ?>')"
+                                                    title="Create portal credentials">
+                                                <i class="fas fa-plus me-1"></i>Portal
+                                            </button>
                                         <?php endif; ?>
                                     <?php endif; ?>
                                 </td>
@@ -402,9 +407,14 @@ document.addEventListener('DOMContentLoaded', () => new bootstrap.Modal(document
                                         </a>
                                     <?php else: ?>
                                         <a href="users.php?search=<?php echo urlencode($emp['username']); ?>" class="btn btn-sm btn-outline-warning"
-                                           title="Manage (HR)" style="padding: 6px 12px; border-radius: 8px;">
+                                            title="Manage (HR)" style="padding: 6px 12px; border-radius: 8px;">
                                             <i class="fas fa-user-cog me-1"></i>HR
                                         </a>
+                                        <button class="btn btn-sm btn-outline-success ms-1"
+                                                 onclick="openCreateAccountModal(<?php echo $emp['employee_id']; ?>, '<?php echo e(addslashes($emp['first_name'] . ' ' . $emp['last_name'])); ?>', '<?php echo e(addslashes($emp['personal_email'] ?? '')); ?>', '<?php echo e(addslashes(getEmployeeDisplayId($emp))); ?>')"
+                                                 title="Create portal credentials" style="padding: 6px 12px; border-radius: 8px;">
+                                             <i class="fas fa-plus me-1"></i>Portal
+                                        </button>
                                     <?php endif; ?>
                                 <?php endif; ?>
                             </div>

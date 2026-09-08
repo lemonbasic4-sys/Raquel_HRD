@@ -276,6 +276,42 @@ function createNotification($conn, $user_id, $title, $message, $link = null)
 
 }
 
+/**
+ * Add account-hold fields without requiring a manual migration on existing installs.
+ */
+function ensureUserAccountSecuritySchema($conn): bool
+{
+    static $ensured = false;
+    if ($ensured) {
+        return true;
+    }
+
+    $columns = [];
+    $result = $conn->query("SHOW COLUMNS FROM users");
+    if ($result) {
+        while ($row = $result->fetch_assoc()) {
+            $columns[$row['Field']] = true;
+        }
+    }
+
+    $definitions = [
+        'account_hold' => "ALTER TABLE users ADD COLUMN account_hold TINYINT(1) NOT NULL DEFAULT 0 AFTER is_active",
+        'account_hold_reason' => "ALTER TABLE users ADD COLUMN account_hold_reason TEXT NULL AFTER account_hold",
+        'account_hold_at' => "ALTER TABLE users ADD COLUMN account_hold_at DATETIME NULL AFTER account_hold_reason",
+        'account_hold_movement_id' => "ALTER TABLE users ADD COLUMN account_hold_movement_id INT NULL AFTER account_hold_at",
+    ];
+
+    foreach ($definitions as $column => $sql) {
+        if (!isset($columns[$column]) && !$conn->query($sql)) {
+            error_log("Unable to add users.{$column}: " . $conn->error);
+            return false;
+        }
+    }
+
+    $ensured = true;
+    return true;
+}
+
 
 
 /**
@@ -1244,9 +1280,23 @@ function resolveRoleFromJobTitle(string $job_title): string
  */
 function executeCareerMovementApplication($conn, array $movement, int $movement_id): void
 {
+    ensureUserAccountSecuritySchema($conn);
     $eid          = (int)$movement['employee_id'];
     $new_position = trim((string)($movement['new_position'] ?? ''));
     $new_bid      = !empty($movement['new_branch_id']) ? (int)$movement['new_branch_id'] : null;
+
+    $before_stmt = $conn->prepare("
+        SELECT e.first_name, e.last_name, e.job_title, e.branch_id, e.department_id,
+               d.department_name, b.branch_name
+        FROM employees e
+        LEFT JOIN departments d ON d.department_id = e.department_id
+        LEFT JOIN branches b ON b.branch_id = e.branch_id
+        WHERE e.employee_id = ? LIMIT 1
+    ");
+    $before_stmt->bind_param("i", $eid);
+    $before_stmt->execute();
+    $before = $before_stmt->get_result()->fetch_assoc() ?: [];
+    $before_stmt->close();
 
     // ── 1. Update employee position/branch ───────────────────────────────────
     // Only update job_title if a new position was actually specified
@@ -1291,34 +1341,109 @@ function executeCareerMovementApplication($conn, array $movement, int $movement_
     }
 
     // ── 2. RBAC: Update users.role and users.branch_id ─────────────────────
-    $new_role = resolveRoleFromJobTitle($new_position);
+    $new_role = $has_new_position ? resolveRoleFromJobTitle($new_position) : null;
 
     $usr_stmt = $conn->prepare("
         SELECT user_id, role, branch_id
         FROM users
         WHERE employee_id = ? AND is_active = 1
-        LIMIT 1
+        ORDER BY CASE WHEN role = 'Employee' THEN 1 ELSE 0 END, user_id
     ");
     $usr_stmt->bind_param("i", $eid);
     $usr_stmt->execute();
-    $linked_user = $usr_stmt->get_result()->fetch_assoc();
+    $linked_users = $usr_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $usr_stmt->close();
 
-    if ($linked_user) {
-        $old_role      = $linked_user['role'];
-        $linked_uid    = (int) $linked_user['user_id'];
-        // Keep NULL as NULL — casting NULL to int gives 0 which violates the FK constraint on branch_id
-        $new_user_bid  = $new_bid ?? ($linked_user['branch_id'] !== null ? (int) $linked_user['branch_id'] : null);
-
-        if ($new_user_bid !== null) {
-            $upd_user = $conn->prepare("UPDATE users SET role = ?, branch_id = ? WHERE user_id = ?");
-            $upd_user->bind_param("sii", $new_role, $new_user_bid, $linked_uid);
-        } else {
-            $upd_user = $conn->prepare("UPDATE users SET role = ?, branch_id = NULL WHERE user_id = ?");
-            $upd_user->bind_param("si", $new_role, $linked_uid);
+    if (!empty($linked_users)) {
+        $primary_hr_user = null;
+        foreach ($linked_users as $candidate) {
+            if (($candidate['role'] ?? '') !== 'Employee') {
+                $primary_hr_user = $candidate;
+                break;
+            }
         }
-        $upd_user->execute();
-        $upd_user->close();
+        $primary_hr_user = $primary_hr_user ?: $linked_users[0];
+        $old_role = $primary_hr_user['role'];
+        if ($new_role === null) {
+            $new_role = $old_role;
+        }
+        $hold_reason = 'Account held after approved career movement #' . $movement_id
+            . '. An Admin must review the transition and issue new credentials.';
+
+        $linked_uid = (int)$primary_hr_user['user_id'];
+        $held_account_count = 0;
+        $portal_account_count = 0;
+        foreach ($linked_users as $linked_user) {
+            $linked_account_id = (int)$linked_user['user_id'];
+            // Former HR personnel keep Employee Portal access; only the HRIS account is held.
+            $is_portal_account = (($linked_user['role'] ?? '') === 'Employee');
+            // Keep the existing HRIS role on held records so HRIS and portal
+            // credentials remain distinguishable after a movement.
+            $account_role = $is_portal_account ? 'Employee' : $linked_user['role'];
+            $new_user_bid = $new_bid ?? ($linked_user['branch_id'] !== null ? (int)$linked_user['branch_id'] : null);
+            if ($is_portal_account) {
+                $portal_account_count++;
+                if ($new_user_bid !== null) {
+                    $upd_user = $conn->prepare("UPDATE users SET role = ?, branch_id = ?, account_hold = 0, account_hold_reason = NULL, account_hold_at = NULL, account_hold_movement_id = NULL WHERE user_id = ?");
+                    $upd_user->bind_param("sii", $account_role, $new_user_bid, $linked_account_id);
+                } else {
+                    $upd_user = $conn->prepare("UPDATE users SET role = ?, branch_id = NULL, account_hold = 0, account_hold_reason = NULL, account_hold_at = NULL, account_hold_movement_id = NULL WHERE user_id = ?");
+                    $upd_user->bind_param("si", $account_role, $linked_account_id);
+                }
+            } elseif ($new_user_bid !== null) {
+                $held_account_count++;
+                $upd_user = $conn->prepare("UPDATE users SET role = ?, branch_id = ?, account_hold = 1, account_hold_reason = ?, account_hold_at = NOW(), account_hold_movement_id = ? WHERE user_id = ?");
+                $upd_user->bind_param("sisii", $account_role, $new_user_bid, $hold_reason, $movement_id, $linked_account_id);
+            } else {
+                $held_account_count++;
+                $upd_user = $conn->prepare("UPDATE users SET role = ?, branch_id = NULL, account_hold = 1, account_hold_reason = ?, account_hold_at = NOW(), account_hold_movement_id = ? WHERE user_id = ?");
+                $upd_user->bind_param("ssii", $account_role, $hold_reason, $movement_id, $linked_account_id);
+            }
+            $upd_user->execute();
+            $upd_user->close();
+        }
+
+        $after_stmt = $conn->prepare("
+            SELECT e.job_title, d.department_name, b.branch_name
+            FROM employees e
+            LEFT JOIN departments d ON d.department_id = e.department_id
+            LEFT JOIN branches b ON b.branch_id = e.branch_id
+            WHERE e.employee_id = ? LIMIT 1
+        ");
+        $after_stmt->bind_param("i", $eid);
+        $after_stmt->execute();
+        $after = $after_stmt->get_result()->fetch_assoc() ?: [];
+        $after_stmt->close();
+
+        $name = trim(($movement['employee_name'] ?? '') ?: (($before['first_name'] ?? '') . ' ' . ($before['last_name'] ?? '')));
+        $account_summary_parts = [];
+        if ($held_account_count > 0) {
+            $account_summary_parts[] = $held_account_count . ' HRIS account(s) held';
+        }
+        if ($portal_account_count > 0) {
+            $account_summary_parts[] = $portal_account_count . ' Employee Portal account(s) kept active';
+        }
+        $account_summary = implode('; ', $account_summary_parts);
+        $summary = "Employee: {$name} (ID {$eid}). "
+            . "Position: " . ($before['job_title'] ?? '—') . " → " . ($after['job_title'] ?? $new_position ?: '—') . ". "
+            . "Department: " . ($before['department_name'] ?? '—') . " → " . ($after['department_name'] ?? '—') . ". "
+            . "Branch: " . ($before['branch_name'] ?? '—') . " → " . ($after['branch_name'] ?? '—') . ". "
+            . "System role: {$old_role} → {$new_role}. "
+            . "Effective date: " . ($movement['effective_date'] ?? '—') . ". "
+            . "{$account_summary}. Historical records remain attached to employee ID {$eid}.";
+
+        $admin_res = $conn->query("SELECT user_id FROM users WHERE role = 'Admin' AND is_active = 1 AND account_hold = 0");
+        if ($admin_res) {
+            while ($admin = $admin_res->fetch_assoc()) {
+                createNotification(
+                    $conn,
+                    (int)$admin['user_id'],
+                    'Account Hold Review Required',
+                    $summary . ' Review the account and issue new credentials before reactivation.',
+                    BASE_URL . '/admin/employee-accounts.php?search=' . urlencode($name)
+                );
+            }
+        }
 
         // ── 3. Audit log for role change ───────────────────────────────────
         if ($old_role !== $new_role) {
@@ -1333,6 +1458,14 @@ function executeCareerMovementApplication($conn, array $movement, int $movement_
             $notif_link  = BASE_URL . '/employee/my-employment.php';
             createNotification($conn, $linked_uid, $notif_title, $notif_msg, $notif_link);
         }
+        logAudit(
+            $conn,
+            $linked_uid,
+            'ACCOUNT_HOLD',
+            'User',
+            $linked_uid,
+            "Account placed on hold after career movement #{$movement_id}. {$summary}"
+        );
     }
 
     // ── 5. Mark movement as applied ────────────────────────────────────────
@@ -5696,4 +5829,3 @@ function formatPHMobileNumber($number): string
     return $digits;
 }
 ?>
-

@@ -3,6 +3,7 @@ $page_title = 'User Management';
 require_once '../includes/session-check.php';
 checkRole(['Admin']);
 require_once '../includes/functions.php';
+ensureUserAccountSecuritySchema($conn);
 
 // Handle toggle active status   
 if (isset($_GET['toggle']) && is_numeric($_GET['toggle'])) {
@@ -294,8 +295,8 @@ document.addEventListener('DOMContentLoaded', () => new bootstrap.Modal(document
                             </td>
                             <td><?php echo $user['role'] === 'Admin' ? '<span class="text-muted small">None</span>' : e($user['branch_name'] ?? 'N/A'); ?></td>
                             <td>
-                                <span class="badge <?php echo $user['is_active'] ? 'bg-success' : 'bg-danger'; ?>">
-                                    <?php echo $user['is_active'] ? 'Active' : 'Inactive'; ?>
+                                <span class="badge <?php echo !empty($user['account_hold']) ? 'bg-warning text-dark' : ($user['is_active'] ? 'bg-success' : 'bg-danger'); ?>">
+                                    <?php echo !empty($user['account_hold']) ? 'On Hold' : ($user['is_active'] ? 'Active' : 'Inactive'); ?>
                                 </span>
                             </td>
                             <td>
