@@ -12,9 +12,9 @@
 -- ============================================
 
 SET FOREIGN_KEY_CHECKS = 0;
-DROP DATABASE IF EXISTS raquel_hris_test_db;
-CREATE DATABASE IF NOT EXISTS raquel_hris_test_db;
-USE raquel_hris_test_db;
+DROP DATABASE IF EXISTS raquel_hris;
+CREATE DATABASE IF NOT EXISTS raquel_hris;
+USE raquel_hris;
 
 -- ============================================
 -- 1. Setup Database

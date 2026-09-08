@@ -4,7 +4,7 @@
 -- Essential file for creating the initial admin account and HRD team employees
 -- ============================================================================
 
-USE raquel_hris_test_db;
+USE raquel_hris;
 SET FOREIGN_KEY_CHECKS = 0;
 
 -- ====================================

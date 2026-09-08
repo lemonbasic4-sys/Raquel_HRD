@@ -1,5 +1,5 @@
 -- Import this after seed employees
-USE raquel_hris_test_db;
+USE raquel_hris;
 SET FOREIGN_KEY_CHECKS = 0;
 
 -- Clean up Employee-portal duplicates left by older versions of this seed.

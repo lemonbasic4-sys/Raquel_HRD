@@ -1,5 +1,5 @@
 -- Mockup Employee Seeds for Information Technology Department
-USE raquel_hris_test_db;
+USE raquel_hris;
 SET FOREIGN_KEY_CHECKS = 0;
 
 -- ====================================

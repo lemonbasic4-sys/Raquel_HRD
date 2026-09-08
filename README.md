@@ -15,7 +15,7 @@
 System tech stack
 
 - Backend: PHP (plain PHP pages and controllers). Uses mysqli for database access.
-- Database: MySQL / MariaDB (database name: raquel_hris_test_db in config/database.php). Charset: utf8mb4.
+- Database: MySQL / MariaDB (database name: raquel_hris in config/database.php). Charset: utf8mb4.
 - Frontend: HTML, CSS, Bootstrap 5 (CDN), Font Awesome (CDN), custom CSS in assets/css.
 - JavaScript: Custom JS under assets/js (includes pjax.js), Chart.js (CDN) for charts, client-side features (offline banner, sound effects).
 - Session & Auth: PHP sessions (session_start), role-based access (Admin, HR Manager, HR Supervisor, HR Staff, Employee), CSRF token generation used in header.

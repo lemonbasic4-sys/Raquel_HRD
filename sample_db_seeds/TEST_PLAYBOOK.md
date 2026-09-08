@@ -54,10 +54,10 @@ Directly imports the complete, clean 45-table database snapshot (`raquel_hris_cu
 cd C:\xampp\htdocs\Raquel_HRD_Test
 
 # 1. Drop and recreate database
-& "C:\xampp\mysql\bin\mysql.exe" -u root -e "DROP DATABASE IF EXISTS raquel_hris_test_db; CREATE DATABASE raquel_hris_test_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+& "C:\xampp\mysql\bin\mysql.exe" -u root -e "DROP DATABASE IF EXISTS raquel_hris; CREATE DATABASE raquel_hris CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 
 # 2. Source the clean backup snapshot
-& "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris_test_db -e "source sample_db_seeds/raquel_hris_current_clean_backup.sql;"
+& "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source sample_db_seeds/raquel_hris_current_clean_backup.sql;"
 
 Write-Host "Database snapshot restored successfully!" -ForegroundColor Green
 ```
@@ -72,18 +72,18 @@ Run this directly in PowerShell to reset and load from individual schema and see
 cd C:\xampp\htdocs\Raquel_HRD_Test
 
 # 1. Drop and recreate the database
-& "C:\xampp\mysql\bin\mysql.exe" -u root -e "DROP DATABASE IF EXISTS raquel_hris_test_db; CREATE DATABASE raquel_hris_test_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+& "C:\xampp\mysql\bin\mysql.exe" -u root -e "DROP DATABASE IF EXISTS raquel_hris; CREATE DATABASE raquel_hris CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 
 # 2. Run imports in chronological order
-& "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris_test_db -e "source database/1st_schema_tables.sql;"
-& "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris_test_db -e "source database/2nd_seed_organization.sql;"
-& "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris_test_db -e "source database/3rd_seed_HR_accounts_.sql;"
-& "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris_test_db -e "source sample_db_seeds/01_test_employees.sql;"
-& "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris_test_db -e "source database/xPortal_accounts.sql;"
-& "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris_test_db -e "source database/data/seed_templates.sql;"
-& "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris_test_db -e "source sample_db_seeds/02_test_hrd_portal_accounts.sql;"
-& "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris_test_db -e "source sample_db_seeds/03_test_governance_approvers.sql;"
-& "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris_test_db -e "source database/zLAST_performance_indexes.sql;"
+& "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source database/1st_schema_tables.sql;"
+& "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source database/2nd_seed_organization.sql;"
+& "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source database/3rd_seed_HR_accounts_.sql;"
+& "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source sample_db_seeds/01_test_employees.sql;"
+& "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source database/xPortal_accounts.sql;"
+& "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source database/data/seed_templates.sql;"
+& "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source sample_db_seeds/02_test_hrd_portal_accounts.sql;"
+& "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source sample_db_seeds/03_test_governance_approvers.sql;"
+& "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source database/zLAST_performance_indexes.sql;"
 
 Write-Host "Database reset and seeded successfully!" -ForegroundColor Green
 ```

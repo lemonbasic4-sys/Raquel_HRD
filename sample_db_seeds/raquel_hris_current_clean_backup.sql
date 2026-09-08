@@ -1,6 +1,6 @@
 -- MariaDB dump 10.19  Distrib 10.4.32-MariaDB, for Win64 (AMD64)
 --
--- Host: localhost    Database: raquel_hris_test_db
+-- Host: localhost    Database: raquel_hris
 -- ------------------------------------------------------
 -- Server version	10.4.32-MariaDB
 
