@@ -1584,6 +1584,9 @@ require_once '../includes/header.php';
                         <?php if ($edit_eval): ?>
                             <input type="hidden" name="edit_id" value="<?php echo (int) $edit_eval['evaluation_id']; ?>">
                         <?php endif; ?>
+                        <!-- These form-owned fields receive the values entered in the consent modal. -->
+                        <input type="hidden" name="employee_consent_agreed" id="submitted_employee_consent_agreed" value="<?php echo !empty($edit_eval['employee_consent_agreed']) ? '1' : ''; ?>">
+                        <input type="hidden" name="employee_signature_data" id="submitted_employee_signature_data" value="<?php echo e($edit_eval['employee_signature_data'] ?? ''); ?>">
 
                         <?php if ($edit_eval && $edit_eval['status'] === 'Returned'): ?>
                             <div class="alert alert-warning border-0 mb-4 shadow-sm" style="border-radius: 12px; border-left: 5px solid #dc3545 !important;">
@@ -1912,7 +1915,7 @@ require_once '../includes/header.php';
                                     
                                     <!-- Mandatory Consent Checkbox -->
                                     <div class="consent-checkbox form-check mb-4">
-                                        <input class="form-check-input" type="checkbox" name="employee_consent_agreed" id="employee_consent_agreed" value="1" <?php echo !empty($edit_eval['employee_consent_agreed']) ? 'checked' : ''; ?>>
+                                        <input class="form-check-input" type="checkbox" id="employee_consent_agreed" value="1" <?php echo !empty($edit_eval['employee_consent_agreed']) ? 'checked' : ''; ?>>
                                         <label class="form-check-label fw-bold text-dark small" for="employee_consent_agreed">
                                             I have read, understood, and agree to the declaration statement above.
                                         </label>
@@ -1931,7 +1934,7 @@ require_once '../includes/header.php';
                                         
                                         <div class="signature-canvas-wrapper border rounded bg-white shadow-sm position-relative text-center" style="touch-action: none;">
                                             <canvas id="signatureCanvas" width="500" height="150" style="width: 100%; height: 110px; cursor: crosshair; display: block;"></canvas>
-                                            <input type="hidden" name="employee_signature_data" id="employee_signature_data" value="<?php echo e($edit_eval['employee_signature_data'] ?? ''); ?>">
+                                            <input type="hidden" id="employee_signature_data" value="<?php echo e($edit_eval['employee_signature_data'] ?? ''); ?>">
                                         </div>
                                         <div class="form-text small text-muted"><i class="fas fa-info-circle me-1"></i>Use your mouse or finger (on touchscreens) to draw your signature inside the box above.</div>
                                     </div>
@@ -2422,8 +2425,19 @@ function validateConsentAndSignature() {
     return true;
 }
 
+function syncConsentForSubmission() {
+    const consent = document.getElementById('employee_consent_agreed');
+    const signature = document.getElementById('employee_signature_data');
+    const submittedConsent = document.getElementById('submitted_employee_consent_agreed');
+    const submittedSignature = document.getElementById('submitted_employee_signature_data');
+
+    if (submittedConsent) submittedConsent.value = consent && consent.checked ? '1' : '';
+    if (submittedSignature) submittedSignature.value = signature ? signature.value : '';
+}
+
 function confirmConsentAndContinue() {
     if (!validateConsentAndSignature()) return;
+    syncConsentForSubmission();
 
     const consent = document.getElementById('employee_consent_agreed');
     if (consent) consent.classList.remove('is-invalid');
@@ -2443,6 +2457,7 @@ document.addEventListener('DOMContentLoaded', function() {
 function showReviewModal() {
     // Guard: do not open if any rating is missing or consent/signature is invalid
     if (!validateAllRatings() || !validateConsentAndSignature()) return;
+    syncConsentForSubmission();
 
     const modal = new bootstrap.Modal(document.getElementById('reviewModal'));
     const reviewContent = document.getElementById('reviewContent');
@@ -2487,6 +2502,8 @@ function confirmFinalSubmit() {
     // then submit — this avoids browser quirks with clicking hidden submit buttons.
     const form = document.querySelector('form[data-autosave]');
     if (!form) return;
+    if (!validateConsentAndSignature()) return;
+    syncConsentForSubmission();
 
     // ── Cancel any pending autosave timers FIRST ──────────────────────────────
     // Without this, a 2-second debounce timer started by the user's last rating
