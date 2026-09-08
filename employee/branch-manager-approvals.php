@@ -12,6 +12,16 @@ require_once '../includes/session-check.php';
 checkRole(['Employee']);
 require_once '../includes/functions.php';
 
+// Older installations may not yet have the Employee Portal workflow columns.
+// Upgrade the career-movement schema before any query references those fields.
+if (!ensureCareerProgressionMovements($conn)) {
+    redirectWith(
+        BASE_URL . '/employee/dashboard.php',
+        'danger',
+        'Career movement approvals are temporarily unavailable because the required database update could not be completed.'
+    );
+}
+
 $bm_employee_id = (int) ($_SESSION['employee_id'] ?? 0);
 $bm_branch_id   = (int) ($_SESSION['branch_id']   ?? 0);
 $user_id        = (int) ($_SESSION['user_id']      ?? 0);
