@@ -1020,6 +1020,91 @@ require_once '../includes/header.php';
     border-radius: 0 0 6px 6px;
     letter-spacing: 0.03em;
 }
+
+/* Compact, viewport-safe declaration dialog */
+#consentModal .consent-modal-dialog {
+    max-width: 540px;
+}
+
+#consentModal .modal-content {
+    max-height: calc(100dvh - 2rem);
+}
+
+#consentModal .consent-modal-header {
+    padding: 0.9rem 1.1rem;
+}
+
+#consentModal .consent-modal-body {
+    overflow-y: auto;
+    padding: 1rem 1.1rem;
+}
+
+#consentModal .consent-declaration {
+    line-height: 1.5 !important;
+    margin-bottom: 0.85rem !important;
+    padding: 0.8rem !important;
+}
+
+#consentModal .consent-checkbox {
+    margin-bottom: 1rem !important;
+}
+
+#consentModal .consent-checkbox .form-check-input {
+    border-radius: 0.25em;
+    height: 1.25rem !important;
+    min-height: 1.25rem !important;
+    min-width: 1.25rem;
+    width: 1.25rem;
+}
+
+#consentModal .consent-checkbox .form-check-label {
+    line-height: 1.35;
+    padding-top: 0.1rem;
+}
+
+#consentModal #signatureCanvas {
+    height: 110px !important;
+}
+
+#consentModal .consent-modal-footer {
+    gap: 0.5rem;
+    padding: 0.75rem 1.1rem;
+}
+
+@media (max-width: 575.98px) {
+    #consentModal .consent-modal-dialog {
+        height: calc(100dvh - 1rem);
+        margin: 0.5rem;
+        max-width: none;
+    }
+
+    #consentModal .modal-content {
+        height: 100%;
+        max-height: none;
+    }
+
+    #consentModal .consent-modal-header {
+        padding: 0.75rem 0.9rem;
+    }
+
+    #consentModal .consent-modal-body {
+        padding: 0.85rem 0.9rem;
+    }
+
+    #consentModal #signatureCanvas {
+        height: 96px !important;
+    }
+
+    #consentModal .consent-modal-footer {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        padding: 0.7rem 0.9rem;
+    }
+
+    #consentModal .consent-modal-footer .consent-footer-note {
+        grid-column: 1 / -1;
+    }
+}
 </style>
 
 <div class="page-hero fadeup">
@@ -1808,21 +1893,26 @@ require_once '../includes/header.php';
                                     placeholder="Share any notes about your self-rating..."><?php echo e($edit_eval['staff_comments'] ?? ''); ?></textarea>
                             </div>
 
-                            <!-- Declaration Consent & HTML5 Digital Signature Pad -->
-                            <div class="card border border-primary border-opacity-25 rounded-3 mb-4 shadow-sm" style="background: #f8faf6;">
-                                <div class="card-header bg-primary bg-opacity-10 fw-bold text-primary py-2" style="font-size:0.9rem;">
-                                    <i class="fas fa-file-contract me-2"></i>Declaration Consent & Digital Signature
-                                </div>
-                                <div class="card-body p-3">
+                            <!-- Declaration Consent & Digital Signature: required before starting a new self-rating -->
+                            <div class="modal fade" id="consentModal" tabindex="-1" aria-labelledby="consentModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+                                <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable consent-modal-dialog">
+                                    <div class="modal-content border-0 shadow-lg">
+                                        <div class="modal-header bg-primary text-white border-0 consent-modal-header">
+                                            <div>
+                                                <div class="small text-uppercase opacity-75 fw-semibold" style="letter-spacing:.06em;">Before you begin</div>
+                                                <h5 class="modal-title fw-bold mb-0" id="consentModalLabel"><i class="fas fa-file-contract me-2"></i>Declaration Consent &amp; Digital Signature</h5>
+                                            </div>
+                                        </div>
+                                        <div class="modal-body consent-modal-body" style="background: #f8faf6;">
                                     <!-- Consent Disclaimer Text -->
-                                    <div class="p-3 bg-white rounded border mb-3 small text-secondary shadow-sm" style="line-height: 1.6;">
+                                    <div class="consent-declaration p-3 bg-white rounded border mb-3 small text-secondary shadow-sm" style="line-height: 1.6;">
                                         <i class="fas fa-quote-left text-primary opacity-50 me-2"></i>
                                         I hereby declare and certify that the scores, self-assessment ratings, and comments provided in this form are accurate, complete, and submitted voluntarily. I understand that this submission forms an official component of my employee performance appraisal record.
                                     </div>
                                     
                                     <!-- Mandatory Consent Checkbox -->
-                                    <div class="form-check mb-4">
-                                        <input class="form-check-input" type="checkbox" name="employee_consent_agreed" id="employee_consent_agreed" value="1" <?php echo !empty($edit_eval['employee_consent_agreed']) ? 'checked' : ''; ?> required>
+                                    <div class="consent-checkbox form-check mb-4">
+                                        <input class="form-check-input" type="checkbox" name="employee_consent_agreed" id="employee_consent_agreed" value="1" <?php echo !empty($edit_eval['employee_consent_agreed']) ? 'checked' : ''; ?>>
                                         <label class="form-check-label fw-bold text-dark small" for="employee_consent_agreed">
                                             I have read, understood, and agree to the declaration statement above.
                                         </label>
@@ -1840,10 +1930,19 @@ require_once '../includes/header.php';
                                         </div>
                                         
                                         <div class="signature-canvas-wrapper border rounded bg-white shadow-sm position-relative text-center" style="touch-action: none;">
-                                            <canvas id="signatureCanvas" width="500" height="150" style="width: 100%; height: 150px; cursor: crosshair; display: block;"></canvas>
+                                            <canvas id="signatureCanvas" width="500" height="150" style="width: 100%; height: 110px; cursor: crosshair; display: block;"></canvas>
                                             <input type="hidden" name="employee_signature_data" id="employee_signature_data" value="<?php echo e($edit_eval['employee_signature_data'] ?? ''); ?>">
                                         </div>
                                         <div class="form-text small text-muted"><i class="fas fa-info-circle me-1"></i>Use your mouse or finger (on touchscreens) to draw your signature inside the box above.</div>
+                                    </div>
+                                        </div>
+                                        <div class="modal-footer bg-white border-0 consent-modal-footer">
+                                            <div class="consent-footer-note small text-muted me-auto"><i class="fas fa-lock me-1"></i>Consent and signature are required.</div>
+                                            <a href="<?php echo BASE_URL; ?>/employee/self-rating.php" class="btn btn-outline-secondary rounded-pill">Choose Another Template</a>
+                                            <button type="button" class="btn btn-primary rounded-pill px-4" onclick="confirmConsentAndContinue()">
+                                                Continue to Self-Rating <i class="fas fa-arrow-right ms-2"></i>
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -2322,6 +2421,24 @@ function validateConsentAndSignature() {
     }
     return true;
 }
+
+function confirmConsentAndContinue() {
+    if (!validateConsentAndSignature()) return;
+
+    const consent = document.getElementById('employee_consent_agreed');
+    if (consent) consent.classList.remove('is-invalid');
+
+    const modalElement = document.getElementById('consentModal');
+    if (modalElement) bootstrap.Modal.getOrCreateInstance(modalElement).hide();
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const shouldOpenConsentModal = <?php echo (!$view_mode && $selected_template_id > 0 && (!$edit_eval || empty($edit_eval['employee_consent_agreed']) || empty($edit_eval['employee_signature_data']))) ? 'true' : 'false'; ?>;
+    const modalElement = document.getElementById('consentModal');
+    if (shouldOpenConsentModal && modalElement) {
+        bootstrap.Modal.getOrCreateInstance(modalElement).show();
+    }
+});
 
 function showReviewModal() {
     // Guard: do not open if any rating is missing or consent/signature is invalid
