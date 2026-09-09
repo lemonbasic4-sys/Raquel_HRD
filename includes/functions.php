@@ -831,11 +831,11 @@ function getPerformanceLevelBadgeClass(string $level): string
  * Calculate evaluation total using section weights (KRA% + Behavior%).
  *
  * Each KRA item carries a weight % (summing to 100% in Section I).
- * Behavior ratings are averaged (Section II).
+ * Shared core values ratings are averaged across all Section II items.
  *
  *   KRA Subtotal = Sigma(KRA Item Weight x Rating) / 100
- *   Behavior Avg = Sigma(Behavior Ratings) / Total Behavior Items
- *   Final Score  = (KRA Subtotal x KRA%) + (Behavior Avg x Behavior%)
+ *   Shared Core Values Avg = Sigma(Shared Core Values Ratings) / Total Shared Core Values Items
+ *   Final Score  = (KRA Subtotal x KRA%) + (Shared Core Values Avg x Shared Core Values%)
  *
  * $kra_weight and $behavior_weight are the template section percentages (typically 80 and 20).
  *

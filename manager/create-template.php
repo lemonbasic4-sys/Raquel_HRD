@@ -581,11 +581,11 @@ require_once '../includes/header.php';
                     <!-- Score Computation Guide -->
                     <div class="p-3 bg-light rounded-3 border h-100">
                         <h6 class="fw-bold text-dark mb-2"><i class="fas fa-calculator text-primary me-2"></i>Evaluation Score Formula</h6>
-                        <p class="small text-muted mb-2">Each KRA item carries a weight % (summing to 100% in Section I). Behavior ratings are averaged (Section II).</p>
+                        <p class="small text-muted mb-2">Each KRA item carries a weight % (summing to 100% in Section I). Shared core values ratings are averaged across all Section II items.</p>
                         <div class="p-3 bg-white rounded border font-monospace small text-dark">
                             <strong>KRA Subtotal</strong> = &Sigma;(KRA Item Weight &times; Rating) &divide; 100<br>
-                            <strong>Behavior Avg</strong> = &Sigma;(Behavior Ratings) &divide; Total Behavior Items<br>
-                            <strong>Final Score</strong> = (KRA Subtotal &times; KRA%) + (Behavior Avg &times; Behavior%)
+                            <strong>Shared Core Values Avg</strong> = &Sigma;(Shared Core Values Ratings) &divide; Total Shared Core Values Items<br>
+                            <strong>Final Score</strong> = (KRA Subtotal &times; KRA%) + (Shared Core Values Avg &times; Shared Core Values%)
                         </div>
                     </div>
                 </div>
