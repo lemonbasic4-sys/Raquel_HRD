@@ -134,6 +134,11 @@ switch ($effective_role) {
                 ['icon' => 'fas fa-address-book', 'label' => 'Employee Info', 'url' => BASE_URL . '/supervisor/employees.php', 'page' => 'employees.php'],
                 ['icon' => 'fas fa-user-plus', 'label' => 'Add Employee', 'url' => BASE_URL . '/supervisor/add-employee.php', 'page' => 'add-employee.php'],
             ],
+            'ORGANIZATION' => [
+                ['icon' => 'fas fa-building', 'label' => 'Branches', 'url' => BASE_URL . '/supervisor/branches.php', 'page' => 'branches.php'],
+                ['icon' => 'fas fa-sitemap', 'label' => 'Departments', 'url' => BASE_URL . '/supervisor/departments.php', 'page' => 'departments.php'],
+                ['icon' => 'fas fa-briefcase', 'label' => 'Positions', 'url' => BASE_URL . '/supervisor/positions.php', 'page' => 'positions.php'],
+            ],
             'EVALUATIONS' => [
                 ['icon' => 'fas fa-layer-group', 'label' => 'Team Evaluation Packages', 'url' => BASE_URL . '/employee/team-evaluation-packages.php', 'page' => 'team-evaluation-packages.php',
                  'badge' => $_sup_pkg_pending ?: null, 'badge_class' => 'bg-warning text-dark'],

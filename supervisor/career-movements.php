@@ -342,6 +342,116 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['movement_action'])) {
     }
 }
 
+// ── POST: Cancel movement (HR Supervisor cancels own pending submission) ────
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cancel_movement'])) {
+    if (!$movement_ready) {
+        redirectWith(BASE_URL . '/supervisor/career-movements.php', 'danger', 'Career Movements could not be initialized.');
+    }
+    $movement_id = (int)($_POST['movement_id'] ?? 0);
+    if ($movement_id <= 0) {
+        redirectWith(BASE_URL . '/supervisor/career-movements.php', 'danger', 'Invalid movement.');
+    }
+
+    // Fetch movement — must be Pending, from HR Portal, submitted by current user
+    $stmt = $conn->prepare("
+        SELECT cm.*, CONCAT(e.first_name,' ',e.last_name) AS employee_name
+        FROM career_movements cm
+        JOIN employees e ON cm.employee_id = e.employee_id
+        WHERE cm.movement_id = ?
+          AND cm.logged_by = ?
+          AND cm.approval_status = 'Pending'
+          AND cm.request_source = 'HR Portal'
+        LIMIT 1
+    ");
+    $stmt->bind_param("ii", $movement_id, $current_user_id);
+    $stmt->execute();
+    $movement = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    if (!$movement) {
+        redirectWith(BASE_URL . '/supervisor/career-movements.php', 'danger', 'Movement not found, already processed, or you are not authorized to cancel it.');
+    }
+
+    $del = $conn->prepare("DELETE FROM career_movements WHERE movement_id = ? AND logged_by = ? AND approval_status = 'Pending'");
+    $del->bind_param("ii", $movement_id, $current_user_id);
+    $del->execute();
+    $del->close();
+
+    logAudit($conn, $current_user_id, 'DELETE', 'Career Movement', $movement_id,
+        "HR Supervisor cancelled pending {$movement['movement_type']} request for {$movement['employee_name']}.");
+    redirectWith(BASE_URL . '/supervisor/career-movements.php', 'warning', 'Career movement cancelled successfully.');
+}
+
+// ── POST: Edit movement (HR Supervisor edits own HR Portal submission) ────────
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_movement'])) {
+    if (!$movement_ready) {
+        redirectWith(BASE_URL . '/supervisor/career-movements.php', 'danger', 'Career Movements could not be initialized.');
+    }
+    $movement_id       = (int)  ($_POST['movement_id']       ?? 0);
+    $movement_type     = trim(  $_POST['movement_type']       ?? '');
+    $new_position      = trim(  $_POST['new_position']        ?? '');
+    $new_branch_id     = ($_POST['new_branch_id'] ?? '') !== '' ? (int) $_POST['new_branch_id'] : null;
+    $effective_date    = trim(  $_POST['effective_date']      ?? '');
+    $reason            = trim(  $_POST['reason']              ?? '');
+    $allowed_types     = ['Promotion', 'Transfer', 'Demotion', 'Role Change'];
+
+    if ($movement_id <= 0 || !in_array($movement_type, $allowed_types, true) || $effective_date === '' || $reason === '') {
+        redirectWith(BASE_URL . '/supervisor/career-movements.php', 'danger', 'Please complete all required fields for the edit.');
+    }
+
+    if ($movement_type !== 'Transfer' && $new_position === '') {
+        redirectWith(BASE_URL . '/supervisor/career-movements.php', 'danger', 'New Position is required for ' . $movement_type . '.');
+    }
+
+    // Fetch movement — must be from HR Portal and submitted by current user (any status)
+    $stmt = $conn->prepare("
+        SELECT cm.*, CONCAT(e.first_name,' ',e.last_name) AS employee_name
+        FROM career_movements cm
+        JOIN employees e ON cm.employee_id = e.employee_id
+        WHERE cm.movement_id = ?
+          AND cm.logged_by = ?
+          AND cm.request_source = 'HR Portal'
+        LIMIT 1
+    ");
+    $stmt->bind_param("ii", $movement_id, $current_user_id);
+    $stmt->execute();
+    $movement = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    if (!$movement) {
+        redirectWith(BASE_URL . '/supervisor/career-movements.php', 'danger', 'Movement not found or you are not authorized to edit it.');
+    }
+
+    $upd = $conn->prepare("
+        UPDATE career_movements
+        SET movement_type  = ?,
+            new_position   = ?,
+            new_branch_id  = ?,
+            effective_date = ?,
+            reason         = ?
+        WHERE movement_id = ? AND logged_by = ?
+    ");
+    $upd->bind_param("ssissii", $movement_type, $new_position, $new_branch_id, $effective_date, $reason, $movement_id, $current_user_id);
+    $upd->execute();
+    $upd->close();
+
+    // If already approved and applied, re-apply the position/branch update directly to the employee's profile
+    if ($movement['approval_status'] === 'Approved' && (int)($movement['is_applied'] ?? 0) === 1) {
+        $updated_mv = array_merge($movement, [
+            'movement_type'  => $movement_type,
+            'new_position'   => $new_position,
+            'new_branch_id'  => $new_branch_id,
+            'effective_date' => $effective_date,
+            'reason'         => $reason
+        ]);
+        executeCareerMovementApplication($conn, $updated_mv, $movement_id);
+    }
+
+    logAudit($conn, $current_user_id, 'UPDATE', 'Career Movement', $movement_id,
+        "HR Supervisor edited {$movement['approval_status']} {$movement_type} request for {$movement['employee_name']}.");
+    redirectWith(BASE_URL . '/supervisor/career-movements.php', 'success', 'Career movement updated successfully.');
+}
+
 // ── Fetch display data ───────────────────────────────────────────────────────
 require_once '../includes/header.php';
 
@@ -749,7 +859,42 @@ function supCmStatusClass($s){return match($s){'Approved'=>'bg-success','Rejecte
                                         <?php elseif ($is_portal_req && $mv['portal_workflow_stage'] === 'Pending_Branch_Manager'): ?>
                                             <span class="small text-muted fst-italic" style="font-size:.72rem;">Awaiting BM</span>
                                         <?php elseif ($is_pending && $is_mine): ?>
-                                            <span class="badge bg-light text-dark border px-2 py-1" style="font-size:.68rem;" title="You submitted this request — awaiting HR Manager approval."><i class="fas fa-clock me-1 text-warning"></i>Awaiting Review</span>
+                                            <div class="d-inline-flex gap-1">
+                                                <button class="btn btn-sm fw-semibold px-2"
+                                                    style="background:linear-gradient(135deg,#0d4d0a,#1a6617);color:#fff;border:1px solid #CBA135;border-radius:6px;font-size:.72rem;"
+                                                    data-bs-toggle="modal" data-bs-target="#supEditModal"
+                                                    data-mvid="<?php echo (int)$mv['movement_id']; ?>"
+                                                    data-type="<?php echo e($mv['movement_type']); ?>"
+                                                    data-position="<?php echo e($mv['new_position']); ?>"
+                                                    data-branchid="<?php echo (int)($mv['new_branch_id'] ?? 0); ?>"
+                                                    data-date="<?php echo e($mv['effective_date']); ?>"
+                                                    data-reason="<?php echo e($mv['reason']); ?>"
+                                                    data-empname="<?php echo e($mv['employee_name']); ?>">
+                                                    <i class="fas fa-pencil-alt me-1" style="color:#CBA135;"></i>Edit
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-danger fw-semibold px-2"
+                                                    style="border-radius:6px;font-size:.72rem;"
+                                                    data-bs-toggle="modal" data-bs-target="#supCancelModal"
+                                                    data-mvid="<?php echo (int)$mv['movement_id']; ?>"
+                                                    data-empname="<?php echo e($mv['employee_name']); ?>"
+                                                    data-type="<?php echo e($mv['movement_type']); ?>">
+                                                    <i class="fas fa-ban me-1"></i>Cancel
+                                                </button>
+                                            </div>
+                                        <?php elseif ($is_mine): ?>
+                                            <!-- Own movement (non-pending): show Edit only -->
+                                            <button class="btn btn-sm fw-semibold px-2"
+                                                style="background:linear-gradient(135deg,#0d4d0a,#1a6617);color:#fff;border:1px solid #CBA135;border-radius:6px;font-size:.72rem;"
+                                                data-bs-toggle="modal" data-bs-target="#supEditModal"
+                                                data-mvid="<?php echo (int)$mv['movement_id']; ?>"
+                                                data-type="<?php echo e($mv['movement_type']); ?>"
+                                                data-position="<?php echo e($mv['new_position']); ?>"
+                                                data-branchid="<?php echo (int)($mv['new_branch_id'] ?? 0); ?>"
+                                                data-date="<?php echo e($mv['effective_date']); ?>"
+                                                data-reason="<?php echo e($mv['reason']); ?>"
+                                                data-empname="<?php echo e($mv['employee_name']); ?>">
+                                                <i class="fas fa-pencil-alt me-1" style="color:#CBA135;"></i>Edit
+                                            </button>
                                         <?php else: ?>
                                             <span class="small text-muted" style="font-size:.72rem;"><?php echo e($mv['approved_by_name']?:'Processed'); ?></span>
                                         <?php endif; ?>
@@ -1063,6 +1208,104 @@ function supCmStatusClass($s){return match($s){'Approved'=>'bg-success','Rejecte
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button type="submit" class="btn btn-danger"><i class="fas fa-times me-1"></i>Confirm Reject</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Cancel Confirmation Modal -->
+<div class="modal fade" id="supCancelModal" tabindex="-1" aria-labelledby="supCancelModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+            <div class="modal-header border-0" style="background:linear-gradient(135deg,#6c1c1c,#991f1f);">
+                <h5 class="modal-title text-white fw-bold" id="supCancelModalLabel">
+                    <i class="fas fa-ban me-2 text-warning"></i>Cancel Career Movement
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="text-center mb-3">
+                    <div class="rounded-circle d-inline-flex align-items-center justify-content-center mb-3 shadow-sm" style="width:56px;height:56px;background:rgba(220,53,69,0.1);border:2px solid rgba(220,53,69,0.3);">
+                        <i class="fas fa-exclamation-triangle text-danger" style="font-size:1.4rem;"></i>
+                    </div>
+                    <h6 class="fw-bold text-dark mb-1">Are you sure you want to cancel this request?</h6>
+                    <p class="text-muted small mb-0">This will permanently withdraw the <strong id="supCancelMvType"></strong> request for <strong id="supCancelEmpName"></strong>. This action cannot be undone.</p>
+                </div>
+            </div>
+            <div class="modal-footer border-0 pt-0 px-4 pb-4 d-flex gap-2">
+                <button type="button" class="btn btn-light fw-semibold flex-fill" style="border-radius:8px;" data-bs-dismiss="modal">
+                    <i class="fas fa-arrow-left me-1"></i>Keep Request
+                </button>
+                <form method="POST" class="flex-fill">
+                    <?php echo csrfField(); ?>
+                    <input type="hidden" name="movement_id" id="supCancelMvId">
+                    <input type="hidden" name="cancel_movement" value="1">
+                    <button type="submit" class="btn btn-danger fw-semibold w-100" style="border-radius:8px;">
+                        <i class="fas fa-ban me-1"></i>Yes, Cancel It
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Movement Modal -->
+<div class="modal fade" id="supEditModal" tabindex="-1" aria-labelledby="supEditModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+            <div class="modal-header border-0" style="background:linear-gradient(135deg,#082E06,#163e12);">
+                <h5 class="modal-title text-white fw-bold" id="supEditModalLabel">
+                    <i class="fas fa-pencil-alt me-2" style="color:#CBA135;"></i>Edit Career Movement
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" id="supEditForm">
+                <?php echo csrfField(); ?>
+                <input type="hidden" name="movement_id" id="supEditMvId">
+                <input type="hidden" name="edit_movement" value="1">
+                <div class="modal-body p-4">
+                    <p class="text-muted small mb-3"><i class="fas fa-user-tie me-1" style="color:#082E06;"></i>Editing request for: <strong id="supEditEmpName" class="text-dark"></strong></p>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold text-secondary small">Movement Type <span class="text-danger">*</span></label>
+                            <select class="form-select" name="movement_type" id="supEditMovType" required style="border-radius:8px;border-color:#c8d3c5;">
+                                <option value="Transfer">Transfer</option>
+                                <option value="Promotion">Promotion</option>
+                                <option value="Demotion">Demotion</option>
+                                <option value="Role Change">Role Change</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold text-secondary small">New Position <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" name="new_position" id="supEditPosition" placeholder="e.g. Senior Sales Associate" style="border-radius:8px;border-color:#c8d3c5;">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold text-secondary small">New Branch <span class="text-muted small">(optional)</span></label>
+                            <select class="form-select" name="new_branch_id" id="supEditBranch" style="border-radius:8px;border-color:#c8d3c5;">
+                                <option value="">No branch change</option>
+                                <?php foreach ($branches as $br): ?>
+                                    <option value="<?php echo (int)$br['branch_id']; ?>"><?php echo e($br['branch_name']); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold text-secondary small">Effective Date <span class="text-danger">*</span></label>
+                            <input type="date" class="form-control" name="effective_date" id="supEditDate" required style="border-radius:8px;border-color:#c8d3c5;">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold text-secondary small">Reason &amp; Justification <span class="text-danger">*</span></label>
+                            <textarea class="form-control" name="reason" id="supEditReason" rows="3" placeholder="Provide clear justification for this request..." required style="border-radius:8px;border-color:#c8d3c5;"></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 px-4 pb-4" style="background:#f8fbf7;">
+                    <button type="button" class="btn btn-light fw-semibold" style="border-radius:8px;" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-1"></i>Discard Changes
+                    </button>
+                    <button type="submit" class="btn fw-semibold text-white px-4" style="background:linear-gradient(135deg,#082E06,#163e12);border:1px solid #CBA135;border-radius:8px;">
+                        <i class="fas fa-save me-1" style="color:#CBA135;"></i>Save Changes
+                    </button>
                 </div>
             </form>
         </div>
@@ -1412,6 +1655,36 @@ document.addEventListener('DOMContentLoaded', function () {
             const btn = e.relatedTarget;
             document.getElementById('supRejectMvId').value          = btn.dataset.mvid;
             document.getElementById('supRejectEmpName').textContent = btn.dataset.empname;
+        });
+    }
+
+    // ── Cancel Modal ──────────────────────────────────────────────────────────
+    const cancelModal = document.getElementById('supCancelModal');
+    if (cancelModal) {
+        cancelModal.addEventListener('show.bs.modal', function (e) {
+            const btn = e.relatedTarget;
+            document.getElementById('supCancelMvId').value          = btn.dataset.mvid;
+            document.getElementById('supCancelEmpName').textContent = btn.dataset.empname;
+            document.getElementById('supCancelMvType').textContent  = btn.dataset.type;
+        });
+    }
+
+    // ── Edit Modal ────────────────────────────────────────────────────────────
+    const editModal = document.getElementById('supEditModal');
+    if (editModal) {
+        editModal.addEventListener('show.bs.modal', function (e) {
+            const btn = e.relatedTarget;
+            document.getElementById('supEditMvId').value         = btn.dataset.mvid;
+            document.getElementById('supEditEmpName').textContent= btn.dataset.empname;
+            document.getElementById('supEditPosition').value     = btn.dataset.position || '';
+            document.getElementById('supEditDate').value         = btn.dataset.date || '';
+            document.getElementById('supEditReason').value       = btn.dataset.reason || '';
+
+            const movTypeSel = document.getElementById('supEditMovType');
+            if (movTypeSel) movTypeSel.value = btn.dataset.type || '';
+
+            const branchSel = document.getElementById('supEditBranch');
+            if (branchSel) branchSel.value = btn.dataset.branchid && btn.dataset.branchid !== '0' ? btn.dataset.branchid : '';
         });
     }
 
