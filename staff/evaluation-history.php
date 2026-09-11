@@ -519,7 +519,12 @@ foreach ($all_history as $row):
     </div>
 <?php endforeach; ?>
 
+<script>
 let staffActiveStatus = 'All';
+
+function normalizeFilterValue(value) {
+    return String(value ?? '').trim().toLowerCase();
+}
 
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize tooltips
@@ -528,13 +533,19 @@ document.addEventListener('DOMContentLoaded', function() {
         return new bootstrap.Tooltip(tooltipTriggerEl);
     });
 
-    document.getElementById('historySearch')?.addEventListener('input', applyStaffFilters);
-    document.getElementById('staffDeptFilter')?.addEventListener('change', applyStaffFilters);
-    document.getElementById('staffTemplateFilter')?.addEventListener('change', applyStaffFilters);
+    const searchInput = document.getElementById('historySearch');
+    const deptFilter = document.getElementById('staffDeptFilter');
+    const templateFilter = document.getElementById('staffTemplateFilter');
+
+    searchInput?.addEventListener('input', applyStaffFilters);
+    deptFilter?.addEventListener('change', applyStaffFilters);
+    templateFilter?.addEventListener('change', applyStaffFilters);
+
+    applyStaffFilters();
 });
 
 function filterHistory(status, btn) {
-    staffActiveStatus = status;
+    staffActiveStatus = status || 'All';
     const container = btn.closest('.btn-group');
     if (container) {
         container.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
@@ -544,18 +555,24 @@ function filterHistory(status, btn) {
 }
 
 function applyStaffFilters() {
-    const q = (document.getElementById('historySearch')?.value || '').toLowerCase().trim();
-    const selDept = document.getElementById('staffDeptFilter')?.value || 'All';
-    const selTmpl = document.getElementById('staffTemplateFilter')?.value || 'All';
+    const q = normalizeFilterValue(document.getElementById('historySearch')?.value);
+    const selDept = normalizeFilterValue(document.getElementById('staffDeptFilter')?.value || 'All');
+    const selTmpl = normalizeFilterValue(document.getElementById('staffTemplateFilter')?.value || 'All');
     const rows = document.querySelectorAll('#historyTable tbody tr.history-row');
     let visible = 0;
 
     rows.forEach(row => {
-        const statusMatch = staffActiveStatus === 'All' || row.dataset.status === staffActiveStatus;
-        const deptMatch = selDept === 'All' || (row.dataset.department || '') === selDept;
-        const tmplMatch = selTmpl === 'All' || (row.dataset.template || '') === selTmpl;
-        const searchMatch = !q || (row.dataset.search || '').includes(q);
+        const rowStatus = normalizeFilterValue(row.dataset.status);
+        const rowDept = normalizeFilterValue(row.dataset.department);
+        const rowTmpl = normalizeFilterValue(row.dataset.template);
+        const rowSearch = normalizeFilterValue(row.dataset.search);
+
+        const statusMatch = staffActiveStatus === 'All' || rowStatus === normalizeFilterValue(staffActiveStatus);
+        const deptMatch = selDept === 'all' || rowDept === selDept;
+        const tmplMatch = selTmpl === 'all' || rowTmpl === selTmpl;
+        const searchMatch = !q || rowSearch.includes(q);
         const show = statusMatch && deptMatch && tmplMatch && searchMatch;
+
         row.style.display = show ? '' : 'none';
         if (show) visible++;
     });

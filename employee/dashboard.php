@@ -43,9 +43,15 @@ $eval_stmt = $conn->prepare("
     SELECT ev.evaluation_id, ev.status, ev.evaluation_type,
            ev.evaluation_period_start, ev.evaluation_period_end,
            ev.total_score, ev.performance_level,
-           et.template_name AS template_title
+            et.template_name AS template_title,
+            ep.package_id, ep.status AS package_status,
+            ep.current_step_order, rs.step_label AS current_step_label
     FROM evaluations ev
     LEFT JOIN evaluation_templates et ON ev.template_id = et.template_id
+        LEFT JOIN evaluation_package_members pm ON pm.evaluation_id = ev.evaluation_id
+        LEFT JOIN evaluation_packages ep ON ep.package_id = pm.package_id
+        LEFT JOIN evaluation_package_route_steps rs
+         ON rs.package_id = ep.package_id AND rs.step_order = ep.current_step_order
     WHERE ev.employee_id = ? AND ev.deleted_at IS NULL
     ORDER BY ev.created_at DESC
     LIMIT 1
@@ -220,6 +226,8 @@ function evalStatusBadge(string $status): string {
         'Pending Supervisor'       => ['info',      'fa-user-check'],
         'Pending HR Consolidation' => ['primary',   'fa-layer-group'],
         'Pending Manager'          => ['primary',   'fa-user-tie'],
+        'Pending Team Consolidation' => ['warning text-dark', 'fa-users'],
+        'Submitted'                => ['info',      'fa-layer-group'],
         'Supervisor Confirmed'     => ['success',   'fa-check-double'],
         'Approved'                 => ['success',   'fa-check-circle'],
         'Rejected'                 => ['danger',    'fa-times-circle'],
@@ -379,7 +387,7 @@ function movementIcon(string $type): string {
 <div class="dashboard-grid row g-4 fadeup align-items-stretch">
 
     <!-- COLUMN 1: My Evaluation Status -->
-    <div class="col-12 col-lg-4 d-flex flex-column">
+    <div class="col-12 col-lg-6 d-flex flex-column">
 
         <!-- Current Evaluation Status -->
         <div class="content-card mb-4">
@@ -439,7 +447,34 @@ function movementIcon(string $type): string {
                 $current_status = $active_eval['status'] ?? '';
                 $hr_role = $employee_hr_role;
 
-                if ($hr_role === 'HR Manager') {
+                $package_workflow = !empty($active_eval['package_id']);
+                if ($package_workflow) {
+                    // Organization packages use their configured department route.
+                    $workflow_labels = ['Team Self-Ratings'];
+                    $route_stmt = $conn->prepare('SELECT step_label FROM evaluation_package_route_steps WHERE package_id = ? ORDER BY step_order');
+                    $route_package_id = (int)$active_eval['package_id'];
+                    $route_stmt->bind_param('i', $route_package_id);
+                    $route_stmt->execute();
+                    $route_result = $route_stmt->get_result();
+                    while ($route_step = $route_result->fetch_assoc()) {
+                        $workflow_labels[] = $route_step['step_label'];
+                    }
+                    $route_stmt->close();
+                    $workflow_labels[] = 'Approved';
+                    $workflow_steps = $workflow_labels;
+
+                    $package_status = $active_eval['package_status'] ?? '';
+                    $package_step = (int)($active_eval['current_step_order'] ?? 0);
+                    if ($package_status === 'Approved and Applied' || $current_status === 'Approved') {
+                        $step_index = count($workflow_labels) - 1;
+                    } elseif ($package_status === 'Returned' || $package_status === 'Cancelled' || $package_step <= 0) {
+                        $step_index = 0;
+                    } else {
+                        // Route step 1 follows the team self-rating stage at index 0.
+                        $step_index = min($package_step, count($workflow_labels) - 2);
+                    }
+                    $status_step_map = [];
+                } elseif ($hr_role === 'HR Manager') {
                     $workflow_steps  = ['Pending Self-Rating', 'Pending Supervisor', 'Approved'];
                     $workflow_labels = ['Self-Rating', 'HR Supervisor', 'Approved'];
                     $status_step_map = [
@@ -548,12 +583,14 @@ function movementIcon(string $type): string {
                     }
                 }
 
-                $step_index = $status_step_map[$current_status] ?? null;
-                if ($step_index === null) {
-                    $step_index = array_search($current_status, $workflow_steps, true);
-                }
-                if ($step_index === false || $step_index === null) {
-                    $step_index = count($workflow_steps) - 1;
+                if (!$package_workflow) {
+                    $step_index = $status_step_map[$current_status] ?? null;
+                    if ($step_index === null) {
+                        $step_index = array_search($current_status, $workflow_steps, true);
+                    }
+                    if ($step_index === false || $step_index === null) {
+                        $step_index = count($workflow_steps) - 1;
+                    }
                 }
                 $total_steps  = count($workflow_steps) - 1;
                 $progress_pct = $total_steps > 0 ? round(($step_index / $total_steps) * 100) : 100;
@@ -602,7 +639,7 @@ function movementIcon(string $type): string {
     </div>
 
     <!-- COLUMN 2: Career Timeline -->
-    <div class="col-12 col-lg-4 d-flex flex-column gap-4">
+    <div class="col-12 col-lg-6 d-flex flex-column gap-4">
 
         <?php if ($show_validation_queue): ?>
         <!-- HR Supervisor Validation Queue -->
@@ -723,56 +760,6 @@ function movementIcon(string $type): string {
                     <p class="text-muted mt-3 mb-0">No career movements on record.</p>
                 </div>
                 <?php endif; ?>
-            </div>
-        </div>
-    </div>
-
-    <!-- COLUMN 3: Employment Snapshot -->
-    <div class="col-12 col-lg-4 d-flex flex-column">
-        <!-- Employment Snapshot -->
-        <div class="content-card mb-0 h-100">
-            <div class="content-card-header">
-                <h2 class="content-card-title">
-                    <i class="fas fa-id-badge" aria-hidden="true"></i>
-                    Employment Snapshot
-                </h2>
-                <a href="<?php echo BASE_URL; ?>/employee/my-employment.php" class="btn btn-sm btn-outline-primary">Full Details</a>
-            </div>
-            <div class="content-card-body p-0" style="padding: 0 !important; display: block;">
-                <table class="table table-borderless table-striped-custom mb-0" style="font-size:.85rem; width: 100%;">
-                    <tr>
-                        <td class="text-muted px-3 py-2" style="width:40%;">Company ID</td>
-                        <td class="px-3 py-2 fw-semibold"><?php echo e(getEmployeeDisplayId($emp)); ?></td>
-                    </tr>
-                    <tr>
-                        <td class="text-muted px-3 py-2">Full Name</td>
-                        <td class="px-3 py-2 fw-semibold"><?php echo e(trim(($emp['first_name'] ?? '') . ' ' . ($emp['last_name'] ?? ''))); ?></td>
-                    </tr>
-                    <tr>
-                        <td class="text-muted px-3 py-2">Position</td>
-                        <td class="px-3 py-2 fw-semibold"><?php echo e($emp['job_title'] ?? '—'); ?></td>
-                    </tr>
-                    <tr>
-                        <td class="text-muted px-3 py-2">Department</td>
-                        <td class="px-3 py-2 fw-semibold"><?php echo e($emp['department_name'] ?? '—'); ?></td>
-                    </tr>
-                    <tr>
-                        <td class="text-muted px-3 py-2">Branch</td>
-                        <td class="px-3 py-2 fw-semibold"><?php echo e($emp['branch_name'] ?? '—'); ?></td>
-                    </tr>
-                    <tr>
-                        <td class="text-muted px-3 py-2">Employment Type</td>
-                        <td class="px-3 py-2 fw-semibold"><?php echo e($emp['employment_type'] ?? '—'); ?></td>
-                    </tr>
-                    <tr>
-                        <td class="text-muted px-3 py-2">Hire Date</td>
-                        <td class="px-3 py-2 fw-semibold"><?php echo formatDate($emp['hire_date'] ?? ''); ?></td>
-                    </tr>
-                    <tr>
-                        <td class="text-muted px-3 py-2">Years of Service</td>
-                        <td class="px-3 py-2 fw-semibold"><?php echo $years_of_service; ?> yr<?php echo $years_of_service != 1 ? 's' : ''; ?></td>
-                    </tr>
-                </table>
             </div>
         </div>
     </div>

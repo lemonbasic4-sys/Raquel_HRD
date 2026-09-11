@@ -21,6 +21,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['import_csv'])) {
         redirectWith($employee_portal_base . '/add-employee.php', 'danger', 'Please upload a valid CSV file.');
     }
 
+    $uploadedName = $_FILES['employee_csv']['name'] ?? '';
+    $uploadedExtension = strtolower(pathinfo($uploadedName, PATHINFO_EXTENSION));
+    $uploadedHandle = fopen($_FILES['employee_csv']['tmp_name'], 'rb');
+    $uploadedSignature = $uploadedHandle ? fread($uploadedHandle, 2) : false;
+    if ($uploadedHandle) {
+        fclose($uploadedHandle);
+    }
+    if ($uploadedExtension !== 'csv' || $uploadedSignature === "PK") {
+        redirectWith($employee_portal_base . '/add-employee.php', 'danger', 'Excel files are not supported here. Save the workbook as CSV UTF-8, then upload the .csv file.');
+    }
+
     $file = fopen($_FILES['employee_csv']['tmp_name'], 'r');
     if (!$file)
         redirectWith($employee_portal_base . '/add-employee.php', 'danger', 'Could not read the uploaded file.');
@@ -40,7 +51,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['import_csv'])) {
     $skipped = 0;
     $errors = [];
 
-    $allowed_statuses = ['OJT', 'Probationary', 'Project Based', 'Project-Based', 'Regular', 'Separated', 'Trainee', 'AWOL', 'Retirement', 'Death', 'Permanent of Total Disability', 'Resignation', 'Failed in Training', 'Termination for Cause'];
+    $parseCsvDate = static function ($value) {
+        $value = trim((string) $value);
+        if ($value === '' || strpos($value, "\0") !== false) {
+            return null;
+        }
+
+        foreach (['m/d/Y', 'n/j/Y', 'Y-m-d'] as $format) {
+            $date = DateTime::createFromFormat($format, $value);
+            $dateErrors = DateTime::getLastErrors();
+            if ($date && ($dateErrors === false || ($dateErrors['warning_count'] === 0 && $dateErrors['error_count'] === 0))) {
+                return $date->format('Y-m-d');
+            }
+        }
+
+        return null;
+    };
+
+    $allowed_statuses = ['OJT', 'Probationary', 'Project Based', 'Project-Based', 'Regular', 'Separated', 'Trainee', 'AWOL', 'Retirement', 'Death', 'Permanent or Total Disability', 'Resignation', 'Failed in Training', 'Termination for Cause'];
 
     while (($row = fgetcsv($file)) !== false) {
         if (empty(array_filter($row)))
@@ -63,28 +91,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['import_csv'])) {
         $employee_code = $getV('Company ID', 39);
 
         $dobRaw = $getV('Birthday', 4);
-        $dob = null;
-        if (!empty($dobRaw)) {
-            $d1 = DateTime::createFromFormat('m/d/Y', $dobRaw) ?: DateTime::createFromFormat('Y-m-d', $dobRaw);
-            if ($d1)
-                $dob = $d1->format('Y-m-d');
-            else
-                $dob = $dobRaw;
-        }
+        $dob = $parseCsvDate($dobRaw);
 
         $pob = $getV('Birthplace', 5);
         $gender = $getV('Gender', 6);
         $civil_status = $getV('Civil Status', 7);
 
         $hireDateRaw = $getV('Hire Date', 33);
-        $hd = null;
-        if (!empty($hireDateRaw)) {
-            $d2 = DateTime::createFromFormat('m/d/Y', $hireDateRaw) ?: DateTime::createFromFormat('Y-m-d', $hireDateRaw);
-            if ($d2)
-                $hd = $d2->format('Y-m-d');
-            else
-                $hd = $hireDateRaw;
-        }
+        $hd = $parseCsvDate($hireDateRaw);
 
         $job_title_name = $getV('Job Title', 34);
         $rank_name_csv  = $getV('Rank');
@@ -94,20 +108,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['import_csv'])) {
         $emp_type = $getV('Employment Type', 38) ?: 'Full-time';
 
         $csRaw = $getV('Contract Start Date');
-        $contract_start_date = null;
-        if (!empty($csRaw)) {
-            $dCS = DateTime::createFromFormat('m/d/Y', $csRaw) ?: DateTime::createFromFormat('Y-m-d', $csRaw);
-            if ($dCS) $contract_start_date = $dCS->format('Y-m-d');
-            else $contract_start_date = $csRaw;
-        }
+        $contract_start_date = $parseCsvDate($csRaw);
 
         $ceRaw = $getV('Contract End Date');
-        $contract_end_date = null;
-        if (!empty($ceRaw)) {
-            $dCE = DateTime::createFromFormat('m/d/Y', $ceRaw) ?: DateTime::createFromFormat('Y-m-d', $ceRaw);
-            if ($dCE) $contract_end_date = $dCE->format('Y-m-d');
-            else $contract_end_date = $ceRaw;
-        }
+        $contract_end_date = $parseCsvDate($ceRaw);
 
         // Validate Status against ENUM 
         $foundStatus = false;
@@ -383,13 +387,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['import_csv'])) {
             $child_name = $has_detailed_family_columns ? $getV('Child 1 First Name') : $getV('Child 1 Name', 49);
             $child_middle_name = $has_detailed_family_columns ? $getV('Child 1 Middle Name') : '';
             $child_dob_raw = $has_detailed_family_columns ? $getV('Child 1 Birthday') : $getV('Child 1 Birthday', 50);
-            $child_dob = null;
-            if (!empty($child_dob_raw)) {
-                $d = DateTime::createFromFormat('m/d/Y', $child_dob_raw)
-                  ?: DateTime::createFromFormat('n/j/Y', $child_dob_raw)
-                  ?: DateTime::createFromFormat('Y-m-d', $child_dob_raw);
-                if ($d) $child_dob = $d->format('Y-m-d');
-            }
+                        $child_dob = $parseCsvDate($child_dob_raw);
             $conn->query("DELETE FROM employee_children WHERE employee_id = $eid");
             if (!empty($child_surname) || !empty($child_name)) {
                 $stmt = $conn->prepare("INSERT INTO employee_children (employee_id, surname, first_name, middle_name, date_of_birth) VALUES (?,?,?,?,?)");
@@ -402,13 +400,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['import_csv'])) {
             $sib_name = $has_detailed_family_columns ? $getV('Sibling 1 First Name') : $getV('Sibling 1 Name', 51);
             $sib_middle_name = $has_detailed_family_columns ? $getV('Sibling 1 Middle Name') : '';
             $sib_dob_raw = $has_detailed_family_columns ? $getV('Sibling 1 Birthday') : $getV('Sibling 1 Birthday', 52);
-            $sib_dob = null;
-            if (!empty($sib_dob_raw)) {
-                $d = DateTime::createFromFormat('m/d/Y', $sib_dob_raw)
-                  ?: DateTime::createFromFormat('n/j/Y', $sib_dob_raw)
-                  ?: DateTime::createFromFormat('Y-m-d', $sib_dob_raw);
-                if ($d) $sib_dob = $d->format('Y-m-d');
-            }
+                        $sib_dob = $parseCsvDate($sib_dob_raw);
             $conn->query("DELETE FROM employee_siblings WHERE employee_id = $eid");
             if (!empty($sib_surname) || !empty($sib_name)) {
                 $stmt = $conn->prepare("INSERT INTO employee_siblings (employee_id, surname, first_name, middle_name, date_of_birth) VALUES (?,?,?,?,?)");
@@ -1334,8 +1326,7 @@ $stepLabels = [
                         aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <p class="small text-muted mb-3">Upload a CSV file to bulk import complete employee records. Ensure
-                        your file matches the system's exact column format.</p>
+                    <p class="small text-muted mb-3">Upload a CSV UTF-8 file to bulk import complete employee records. Excel workbooks (.xlsx) are not supported; save them as CSV first. Ensure your file matches the system's exact column format.</p>
 
                     <div class="mb-3">
                         <label for="employee_csv" class="form-label fw-bold">Select CSV File</label>

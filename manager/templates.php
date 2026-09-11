@@ -288,7 +288,7 @@ $used_template_count = (int) $conn->query("SELECT COUNT(DISTINCT template_id) as
                 <div class="chart-card fadeup h-100 position-relative" style="transition:transform 0.2s,box-shadow 0.2s;cursor:pointer;" onmouseover="this.style.transform='translateY(-4px)';this.style.boxShadow='0 8px 25px rgba(0,0,0,0.08)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
                     <!-- Checkbox for Batch Delete -->
                     <div class="position-absolute" style="top: 15px; right: 15px; z-index: 10;">
-                        <input class="form-check-input template-checkbox shadow-sm border-secondary cursor-pointer" type="checkbox" name="template_ids[]" value="<?php echo $t['template_id']; ?>" style="width: 1.3rem; height: 1.3rem;" onchange="toggleBatchDeleteBtn()">
+                        <input class="template-checkbox" type="checkbox" name="template_ids[]" value="<?php echo $t['template_id']; ?>" aria-label="Select <?php echo e($t['template_name']); ?> for batch deletion" onchange="toggleBatchDeleteBtn()">
                     </div>
                     <div class="card-body p-4 pt-5">
                         <!-- Top -->
@@ -499,6 +499,38 @@ function confirmBatchDelete() {
 .bg-primary-subtle { background-color: #e3f2fd; }
 .bg-success-subtle { background-color: #e8f5e9; }
 .bg-info-subtle { background-color: #e0f7fa; }
+.template-checkbox {
+    appearance: none;
+    -webkit-appearance: none;
+    background: #fff;
+    border: 2px solid #8a98a8;
+    border-radius: 5px;
+    cursor: pointer;
+    display: block;
+    height: 20px !important;
+    margin: 0;
+    min-height: 20px !important;
+    min-width: 20px;
+    position: relative;
+    width: 20px !important;
+}
+.template-checkbox:hover { border-color: #294306; }
+.template-checkbox:checked { background: #294306; border-color: #294306; }
+.template-checkbox:checked::after {
+    border: solid #fff;
+    border-width: 0 2px 2px 0;
+    content: '';
+    height: 10px;
+    left: 6px;
+    position: absolute;
+    top: 2px;
+    transform: rotate(45deg);
+    width: 5px;
+}
+.template-checkbox:focus-visible {
+    outline: 3px solid rgba(189, 148, 20, .4);
+    outline-offset: 2px;
+}
 </style>
 
 <?php require_once '../includes/footer.php'; ?>

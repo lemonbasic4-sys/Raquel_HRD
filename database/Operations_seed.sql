@@ -1,5 +1,5 @@
 -- Mockup Employee Seeds for Operations Department
-USE raquel_hris;
+USE raquel_hris_Test;
 SET FOREIGN_KEY_CHECKS = 0;
 
 -- ====================================

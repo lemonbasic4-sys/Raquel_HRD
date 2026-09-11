@@ -66,7 +66,7 @@ $branches_res = $conn->query("SELECT branch_name FROM branches ORDER BY branch_n
 $branches = [];
 while ($r = $branches_res->fetch_assoc()) $branches[] = $r['branch_name'];
 
-$statuses = ['OJT','Probationary','Project Based','Regular','Separated','Trainee','AWOL','Retirement','Death','Permanent of Total Disability','Resignation','Failed in Training','Termination for Cause'];
+$statuses = ['OJT','Probationary','Project Based','Regular','Separated','Trainee','AWOL','Retirement','Death','Permanent or Total Disability','Resignation','Failed in Training','Termination for Cause'];
 ?>
 
 <style>

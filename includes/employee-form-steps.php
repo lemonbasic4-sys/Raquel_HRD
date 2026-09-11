@@ -1177,7 +1177,7 @@ $rankCategories = $rankCategories ?? [
         <div class="col-md-4 mb-3">
             <label class="form-label">Employment Status <span class="text-danger">*</span></label>
             <?php
-            $employmentStatuses = ['OJT', 'Probationary', 'Project Based', 'Regular', 'Separated', 'Trainee', 'AWOL', 'Retirement', 'Death', 'Permanent of Total Disability', 'Resignation', 'Failed in Training', 'Termination for Cause'];
+            $employmentStatuses = ['OJT', 'Probationary', 'Project Based', 'Regular', 'Separated', 'Trainee', 'AWOL', 'Retirement', 'Death', 'Permanent or Total Disability', 'Resignation', 'Failed in Training', 'Termination for Cause'];
             $employmentStatusValue = $e['employment_status'] ?? 'Regular';
             ?>
             <select class="form-select" name="employment_status" id="employment_status_select" required>
@@ -1342,93 +1342,6 @@ $rankCategories = $rankCategories ?? [
     });
     </script>
 
-        <!-- Summary Cards (populated dynamically by updatePDSSummary() on showStep(12)) -->
-        <div class="row mt-4 pt-3 border-top">
-            <div class="col-md-12">
-                <h5 class="fw-bold text-primary mb-3"><i class="fas fa-clipboard-list me-2"></i>PDS Summary Review</h5>
-                <div class="row">
-                    <div class="col-md-6 mb-3">
-                        <div class="card h-100 border border-light shadow-sm">
-                            <div class="card-header bg-light d-flex justify-content-between align-items-center py-2">
-                                <span class="fw-bold text-dark"><i class="fas fa-user-circle me-2 text-primary"></i>Core Identity</span>
-                                <button type="button" onclick="showStep(1)" class="btn btn-sm btn-link text-decoration-none p-0"><i class="fas fa-edit me-1"></i>Edit</button>
-                            </div>
-                            <div class="card-body py-3">
-                                <div class="row g-2 small">
-                                    <div class="col-5 text-muted">Full Name:</div><div class="col-7 fw-bold" id="sum-name">--</div>
-                                    <div class="col-5 text-muted">Date of Birth:</div><div class="col-7 fw-bold" id="sum-dob">--</div>
-                                    <div class="col-5 text-muted">Gender:</div><div class="col-7 fw-bold" id="sum-gender">--</div>
-                                    <div class="col-5 text-muted">Civil Status:</div><div class="col-7 fw-bold" id="sum-civil">--</div>
-                                    <div class="col-5 text-muted">Mobile No:</div><div class="col-7 fw-bold" id="sum-mobile">--</div>
-                                    <div class="col-5 text-muted">Email Address:</div><div class="col-7 fw-bold text-truncate" id="sum-email">--</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        <div class="card h-100 border border-light shadow-sm">
-                            <div class="card-header bg-light d-flex justify-content-between align-items-center py-2">
-                                <span class="fw-bold text-dark"><i class="fas fa-id-card me-2 text-primary"></i>Government IDs</span>
-                                <button type="button" onclick="showStep(1)" class="btn btn-sm btn-link text-decoration-none p-0"><i class="fas fa-edit me-1"></i>Edit</button>
-                            </div>
-                            <div class="card-body py-3">
-                                <div class="row g-2 small">
-                                    <div class="col-5 text-muted">SSS No:</div><div class="col-7 fw-bold" id="sum-sss">--</div>
-                                    <div class="col-5 text-muted">PhilHealth No:</div><div class="col-7 fw-bold" id="sum-philhealth">--</div>
-                                    <div class="col-5 text-muted">Pag-IBIG No:</div><div class="col-7 fw-bold" id="sum-pagibig">--</div>
-                                    <div class="col-5 text-muted">TIN No:</div><div class="col-7 fw-bold" id="sum-tin">--</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        <div class="card h-100 border border-light shadow-sm">
-                            <div class="card-header bg-light d-flex justify-content-between align-items-center py-2">
-                                <span class="fw-bold text-dark"><i class="fas fa-history me-2 text-primary"></i>Background</span>
-                                <button type="button" onclick="showStep(2)" class="btn btn-sm btn-link text-decoration-none p-0"><i class="fas fa-edit me-1"></i>Edit</button>
-                            </div>
-                            <div class="card-body py-3">
-                                <div class="row g-2 small">
-                                    <div class="col-5 text-muted">Children:</div><div class="col-7 fw-bold" id="sum-children">--</div>
-                                    <div class="col-5 text-muted">Siblings:</div><div class="col-7 fw-bold" id="sum-siblings">--</div>
-                                    <div class="col-5 text-muted">Education:</div><div class="col-7 fw-bold" id="sum-education">--</div>
-                                    <div class="col-5 text-muted">Work History:</div><div class="col-7 fw-bold" id="sum-work">--</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        <div class="card h-100 border border-light shadow-sm">
-                            <div class="card-header bg-light d-flex justify-content-between align-items-center py-2">
-                                <span class="fw-bold text-dark"><i class="fas fa-certificate me-2 text-primary"></i>Qualifications</span>
-                                <button type="button" onclick="showStep(7)" class="btn btn-sm btn-link text-decoration-none p-0"><i class="fas fa-edit me-1"></i>Edit</button>
-                            </div>
-                            <div class="card-body py-3">
-                                <div class="row g-2 small">
-                                    <div class="col-5 text-muted">Eligibility/PRC:</div><div class="col-7 fw-bold" id="sum-eligibility">--</div>
-                                    <div class="col-5 text-muted">Skills:</div><div class="col-7 fw-bold" id="sum-skills">--</div>
-                                    <div class="col-5 text-muted">Recognitions:</div><div class="col-7 fw-bold" id="sum-recognitions">--</div>
-                                    <div class="col-5 text-muted">Properties/Assets:</div><div class="col-7 fw-bold" id="sum-properties">--</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-12 mb-3">
-                        <div class="card border border-light shadow-sm">
-                            <div class="card-header bg-light d-flex justify-content-between align-items-center py-2">
-                                <span class="fw-bold text-dark"><i class="fas fa-exclamation-triangle me-2 text-primary"></i>Disclosures & Declarations</span>
-                                <button type="button" onclick="showStep(10)" class="btn btn-sm btn-link text-decoration-none p-0"><i class="fas fa-edit me-1"></i>Edit</button>
-                            </div>
-                            <div class="card-body py-3">
-                                <div class="row g-2 small">
-                                    <div class="col-5 text-muted">Active Declarations:</div><div class="col-7 fw-bold" id="sum-disclosures">--</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
     </div>
 
 <script>

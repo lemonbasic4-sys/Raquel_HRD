@@ -121,7 +121,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
         // 4. Notify the employee being evaluated
         if (!empty($eval_info['emp_user_id'])) {
-            createNotification($conn, $eval_info['emp_user_id'], 'Evaluation Approved', $app_msg, BASE_URL . '/employee/self-rating.php?view=' . $eval_id);
+            createNotification($conn, $eval_info['emp_user_id'], 'Evaluation Approved', $app_msg, BASE_URL . '/employee/evaluation-history-view.php?id=' . $eval_id);
         }
         logAudit($conn, $_SESSION['user_id'], 'UPDATE', 'Evaluation', $eval_id, "Approved evaluation for {$eval_info['emp_name']}");
         redirectWith(BASE_URL . '/manager/pending-approvals.php', 'success', 'Evaluation approved successfully.');
@@ -166,7 +166,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
         // Notify the employee being evaluated
         if (!empty($eval_info['emp_user_id'])) {
-            createNotification($conn, $eval_info['emp_user_id'], 'Evaluation Rejected', $rej_msg, BASE_URL . '/employee/self-rating.php?view=' . $eval_id);
+            createNotification($conn, $eval_info['emp_user_id'], 'Evaluation Rejected', $rej_msg, BASE_URL . '/employee/evaluation-history-view.php?id=' . $eval_id);
         }
 
         logAudit($conn, $_SESSION['user_id'], 'UPDATE', 'Evaluation', $eval_id, "Rejected evaluation for {$eval_info['emp_name']}");

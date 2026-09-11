@@ -61,7 +61,7 @@ while ($r = $dept_job_map_res->fetch_assoc()) {
     $dept_job_map[$r['department_name']][] = $r['job_title'];
 }
 
-$statuses = ['OJT', 'Probationary', 'Project Based', 'Regular', 'Separated', 'Trainee', 'AWOL', 'Retirement', 'Death', 'Permanent of Total Disability', 'Resignation', 'Failed in Training', 'Termination for Cause'];
+$statuses = ['OJT', 'Probationary', 'Project Based', 'Regular', 'Separated', 'Trainee', 'AWOL', 'Retirement', 'Death', 'Permanent or Total Disability', 'Resignation', 'Failed in Training', 'Termination for Cause'];
 ?>
 
 <style>

@@ -8,91 +8,76 @@ checkRole(['HR Staff']);
 require_once '../includes/functions.php';
 require_once '../includes/header.php';
 
-// Fetch stats for observer role
-$total_employees = $conn->query("SELECT COUNT(*) as c FROM employees WHERE is_active = 1")->fetch_assoc()['c'];
-$approved_count = $conn->query("SELECT COUNT(*) as c FROM evaluations WHERE status = 'Approved'")->fetch_assoc()['c'];
-$returned_count = $conn->query("SELECT COUNT(*) as c FROM evaluations WHERE status = 'Returned'")->fetch_assoc()['c'];
-$rejected_count = $conn->query("SELECT COUNT(*) as c FROM evaluations WHERE status = 'Rejected'")->fetch_assoc()['c'];
+// Fetch operational overview data for the observer role.
+$employee_scope = "employee_id NOT IN (SELECT employee_id FROM users WHERE role = 'Admin' AND employee_id IS NOT NULL)";
+$total_employees = (int)$conn->query("SELECT COUNT(*) as c FROM employees WHERE is_active = 1 AND $employee_scope")->fetch_assoc()['c'];
+$pending_changes = (int)$conn->query("SELECT COUNT(*) as c FROM employee_change_requests WHERE status = 'Pending'")->fetch_assoc()['c'];
+$active_packages = (int)$conn->query("SELECT COUNT(*) as c FROM evaluation_packages WHERE status <> 'Approved and Applied'")->fetch_assoc()['c'];
 
-// Recent finalized evaluations in the system
+$evaluation_status_counts = ['Approved' => 0, 'Returned' => 0, 'Rejected' => 0];
+$evaluation_status_result = $conn->query("SELECT status, COUNT(*) as total FROM evaluations WHERE status IN ('Approved', 'Returned', 'Rejected') GROUP BY status");
+if ($evaluation_status_result) {
+    while ($status_row = $evaluation_status_result->fetch_assoc()) {
+        $evaluation_status_counts[$status_row['status']] = (int)$status_row['total'];
+    }
+}
+
+$pending_requests = $conn->query("SELECT ecr.request_id, ecr.change_summary, ecr.created_at,
+        CONCAT(e.first_name, ' ', e.last_name) AS employee_name
+    FROM employee_change_requests ecr
+    JOIN employees e ON e.employee_id = ecr.employee_id
+    WHERE ecr.status = 'Pending'
+    ORDER BY ecr.created_at DESC LIMIT 4");
+
+$unread_notifications = 0;
+if (isset($_SESSION['user_id'])) {
+    $notification_stmt = $conn->prepare("SELECT COUNT(*) as c FROM notifications WHERE user_id = ? AND is_read = 0");
+    $notification_stmt->bind_param('i', $_SESSION['user_id']);
+    $notification_stmt->execute();
+    $unread_notifications = (int)($notification_stmt->get_result()->fetch_assoc()['c'] ?? 0);
+    $notification_stmt->close();
+}
+
+// Recent finalized evaluations in the system.
 $recent = $conn->query("
     SELECT ev.*, CONCAT(e.first_name, ' ', e.last_name) as employee_name, et.template_name
     FROM evaluations ev
     LEFT JOIN employees e ON ev.employee_id = e.employee_id
     LEFT JOIN evaluation_templates et ON ev.template_id = et.template_id
-    WHERE ev.status IN ('Approved', 'Rejected', 'Returned')
+    WHERE ev.status IN ('Approved', 'Rejected', 'Returned') AND e.$employee_scope
     ORDER BY ev.updated_at DESC LIMIT 5
 ");
 ?>
 
 <style>
-    .staff-dashboard .quick-action-grid {
-        display: grid;
-        gap: 14px;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    .staff-dashboard .quick-action-card {
+    .staff-dashboard .attention-list { padding: 8px 20px 18px; }
+    .staff-dashboard .attention-item {
         align-items: center;
-        background: #fff;
-        border: 1px solid #eef2e8;
-        border-radius: 14px;
-        color: inherit;
-        display: grid;
+        border-bottom: 1px solid #f0f4eb;
+        display: flex;
         gap: 12px;
-        grid-template-columns: 44px minmax(0, 1fr) 18px;
-        min-height: 92px;
-        padding: 16px;
-        text-decoration: none;
-        transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+        padding: 14px 0;
     }
-
-    .staff-dashboard .quick-action-card:hover {
-        border-color: var(--primary-light);
-        box-shadow: 0 10px 24px rgba(12, 32, 8, 0.08);
-        transform: translateY(-2px);
-    }
-
-    .staff-dashboard .quick-action-card .qa-icon {
+    .staff-dashboard .attention-item:last-child { border-bottom: 0; }
+    .staff-dashboard .attention-icon {
         align-items: center;
-        border-radius: 12px;
-        display: inline-flex;
-        height: 44px;
-        justify-content: center;
-        width: 44px;
-    }
-
-    .staff-dashboard .quick-action-card.primary .qa-icon {
-        background: rgba(41, 67, 6, 0.09);
-        color: var(--primary-blue);
-    }
-
-    .staff-dashboard .quick-action-card.gold .qa-icon {
-        background: rgba(189, 148, 20, 0.14);
+        background: rgba(189, 148, 20, 0.12);
+        border-radius: 10px;
         color: #a97800;
+        display: inline-flex;
+        flex-shrink: 0;
+        height: 36px;
+        justify-content: center;
+        width: 36px;
     }
-
-    .staff-dashboard .quick-action-card.info .qa-icon {
-        background: rgba(13, 110, 253, 0.1);
-        color: #0d6efd;
-    }
-
-    .staff-dashboard .quick-action-card.green .qa-icon {
-        background: rgba(25, 135, 84, 0.1);
-        color: #198754;
-    }
-
-    .staff-dashboard .quick-action-card strong {
-        display: block;
-        font-size: 0.95rem;
-        line-height: 1.2;
-    }
-
-    .staff-dashboard .quick-action-card small {
-        color: var(--text-muted);
-        display: block;
-        margin-top: 3px;
-    }
+    .staff-dashboard .attention-copy { flex: 1; min-width: 0; }
+    .staff-dashboard .attention-copy strong { display: block; font-size: .86rem; }
+    .staff-dashboard .attention-copy small { color: var(--text-muted); display: block; margin-top: 2px; }
+    .staff-dashboard .status-row { margin: 0 20px; padding: 14px 0; }
+    .staff-dashboard .status-row + .status-row { border-top: 1px solid #f0f4eb; }
+    .staff-dashboard .status-label { display: flex; justify-content: space-between; font-size: .82rem; font-weight: 600; margin-bottom: 6px; }
+    .staff-dashboard .status-track { background: #edf1ea; border-radius: 99px; height: 7px; overflow: hidden; }
+    .staff-dashboard .status-fill { border-radius: inherit; height: 100%; }
 
     .staff-dashboard .submission-list {
         padding: 15px;
@@ -216,14 +201,8 @@ $recent = $conn->query("
     }
 
     @media (max-width: 768px) {
-        .staff-dashboard .quick-action-grid,
         .staff-dashboard .submission-item {
             grid-template-columns: 1fr;
-        }
-
-        .staff-dashboard .quick-action-card {
-            grid-template-columns: 42px minmax(0, 1fr) 18px;
-            min-height: 82px;
         }
 
         .staff-dashboard .submission-item {
@@ -276,10 +255,10 @@ $recent = $conn->query("
             <div class="stat-card">
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
-                        <div class="stat-value"><?php echo $approved_count; ?></div>
-                        <div class="stat-label">Approved Evaluations</div>
+                        <div class="stat-value"><?php echo $pending_changes; ?></div>
+                        <div class="stat-label">Pending Changes</div>
                     </div>
-                    <i class="fas fa-check-circle stat-icon" style="color:#28a745;"></i>
+                    <i class="fas fa-clock stat-icon" style="color:#ffc107;"></i>
                 </div>
             </div>
         </div>
@@ -287,10 +266,10 @@ $recent = $conn->query("
             <div class="stat-card">
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
-                        <div class="stat-value"><?php echo $returned_count; ?></div>
-                        <div class="stat-label">Returned Evaluations</div>
+                        <div class="stat-value"><?php echo $active_packages; ?></div>
+                        <div class="stat-label">Active Packages</div>
                     </div>
-                    <i class="fas fa-undo stat-icon" style="color:#ffc107;"></i>
+                    <i class="fas fa-layer-group stat-icon" style="color:#BD9414;"></i>
                 </div>
             </div>
         </div>
@@ -298,10 +277,10 @@ $recent = $conn->query("
             <div class="stat-card">
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
-                        <div class="stat-value"><?php echo $rejected_count; ?></div>
-                        <div class="stat-label">Rejected Evaluations</div>
+                        <div class="stat-value"><?php echo $unread_notifications; ?></div>
+                        <div class="stat-label">Unread Notifications</div>
                     </div>
-                    <i class="fas fa-times-circle stat-icon" style="color:#dc3545;"></i>
+                    <i class="fas fa-bell stat-icon" style="color:#0d6efd;"></i>
                 </div>
             </div>
         </div>
@@ -309,70 +288,58 @@ $recent = $conn->query("
 </div>
 
 <div class="row g-4 mb-4">
-    <div class="col-lg-8">
+    <div class="col-lg-7">
         <div class="chart-card h-100">
-            <div class="cc-header">
-                <h5 class="mb-0"><i class="fas fa-bolt me-2"></i>Workspace Navigation</h5>
+            <div class="cc-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-inbox me-2"></i>Needs Attention</h5>
+                <span class="text-muted small">Current workload</span>
             </div>
-            <div class="cc-body">
-                <div class="quick-action-grid">
-                    <a href="<?php echo BASE_URL; ?>/staff/search-employees.php" class="quick-action-card primary">
-                        <span class="qa-icon"><i class="fas fa-users"></i></span>
-                        <span>
-                            <strong>Employee Directory</strong>
-                            <small>Search and view active employee profiles.</small>
-                        </span>
-                        <i class="fas fa-chevron-right text-muted"></i>
-                    </a>
-                    <a href="<?php echo BASE_URL; ?>/staff/evaluation-history.php" class="quick-action-card gold">
-                        <span class="qa-icon"><i class="fas fa-history"></i></span>
-                        <span>
-                            <strong>Evaluation History</strong>
-                            <small>Comprehensive read-only record archive.</small>
-                        </span>
-                        <i class="fas fa-chevron-right text-muted"></i>
-                    </a>
-                    <a href="<?php echo BASE_URL; ?>/staff/career-movements.php" class="quick-action-card green">
-                        <span class="qa-icon"><i class="fas fa-route"></i></span>
-                        <span>
-                            <strong>Career Movements</strong>
-                            <small>Validation & progression pathways.</small>
-                        </span>
-                        <span class="badge bg-warning text-dark px-2 rounded-pill small" style="font-size:0.6rem;white-space:nowrap;">DEV</span>
-                    </a>
+            <div class="attention-list">
+                <div class="attention-item">
+                    <span class="attention-icon"><i class="fas fa-user-pen"></i></span>
+                    <div class="attention-copy">
+                        <strong>Employee change requests</strong>
+                        <small><?php echo $pending_changes; ?> pending request<?php echo $pending_changes === 1 ? '' : 's'; ?> in the approval queue.</small>
+                    </div>
+                    <a href="<?php echo BASE_URL; ?>/staff/employees.php" class="btn btn-sm btn-outline-primary" title="View employee change requests"><i class="fas fa-arrow-up-right-from-square"></i></a>
                 </div>
+                <div class="attention-item">
+                    <span class="attention-icon"><i class="fas fa-layer-group"></i></span>
+                    <div class="attention-copy">
+                        <strong>Evaluation packages</strong>
+                        <small><?php echo $active_packages; ?> package<?php echo $active_packages === 1 ? '' : 's'; ?> still in progress.</small>
+                    </div>
+                    <a href="<?php echo BASE_URL; ?>/staff/package-tracker.php" class="btn btn-sm btn-outline-primary" title="View evaluation packages"><i class="fas fa-arrow-up-right-from-square"></i></a>
+                </div>
+                <div class="attention-item">
+                    <span class="attention-icon"><i class="fas fa-bell"></i></span>
+                    <div class="attention-copy">
+                        <strong>Notifications</strong>
+                        <small><?php echo $unread_notifications; ?> unread notification<?php echo $unread_notifications === 1 ? '' : 's'; ?> for your account.</small>
+                    </div>
+                    <a href="<?php echo BASE_URL; ?>/staff/notifications.php" class="btn btn-sm btn-outline-primary" title="View notifications"><i class="fas fa-arrow-up-right-from-square"></i></a>
+                </div>
+                <?php if ($pending_changes === 0 && $active_packages === 0 && $unread_notifications === 0): ?>
+                    <div class="text-center text-muted small py-3"><i class="fas fa-check-circle text-success me-1"></i>No outstanding items.</div>
+                <?php endif; ?>
             </div>
         </div>
     </div>
-
-    <div class="col-lg-4">
-        <div class="chart-card workflow-card">
-            <div class="cc-header">
-                <h5 class="mb-0"><i class="fas fa-route me-2"></i>System Flow (Observer)</h5>
+    <div class="col-lg-5">
+        <div class="chart-card h-100">
+            <div class="cc-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Evaluation Status</h5>
+                <a href="<?php echo BASE_URL; ?>/staff/evaluation-history.php" class="text-primary small">View history</a>
             </div>
-            <div class="cc-body">
-                <div class="workflow-step">
-                    <span class="step-icon"><i class="fas fa-users-viewfinder"></i></span>
-                    <div>
-                        <div class="fw-bold small text-dark">Directory Lookups</div>
-                        <small class="text-muted">Quickly locate active employee codes, department listings, and branch locations.</small>
-                    </div>
+            <?php $evaluation_total = array_sum($evaluation_status_counts); ?>
+            <?php foreach (['Approved' => ['bg-success', 'fa-check-circle'], 'Returned' => ['bg-warning', 'fa-undo'], 'Rejected' => ['bg-danger', 'fa-times-circle']] as $status_label => $status_meta): ?>
+                <?php $status_total = $evaluation_status_counts[$status_label]; $status_width = $evaluation_total > 0 ? ($status_total / $evaluation_total) * 100 : 0; ?>
+                <div class="status-row">
+                    <div class="status-label"><span><?php echo $status_label; ?></span><span><?php echo $status_total; ?></span></div>
+                    <div class="status-track"><div class="status-fill <?php echo $status_meta[0]; ?>" style="width:<?php echo $status_width; ?>%;"></div></div>
                 </div>
-                <div class="workflow-step">
-                    <span class="step-icon"><i class="fas fa-file-invoice"></i></span>
-                    <div>
-                        <div class="fw-bold small text-dark">Audit Rating Archives</div>
-                        <small class="text-muted">Review score sheets, supervisor adjustments, and manager overrides read-only.</small>
-                    </div>
-                </div>
-                <div class="workflow-step">
-                    <span class="step-icon"><i class="fas fa-route"></i></span>
-                    <div>
-                        <div class="fw-bold small text-dark">Monitor Progression</div>
-                        <small class="text-muted">Career tracking modules under future deployment.</small>
-                    </div>
-                </div>
-            </div>
+            <?php endforeach; ?>
+            <div class="text-muted small px-4 pb-3">Finalized records available to the HR Staff archive: <strong><?php echo $evaluation_total; ?></strong></div>
         </div>
     </div>
 </div>

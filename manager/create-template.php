@@ -765,8 +765,37 @@ require_once '../includes/header.php';
 <!-- ============================================================ -->
 <!-- STAGE 5 POP-UP MODAL: WHOLE DETAILS OF THE TEMPLATE STATUS -->
 <!-- ============================================================ -->
+<style>
+    #templateStatusModal .template-status-modal-dialog {
+        max-width: 960px;
+    }
+
+    #templateStatusModal .modal-body {
+        max-height: 68vh !important;
+    }
+
+    @media (max-width: 767.98px) {
+        #templateStatusModal .template-status-modal-dialog {
+            margin: .5rem;
+            max-width: none;
+        }
+
+        #templateStatusModal .modal-header,
+        #templateStatusModal .modal-footer {
+            padding: 1rem !important;
+        }
+
+        #templateStatusModal .modal-title {
+            font-size: 1rem;
+        }
+
+        #templateStatusModal .modal-header .fa-2x {
+            font-size: 1.25em;
+        }
+    }
+</style>
 <div class="modal fade" id="templateStatusModal" tabindex="-1" aria-labelledby="templateStatusModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-xl">
+    <div class="modal-dialog modal-dialog-centered template-status-modal-dialog">
         <div class="modal-content border-0 shadow-lg" style="border-radius:20px; overflow:hidden;">
             <!-- Modal Header -->
             <div class="modal-header border-0 p-4 text-white" style="background: linear-gradient(135deg, #102a43, #243b53);">
@@ -783,7 +812,7 @@ require_once '../includes/header.php';
             </div>
 
             <!-- Modal Body -->
-            <div class="modal-body p-4 style-custom-scrollbar" style="max-height: 75vh; overflow-y: auto; background:#f8f9fa;">
+            <div class="modal-body p-4 style-custom-scrollbar" style="overflow-y: auto; background:#f8f9fa;">
                 
                 <!-- System Status Checks Banner -->
                 <div class="card border-0 shadow-sm mb-4" style="border-radius:14px;">

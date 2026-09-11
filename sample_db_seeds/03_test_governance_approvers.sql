@@ -9,7 +9,7 @@
 --   Step 6: Audit Committee                    -> Isabel Mendoza (AUD-S01, 90202)
 --   Step 7: Board of Directors (Final Lock)     -> Manuel Ramos (AUD-M01, 90203)
 -- ============================================================================
-USE raquel_hris;
+USE raquel_hris_Test;
 
 -- Ensure table exists before seeding (same shape as includes/functions.php)
 CREATE TABLE IF NOT EXISTS evaluation_governance_approvers (

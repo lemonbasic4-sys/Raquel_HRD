@@ -9,6 +9,16 @@ ensureEvaluationWorkflowSchema($conn);
 $employee_id = (int) ($_SESSION['employee_id'] ?? 0);
 $user_id = (int) ($_SESSION['user_id'] ?? 0);
 
+// Read-only evaluation views belong in the history audit trail. Keep this page
+// for the active self-rating workflow (new, draft, returned, and edit modes).
+if (isset($_GET['view']) && is_numeric($_GET['view']) && (int)$_GET['view'] > 0) {
+    redirectWith(
+        BASE_URL . '/employee/evaluation-history-view.php?id=' . (int)$_GET['view'],
+        'info',
+        'Evaluation details are now available in Evaluation History & Audit Trail.'
+    );
+}
+
 // Validate user_id exists in users table to prevent FK constraint failure
 $user_id_nullable = null;
 if ($user_id > 0) {
@@ -2134,7 +2144,7 @@ require_once '../includes/header.php';
                                         <?php endif; ?>
                                     </div>
                                     <div class="mt-3">
-                                        <a href="<?php echo BASE_URL; ?>/employee/self-rating.php?view=<?php echo (int) $item['evaluation_id']; ?>"
+                                        <a href="<?php echo BASE_URL; ?>/employee/evaluation-history-view.php?id=<?php echo (int) $item['evaluation_id']; ?>"
                                             class="btn btn-sm btn-outline-info me-2">
                                             <i class="fas fa-eye me-1"></i>View
                                         </a>

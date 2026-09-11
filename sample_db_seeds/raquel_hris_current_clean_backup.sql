@@ -981,7 +981,7 @@ CREATE TABLE `employees` (
   `rank_category_id` int(11) DEFAULT NULL,
   `branch_id` int(11) DEFAULT NULL,
   `reports_to` int(11) DEFAULT NULL,
-  `employment_status` enum('OJT','Probationary','Project Based','Regular','Separated','Trainee','AWOL','Retirement','Death','Permanent of Total Disability','Resignation','Failed in Training','Termination for Cause') DEFAULT 'Regular',
+  `employment_status` enum('OJT','Probationary','Project Based','Regular','Separated','Trainee','AWOL','Retirement','Death','Permanent or Total Disability','Resignation','Failed in Training','Termination for Cause') DEFAULT 'Regular',
   `employment_type` enum('Full-time','Part-time') DEFAULT 'Full-time',
   `contract_start_date` date DEFAULT NULL,
   `contract_end_date` date DEFAULT NULL,

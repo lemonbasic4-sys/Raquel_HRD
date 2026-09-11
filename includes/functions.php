@@ -5525,7 +5525,7 @@ function getEmploymentStatusBadgeStyle(string $status): array
         'Termination for Cause'          => ['bg' => '#7f1d1d', 'color' => '#ffffff', 'border' => '#991b1b'], // Dark Burgundy
         'Retirement'                     => ['bg' => '#e0f2fe', 'color' => '#075985', 'border' => '#bae6fd'], // Sky Blue
         'Death'                          => ['bg' => '#111827', 'color' => '#f9fafb', 'border' => '#374151'], // Dark Slate
-        'Permanent of Total Disability'  => ['bg' => '#f5f3ff', 'color' => '#5b21b6', 'border' => '#ddd6fe'], // Deep Lavender
+        'Permanent or Total Disability'  => ['bg' => '#f5f3ff', 'color' => '#5b21b6', 'border' => '#ddd6fe'], // Deep Lavender
     ];
 
     return $statusMap[$status] ?? ['bg' => '#f3f4f6', 'color' => '#374151', 'border' => '#d1d5db'];

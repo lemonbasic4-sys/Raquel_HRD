@@ -12,9 +12,9 @@
 -- ============================================
 
 SET FOREIGN_KEY_CHECKS = 0;
-DROP DATABASE IF EXISTS raquel_hris;
-CREATE DATABASE IF NOT EXISTS raquel_hris;
-USE raquel_hris;
+DROP DATABASE IF EXISTS raquel_hris_Test;
+CREATE DATABASE IF NOT EXISTS raquel_hris_Test;
+USE raquel_hris_Test;
 
 -- ============================================
 -- 1. Setup Database
@@ -112,7 +112,7 @@ CREATE TABLE employees (
     rank_category_id INT NULL,
     branch_id INT NULL,
     reports_to INT NULL,
-    employment_status ENUM('OJT', 'Probationary', 'Project Based', 'Regular', 'Separated', 'Trainee', 'AWOL', 'Retirement', 'Death', 'Permanent of Total Disability', 'Resignation', 'Failed in Training', 'Termination for Cause') DEFAULT 'Regular',
+    employment_status ENUM('OJT', 'Probationary', 'Project Based', 'Regular', 'Separated', 'Trainee', 'AWOL', 'Retirement', 'Death', 'Permanent or Total Disability', 'Resignation', 'Failed in Training', 'Termination for Cause') DEFAULT 'Regular',
     employment_type ENUM('Full-time', 'Part-time') DEFAULT 'Full-time',
     contract_start_date DATE NULL,
     contract_end_date DATE NULL,

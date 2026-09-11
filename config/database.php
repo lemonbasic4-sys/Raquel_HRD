@@ -2,9 +2,8 @@
 define('DB_HOST', 'localhost');
 define('DB_USER', 'root');
 define('DB_PASS', '');
-define('DB_NAME', 'raquel_hris');
+define('DB_NAME', 'raquel_hris_test');
 
-// Raquel Pawnshop operates on Philippine time. All scheduled tasks use this clock.
 date_default_timezone_set('Asia/Manila');
 
 define('BASE_URL', '/' . basename(dirname(__DIR__)));

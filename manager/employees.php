@@ -176,7 +176,7 @@ $branches = [];
 while ($r = $branches_res->fetch_assoc())
     $branches[] = $r['branch_name'];
 
-$statuses = ['OJT', 'Probationary', 'Project Based', 'Regular', 'Separated', 'Trainee', 'AWOL', 'Retirement', 'Death', 'Permanent of Total Disability', 'Resignation', 'Failed in Training', 'Termination for Cause'];
+$statuses = ['OJT', 'Probationary', 'Project Based', 'Regular', 'Separated', 'Trainee', 'AWOL', 'Retirement', 'Death', 'Permanent or Total Disability', 'Resignation', 'Failed in Training', 'Termination for Cause'];
 $selected_branch = $_GET['branch'] ?? $user_assigned_branch_name;
 ?>
 
@@ -189,7 +189,9 @@ $selected_branch = $_GET['branch'] ?? $user_assigned_branch_name;
         font-size: .72rem;
         font-weight: 600;
         letter-spacing: .3px;
-        white-space: nowrap;
+        white-space: normal;
+        overflow-wrap: anywhere;
+        word-break: break-word;
     }
     .job-badge-executive   { background: #fff3cd; color: #856404; border: 1px solid #ffc107; }
     .job-badge-mgmt-team   { background: #ede7f6; color: #5e35b1; border: 1px solid #9c77e0; }
@@ -632,6 +634,7 @@ $selected_branch = $_GET['branch'] ?? $user_assigned_branch_name;
                      data-department="<?php echo e($emp['department_name'] ?? 'N/A'); ?>"
                      data-branch="<?php echo e($emp['branch_name'] ?? 'N/A'); ?>"
                      data-status="<?php echo e($emp['employment_status']); ?>"
+                     data-active="<?php echo $emp['is_active'] ? '1' : '0'; ?>"
                      data-search="<?php echo e($emp['employee_id'] . ' ' . ($emp['employee_code'] ?? '') . ' ' . getEmployeeDisplayId($emp) . ' ' . $emp['first_name'] . ' ' . $emp['last_name'] . ' ' . $emp['last_name'] . ' ' . $emp['first_name'] . ' ' . ($emp['job_title'] ?? '') . ' ' . ($emp['department_name'] ?? '') . ' ' . ($emp['branch_name'] ?? '') . ' ' . ($emp['employment_status'] ?? '')); ?>"
                      style="display: none; flex-direction: column; align-items: stretch; width: 100%; box-sizing: border-box;">
 
@@ -748,12 +751,12 @@ $selected_branch = $_GET['branch'] ?? $user_assigned_branch_name;
                 <div class="mb-3">
                     <label class="form-label fw-bold">Reason for Separation</label>
                     <select id="separationReason" class="form-select">
-                        <option value="Regular">Regular (Temporary Deactivation)</option>
+                        <option value="" selected disabled>Select a reason</option>
                         <option value="Separated">Separated (General)</option>
                         <option value="AWOL">AWOL</option>
                         <option value="Retirement">Retirement</option>
                         <option value="Death">Death</option>
-                        <option value="Permanent of Total Disability">Permanent of Total Disability</option>
+                        <option value="Permanent or Total Disability">Permanent or Total Disability</option>
                         <option value="Resignation">Resignation</option>
                         <option value="Failed in Training">Failed in Training</option>
                         <option value="Termination for Cause">Termination for Cause</option>
@@ -1205,6 +1208,7 @@ $selected_branch = $_GET['branch'] ?? $user_assigned_branch_name;
         const normFDept     = normText(fDepartment);
         const normFBranch   = normText(fBranch);
         const normFStatus   = normText(fStatus);
+        const showInactive = filterInput !== '' || normFStatus !== '';
 
         let visibleRows = [];
 
@@ -1222,8 +1226,9 @@ $selected_branch = $_GET['branch'] ?? $user_assigned_branch_name;
                     (normFDept     === '' || normText(row.dataset.department) === normFDept) &&
                     (normFBranch   === '' || normText(row.dataset.branch) === normFBranch) &&
                     (normFStatus   === '' || normText(row.dataset.status) === normFStatus);
+                const activeMatch = row.dataset.active === '1' || showInactive;
 
-                if (textMatch && dropdownMatch) {
+                if (textMatch && dropdownMatch && activeMatch) {
                     visibleRows.push(row);
                     row.classList.remove('filtered-out');
                 } else {
@@ -1245,8 +1250,9 @@ $selected_branch = $_GET['branch'] ?? $user_assigned_branch_name;
                 (normFDept     === '' || normText(card.dataset.department) === normFDept) &&
                 (normFBranch   === '' || normText(card.dataset.branch) === normFBranch) &&
                 (normFStatus   === '' || normText(card.dataset.status) === normFStatus);
+            const activeMatch = card.dataset.active === '1' || showInactive;
 
-            if (textMatch && dropdownMatch) {
+            if (textMatch && dropdownMatch && activeMatch) {
                 visibleCards.push(card);
             } else {
                 card.style.display = "none";

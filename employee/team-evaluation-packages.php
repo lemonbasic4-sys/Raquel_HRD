@@ -1025,9 +1025,8 @@ if (in_array($session_role, ['HR Manager', 'HR Supervisor', 'Admin'], true)) {
 
                                     <div class="p-3 mb-3 rounded-3 shadow-sm" style="background-color: #fffbeb !important; border: 2px solid #f59e0b !important;">
                                         <div class="form-check d-flex align-items-start gap-3 ps-2">
-                                            <input class="form-check-input flex-shrink-0 mt-1" type="checkbox" id="chkConfirm-<?php echo (int)$package['package_id']; ?>" style="width: 26px; height: 26px; cursor: pointer; border: 2px solid #d97706 !important;" <?php echo !$package_next_check['ok'] ? 'disabled' : ''; ?>>
+                                            <input class="form-check-input flex-shrink-0 mt-1" type="checkbox" name="confirm_hand_off" value="1" id="chkConfirm-<?php echo (int)$package['package_id']; ?>" required style="width: 26px; height: 26px; min-height: 26px; cursor: pointer; accent-color: #d97706; appearance: auto; -webkit-appearance: checkbox; border: 2px solid #d97706 !important;" <?php echo !$package_next_check['ok'] ? 'disabled' : ''; ?>>
                                             <label class="form-check-label fw-bold text-dark mb-0 ms-2" for="chkConfirm-<?php echo (int)$package['package_id']; ?>" style="font-size: 0.98rem; line-height: 1.4; cursor: pointer;">
-                                                <i class="fas fa-check-square me-1 text-warning fa-lg"></i>
                                                 I confirm that I have thoroughly reviewed all member ratings, evaluator adjustments, and developmental plans for this department before forwarding to <span class="text-decoration-underline text-primary"><?php echo e($next_reviewer_name); ?></span>.
                                             </label>
                                         </div>

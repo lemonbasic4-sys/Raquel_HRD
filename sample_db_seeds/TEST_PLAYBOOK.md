@@ -69,10 +69,10 @@ Run this directly in PowerShell to reset and load from individual schema and see
 
 ```powershell
 # Set working directory to project root
-cd C:\xampp\htdocs\Raquel_HRD
+cd C:\xampp\htdocs\Raquel_HRD_Test
 
 # 1. Drop and recreate the database
-& "C:\xampp\mysql\bin\mysql.exe" -u root -e "DROP DATABASE IF EXISTS raquel_hris; CREATE DATABASE raquel_hris CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+& "C:\xampp\mysql\bin\mysql.exe" -u root -e "DROP DATABASE IF EXISTS raquel_hris_test; CREATE DATABASE raquel_hris CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 
 # 2. Run imports in chronological order
 & "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source database/1st_schema_tables.sql;"

@@ -7,7 +7,7 @@
 --            Each department receives 4 templates with 13 criteria
 --            each: 5 KRAs + 8 Standard Behavior & Values.
 -- =====================================================
-USE raquel_hris;
+USE raquel_hris_Test;
 SET FOREIGN_KEY_CHECKS = 0;
 
 DELETE FROM evaluation_criteria WHERE template_id BETWEEN 100 AND 199;

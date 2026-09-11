@@ -258,7 +258,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['action'])) {
                     $target_user_id,
                     'Evaluation Approved',
                     "Your evaluation has been approved by the HR Supervisor.",
-                    BASE_URL . '/employee/self-rating.php?view=' . $eval_id
+                    BASE_URL . '/employee/evaluation-history-view.php?id=' . $eval_id
                 );
             }
 
