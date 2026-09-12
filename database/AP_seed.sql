@@ -1,5 +1,5 @@
 -- Mockup Employee Seeds for Acquired Properties Department
-USE raquel_hris_Test;
+USE raquel_hris;
 SET FOREIGN_KEY_CHECKS = 0;
 
 -- ====================================
