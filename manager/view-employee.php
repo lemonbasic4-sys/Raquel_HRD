@@ -195,6 +195,163 @@ $discList = [
         color: var(--text-dark);
     }
 
+    .employee-reference-hero {
+        background: #fff;
+        border: 1px solid #e5ebe7;
+        border-radius: 14px;
+        box-shadow: 0 10px 28px rgba(15, 23, 42, .06);
+        padding: 1rem 1.1rem;
+        margin-bottom: .55rem;
+    }
+
+    .employee-reference-identity {
+        display: flex;
+        align-items: center;
+        gap: 1.1rem;
+        min-width: 0;
+    }
+
+    .employee-reference-avatar {
+        width: 98px;
+        height: 98px;
+        flex: 0 0 98px;
+        object-fit: cover;
+        border-radius: 50%;
+        border: 4px solid #f0f1ef;
+        box-shadow: 0 4px 12px rgba(15, 23, 42, .12);
+    }
+
+    .employee-reference-copy {
+        min-width: 0;
+        flex: 1;
+    }
+
+    .employee-reference-copy h2 {
+        color: #142236;
+        font-size: 1.25rem;
+        line-height: 1.25;
+        font-weight: 800;
+        margin: 0 0 .2rem;
+    }
+
+    .employee-reference-copy p {
+        color: #61706b;
+        font-size: .82rem;
+        line-height: 1.4;
+        margin: 0;
+    }
+
+    .employee-reference-contact {
+        display: flex;
+        flex-wrap: wrap;
+        gap: .65rem 1.1rem;
+        margin-top: .7rem;
+        color: #33453d;
+        font-size: .76rem;
+    }
+
+    .employee-reference-contact i,
+    .employee-reference-summary i {
+        color: #12613a;
+    }
+
+    .employee-reference-summary {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(125px, 1fr));
+        gap: .65rem;
+        width: min(42%, 420px);
+        margin-left: auto;
+    }
+
+    .employee-reference-summary-item {
+        min-width: 0;
+        padding: .65rem .7rem;
+        border: 1px solid #e9efeb;
+        border-radius: 8px;
+        background: #f8faf9;
+    }
+
+    .employee-reference-summary-item small,
+    .employee-reference-summary-item strong {
+        display: block;
+    }
+
+    .employee-reference-summary-item small {
+        color: #718078;
+        font-size: .67rem;
+        margin-bottom: .15rem;
+    }
+
+    .employee-reference-summary-item strong {
+        color: #1c2c24;
+        font-size: .78rem;
+        line-height: 1.3;
+        overflow-wrap: anywhere;
+    }
+
+    .legacy-profile-rail {
+        display: none !important;
+    }
+
+    .employee-information-tabs {
+        display: flex;
+        gap: .15rem;
+        overflow-x: auto;
+        margin-bottom: 1rem;
+        padding: 0 .35rem;
+        background: #fff;
+        border: 1px solid #e5ebe7;
+        border-radius: 10px;
+        scrollbar-width: thin;
+    }
+
+    .employee-information-tab {
+        flex: 0 0 auto;
+        appearance: none;
+        border: 0;
+        border-bottom: 2px solid transparent;
+        border-radius: 8px 8px 0 0;
+        background: transparent;
+        color: #60706a;
+        font-size: .74rem;
+        font-weight: 700;
+        padding: .7rem .8rem .62rem;
+        white-space: nowrap;
+        transition: color .18s ease, background-color .18s ease, border-color .18s ease;
+    }
+
+    .employee-information-tab:hover,
+    .employee-information-tab:focus-visible,
+    .employee-information-tab[aria-selected="true"] {
+        color: #12613a;
+        background: #f5faf7;
+        border-bottom-color: #12613a;
+        outline: none;
+    }
+
+    .employee-information-tab i {
+        margin-right: .35rem;
+    }
+
+    [data-profile-panel][hidden] {
+        display: none !important;
+    }
+
+    .profile-panel-active {
+        flex: 0 0 100% !important;
+        max-width: 100% !important;
+    }
+
+    .profile-panel-active > .employee-section-card,
+    [data-profile-panel].profile-panel-active {
+        animation: profile-panel-in .22s ease-out;
+    }
+
+    @keyframes profile-panel-in {
+        from { opacity: .3; transform: translateY(5px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
     .employee-card-grid {
         display: grid;
         gap: 1.5rem;
@@ -205,6 +362,7 @@ $discList = [
         border: 1px solid rgba(15, 23, 42, 0.08);
         box-shadow: 0 14px 30px rgba(15, 23, 42, 0.06);
         overflow: hidden;
+        background: #fff;
     }
 
     .employee-section-header {
@@ -231,46 +389,18 @@ $discList = [
         padding: 1.5rem;
     }
 
-    .performance-career-tabs {
-        display: flex;
-        gap: 0.35rem;
-        overflow-x: auto;
-        border-bottom: 1px solid #e2e8f0;
-        padding: 0 1.5rem;
-        scrollbar-width: thin;
+    .employee-section-card .employee-section-header h5 {
+        color: #17251f;
+        font-size: 1.05rem;
+        letter-spacing: -.01em;
     }
 
-    .performance-career-tab {
-        appearance: none;
-        flex: 0 0 auto;
-        border: 0;
-        border-bottom: 3px solid transparent;
-        background: transparent;
-        color: var(--text-muted);
-        font-size: 0.9rem;
-        font-weight: 700;
-        padding: 0.95rem 1rem 0.8rem;
-        transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
-    }
-
-    .performance-career-tab:hover,
-    .performance-career-tab:focus-visible {
-        background: #f8fafc;
-        color: var(--primary-blue);
-        outline: none;
-    }
-
-    .performance-career-tab[aria-selected="true"] {
-        border-bottom-color: #bd9414;
-        color: var(--text-dark);
+    .employee-section-card .employee-section-kicker {
+        color: #12613a;
     }
 
     .performance-career-panel {
         animation: performance-career-panel-in 0.2s ease-out;
-    }
-
-    .performance-career-panel[hidden] {
-        display: none !important;
     }
 
     @keyframes performance-career-panel-in {
@@ -284,6 +414,7 @@ $discList = [
         background: #fbfcfe;
         padding: 1.15rem;
         margin-bottom: 1rem;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, .8);
     }
 
     .employee-subsection:last-child {
@@ -322,6 +453,14 @@ $discList = [
         background: #fff;
         min-width: 0;
         overflow: hidden;
+        box-shadow: 0 2px 8px rgba(15, 23, 42, .025);
+        transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease;
+    }
+
+    .detail-item:hover {
+        border-color: #cfe3d7;
+        box-shadow: 0 7px 16px rgba(18, 97, 58, .08);
+        transform: translateY(-1px);
     }
 
     .detail-label {
@@ -521,6 +660,23 @@ $discList = [
     }
 
     @media (max-width: 767.98px) {
+        .employee-reference-identity {
+            align-items: flex-start;
+            flex-wrap: wrap;
+        }
+
+        .employee-reference-avatar {
+            width: 78px;
+            height: 78px;
+            flex-basis: 78px;
+        }
+
+        .employee-reference-summary {
+            width: 100%;
+            margin-left: 0;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
         .employee-section-header {
             padding: 1.1rem 1.1rem 0;
         }
@@ -528,10 +684,6 @@ $discList = [
         .employee-section-card .card-body,
         .employee-profile-card .card-body {
             padding: 1.1rem;
-        }
-
-        .performance-career-tabs {
-            padding: 0 1.1rem;
         }
 
         .employee-table-wrap,
@@ -574,18 +726,72 @@ $discList = [
     }
 </style>
 
-<div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
+<?php
+$hero_hire_date = !empty($emp['hire_date']) ? new DateTime($emp['hire_date']) : null;
+$hero_tenure = 'N/A';
+if ($hero_hire_date) {
+    $hero_tenure_diff = $hero_hire_date->diff(new DateTime());
+    $hero_tenure = $hero_tenure_diff->y . ' years ' . $hero_tenure_diff->m . ' months';
+}
+$hero_name = trim($emp['first_name'] . ' ' . ($emp['middle_name'] ? $emp['middle_name'] . ' ' : '') . $emp['last_name'] . ($emp['name_extension'] ? ' ' . $emp['name_extension'] : ''));
+?>
+
+<div class="d-flex justify-content-between align-items-end flex-wrap gap-3 mb-3">
     <div>
-        <p class="text-muted mb-1">Employee Personal Data Sheet</p>
-        <h1 class="employee-page-title mb-0">Employee Information</h1>
+        <div class="small text-muted mb-1"><i class="fas fa-users me-1"></i>Employees <span class="mx-1">›</span> Employee Profile</div>
+        <h1 class="employee-page-title mb-0">Employee Profile</h1>
+        <p class="text-muted small mb-0">View and manage employee information, employment details, and performance records.</p>
     </div>
-    <a href="<?php echo htmlspecialchars($return_to, ENT_QUOTES, 'UTF-8'); ?>" class="btn btn-secondary">
-        <i class="fas fa-arrow-left me-2"></i>Back
-    </a>
+    <div class="d-flex gap-2 flex-wrap">
+        <a href="<?php echo BASE_URL; ?>/manager/edit-employee.php?id=<?php echo $eid; ?>&return=<?php echo urlencode($return_to); ?>" class="btn btn-primary"><i class="fas fa-pen me-2"></i>Edit Profile</a>
+        <button type="button" class="btn btn-light border" onclick="window.print()"><i class="fas fa-print me-2"></i>Print</button>
+        <a href="<?php echo htmlspecialchars($return_to, ENT_QUOTES, 'UTF-8'); ?>" class="btn btn-light border" title="Back to employees"><i class="fas fa-arrow-left"></i></a>
+    </div>
 </div>
 
+<div class="employee-reference-hero">
+    <div class="employee-reference-identity">
+        <div class="position-relative cursor-pointer" onclick="viewFullImage('<?php echo getEmployeeAvatar($emp['profile_picture']); ?>', '<?php echo e($hero_name); ?>')">
+            <img src="<?php echo getEmployeeAvatar($emp['profile_picture']); ?>" class="employee-reference-avatar" alt="Employee profile photo">
+            <span class="position-absolute bottom-0 end-0 bg-dark text-white rounded-circle p-2 border border-white" style="font-size:.65rem;line-height:1;"><i class="fas fa-search-plus"></i></span>
+        </div>
+        <div class="employee-reference-copy">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <h2><?php echo e($hero_name); ?></h2>
+                <span class="badge rounded-pill <?php echo $emp['is_active'] ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger'; ?>"><i class="fas fa-circle me-1" style="font-size:.45rem;vertical-align:middle;"></i><?php echo $emp['is_active'] ? 'Active' : 'Inactive'; ?></span>
+            </div>
+            <p><?php echo e($emp['job_title']); ?></p>
+            <p><?php echo e($emp['branch_name'] ?: 'N/A'); ?></p>
+            <div class="employee-reference-contact">
+                <?php if (!empty($emp['rank_name'])): ?><span class="rank-badge <?php echo $rankBadgeClass; ?>"><i class="fas fa-layer-group"></i><?php echo e($emp['rank_name']); ?></span><?php endif; ?>
+                <span><i class="fas fa-id-badge me-1"></i><?php echo e(getEmployeeDisplayId($emp)); ?></span>
+                <span><i class="fas fa-envelope me-1"></i><?php echo e($emp['email'] ?: 'N/A'); ?></span>
+                <span><i class="fas fa-phone me-1"></i><?php echo e($emp['contact_number'] ?: 'N/A'); ?></span>
+            </div>
+        </div>
+        <div class="employee-reference-summary">
+            <div class="employee-reference-summary-item"><small><i class="fas fa-briefcase me-1"></i>Hire Date</small><strong><?php echo formatDate($emp['hire_date']); ?></strong></div>
+            <div class="employee-reference-summary-item"><small><i class="fas fa-calendar me-1"></i>Tenure</small><strong><?php echo e($hero_tenure); ?></strong></div>
+            <div class="employee-reference-summary-item"><small><i class="fas fa-building me-1"></i>Department</small><strong><?php echo e($emp['department_name'] ?: 'N/A'); ?></strong></div>
+        </div>
+    </div>
+</div>
+
+<nav class="employee-information-tabs" role="tablist" aria-label="Employee information sections">
+    <button class="employee-information-tab" type="button" role="tab" aria-selected="true" tabindex="0" data-profile-tab="all"><i class="fas fa-th-large"></i>All Info</button>
+    <button class="employee-information-tab" type="button" role="tab" aria-selected="false" tabindex="-1" data-profile-tab="personal"><i class="fas fa-user"></i>Personal Info</button>
+    <button class="employee-information-tab" type="button" role="tab" aria-selected="false" tabindex="-1" data-profile-tab="employment"><i class="fas fa-briefcase"></i>Employment</button>
+    <button class="employee-information-tab" type="button" role="tab" aria-selected="false" tabindex="-1" data-profile-tab="contact"><i class="fas fa-envelope"></i>Contact</button>
+    <button class="employee-information-tab" type="button" role="tab" aria-selected="false" tabindex="-1" data-profile-tab="education"><i class="fas fa-graduation-cap"></i>Education</button>
+    <button class="employee-information-tab" type="button" role="tab" aria-selected="false" tabindex="-1" data-profile-tab="family"><i class="fas fa-users"></i>Family</button>
+    <button class="employee-information-tab" type="button" role="tab" aria-selected="false" tabindex="-1" data-profile-tab="training"><i class="fas fa-certificate"></i>Skills &amp; Training</button>
+    <button class="employee-information-tab" type="button" role="tab" aria-selected="false" tabindex="-1" data-profile-tab="performance"><i class="fas fa-chart-line"></i>Performance</button>
+    <button class="employee-information-tab" type="button" role="tab" aria-selected="false" tabindex="-1" data-profile-tab="documents"><i class="fas fa-folder"></i>Documents</button>
+    <button class="employee-information-tab" type="button" role="tab" aria-selected="false" tabindex="-1" data-profile-tab="timeline"><i class="fas fa-calendar"></i>Profile Audit Trail</button>
+</nav>
+
 <div class="row g-4">
-    <div class="col-lg-4 col-xl-3 profile-sticky-col">
+    <div class="col-lg-4 col-xl-3 profile-sticky-col legacy-profile-rail">
         <div class="content-card employee-profile-card text-center">
             <div class="card-body py-4">
                 <div class="position-relative d-inline-block cursor-pointer mb-3"
@@ -699,7 +905,7 @@ $discList = [
         </div>
     </div>
 
-    <div class="col-lg-8 col-xl-9">
+    <div class="col-12">
         <?php
         // Query approved evaluations for 5-Year performance trend
         $perf_history_q = $conn->prepare("
@@ -777,23 +983,14 @@ $discList = [
         ?>
 
         <!-- Performance and career data share one full-width, client-side tab interface. -->
-        <div class="content-card employee-section-card mb-4">
+        <div class="content-card employee-section-card mb-4" data-profile-panel="performance">
             <div class="employee-section-header">
                 <div>
                     <div class="employee-section-kicker"><i class="fas fa-chart-line text-warning"></i>Employee Insights</div>
                     <h5 class="mb-0">Performance &amp; Career</h5>
                 </div>
             </div>
-            <div class="performance-career-tabs" role="tablist" aria-label="Performance and career information">
-                <button class="performance-career-tab" id="performance-tab" type="button" role="tab" aria-selected="true" aria-controls="performance-panel" tabindex="0">
-                    <i class="fas fa-chart-line me-2" aria-hidden="true"></i>Performance Analytics
-                </button>
-                <button class="performance-career-tab" id="career-tab" type="button" role="tab" aria-selected="false" aria-controls="career-panel" tabindex="-1">
-                    <i class="fas fa-route me-2" aria-hidden="true"></i>Career Progression
-                </button>
-            </div>
-
-            <div class="performance-career-panel" id="performance-panel" role="tabpanel" aria-labelledby="performance-tab" tabindex="0">
+            <div class="performance-career-panel" id="performance-panel">
                 <div class="employee-section-header">
                     <div>
                         <div class="employee-section-kicker"><i class="fas fa-chart-line text-warning"></i>Performance Analytics</div>
@@ -885,7 +1082,7 @@ $discList = [
                 </div>
             </div>
 
-            <div class="performance-career-panel" id="career-panel" role="tabpanel" aria-labelledby="career-tab" tabindex="0" hidden>
+            <div class="performance-career-panel" id="career-panel">
                 <div class="employee-section-header">
                     <div>
                         <div class="employee-section-kicker"><i class="fas fa-route text-warning me-1"></i>Career Progression</div>
@@ -945,7 +1142,7 @@ $discList = [
 
         <div class="row g-4">
             <div class="col-xl-6">
-                <div class="content-card employee-section-card h-100">
+                <div class="content-card employee-section-card h-100" data-profile-panel="personal">
                     <div class="employee-section-header">
                         <div>
                             <div class="employee-section-kicker"><i class="fas fa-user"></i>Personal</div>
@@ -980,7 +1177,7 @@ $discList = [
             </div>
 
             <div class="col-xl-6">
-                <div class="content-card employee-section-card h-100">
+                <div class="content-card employee-section-card h-100" data-profile-panel="contact">
                     <div class="employee-section-header">
                         <div>
                             <div class="employee-section-kicker"><i class="fas fa-address-card"></i>Contact</div>
@@ -1036,7 +1233,7 @@ $discList = [
             </div>
 
             <div class="col-12">
-                <div class="content-card employee-section-card">
+                <div class="content-card employee-section-card" data-profile-panel="family">
                     <div class="employee-section-header">
                         <div>
                             <div class="employee-section-kicker"><i class="fas fa-heart"></i>Family</div>
@@ -1142,7 +1339,7 @@ $discList = [
             </div>
 
             <div class="col-xl-6">
-                <div class="content-card employee-section-card h-100">
+                <div class="content-card employee-section-card h-100" data-profile-panel="education">
                     <div class="employee-section-header">
                         <div>
                             <div class="employee-section-kicker"><i class="fas fa-graduation-cap"></i>Education</div>
@@ -1185,7 +1382,7 @@ $discList = [
             </div>
 
             <div class="col-xl-6">
-                <div class="content-card employee-section-card h-100">
+                <div class="content-card employee-section-card h-100" data-profile-panel="training">
                     <div class="employee-section-header">
                         <div>
                             <div class="employee-section-kicker"><i class="fas fa-briefcase"></i>Work</div>
@@ -1235,7 +1432,7 @@ $discList = [
             </div>
 
             <div class="col-12">
-                <div class="content-card employee-section-card">
+                <div class="content-card employee-section-card" data-profile-panel="training">
                     <div class="employee-section-header">
                         <div>
                             <div class="employee-section-kicker"><i class="fas fa-certificate"></i>Training</div>
@@ -1417,7 +1614,7 @@ $discList = [
             </div>
 
             <div class="col-xl-6">
-                <div class="content-card employee-section-card h-100">
+                <div class="content-card employee-section-card h-100" data-profile-panel="documents">
                     <div class="employee-section-header">
                         <div>
                             <div class="employee-section-kicker"><i class="fas fa-clipboard-list"></i>Disclosures</div>
@@ -1443,7 +1640,7 @@ $discList = [
             </div>
 
             <div class="col-xl-6">
-                <div class="content-card employee-section-card h-100">
+                <div class="content-card employee-section-card h-100" data-profile-panel="employment">
                     <div class="employee-section-header">
                         <div>
                             <div class="employee-section-kicker"><i class="fas fa-id-card"></i>Employment</div>
@@ -1491,7 +1688,7 @@ $discList = [
             </div>
 
             <div class="col-12">
-                <div class="content-card employee-section-card">
+                <div class="content-card employee-section-card" data-profile-panel="documents">
                     <div class="employee-section-header">
                         <div>
                             <div class="employee-section-kicker"><i class="fas fa-file-invoice-dollar"></i>SALN</div>
@@ -1598,7 +1795,7 @@ $discList = [
             </div>
 
             <div class="col-12">
-                <div class="content-card employee-section-card">
+                <div class="content-card employee-section-card" data-profile-panel="documents">
                     <div class="employee-section-header">
                         <div>
                             <div class="employee-section-kicker"><i class="fas fa-address-book"></i>References</div>
@@ -1721,39 +1918,54 @@ $discList = [
     }
 
     document.addEventListener('DOMContentLoaded', function () {
-        const tabs = Array.from(document.querySelectorAll('.performance-career-tab'));
-        const panels = Array.from(document.querySelectorAll('.performance-career-panel'));
+        const profileTabs = Array.from(document.querySelectorAll('.employee-information-tab'));
+        const profilePanels = Array.from(document.querySelectorAll('[data-profile-panel]'));
 
-        function activateTab(tab, moveFocus) {
-            const panelId = tab.getAttribute('aria-controls');
-            tabs.forEach(function (item) {
+        function getPanelTarget(panel) {
+            const parent = panel.parentElement;
+            const siblingPanels = parent ? parent.querySelectorAll('[data-profile-panel]') : [];
+            return parent && parent.matches('.col-xl-6, .col-12') && siblingPanels.length === 1 ? parent : panel;
+        }
+
+        function activateProfileTab(tab, moveFocus) {
+            const selectedPanel = tab.getAttribute('data-profile-tab');
+            profileTabs.forEach(function (item) {
                 const isActive = item === tab;
                 item.setAttribute('aria-selected', isActive ? 'true' : 'false');
                 item.tabIndex = isActive ? 0 : -1;
             });
-            panels.forEach(function (panel) {
-                panel.hidden = panel.id !== panelId;
+            profilePanels.forEach(function (panel) {
+                const target = getPanelTarget(panel);
+                const isSelected = selectedPanel === 'all' || panel.getAttribute('data-profile-panel') === selectedPanel;
+                target.hidden = !isSelected;
+                target.classList.toggle('profile-panel-active', selectedPanel !== 'all' && isSelected);
             });
-            if (moveFocus) tab.focus();
-            window.dispatchEvent(new Event('resize'));
+            if (moveFocus) tab.focus({ preventScroll: true });
         }
 
-        tabs.forEach(function (tab, index) {
+        profileTabs.forEach(function (tab, index) {
             tab.addEventListener('click', function () {
-                activateTab(tab, false);
+                activateProfileTab(tab, false);
             });
             tab.addEventListener('keydown', function (event) {
                 let nextIndex = null;
-                if (event.key === 'ArrowRight') nextIndex = (index + 1) % tabs.length;
-                if (event.key === 'ArrowLeft') nextIndex = (index - 1 + tabs.length) % tabs.length;
+                if (event.key === 'ArrowRight') nextIndex = (index + 1) % profileTabs.length;
+                if (event.key === 'ArrowLeft') nextIndex = (index - 1 + profileTabs.length) % profileTabs.length;
                 if (event.key === 'Home') nextIndex = 0;
-                if (event.key === 'End') nextIndex = tabs.length - 1;
+                if (event.key === 'End') nextIndex = profileTabs.length - 1;
                 if (nextIndex !== null) {
                     event.preventDefault();
-                    activateTab(tabs[nextIndex], true);
+                    profileTabs[nextIndex].click();
+                    profileTabs[nextIndex].focus({ preventScroll: true });
                 }
             });
         });
+
+        const initialProfileTab = profileTabs.find(function (tab) {
+            return tab.getAttribute('aria-selected') === 'true';
+        }) || profileTabs[0];
+        if (initialProfileTab) activateProfileTab(initialProfileTab, false);
+
     });
 </script>
 

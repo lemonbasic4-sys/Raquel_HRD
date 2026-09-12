@@ -10,7 +10,7 @@ if (!isset($conn) || !isset($eid) || (int)$eid <= 0) return;
 $edit_history = getEmployeeEditHistory($conn, (int)$eid, 50);
 ?>
 
-<div class="col-12 mt-2">
+<div class="col-12 mt-2" data-profile-panel="timeline">
     <div class="content-card employee-section-card">
         <div class="employee-section-header">
             <div>
