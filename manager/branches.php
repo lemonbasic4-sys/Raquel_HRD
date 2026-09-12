@@ -156,6 +156,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     }
 }
 
+// ─── Handle DEACTIVATE / ACTIVATE ────────────────────────
+if (isset($_GET['deactivate']) && is_numeric($_GET['deactivate'])) {
+    $bid = (int) $_GET['deactivate'];
+    $branch = $conn->query("SELECT branch_name FROM branches WHERE branch_id = $bid")->fetch_assoc();
+
+    if ($branch) {
+        $employee_count = (int) ($conn->query("SELECT COUNT(*) AS cnt FROM employees WHERE branch_id = $bid AND deleted_at IS NULL")->fetch_assoc()['cnt'] ?? 0);
+        if ($employee_count > 0) {
+            redirectWith(BASE_URL . '/manager/branches.php', 'danger', "Cannot deactivate branch — it still has $employee_count assigned employee(s). Reassign them first.");
+        }
+
+        $conn->query("UPDATE branches SET is_active = 0 WHERE branch_id = $bid");
+        logAudit($conn, $_SESSION['user_id'], 'UPDATE', 'Branch', $bid, 'Deactivated branch: ' . $branch['branch_name']);
+        redirectWith(BASE_URL . '/manager/branches.php', 'success', 'Branch deactivated successfully.');
+    }
+    redirectWith(BASE_URL . '/manager/branches.php', 'danger', 'Branch not found.');
+}
+
+if (isset($_GET['activate']) && is_numeric($_GET['activate'])) {
+    $bid = (int) $_GET['activate'];
+    $branch = $conn->query("SELECT branch_name FROM branches WHERE branch_id = $bid")->fetch_assoc();
+
+    if ($branch) {
+        $conn->query("UPDATE branches SET is_active = 1 WHERE branch_id = $bid");
+        logAudit($conn, $_SESSION['user_id'], 'UPDATE', 'Branch', $bid, 'Reactivated branch: ' . $branch['branch_name']);
+        redirectWith(BASE_URL . '/manager/branches.php', 'success', 'Branch reactivated successfully.');
+    }
+    redirectWith(BASE_URL . '/manager/branches.php', 'danger', 'Branch not found.');
+}
+
 // ─── Handle DELETE (GET with confirmation) ───────────────
 if (isset($_GET['delete']) && is_numeric($_GET['delete'])) {
     $bid = (int) $_GET['delete'];
@@ -317,6 +347,7 @@ $branch_user_total = (int) $conn->query("SELECT COUNT(*) as cnt FROM users WHERE
                                             <i class="fas fa-building" style="font-size:0.75rem;"></i>
                                         </div>
                                         <strong><?php echo e($b['branch_name']); ?></strong>
+                                        <span class="badge <?php echo !empty($b['is_active']) ? 'bg-success' : 'bg-secondary'; ?> ms-2"><?php echo !empty($b['is_active']) ? 'Active' : 'Inactive'; ?></span>
                                     </div>
                                 </td>
                                 <td data-label="Location"><?php echo e($b['location']); ?></td>
@@ -333,6 +364,15 @@ $branch_user_total = (int) $conn->query("SELECT COUNT(*) as cnt FROM users WHERE
                                         data-bs-toggle="modal" data-bs-target="#editBranchModal">
                                         <i class="fas fa-edit"></i>
                                     </button>
+                                    <?php if (!empty($b['is_active'])): ?>
+                                        <a class="btn btn-sm btn-outline-warning" title="Deactivate" href="?deactivate=<?php echo $b['branch_id']; ?>" onclick="return confirm('Deactivate <?php echo e(addslashes($b['branch_name'])); ?>?');">
+                                            <i class="fas fa-toggle-off"></i>
+                                        </a>
+                                    <?php else: ?>
+                                        <a class="btn btn-sm btn-outline-success" title="Reactivate" href="?activate=<?php echo $b['branch_id']; ?>">
+                                            <i class="fas fa-toggle-on"></i>
+                                        </a>
+                                    <?php endif; ?>
                                     <button class="btn btn-sm btn-outline-danger" title="Delete"
                                         onclick="setDeleteTarget(<?php echo $b['branch_id']; ?>, '<?php echo e(addslashes($b['branch_name'])); ?>', <?php echo $b['employee_count'] + $b['user_count']; ?>)"
                                         data-bs-toggle="modal" data-bs-target="#deleteBranchModal">
@@ -369,6 +409,7 @@ $branch_user_total = (int) $conn->query("SELECT COUNT(*) as cnt FROM users WHERE
                                 <div style="min-width: 0;">
                                     <h6 class="fw-bold mb-0 text-truncate" style="font-size: 0.92rem; color: #1c271b;">
                                         <?php echo e($b['branch_name']); ?>
+                                        <span class="badge <?php echo !empty($b['is_active']) ? 'bg-success' : 'bg-secondary'; ?> ms-1" style="font-size:0.62rem;"><?php echo !empty($b['is_active']) ? 'Active' : 'Inactive'; ?></span>
                                     </h6>
                                     <small class="text-muted text-truncate d-block" style="font-size: 0.74rem;">
                                         <i class="fas fa-map-marker-alt text-danger me-1"></i><?php echo e($b['location']); ?>
@@ -381,6 +422,15 @@ $branch_user_total = (int) $conn->query("SELECT COUNT(*) as cnt FROM users WHERE
                                     data-bs-toggle="modal" data-bs-target="#editBranchModal">
                                     <i class="fas fa-edit"></i>
                                 </button>
+                                <?php if (!empty($b['is_active'])): ?>
+                                    <a class="btn btn-sm btn-outline-warning py-1 px-2" title="Deactivate" href="?deactivate=<?php echo $b['branch_id']; ?>" onclick="return confirm('Deactivate <?php echo e(addslashes($b['branch_name'])); ?>?');">
+                                        <i class="fas fa-toggle-off"></i>
+                                    </a>
+                                <?php else: ?>
+                                    <a class="btn btn-sm btn-outline-success py-1 px-2" title="Reactivate" href="?activate=<?php echo $b['branch_id']; ?>">
+                                        <i class="fas fa-toggle-on"></i>
+                                    </a>
+                                <?php endif; ?>
                                 <button class="btn btn-sm btn-outline-danger py-1 px-2" title="Delete"
                                     onclick="setDeleteTarget(<?php echo $b['branch_id']; ?>, '<?php echo e(addslashes($b['branch_name'])); ?>', <?php echo $b['employee_count'] + $b['user_count']; ?>)"
                                     data-bs-toggle="modal" data-bs-target="#deleteBranchModal">

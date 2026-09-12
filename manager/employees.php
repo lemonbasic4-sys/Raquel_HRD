@@ -21,7 +21,7 @@ function getJobTitleBadgeClass(int $rankId): string {
 <?php
 $page_title = 'Employees';
 require_once '../includes/session-check.php';
-checkRole(['HR Manager']);
+checkRole(['HR Manager', 'HR Supervisor']);
 require_once '../includes/functions.php';
 
 // Resolve the user's assigned branch name for auto-filtering

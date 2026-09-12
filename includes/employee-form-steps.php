@@ -1267,14 +1267,19 @@ $rankCategories = $rankCategories ?? [
                         <input class="form-check-input" type="checkbox" name="is_active" id="isActive" <?php echo $chk('is_active'); ?>>
                         <label class="form-check-label" for="isActive">Active Employee</label>
                     </div>
+                    <div class="d-flex flex-wrap gap-2 mt-2">
+                        <button type="button" class="btn btn-sm btn-outline-danger" id="separateEmployeeBtn"><i class="fas fa-user-slash me-1"></i>Separate Employee</button>
+                        <button type="button" class="btn btn-sm btn-outline-success" id="reactivateEmployeeBtn"><i class="fas fa-user-check me-1"></i>Reactivate Employee</button>
+                    </div>
+                    <small class="text-muted">Choose a separation reason below, then save the employee record.</small>
                 </div>
             <?php endif; ?>
         </div>
         <div class="row" id="separationFieldsRow" style="<?php echo (empty($e['is_active']) || !empty($e['separation_date'])) ? '' : 'display:none;'; ?>">
             <div class="col-md-4 mb-3">
-                <label class="form-label text-danger fw-semibold"><i class="fas fa-calendar-times me-1"></i>Separation Effective Date</label>
+                <label class="form-label text-danger fw-semibold"><i class="fas fa-calendar-times me-1"></i>Separation Effective Date <span class="text-danger">*</span></label>
                 <input type="date" class="form-control" name="separation_date" id="separation_date" value="<?php echo $v('separation_date'); ?>">
-                <small class="text-muted">Effective date if the employee is separated.</small>
+                <small class="text-muted">Effective date when the separation officially takes effect.</small>
             </div>
             <div class="col-md-8 mb-3">
                 <label class="form-label fw-semibold">Separation Remarks / Notes</label>

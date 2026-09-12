@@ -3,6 +3,81 @@ $page_title = 'Employee Information';
 require_once '../includes/session-check.php';
 checkRole(['HR Supervisor']);
 require_once '../includes/functions.php';
+
+// Helper to preserve active filter parameters upon redirect
+$get_params = $_GET;
+$buildRedirectWithFilters = function ($actionKey) use ($get_params) {
+    $params = $get_params;
+    unset($params[$actionKey]);
+    if ($actionKey === 'deactivate') {
+        unset($params['status'], $params['effective_date'], $params['remarks']);
+    }
+    $qs = http_build_query($params);
+    return BASE_URL . '/supervisor/employees.php' . ($qs ? '?' . $qs : '');
+};
+
+ensureEmployeeSeparationColumns($conn);
+
+if (isset($_GET['deactivate']) && is_numeric($_GET['deactivate'])) {
+    $eid = (int) $_GET['deactivate'];
+    $status = $_GET['status'] ?? 'Separated';
+    $raw_eff_date = trim($_GET['effective_date'] ?? '');
+    $separation_date = !empty($raw_eff_date) ? date('Y-m-d', strtotime($raw_eff_date)) : date('Y-m-d');
+    $separation_remarks = trim($_GET['remarks'] ?? '');
+    $remarks_val = $separation_remarks !== '' ? $separation_remarks : null;
+
+    $stmt = $conn->prepare("UPDATE employees SET is_active = 0, employment_status = ?, separation_date = ?, separation_remarks = ? WHERE employee_id = ?");
+    $stmt->bind_param("sssi", $status, $separation_date, $remarks_val, $eid);
+
+    if ($stmt->execute()) {
+        $audit_detail = "Separated employee with status: $status, Effective: $separation_date" . ($remarks_val ? ", Remarks: $remarks_val" : "");
+        logAudit($conn, $_SESSION['user_id'], 'UPDATE', 'Employee', $eid, $audit_detail);
+        redirectWith($buildRedirectWithFilters('deactivate'), 'success', 'Employee separation processed successfully.');
+    }
+    $stmt->close();
+}
+if (isset($_GET['activate']) && is_numeric($_GET['activate'])) {
+    $eid = (int) $_GET['activate'];
+    $conn->query("UPDATE employees SET is_active = 1, employment_status = 'Regular', separation_date = NULL, separation_remarks = NULL WHERE employee_id = $eid");
+    logAudit($conn, $_SESSION['user_id'], 'UPDATE', 'Employee', $eid, 'Reactivated employee and reset separation record');
+    redirectWith($buildRedirectWithFilters('activate'), 'success', 'Employee reactivated successfully.');
+}
+
+if (isset($_GET['delete']) && is_numeric($_GET['delete'])) {
+    $eid = (int) $_GET['delete'];
+    $conn->query("DELETE FROM users WHERE employee_id = $eid");
+    $tables = [
+        'employee_details',
+        'employee_government_ids',
+        'employee_addresses',
+        'employee_contacts',
+        'employee_emergency_contacts',
+        'employee_disclosures',
+        'employee_family',
+        'employee_children',
+        'employee_siblings',
+        'employee_education',
+        'employee_work_experience',
+        'employee_trainings',
+        'employee_voluntary_work',
+        'employee_eligibility',
+        'employee_skills',
+        'employee_recognitions',
+        'employee_memberships',
+        'employee_real_properties',
+        'employee_personal_properties',
+        'employee_liabilities',
+        'employee_references'
+    ];
+    foreach ($tables as $tbl) {
+        $conn->query("DELETE FROM $tbl WHERE employee_id = $eid");
+    }
+
+    $conn->query("DELETE FROM employees WHERE employee_id = $eid");
+    logAudit($conn, $_SESSION['user_id'], 'DELETE', 'Employee', $eid, 'Permanently deleted employee');
+    redirectWith($buildRedirectWithFilters('delete'), 'success', 'Employee deleted permanently.');
+}
+
 require_once '../includes/header.php';
 
 // Fetch all non-admin employees so the supervisor directory matches HR Manager visibility.
@@ -394,8 +469,7 @@ $statuses = ['OJT', 'Probationary', 'Project Based', 'Regular', 'Separated', 'Tr
                                     data-branch="<?php echo e($emp['branch_name'] ?? 'N/A'); ?>"
                                     data-status="<?php echo e($emp['employment_status']); ?>"
                                     data-search="<?php echo e($emp['employee_id'] . ' ' . ($emp['employee_code'] ?? '') . ' ' . getEmployeeDisplayId($emp) . ' ' . $emp['first_name'] . ' ' . $emp['last_name'] . ' ' . $emp['last_name'] . ' ' . $emp['first_name'] . ' ' . ($emp['job_title'] ?? '') . ' ' . ($emp['department_name'] ?? '') . ' ' . ($emp['branch_name'] ?? '') . ' ' . ($emp['employment_status'] ?? '')); ?>"
-                                    data-active="<?php echo $emp['is_active'] ? '1' : '0'; ?>"
-                                    style="display: none;">
+                                    data-active="<?php echo $emp['is_active'] ? '1' : '0'; ?>">
                                     <td data-label="#"><strong><?php echo $count++; ?></strong></td>
                                     <td data-label="Name">
                                         <div class="d-flex align-items-center">
@@ -440,16 +514,34 @@ $statuses = ['OJT', 'Probationary', 'Project Based', 'Regular', 'Separated', 'Tr
                                     <td data-label="Hire Date"><small><?php echo formatDate($emp['hire_date']); ?></small></td>
                                     <td data-label="Actions">
                                         <div class="d-flex gap-1 align-items-center flex-nowrap">
-                                             <a href="<?php echo BASE_URL; ?>/supervisor/view-employee.php?id=<?php echo $emp['employee_id']; ?>"
-                                                 class="btn btn-sm btn-outline-info employee-view-link" data-base-href="<?php echo BASE_URL; ?>/supervisor/view-employee.php?id=<?php echo $emp['employee_id']; ?>" title="View Details">
-                                                 <i class="fas fa-eye"></i>
-                                             </a>
+                                            <a href="<?php echo BASE_URL; ?>/supervisor/view-employee.php?id=<?php echo $emp['employee_id']; ?>"
+                                                class="btn btn-sm btn-outline-info employee-view-link" data-base-href="<?php echo BASE_URL; ?>/supervisor/view-employee.php?id=<?php echo $emp['employee_id']; ?>" title="View Details">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
                                             <a href="<?php echo BASE_URL; ?>/supervisor/edit-employee.php?id=<?php echo $emp['employee_id']; ?>"
                                                 class="btn btn-sm btn-outline-primary employee-edit-link"
                                                 data-base-href="<?php echo BASE_URL; ?>/supervisor/edit-employee.php?id=<?php echo $emp['employee_id']; ?>"
                                                 title="Edit Employee">
                                                 <i class="fas fa-edit"></i>
                                             </a>
+                                            <?php if ($emp['is_active']): ?>
+                                                <button type="button" class="btn btn-sm btn-outline-warning" title="Deactivate"
+                                                    onclick="setDeactivateTarget(<?php echo $emp['employee_id']; ?>, '<?php echo e(addslashes($emp['first_name'] . ' ' . $emp['last_name'])); ?>')"
+                                                    data-bs-toggle="modal" data-bs-target="#deactivateModal">
+                                                    <i class="fas fa-user-slash"></i>
+                                                </button>
+                                            <?php else: ?>
+                                                <button type="button" class="btn btn-sm btn-outline-success" title="Activate"
+                                                    onclick="setActivateTarget(<?php echo $emp['employee_id']; ?>, '<?php echo e(addslashes($emp['first_name'] . ' ' . $emp['last_name'])); ?>')"
+                                                    data-bs-toggle="modal" data-bs-target="#activateModal">
+                                                    <i class="fas fa-user-check"></i>
+                                                </button>
+                                            <?php endif; ?>
+                                            <button type="button" class="btn btn-sm btn-outline-danger" title="Delete Permanently"
+                                                onclick="setDeleteTarget(<?php echo $emp['employee_id']; ?>, '<?php echo e(addslashes($emp['first_name'] . ' ' . $emp['last_name'])); ?>')"
+                                                data-bs-toggle="modal" data-bs-target="#deleteModal">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
                                         </div>
                                     </td>
                                 </tr>
@@ -475,8 +567,7 @@ $statuses = ['OJT', 'Probationary', 'Project Based', 'Regular', 'Separated', 'Tr
                          data-department="<?php echo e($emp['department_name'] ?? 'N/A'); ?>"
                          data-branch="<?php echo e($emp['branch_name'] ?? 'N/A'); ?>"
                          data-status="<?php echo e($emp['employment_status']); ?>"
-                         data-search="<?php echo e($emp['employee_id'] . ' ' . ($emp['employee_code'] ?? '') . ' ' . getEmployeeDisplayId($emp) . ' ' . $emp['first_name'] . ' ' . $emp['last_name'] . ' ' . $emp['last_name'] . ' ' . $emp['first_name'] . ' ' . ($emp['job_title'] ?? '') . ' ' . ($emp['department_name'] ?? '') . ' ' . ($emp['branch_name'] ?? '') . ' ' . ($emp['employment_status'] ?? '')); ?>"
-                         style="display: none;">
+                         data-search="<?php echo e($emp['employee_id'] . ' ' . ($emp['employee_code'] ?? '') . ' ' . getEmployeeDisplayId($emp) . ' ' . $emp['first_name'] . ' ' . $emp['last_name'] . ' ' . $emp['last_name'] . ' ' . $emp['first_name'] . ' ' . ($emp['job_title'] ?? '') . ' ' . ($emp['department_name'] ?? '') . ' ' . ($emp['branch_name'] ?? '') . ' ' . ($emp['employment_status'] ?? '')); ?>">
                         <div class="student-avatar">
                             <img src="<?php echo getEmployeeAvatar($emp['profile_picture']); ?>" alt="Profile" class="avatar-img">
                         </div>
@@ -494,9 +585,27 @@ $statuses = ['OJT', 'Probationary', 'Project Based', 'Regular', 'Separated', 'Tr
                         </div>
                         <div class="ms-auto text-end d-flex flex-column align-items-end gap-2">
                             <?php echo renderEmploymentStatusBadge($emp['employment_status']); ?>
-                            <div class="d-flex gap-1">
+                            <div class="d-flex gap-1 flex-wrap justify-content-end">
                                 <a href="<?php echo BASE_URL; ?>/supervisor/view-employee.php?id=<?php echo $emp['employee_id']; ?>" class="btn btn-xs btn-outline-info employee-view-link" data-base-href="<?php echo BASE_URL; ?>/supervisor/view-employee.php?id=<?php echo $emp['employee_id']; ?>" title="View"><i class="fas fa-eye"></i></a>
                                 <a href="<?php echo BASE_URL; ?>/supervisor/edit-employee.php?id=<?php echo $emp['employee_id']; ?>" class="btn btn-xs btn-outline-primary employee-edit-link" data-base-href="<?php echo BASE_URL; ?>/supervisor/edit-employee.php?id=<?php echo $emp['employee_id']; ?>" title="Edit"><i class="fas fa-edit"></i></a>
+                                <?php if ($emp['is_active']): ?>
+                                    <button type="button" class="btn btn-xs btn-outline-warning" title="Deactivate"
+                                        onclick="setDeactivateTarget(<?php echo $emp['employee_id']; ?>, '<?php echo e(addslashes($emp['first_name'] . ' ' . $emp['last_name'])); ?>')"
+                                        data-bs-toggle="modal" data-bs-target="#deactivateModal">
+                                        <i class="fas fa-user-slash"></i>
+                                    </button>
+                                <?php else: ?>
+                                    <button type="button" class="btn btn-xs btn-outline-success" title="Activate"
+                                        onclick="setActivateTarget(<?php echo $emp['employee_id']; ?>, '<?php echo e(addslashes($emp['first_name'] . ' ' . $emp['last_name'])); ?>')"
+                                        data-bs-toggle="modal" data-bs-target="#activateModal">
+                                        <i class="fas fa-user-check"></i>
+                                    </button>
+                                <?php endif; ?>
+                                <button type="button" class="btn btn-xs btn-outline-danger" title="Delete Permanently"
+                                    onclick="setDeleteTarget(<?php echo $emp['employee_id']; ?>, '<?php echo e(addslashes($emp['first_name'] . ' ' . $emp['last_name'])); ?>')"
+                                    data-bs-toggle="modal" data-bs-target="#deleteModal">
+                                    <i class="fas fa-trash"></i>
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -515,6 +624,58 @@ $statuses = ['OJT', 'Probationary', 'Project Based', 'Regular', 'Separated', 'Tr
 </div>
 
 <script>
+    let deactivateTargetId = null;
+    function setDeactivateTarget(id, name) {
+        deactivateTargetId = id;
+        document.getElementById('deactivateEmpName').textContent = name;
+        document.getElementById('separationReason').value = '';
+        document.getElementById('separationDate').value = '<?php echo date('Y-m-d'); ?>';
+        document.getElementById('separationRemarks').value = '';
+    }
+
+    document.getElementById('deactivateConfirmBtn').addEventListener('click', function() {
+        const reason = document.getElementById('separationReason').value;
+        const effDate = document.getElementById('separationDate').value;
+        const remarks = document.getElementById('separationRemarks').value.trim();
+
+        if (!reason) {
+            alert('Please select a reason for separation.');
+            document.getElementById('separationReason').focus();
+            return;
+        }
+        if (!effDate) {
+            alert('Please select an effective date.');
+            document.getElementById('separationDate').focus();
+            return;
+        }
+        if (deactivateTargetId) {
+            const params = new URLSearchParams(window.location.search);
+            params.set('deactivate', deactivateTargetId);
+            params.set('status', reason);
+            params.set('effective_date', effDate);
+            if (remarks) {
+                params.set('remarks', remarks);
+            } else {
+                params.delete('remarks');
+            }
+            window.location.href = '?' + params.toString();
+        }
+    });
+
+    function setActivateTarget(id, name) {
+        document.getElementById('activateEmpName').textContent = name;
+        const params = new URLSearchParams(window.location.search);
+        params.set('activate', id);
+        document.getElementById('activateConfirmBtn').href = '?' + params.toString();
+    }
+
+    function setDeleteTarget(id, name) {
+        document.getElementById('deleteEmpName').textContent = name;
+        const params = new URLSearchParams(window.location.search);
+        params.set('delete', id);
+        document.getElementById('deleteConfirmBtn').href = '?' + params.toString();
+    }
+
     // State Variables
     let currentPage = 1;
     const ITEMS_PER_PAGE = 10;
@@ -845,5 +1006,92 @@ $statuses = ['OJT', 'Probationary', 'Project Based', 'Regular', 'Separated', 'Tr
         updateFilterChips();
     });
 </script>
+
+<!-- Separation (Deactivate) Confirmation Modal -->
+<div class="modal fade" id="deactivateModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title"><i class="fas fa-user-slash me-2"></i>Employee Separation</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="text-center mb-3">
+                    <p class="mb-1">Select separation details for <strong id="deactivateEmpName"></strong>:</p>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Reason for Separation <span class="text-danger">*</span></label>
+                    <select id="separationReason" class="form-select" required>
+                        <option value="" selected disabled>Select a reason</option>
+                        <option value="Separated">Separated (General)</option>
+                        <option value="AWOL">AWOL</option>
+                        <option value="Retirement">Retirement</option>
+                        <option value="Death">Death</option>
+                        <option value="Permanent or Total Disability">Permanent or Total Disability</option>
+                        <option value="Resignation">Resignation</option>
+                        <option value="Failed in Training">Failed in Training</option>
+                        <option value="Termination for Cause">Termination for Cause</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Effective Date <span class="text-danger">*</span></label>
+                    <input type="date" id="separationDate" class="form-control" value="<?php echo date('Y-m-d'); ?>" required>
+                    <div class="form-text small">Date when the separation takes official effect.</div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Separation Remarks / Notes <span class="text-muted fw-normal">(Optional)</span></label>
+                    <textarea id="separationRemarks" class="form-control" rows="2" placeholder="e.g. Clearance processed, voluntary resignation, etc."></textarea>
+                </div>
+                <p class="text-muted small text-center mb-0"><i class="fas fa-info-circle me-1"></i>This will mark the employee as inactive, record the separation effective date, and update their employment status.</p>
+            </div>
+            <div class="modal-footer justify-content-center">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" id="deactivateConfirmBtn" class="btn btn-warning">
+                    <i class="fas fa-user-slash me-1"></i>Confirm Separation
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Activate Confirmation Modal -->
+<div class="modal fade" id="activateModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title"><i class="fas fa-user-check me-2"></i>Activate Employee</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center">
+                <p>Reactivate <strong id="activateEmpName"></strong>?</p>
+                <p class="text-muted small">This will mark them as an active employee again and reset their status to <strong>Regular</strong>.</p>
+            </div>
+            <div class="modal-footer justify-content-center">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <a href="#" id="activateConfirmBtn" class="btn btn-success"><i class="fas fa-user-check me-1"></i>Activate</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title"><i class="fas fa-exclamation-triangle me-2"></i>Delete Employee</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center">
+                <p>Permanently delete <strong id="deleteEmpName"></strong>?</p>
+                <p class="text-danger small"><i class="fas fa-exclamation-circle me-1"></i>This will remove all their records including evaluations. This cannot be undone!</p>
+            </div>
+            <div class="modal-footer justify-content-center">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <a href="#" id="deleteConfirmBtn" class="btn btn-danger"><i class="fas fa-trash me-1"></i>Delete Permanently</a>
+            </div>
+        </div>
+    </div>
+</div>
 
 <?php require_once '../includes/footer.php'; ?>

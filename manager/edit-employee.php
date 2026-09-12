@@ -1,7 +1,7 @@
 <?php
 $page_title = 'Edit Employee';
 require_once '../includes/session-check.php';
-checkRole(['HR Manager']);
+checkRole(['HR Manager', 'HR Supervisor']);
 require_once '../includes/functions.php';
 
 $eid = isset($_GET['id']) ? (int) $_GET['id'] : 0;
@@ -199,12 +199,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $employment_type = $_POST['employment_type'] ?? 'Full-time';
     $employee_code = strtoupper(trim($_POST['employee_code'] ?? ''));
     if ($employee_code === '') $employee_code = null;
-    $is_active = isset($_POST['is_active']) ? 1 : 0;
+    $is_active = $_SESSION['role'] === 'HR Supervisor'
+        ? (int) ($emp['is_active'] ?? 1)
+        : (isset($_POST['is_active']) ? 1 : 0);
+    $separationStatuses = ['Separated', 'AWOL', 'Retirement', 'Death', 'Permanent or Total Disability', 'Resignation', 'Failed in Training', 'Termination for Cause'];
+    $is_separation_status = in_array($employment_status, $separationStatuses, true);
+    if ($is_separation_status) $is_active = 0;
     // emergency contact fields are now arrays — handled in the save block below
     $contract_start_date = !empty($_POST['contract_start_date']) ? $_POST['contract_start_date'] : null;
     $contract_end_date = !empty($_POST['contract_end_date']) ? $_POST['contract_end_date'] : null;
     $separation_date = (!empty($_POST['separation_date']) && $is_active == 0) ? $_POST['separation_date'] : null;
     $separation_remarks = ($is_active == 0 && !empty(trim($_POST['separation_remarks'] ?? ''))) ? trim($_POST['separation_remarks']) : null;
+    if ($is_separation_status && empty($separation_date)) $separation_date = date('Y-m-d');
     if ($is_active == 1) {
         $separation_date = null;
         $separation_remarks = null;

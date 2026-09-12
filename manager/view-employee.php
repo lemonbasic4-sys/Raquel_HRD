@@ -1,7 +1,7 @@
 <?php
 $page_title = 'View Employee';
 require_once '../includes/session-check.php';
-checkRole(['HR Manager', 'System Administrator']);
+checkRole(['HR Manager', 'HR Supervisor', 'System Administrator']);
 require_once '../includes/functions.php';
 
 $eid = isset($_GET['id']) ? (int) $_GET['id'] : 0;

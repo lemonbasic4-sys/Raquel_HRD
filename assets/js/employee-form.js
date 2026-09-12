@@ -1524,6 +1524,47 @@ document.addEventListener("DOMContentLoaded", function () {
     // Toggle contract dates visibility + update labels dynamically based on employment status
     const statusSelect = document.querySelector('select[name="employment_status"]');
     const contractDatesRow = document.getElementById('contractDatesRow');
+    const separationFieldsRow = document.getElementById('separationFieldsRow');
+    const separationDateInput = document.getElementById('separation_date');
+    const separationRemarksInput = document.getElementById('separation_remarks');
+    const activeInput = document.getElementById('isActive');
+    const separateEmployeeBtn = document.getElementById('separateEmployeeBtn');
+    const reactivateEmployeeBtn = document.getElementById('reactivateEmployeeBtn');
+    const separationStatuses = ['Separated', 'AWOL', 'Retirement', 'Death', 'Permanent or Total Disability', 'Resignation', 'Failed in Training', 'Termination for Cause'];
+
+    const syncSeparationState = () => {
+        if (!statusSelect || !separationFieldsRow) return;
+        const isSeparation = separationStatuses.includes(statusSelect.value);
+        const isInactive = activeInput ? !activeInput.checked : isSeparation;
+        separationFieldsRow.style.display = (isSeparation || isInactive) ? '' : 'none';
+        if (separationDateInput) {
+            separationDateInput.required = isSeparation;
+            if (isSeparation && !separationDateInput.value) separationDateInput.value = new Date().toISOString().slice(0, 10);
+        }
+        if (isSeparation && activeInput) activeInput.checked = false;
+    };
+
+    if (separateEmployeeBtn) {
+        separateEmployeeBtn.addEventListener('click', () => {
+            if (statusSelect && !separationStatuses.includes(statusSelect.value)) statusSelect.value = 'Separated';
+            if (activeInput) activeInput.checked = false;
+            syncSeparationState();
+            if (statusSelect) statusSelect.focus();
+        });
+    }
+    if (reactivateEmployeeBtn) {
+        reactivateEmployeeBtn.addEventListener('click', () => {
+            if (statusSelect) statusSelect.value = 'Regular';
+            if (activeInput) activeInput.checked = true;
+            if (separationDateInput) separationDateInput.value = '';
+            if (separationRemarksInput) separationRemarksInput.value = '';
+            syncSeparationState();
+        });
+    }
+    if (statusSelect) statusSelect.addEventListener('change', syncSeparationState);
+    if (activeInput) activeInput.addEventListener('change', syncSeparationState);
+    syncSeparationState();
+
     if (statusSelect && contractDatesRow) {
         const statusesWithDates = ['OJT', 'Probationary', 'Project Based', 'Project-Based', 'Trainee'];
 
