@@ -173,6 +173,7 @@ switch ($effective_role) {
             'EMPLOYEES' => [
                 ['icon' => 'fas fa-users', 'label' => 'Employees', 'url' => BASE_URL . '/staff/employees.php', 'page' => 'employees.php',
                  'badge' => $staff_pending_ecr > 0 ? $staff_pending_ecr : null, 'badge_class' => 'bg-warning text-dark'],
+                ['icon' => 'fas fa-user-plus', 'label' => 'Add Employee', 'url' => BASE_URL . '/staff/add-employee.php', 'page' => 'add-employee.php'],
                 ['icon' => 'fas fa-building', 'label' => 'Branches & Roster', 'url' => BASE_URL . '/staff/branches.php', 'page' => 'branches.php'],
             ],
             'EVALUATIONS & MONITORING' => [

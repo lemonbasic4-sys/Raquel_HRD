@@ -32,10 +32,11 @@ require_once '../includes/header.php';
 
 // Fetch all employees (exclude Admin accounts)
 $employees = $conn->query("
-    SELECT e.*, b.branch_name, d.department_name
+    SELECT e.*, b.branch_name, d.department_name, jt.rank_category_id
     FROM employees e
     LEFT JOIN branches b ON e.branch_id = b.branch_id
     LEFT JOIN departments d ON e.department_id = d.department_id
+    LEFT JOIN job_titles jt ON e.job_title_id = jt.job_title_id
     WHERE e.employee_id NOT IN (SELECT employee_id FROM users WHERE role = 'Admin' AND employee_id IS NOT NULL)
     ORDER BY e.last_name, e.first_name
 ");
@@ -47,9 +48,11 @@ $pending_count     = (int) $conn->query("SELECT COUNT(*) as c FROM employee_chan
 // Filter dropdowns
 $job_titles_res = $conn->query("
     SELECT jt.job_title_id, jt.job_title, d.department_id, d.department_name,
+        rc.rank_name,
            (SELECT COUNT(*) FROM employees e WHERE e.job_title_id = jt.job_title_id) AS employee_count
     FROM job_titles jt
     LEFT JOIN departments d ON jt.department_id = d.department_id
+    LEFT JOIN rank_categories rc ON jt.rank_category_id = rc.rank_category_id
     WHERE jt.job_title IS NOT NULL AND jt.job_title != ''
     ORDER BY d.department_name ASC, jt.job_title ASC
 ");
@@ -70,7 +73,7 @@ $statuses = ['OJT','Probationary','Project Based','Regular','Separated','Trainee
 ?>
 
 <style>
-    .job-badge { display:inline-block;padding:2px 9px;border-radius:12px;font-size:.72rem;font-weight:600;letter-spacing:.3px;white-space:nowrap; }
+    .job-badge { display:inline-block;padding:2px 9px;border-radius:12px;font-size:.72rem;font-weight:600;letter-spacing:.3px;white-space:normal;overflow-wrap:anywhere;word-break:break-word; }
     .job-badge-executive   { background:#fff3cd;color:#856404;border:1px solid #ffc107; }
     .job-badge-mgmt-team   { background:#ede7f6;color:#5e35b1;border:1px solid #9c77e0; }
     .job-badge-manager     { background:#dbeafe;color:#1d4ed8;border:1px solid #60a5fa; }
@@ -93,6 +96,10 @@ $statuses = ['OJT','Probationary','Project Based','Regular','Separated','Trainee
     .btn-clear-filters:hover { background:#fff5f5; }
     @keyframes chipIn { from { transform:scale(.85);opacity:0; } to { transform:scale(1);opacity:1; } }
     .pending-badge { display:inline-block;background:#fff3cd;color:#856404;border:1px solid #ffc107;border-radius:10px;padding:1px 7px;font-size:.65rem;font-weight:700;letter-spacing:.3px;vertical-align:middle;margin-left:4px; }
+    @media (max-width: 768px) {
+        .filter-toolbar, .filter-summary { display:none !important; }
+        .cc-header .search-box { display:none !important; }
+    }
 </style>
 
 <div class="page-hero fadeup mb-4">
@@ -100,7 +107,7 @@ $statuses = ['OJT','Probationary','Project Based','Regular','Separated','Trainee
         <div>
             <div style="font-size:.72rem;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,.55);">HR Staff · Employees</div>
             <h4 class="text-white fw-bold mb-0 mt-1"><i class="fas fa-users me-2" style="color:#BD9414;"></i>All Employees</h4>
-            <p class="text-white-50 small mb-0 mt-2">Find employee records and submit update requests for review through the appropriate approval process.</p>
+            <p class="text-white-50 small mb-0 mt-2">View employee records and submit update requests for review through the appropriate approval process.</p>
         </div>
         <div style="color:rgba(255,255,255,.6);font-size:.8rem;">
             <i class="fas fa-sync-alt me-1"></i>Data as of <?php echo date('F d, Y'); ?>
@@ -134,8 +141,8 @@ $statuses = ['OJT','Probationary','Project Based','Regular','Separated','Trainee
         <div class="col-6 col-md-3">
             <div class="stat-card">
                 <div class="d-flex justify-content-between align-items-start">
-                    <div><div class="stat-value"><?php echo $pending_count; ?></div><div class="stat-label">Pending Changes</div></div>
-                    <i class="fas fa-clock stat-icon" style="color:#ffc107;"></i>
+                    <div><div class="stat-value">4</div><div class="stat-label">Filters</div></div>
+                    <i class="fas fa-filter stat-icon" style="color:#17a2b8;"></i>
                 </div>
             </div>
         </div>
@@ -152,11 +159,26 @@ $statuses = ['OJT','Probationary','Project Based','Regular','Separated','Trainee
 <?php endif; ?>
 
 <div class="chart-card fadeup">
+    <div class="hr-mobile-search-bar d-md-none px-3 pt-3 pb-1">
+        <div class="hr-search-input-wrap">
+            <i class="fas fa-search hr-search-icon"></i>
+            <input type="search" class="hr-search-input" id="mobileSearchEmp" placeholder="Search employees" aria-label="Search employees">
+        </div>
+        <button type="button" class="hr-filter-btn" id="mobileFilterOpenBtn" data-hr-filter-open>
+            <i class="fas fa-sliders-h"></i> Filters
+            <span class="hr-filter-count" style="display:none;">0</span>
+        </button>
+    </div>
     <div class="cc-header">
         <h5 class="d-none d-md-block"><i class="fas fa-users me-2"></i>All Employees</h5>
-        <div class="search-box">
-            <i class="fas fa-search search-icon"></i>
-            <input type="search" class="form-control form-control-sm" id="customSearchEmp" placeholder="Search by name, employee ID, position, or department" aria-label="Search employees by name, employee ID, position, or department" title="Search by name, employee ID, position, or department">
+        <div class="d-flex align-items-center gap-2">
+            <a href="<?php echo BASE_URL; ?>/staff/add-employee.php" class="btn btn-warning btn-sm fw-semibold">
+                <i class="fas fa-user-plus me-1"></i>Add Employee
+            </a>
+            <div class="search-box">
+                <i class="fas fa-search search-icon"></i>
+                <input type="search" class="form-control form-control-sm" id="customSearchEmp" placeholder="Search by name, employee ID, position, or department" aria-label="Search employees by name, employee ID, position, or department" title="Search by name, employee ID, position, or department">
+            </div>
         </div>
     </div>
 
@@ -171,6 +193,7 @@ $statuses = ['OJT','Probationary','Project Based','Regular','Separated','Trainee
                         <?php foreach ($titles as $jt): ?>
                             <option value="<?php echo e($jt['job_title']); ?>">
                                 <?php echo e($jt['job_title']); ?>
+                                <?php if (!empty($jt['rank_name'])): ?> — [<?php echo e($jt['rank_name']); ?>]<?php endif; ?>
                                 <?php if ($jt['employee_count'] > 0): ?>(<?php echo $jt['employee_count']; ?>)<?php endif; ?>
                             </option>
                         <?php endforeach; ?>
@@ -341,9 +364,58 @@ $statuses = ['OJT','Probationary','Project Based','Regular','Separated','Trainee
     </div>
 </div>
 
+<div class="hr-filter-backdrop" id="hrFilterBackdrop"></div>
+<div class="hr-filter-sheet" id="hrFilterSheet">
+    <div class="hr-filter-sheet-handle"></div>
+    <div class="hr-filter-sheet-header">
+        <h6 class="hr-filter-sheet-title"><i class="fas fa-sliders-h me-2" style="color:var(--hrm-gold);"></i>Filter Employees</h6>
+        <button type="button" class="hr-filter-clear-btn" id="hrFilterClear">Reset All</button>
+    </div>
+    <div class="hr-filter-sheet-body">
+        <div class="hr-filter-group">
+            <label><i class="fas fa-briefcase me-1"></i>Job Title</label>
+            <select id="mobileFilterJobTitle">
+                <option value="">All Titles</option>
+                <?php foreach ($job_titles_by_dept as $dept_name => $titles): ?>
+                    <optgroup label="<?php echo e($dept_name); ?>">
+                        <?php foreach ($titles as $jt): ?>
+                            <option value="<?php echo e($jt['job_title']); ?>"><?php echo e($jt['job_title']); ?></option>
+                        <?php endforeach; ?>
+                    </optgroup>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div class="hr-filter-group">
+            <label><i class="fas fa-sitemap me-1"></i>Department</label>
+            <select id="mobileFilterDepartment">
+                <option value="">All Departments</option>
+                <?php foreach ($departments as $dept): ?><option value="<?php echo e($dept); ?>"><?php echo e($dept); ?></option><?php endforeach; ?>
+            </select>
+        </div>
+        <div class="hr-filter-group">
+            <label><i class="fas fa-building me-1"></i>Branch</label>
+            <select id="mobileFilterBranch">
+                <option value="">All Branches</option>
+                <?php foreach ($branches as $branch): ?><option value="<?php echo e($branch); ?>"><?php echo e($branch); ?></option><?php endforeach; ?>
+            </select>
+        </div>
+        <div class="hr-filter-group">
+            <label><i class="fas fa-user-tag me-1"></i>Status</label>
+            <select id="mobileFilterStatus">
+                <option value="">All Statuses</option>
+                <?php foreach ($statuses as $status): ?><option value="<?php echo e($status); ?>"><?php echo e($status); ?></option><?php endforeach; ?>
+            </select>
+        </div>
+    </div>
+    <div class="hr-filter-sheet-footer">
+        <button type="button" class="hr-filter-apply-btn" id="hrFilterApply"><i class="fas fa-check me-1"></i>Apply Filters</button>
+    </div>
+</div>
+
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     const searchInput    = document.getElementById('customSearchEmp');
+    const mobileSearch   = document.getElementById('mobileSearchEmp');
     const filterJobTitle = document.getElementById('filterJobTitle');
     const filterDept     = document.getElementById('filterDepartment');
     const filterBranch   = document.getElementById('filterBranch');
@@ -357,6 +429,11 @@ document.addEventListener('DOMContentLoaded', function () {
     const pageControls   = document.getElementById('paginationControls');
     const PAGE_SIZE      = 50;
     let currentPage      = 1;
+
+    mobileSearch?.addEventListener('input', function () {
+        searchInput.value = this.value;
+        searchInput.dispatchEvent(new Event('input'));
+    });
 
     const urlParams = new URLSearchParams(window.location.search);
     const initialSearch = urlParams.get('search');
@@ -453,6 +530,28 @@ document.addEventListener('DOMContentLoaded', function () {
 
     [searchInput, filterJobTitle, filterDept, filterBranch, filterStatus].forEach(el => {
         el.addEventListener('input', () => { currentPage = 1; applyFilters(); });
+    });
+
+    document.getElementById('hrFilterApply')?.addEventListener('click', function () {
+        const pairs = [
+            ['mobileFilterJobTitle', filterJobTitle],
+            ['mobileFilterDepartment', filterDept],
+            ['mobileFilterBranch', filterBranch],
+            ['mobileFilterStatus', filterStatus]
+        ];
+        pairs.forEach(([mobileId, desktopSelect]) => {
+            const mobileSelect = document.getElementById(mobileId);
+            if (mobileSelect) desktopSelect.value = mobileSelect.value;
+        });
+        currentPage = 1;
+        applyFilters();
+    });
+
+    document.getElementById('hrFilterClear')?.addEventListener('click', function () {
+        ['mobileFilterJobTitle', 'mobileFilterDepartment', 'mobileFilterBranch', 'mobileFilterStatus'].forEach(id => {
+            const select = document.getElementById(id);
+            if (select) select.value = '';
+        });
     });
     filterChips.addEventListener('click', e => {
         const key = e.target.dataset.key;

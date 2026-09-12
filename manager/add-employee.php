@@ -1,11 +1,15 @@
 <?php
 $page_title = 'Add Employee';
 require_once '../includes/session-check.php';
-checkRole(['HR Manager', 'HR Supervisor']);
+checkRole(['HR Manager', 'HR Supervisor', 'HR Staff']);
 require_once '../includes/functions.php';
 
 // The same protected creation workflow is available from each authorized portal.
-$employee_portal_base = BASE_URL . '/' . (($_SESSION['role'] ?? '') === 'HR Supervisor' ? 'supervisor' : 'manager');
+$employee_portal_base = BASE_URL . '/' . match ($_SESSION['role'] ?? '') {
+    'HR Supervisor' => 'supervisor',
+    'HR Staff' => 'staff',
+    default => 'manager',
+};
 
 // Check for saved form draft from previous failed attempt (Persistence)
 $emp = $_SESSION['form_draft'] ?? [];
