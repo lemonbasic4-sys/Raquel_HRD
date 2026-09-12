@@ -131,33 +131,163 @@ require_once '../includes/header.php';
     </div>
 </div>
 
+<nav class="employee-information-tabs" role="tablist" aria-label="Employment information sections">
+    <button class="employee-information-tab" type="button" role="tab" aria-selected="true" tabindex="0" data-profile-tab="all"><i class="fas fa-th-large"></i>All Information</button>
+    <button class="employee-information-tab" type="button" role="tab" aria-selected="false" tabindex="-1" data-profile-tab="employment"><i class="fas fa-briefcase"></i>Employment Details</button>
+    <button class="employee-information-tab" type="button" role="tab" aria-selected="false" tabindex="-1" data-profile-tab="contact"><i class="fas fa-envelope"></i>Contact Information</button>
+    <button class="employee-information-tab" type="button" role="tab" aria-selected="false" tabindex="-1" data-profile-tab="government"><i class="fas fa-id-card"></i>Government IDs</button>
+    <button class="employee-information-tab" type="button" role="tab" aria-selected="false" tabindex="-1" data-profile-tab="personal"><i class="fas fa-user"></i>Profile Summary</button>
+    <button class="employee-information-tab" type="button" role="tab" aria-selected="false" tabindex="-1" data-profile-tab="addresses"><i class="fas fa-map-marker-alt"></i>Addresses</button>
+    <button class="employee-information-tab" type="button" role="tab" aria-selected="false" tabindex="-1" data-profile-tab="emergency"><i class="fas fa-exclamation-circle"></i>Emergency Contacts</button>
+    <button class="employee-information-tab" type="button" role="tab" aria-selected="false" tabindex="-1" data-profile-tab="career"><i class="fas fa-route"></i>Career Movement History</button>
+</nav>
 
+<style>
+    .employee-information-tabs {
+        display: flex;
+        width: 100%;
+        gap: 0;
+        overflow-x: auto;
+        margin-bottom: 1rem;
+        padding: 0;
+        background: #fff;
+        border: 1px solid #e5ebe7;
+        border-radius: 10px;
+        scrollbar-width: thin;
+    }
+
+    .employee-information-tab {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex: 0 0 auto;
+        min-width: 118px;
+        appearance: none;
+        border: 0;
+        border-bottom: 2px solid transparent;
+        border-radius: 8px 8px 0 0;
+        background: transparent;
+        color: #60706a;
+        font-size: .66rem;
+        font-weight: 700;
+        padding: .7rem .35rem .62rem;
+        white-space: nowrap;
+        text-align: center;
+        transition: color .18s ease, background-color .18s ease, border-color .18s ease;
+    }
+
+    .employee-information-tab:hover,
+    .employee-information-tab:focus-visible,
+    .employee-information-tab[aria-selected="true"] {
+        color: #12613a;
+        background: #f5faf7;
+        border-bottom-color: #12613a;
+        outline: none;
+    }
+
+    .employee-information-tab i {
+        margin-right: .35rem;
+    }
+
+    .pds-card[hidden] {
+        display: none !important;
+    }
+
+    .pds-info-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 18px;
+        width: 100%;
+    }
+
+    .pds-card {
+        max-width: 100%;
+        width: 100%;
+        min-height: 270px;
+        background: #fff;
+        border: 1px solid #e8ece8;
+        border-radius: 14px;
+        padding: 18px 18px 14px;
+        box-shadow: 0 8px 22px rgba(15, 23, 42, 0.04);
+    }
+
+    .pds-card-title {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 18px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid #edf1ee;
+        font-size: 1.05rem;
+        font-weight: 800;
+        color: #1d2d24;
+    }
+
+    .pds-card-title i {
+        color: #12613a;
+        font-size: 0.96rem;
+    }
+
+    .pds-data-row {
+        display: grid;
+        grid-template-columns: minmax(120px, 170px) 1fr;
+        gap: 10px 18px;
+        align-items: center;
+        padding: 8px 0;
+        border-bottom: 1px solid #f2f5f2;
+        font-size: 0.9rem;
+    }
+
+    .pds-data-row:last-child {
+        border-bottom: none;
+    }
+
+    .pds-data-row .label {
+        color: #64706a;
+        font-weight: 600;
+        letter-spacing: 0.01em;
+    }
+
+    .pds-data-row .value {
+        color: #1d2d24;
+        font-weight: 600;
+        word-break: break-word;
+    }
+
+    .company-id-text,
+    .company-id-value {
+        font-weight: 700;
+    }
+
+    .rank-badge {
+        display: inline-block;
+        background: linear-gradient(135deg, #efebff, #dbd0ff);
+        color: #5e3bc7;
+        border: 1px solid rgba(94, 59, 199, 0.18);
+        border-radius: 999px;
+        padding: 4px 10px;
+        font-size: 0.72rem;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+    }
+</style>
 
 <div class="pds-info-grid">
-    <div class="pds-card fadeup-1">
+    <div class="pds-card fadeup-1" data-profile-panel="employment" style="max-width: 100%; width: 100%;">
         <div class="pds-card-title"><i class="fas fa-briefcase"></i>Employment Details</div>
-        <div class="pds-data-row"><span class="label company-id-text">Company ID</span><span
-                class="value company-id-value"><?php echo e(getEmployeeDisplayId($emp)); ?></span></div>
-        <div class="pds-data-row"><span class="label">Rank</span><span
-                class="value"><span class="rank-badge"><?php echo e($emp['rank_name'] ?? '—'); ?></span></span></div>
-        <div class="pds-data-row"><span class="label">Full Name</span><span
-                class="value"><?php echo e(trim(($emp['first_name'] ?? '') . ' ' . ($emp['last_name'] ?? ''))); ?></span>
-        </div>
-        <div class="pds-data-row"><span class="label">Position</span><span
-                class="value"><?php echo e($emp['job_title'] ?? '—'); ?></span></div>
-        <div class="pds-data-row"><span class="label">Department</span><span
-                class="value"><?php echo e($emp['department_name'] ?? '—'); ?></span></div>
-        <div class="pds-data-row"><span class="label">Branch</span><span
-                class="value"><?php echo e($emp['branch_name'] ?? '—'); ?></span></div>
-        <div class="pds-data-row"><span class="label">Hire Date</span><span
-                class="value"><?php echo formatDate($emp['hire_date'] ?? ''); ?></span></div>
-        <div class="pds-data-row"><span class="label">Employment Status</span><span
-                class="value"><?php echo e($emp['employment_status'] ?? '—'); ?></span></div>
-        <div class="pds-data-row"><span class="label">Employment Type</span><span
-                class="value"><?php echo e($emp['employment_type'] ?? '—'); ?></span></div>
+        <div class="pds-data-row"><span class="label company-id-text">Company ID</span><span class="value company-id-value"><?php echo e(getEmployeeDisplayId($emp)); ?></span></div>
+        <div class="pds-data-row"><span class="label">Rank</span><span class="value"><span class="rank-badge"><?php echo e($emp['rank_name'] ?? '—'); ?></span></span></div>
+        <div class="pds-data-row"><span class="label">Full Name</span><span class="value"><?php echo e(trim(($emp['first_name'] ?? '') . ' ' . ($emp['last_name'] ?? ''))); ?></span></div>
+        <div class="pds-data-row"><span class="label">Position</span><span class="value"><?php echo e($emp['job_title'] ?? '—'); ?></span></div>
+        <div class="pds-data-row"><span class="label">Department</span><span class="value"><?php echo e($emp['department_name'] ?? '—'); ?></span></div>
+        <div class="pds-data-row"><span class="label">Branch</span><span class="value"><?php echo e($emp['branch_name'] ?? '—'); ?></span></div>
+        <div class="pds-data-row"><span class="label">Hire Date</span><span class="value"><?php echo formatDate($emp['hire_date'] ?? ''); ?></span></div>
+        <div class="pds-data-row"><span class="label">Employment Status</span><span class="value"><?php echo e($emp['employment_status'] ?? '—'); ?></span></div>
+        <div class="pds-data-row"><span class="label">Employment Type</span><span class="value"><?php echo e($emp['employment_type'] ?? '—'); ?></span></div>
     </div>
 
-    <div class="pds-card fadeup-2">
+    <div class="pds-card fadeup-2" data-profile-panel="contact" style="max-width: 100%; width: 100%;">
         <div class="pds-card-title"><i class="fas fa-phone"></i>Contact Information</div>
         <div class="pds-data-row"><span class="label">Mobile Number</span><span
                 class="value"><?php echo e($emp['mobile_number'] ?? '—'); ?></span></div>
@@ -183,7 +313,7 @@ require_once '../includes/header.php';
                 ?></span></div>
     </div>
 
-    <div class="pds-card fadeup-3">
+    <div class="pds-card fadeup-3" data-profile-panel="government" style="max-width: 100%; width: 100%;">
         <div class="pds-card-title d-flex align-items-center justify-content-between">
             <span><i class="fas fa-id-badge me-2"></i>Government IDs</span>
             <button type="button" class="btn btn-sm btn-light border py-1 px-2 rounded-pill shadow-none" id="toggleGovIdsBtn" onclick="toggleGovIds()" style="font-size: 0.75rem; font-weight: 600; color: #475569; background: #f8fafc; transition: all 0.2s ease;" title="Toggle Confidential IDs">
@@ -215,7 +345,7 @@ require_once '../includes/header.php';
         <?php endforeach; ?>
     </div>
 
-    <div class="pds-card fadeup-4">
+    <div class="pds-card fadeup-4" data-profile-panel="personal" style="max-width: 100%; width: 100%;">
         <div class="pds-card-title"><i class="fas fa-user"></i>Profile Summary</div>
         <div class="pds-data-row"><span class="label">Gender</span><span
                 class="value"><?php echo e($emp['gender'] ?? '—'); ?></span></div>
@@ -231,7 +361,7 @@ require_once '../includes/header.php';
                 class="value"><?php echo !empty($emp['is_active']) ? 'Active' : 'Inactive'; ?></span></div>
     </div>
 
-    <div class="pds-card fadeup-5">
+    <div class="pds-card fadeup-5" data-profile-panel="addresses" style="max-width: 100%; width: 100%;">
         <div class="pds-card-title"><i class="fas fa-map-marker-alt"></i>Addresses</div>
         <div class="pds-data-row flex-column align-items-start mb-3">
             <span class="label mb-1" style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;">Residential Address</span>
@@ -248,7 +378,7 @@ require_once '../includes/header.php';
         </div>
     </div>
 
-    <div class="pds-card fadeup-6">
+    <div class="pds-card fadeup-6" data-profile-panel="emergency" style="max-width: 100%; width: 100%;">
         <div class="pds-card-title"><i class="fas fa-exclamation-circle"></i>Emergency Contacts</div>
         <?php if (empty($emergency_contacts)): ?>
             <div class="text-muted small text-center py-3">No emergency contacts listed.</div>
@@ -299,7 +429,7 @@ require_once '../includes/header.php';
         $cm_stmt->close();
     }
     ?>
-    <div class="pds-card fadeup-7" style="grid-column: 1 / -1;">
+    <div class="pds-card fadeup-7" data-profile-panel="career" style="grid-column: 1 / -1; max-width: 100%; width: 100%;">
         <div class="pds-card-title"><i class="fas fa-route"></i>Career Movement History</div>
         <?php if (empty($cm_history)): ?>
             <div class="text-muted small text-center py-3"><i class="fas fa-route d-block mb-1" style="font-size:1.5rem;opacity:.3;"></i>No career movements recorded yet.</div>
@@ -404,6 +534,34 @@ function toggleSingleId(iconEl) {
         iconEl.className = 'fas fa-eye text-muted cursor-pointer single-id-toggle ms-auto';
     }
 }
+
+document.addEventListener('DOMContentLoaded', function () {
+    const tabs = Array.from(document.querySelectorAll('.employee-information-tab'));
+    const panels = Array.from(document.querySelectorAll('[data-profile-panel]'));
+
+    function activateTab(tab) {
+        const selected = tab.getAttribute('data-profile-tab');
+
+        tabs.forEach(function (item) {
+            const active = item === tab;
+            item.setAttribute('aria-selected', active ? 'true' : 'false');
+            item.tabIndex = active ? 0 : -1;
+        });
+
+        panels.forEach(function (panel) {
+            const visible = selected === 'all' || panel.getAttribute('data-profile-panel') === selected;
+            panel.hidden = !visible;
+        });
+    }
+
+    tabs.forEach(function (tab) {
+        tab.addEventListener('click', function () {
+            activateTab(tab);
+        });
+    });
+
+    if (tabs.length) activateTab(tabs[0]);
+});
 </script>
 
 <?php require_once '../includes/footer.php'; ?>
