@@ -775,6 +775,28 @@ $hero_name = trim($emp['first_name'] . ' ' . ($emp['middle_name'] ? $emp['middle
             <div class="employee-reference-summary-item"><small><i class="fas fa-building me-1"></i>Department</small><strong><?php echo e($emp['department_name'] ?: 'N/A'); ?></strong></div>
         </div>
     </div>
+    <?php if (!$emp['is_active'] || !empty($emp['separation_date'])): ?>
+        <div class="alert alert-warning text-start py-2 px-3 mt-3 mb-0 border-start border-4 border-warning shadow-sm" style="background-color: #fff9db; border-color: #f59f00 !important;">
+            <div class="fw-bold text-dark mb-1 d-flex align-items-center gap-1" style="font-size: 0.85rem;">
+                <i class="fas fa-user-slash text-warning me-1"></i>Separation Notice
+            </div>
+            <div class="d-flex justify-content-between gap-2 small mb-1">
+                <span class="text-muted">Status:</span>
+                <span class="fw-bold text-dark"><?php echo e($emp['employment_status']); ?></span>
+            </div>
+            <?php if (!empty($emp['separation_date'])): ?>
+                <div class="d-flex justify-content-between gap-2 small mb-1">
+                    <span class="text-muted">Effective:</span>
+                    <span class="fw-bold text-danger"><?php echo formatDate($emp['separation_date']); ?></span>
+                </div>
+            <?php endif; ?>
+            <?php if (!empty($emp['separation_remarks'])): ?>
+                <div class="small mt-1 pt-1 border-top border-warning-subtle text-muted" style="font-size: 0.75rem;">
+                    <strong>Notes:</strong> <?php echo nl2br(e($emp['separation_remarks'])); ?>
+                </div>
+            <?php endif; ?>
+        </div>
+    <?php endif; ?>
 </div>
 
 <nav class="employee-information-tabs" role="tablist" aria-label="Employee information sections">
@@ -828,29 +850,6 @@ $hero_name = trim($emp['first_name'] . ' ' . ($emp['middle_name'] ? $emp['middle
                     </span>
                     <span class="badge bg-primary px-3 py-2"><?php echo e($emp['employment_status']); ?></span>
                 </div>
-
-                <?php if (!$emp['is_active'] || !empty($emp['separation_date'])): ?>
-                    <div class="alert alert-warning text-start py-2 px-3 mt-2 mb-3 border-start border-4 border-warning shadow-sm" style="background-color: #fff9db; border-color: #f59f00 !important;">
-                        <div class="fw-bold text-dark mb-1 d-flex align-items-center gap-1" style="font-size: 0.85rem;">
-                            <i class="fas fa-user-slash text-warning me-1"></i>Separation Notice
-                        </div>
-                        <div class="d-flex justify-content-between gap-2 small mb-1">
-                            <span class="text-muted">Status:</span>
-                            <span class="fw-bold text-dark"><?php echo e($emp['employment_status']); ?></span>
-                        </div>
-                        <?php if (!empty($emp['separation_date'])): ?>
-                            <div class="d-flex justify-content-between gap-2 small mb-1">
-                                <span class="text-muted">Effective:</span>
-                                <span class="fw-bold text-danger"><?php echo formatDate($emp['separation_date']); ?></span>
-                            </div>
-                        <?php endif; ?>
-                        <?php if (!empty($emp['separation_remarks'])): ?>
-                            <div class="small mt-1 pt-1 border-top border-warning-subtle text-muted" style="font-size: 0.75rem;">
-                                <strong>Notes:</strong> <?php echo nl2br(e($emp['separation_remarks'])); ?>
-                            </div>
-                        <?php endif; ?>
-                    </div>
-                <?php endif; ?>
 
                 <?php if (in_array($emp['employment_status'], ['OJT', 'Probationary', 'Project Based', 'Project-Based', 'Trainee'], true)): ?>
                     <div class="alert alert-info text-start py-2 px-3 mt-2 mb-3 border-start border-4 border-info shadow-sm">
