@@ -1270,6 +1270,17 @@ $rankCategories = $rankCategories ?? [
                 </div>
             <?php endif; ?>
         </div>
+        <div class="row" id="separationFieldsRow" style="<?php echo (empty($e['is_active']) || !empty($e['separation_date'])) ? '' : 'display:none;'; ?>">
+            <div class="col-md-4 mb-3">
+                <label class="form-label text-danger fw-semibold"><i class="fas fa-calendar-times me-1"></i>Separation Effective Date</label>
+                <input type="date" class="form-control" name="separation_date" id="separation_date" value="<?php echo $v('separation_date'); ?>">
+                <small class="text-muted">Effective date if the employee is separated.</small>
+            </div>
+            <div class="col-md-8 mb-3">
+                <label class="form-label fw-semibold">Separation Remarks / Notes</label>
+                <input type="text" class="form-control" name="separation_remarks" id="separation_remarks" value="<?php echo $v('separation_remarks'); ?>" placeholder="Separation notes, turnover details, or clearance remarks">
+            </div>
+        </div>
     <?php endif; ?>
 
     <div class="form-section-title mt-4"><i class="fas fa-heartbeat"></i> Emergency Contacts</div>
@@ -1453,5 +1464,13 @@ document.addEventListener("DOMContentLoaded", function() {
 
     // Run once on load so the list is correct in edit mode.
     updateJobTitles();
+
+    const activeToggle = document.getElementById('isActive');
+    const sepRow = document.getElementById('separationFieldsRow');
+    if (activeToggle && sepRow) {
+        activeToggle.addEventListener('change', function() {
+            sepRow.style.display = this.checked ? 'none' : 'flex';
+        });
+    }
 });
 </script>

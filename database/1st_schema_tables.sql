@@ -116,6 +116,8 @@ CREATE TABLE employees (
     employment_type ENUM('Full-time', 'Part-time') DEFAULT 'Full-time',
     contract_start_date DATE NULL,
     contract_end_date DATE NULL,
+    separation_date DATE NULL DEFAULT NULL,
+    separation_remarks TEXT NULL,
     
     profile_picture VARCHAR(255) NULL,
     is_active TINYINT(1) DEFAULT 1,

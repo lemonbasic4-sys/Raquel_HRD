@@ -203,6 +203,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // emergency contact fields are now arrays — handled in the save block below
     $contract_start_date = !empty($_POST['contract_start_date']) ? $_POST['contract_start_date'] : null;
     $contract_end_date = !empty($_POST['contract_end_date']) ? $_POST['contract_end_date'] : null;
+    $separation_date = (!empty($_POST['separation_date']) && $is_active == 0) ? $_POST['separation_date'] : null;
+    $separation_remarks = ($is_active == 0 && !empty(trim($_POST['separation_remarks'] ?? ''))) ? trim($_POST['separation_remarks']) : null;
+    if ($is_active == 1) {
+        $separation_date = null;
+        $separation_remarks = null;
+    }
 
     if ($job_title_id !== null) {
         $jtStmt = $conn->prepare("SELECT job_title, department_id, is_active FROM job_titles WHERE job_title_id = ?");
@@ -289,15 +295,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             employee_code=?, first_name=?, last_name=?, middle_name=?, name_extension=?,
             date_of_birth=?, place_of_birth=?, gender=?, civil_status=?,
             hire_date=?, job_title=?, job_title_id=?, department_id=?, rank_category_id=?, branch_id=?,
-            employment_status=?, employment_type=?, contract_start_date=?, contract_end_date=?, is_active=?";
+            employment_status=?, employment_type=?, contract_start_date=?, contract_end_date=?, is_active=?,
+            separation_date=?, separation_remarks=?";
 
         if ($new_filename)
             $sql .= ", profile_picture=?";
         $sql .= " WHERE employee_id=?";
 
         $stmt = $conn->prepare($sql);
-        $types = "sssssssssssiiiissssi" . ($new_filename ? "s" : "") . "i";
-        $params = [$employee_code, $first_name, $last_name, $middle_name, $name_extension, $date_of_birth, $place_of_birth, $gender, $civil_status, $hire_date, $job_title, $job_title_id, $department_id, $rank_category_id, $branch_id, $employment_status, $employment_type, $contract_start_date, $contract_end_date, $is_active];
+        $types = "sssssssssssiiiissssiss" . ($new_filename ? "s" : "") . "i";
+        $params = [$employee_code, $first_name, $last_name, $middle_name, $name_extension, $date_of_birth, $place_of_birth, $gender, $civil_status, $hire_date, $job_title, $job_title_id, $department_id, $rank_category_id, $branch_id, $employment_status, $employment_type, $contract_start_date, $contract_end_date, $is_active, $separation_date, $separation_remarks];
         if ($new_filename)
             $params[] = $new_filename;
         $params[] = $eid;
@@ -714,6 +721,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'employment_type' => $employment_type,
             'contract_start_date' => $contract_start_date,
             'contract_end_date' => $contract_end_date,
+            'separation_date' => $separation_date,
+            'separation_remarks' => $separation_remarks,
             'res_street' => $res_street,
             'res_barangay' => $res_barangay,
             'res_city' => $res_city,

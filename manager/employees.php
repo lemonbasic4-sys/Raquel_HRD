@@ -44,30 +44,37 @@ $buildRedirectWithFilters = function ($actionKey) use ($get_params) {
     $params = $get_params;
     unset($params[$actionKey]);
     if ($actionKey === 'deactivate') {
-        unset($params['status']);
+        unset($params['status'], $params['effective_date'], $params['remarks']);
     }
     $qs = http_build_query($params);
     return BASE_URL . '/manager/employees.php' . ($qs ? '?' . $qs : '');
 };
 
+ensureEmployeeSeparationColumns($conn);
+
 // Handle activate/deactivate
 if (isset($_GET['deactivate']) && is_numeric($_GET['deactivate'])) {
     $eid = (int) $_GET['deactivate'];
     $status = $_GET['status'] ?? 'Separated';
-    
-    $stmt = $conn->prepare("UPDATE employees SET is_active = 0, employment_status = ? WHERE employee_id = ?");
-    $stmt->bind_param("si", $status, $eid);
-    
+    $raw_eff_date = trim($_GET['effective_date'] ?? '');
+    $separation_date = !empty($raw_eff_date) ? date('Y-m-d', strtotime($raw_eff_date)) : date('Y-m-d');
+    $separation_remarks = trim($_GET['remarks'] ?? '');
+    $remarks_val = $separation_remarks !== '' ? $separation_remarks : null;
+
+    $stmt = $conn->prepare("UPDATE employees SET is_active = 0, employment_status = ?, separation_date = ?, separation_remarks = ? WHERE employee_id = ?");
+    $stmt->bind_param("sssi", $status, $separation_date, $remarks_val, $eid);
+
     if ($stmt->execute()) {
-        logAudit($conn, $_SESSION['user_id'], 'UPDATE', 'Employee', $eid, "Deactivated employee with status: $status");
-        redirectWith($buildRedirectWithFilters('deactivate'), 'success', 'Employee deactivated successfully.');
+        $audit_detail = "Separated employee with status: $status, Effective: $separation_date" . ($remarks_val ? ", Remarks: $remarks_val" : "");
+        logAudit($conn, $_SESSION['user_id'], 'UPDATE', 'Employee', $eid, $audit_detail);
+        redirectWith($buildRedirectWithFilters('deactivate'), 'success', 'Employee separation processed successfully.');
     }
     $stmt->close();
 }
 if (isset($_GET['activate']) && is_numeric($_GET['activate'])) {
     $eid = (int) $_GET['activate'];
-    $conn->query("UPDATE employees SET is_active = 1, employment_status = 'Regular' WHERE employee_id = $eid");
-    logAudit($conn, $_SESSION['user_id'], 'UPDATE', 'Employee', $eid, 'Reactivated employee');
+    $conn->query("UPDATE employees SET is_active = 1, employment_status = 'Regular', separation_date = NULL, separation_remarks = NULL WHERE employee_id = $eid");
+    logAudit($conn, $_SESSION['user_id'], 'UPDATE', 'Employee', $eid, 'Reactivated employee and reset separation record');
     redirectWith($buildRedirectWithFilters('activate'), 'success', 'Employee reactivated successfully.');
 }
 
@@ -573,7 +580,11 @@ $selected_branch = $_GET['branch'] ?? $user_assigned_branch_name;
                             <td data-label="Branch"><?php echo e($emp['branch_name'] ?? 'N/A'); ?></td>
                             <td data-label="Status">
                                 <?php echo renderEmploymentStatusBadge($emp['employment_status']); ?>
-                                <?php if ($emp_dr !== null && $emp_dr <= 60): ?>
+                                <?php if (!$emp['is_active'] && !empty($emp['separation_date'])): ?>
+                                    <small class="text-muted d-block mt-1" style="font-size: 0.72rem; white-space: nowrap;">
+                                        <i class="fas fa-calendar-times me-1 text-danger"></i>Eff: <?php echo formatDate($emp['separation_date']); ?>
+                                    </small>
+                                <?php elseif ($emp_dr !== null && $emp_dr <= 60): ?>
                                     <?php
                                     if ($emp_dr < 0)       { $eI = 'fa-times-circle';         $eL = 'Overdue '.abs($emp_dr).'d'; $eC = 'bg-danger'; }
                                     elseif ($emp_dr === 0) { $eI = 'fa-exclamation-circle';  $eL = 'Ends Today!';               $eC = 'bg-danger'; }
@@ -640,7 +651,14 @@ $selected_branch = $_GET['branch'] ?? $user_assigned_branch_name;
 
                     <!-- Top Header Bar: Status Badge on left + Actions Menu Button on right -->
                     <div class="d-flex align-items-center justify-content-between pb-2 mb-2 border-bottom">
-                        <?php echo renderEmploymentStatusBadge($emp['employment_status']); ?>
+                        <div>
+                            <?php echo renderEmploymentStatusBadge($emp['employment_status']); ?>
+                            <?php if (!$emp['is_active'] && !empty($emp['separation_date'])): ?>
+                                <div class="text-muted mt-1" style="font-size: 0.72rem;">
+                                    <i class="fas fa-calendar-times me-1 text-danger"></i>Eff: <?php echo formatDate($emp['separation_date']); ?>
+                                </div>
+                            <?php endif; ?>
+                        </div>
 
                         <!-- Actions Dropdown Menu -->
                         <div class="dropdown">
@@ -745,12 +763,12 @@ $selected_branch = $_GET['branch'] ?? $user_assigned_branch_name;
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <div class="text-center mb-4">
-                    <p>Select separation reason for <strong id="deactivateEmpName"></strong>:</p>
+                <div class="text-center mb-3">
+                    <p class="mb-1">Select separation details for <strong id="deactivateEmpName"></strong>:</p>
                 </div>
                 <div class="mb-3">
-                    <label class="form-label fw-bold">Reason for Separation</label>
-                    <select id="separationReason" class="form-select">
+                    <label class="form-label fw-bold">Reason for Separation <span class="text-danger">*</span></label>
+                    <select id="separationReason" class="form-select" required>
                         <option value="" selected disabled>Select a reason</option>
                         <option value="Separated">Separated (General)</option>
                         <option value="AWOL">AWOL</option>
@@ -762,7 +780,16 @@ $selected_branch = $_GET['branch'] ?? $user_assigned_branch_name;
                         <option value="Termination for Cause">Termination for Cause</option>
                     </select>
                 </div>
-                <p class="text-muted small text-center"><i class="fas fa-info-circle me-1"></i>This will mark the employee as inactive and update their status.</p>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Effective Date <span class="text-danger">*</span></label>
+                    <input type="date" id="separationDate" class="form-control" value="<?php echo date('Y-m-d'); ?>" required>
+                    <div class="form-text small">Date when the separation takes official effect.</div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Separation Remarks / Notes <span class="text-muted fw-normal">(Optional)</span></label>
+                    <textarea id="separationRemarks" class="form-control" rows="2" placeholder="e.g. Clearance processed, voluntary resignation, etc."></textarea>
+                </div>
+                <p class="text-muted small text-center mb-0"><i class="fas fa-info-circle me-1"></i>This will mark the employee as inactive, record the separation effective date, and update their employment status.</p>
             </div>
             <div class="modal-footer justify-content-center">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -889,14 +916,36 @@ $selected_branch = $_GET['branch'] ?? $user_assigned_branch_name;
     function setDeactivateTarget(id, name) {
         deactivateTargetId = id;
         document.getElementById('deactivateEmpName').textContent = name;
+        document.getElementById('separationReason').value = '';
+        document.getElementById('separationDate').value = '<?php echo date('Y-m-d'); ?>';
+        document.getElementById('separationRemarks').value = '';
     }
 
     document.getElementById('deactivateConfirmBtn').addEventListener('click', function() {
         const reason = document.getElementById('separationReason').value;
+        const effDate = document.getElementById('separationDate').value;
+        const remarks = document.getElementById('separationRemarks').value.trim();
+
+        if (!reason) {
+            alert('Please select a reason for separation.');
+            document.getElementById('separationReason').focus();
+            return;
+        }
+        if (!effDate) {
+            alert('Please select an effective date.');
+            document.getElementById('separationDate').focus();
+            return;
+        }
         if (deactivateTargetId) {
             const params = new URLSearchParams(window.location.search);
             params.set('deactivate', deactivateTargetId);
             params.set('status', reason);
+            params.set('effective_date', effDate);
+            if (remarks) {
+                params.set('remarks', remarks);
+            } else {
+                params.delete('remarks');
+            }
             window.location.href = '?' + params.toString();
         }
     });

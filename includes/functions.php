@@ -5575,6 +5575,30 @@ function ensureEmployeeEditHistorySchema($conn): bool
 }
 
 /**
+ * Ensures the separation_date and separation_remarks columns exist on the employees table.
+ */
+function ensureEmployeeSeparationColumns($conn): bool
+{
+    static $separation_ensured = false;
+    if ($separation_ensured) return true;
+    try {
+        $chk = $conn->query("SHOW COLUMNS FROM employees LIKE 'separation_date'");
+        if ($chk && $chk->num_rows === 0) {
+            $conn->query("ALTER TABLE employees ADD COLUMN separation_date DATE NULL DEFAULT NULL AFTER contract_end_date");
+        }
+        $chk2 = $conn->query("SHOW COLUMNS FROM employees LIKE 'separation_remarks'");
+        if ($chk2 && $chk2->num_rows === 0) {
+            $conn->query("ALTER TABLE employees ADD COLUMN separation_remarks TEXT NULL DEFAULT NULL AFTER separation_date");
+        }
+        $separation_ensured = true;
+        return true;
+    } catch (Throwable $e) {
+        error_log('ensureEmployeeSeparationColumns error: ' . $e->getMessage());
+        return false;
+    }
+}
+
+/**
  * Computes the differences between original and newly submitted employee data,
  * records the exact changes to employee_edit_history, and creates an audit log entry.
  */

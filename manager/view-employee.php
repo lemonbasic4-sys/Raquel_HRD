@@ -623,6 +623,29 @@ $discList = [
                     <span class="badge bg-primary px-3 py-2"><?php echo e($emp['employment_status']); ?></span>
                 </div>
 
+                <?php if (!$emp['is_active'] || !empty($emp['separation_date'])): ?>
+                    <div class="alert alert-warning text-start py-2 px-3 mt-2 mb-3 border-start border-4 border-warning shadow-sm" style="background-color: #fff9db; border-color: #f59f00 !important;">
+                        <div class="fw-bold text-dark mb-1 d-flex align-items-center gap-1" style="font-size: 0.85rem;">
+                            <i class="fas fa-user-slash text-warning me-1"></i>Separation Notice
+                        </div>
+                        <div class="d-flex justify-content-between gap-2 small mb-1">
+                            <span class="text-muted">Status:</span>
+                            <span class="fw-bold text-dark"><?php echo e($emp['employment_status']); ?></span>
+                        </div>
+                        <?php if (!empty($emp['separation_date'])): ?>
+                            <div class="d-flex justify-content-between gap-2 small mb-1">
+                                <span class="text-muted">Effective:</span>
+                                <span class="fw-bold text-danger"><?php echo formatDate($emp['separation_date']); ?></span>
+                            </div>
+                        <?php endif; ?>
+                        <?php if (!empty($emp['separation_remarks'])): ?>
+                            <div class="small mt-1 pt-1 border-top border-warning-subtle text-muted" style="font-size: 0.75rem;">
+                                <strong>Notes:</strong> <?php echo nl2br(e($emp['separation_remarks'])); ?>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                <?php endif; ?>
+
                 <?php if (in_array($emp['employment_status'], ['OJT', 'Probationary', 'Project Based', 'Project-Based', 'Trainee'], true)): ?>
                     <div class="alert alert-info text-start py-2 px-3 mt-2 mb-3 border-start border-4 border-info shadow-sm">
                         <div class="fw-bold text-info mb-2"><i class="fas fa-clock me-1"></i>Contract Period</div>
@@ -1454,6 +1477,12 @@ $discList = [
                                 echo field('Hire Date', formatDate($emp['hire_date']));
                                 echo field('Employment Status', $emp['employment_status']);
                                 echo field('Employment Type', $emp['employment_type']);
+                                if (!$emp['is_active'] || !empty($emp['separation_date'])) {
+                                    echo field('Separation Effective Date', !empty($emp['separation_date']) ? formatDate($emp['separation_date']) : 'N/A');
+                                    if (!empty($emp['separation_remarks'])) {
+                                        echo field('Separation Remarks', $emp['separation_remarks']);
+                                    }
+                                }
                                 ?>
                             </div>
                         </div>
