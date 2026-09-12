@@ -770,7 +770,6 @@ $selected_branch = $_GET['branch'] ?? $user_assigned_branch_name;
                     <label class="form-label fw-bold">Reason for Separation <span class="text-danger">*</span></label>
                     <select id="separationReason" class="form-select" required>
                         <option value="" selected disabled>Select a reason</option>
-                        <option value="Separated">Separated</option>
                         <option value="AWOL">AWOL</option>
                         <option value="Retirement">Retirement</option>
                         <option value="Death">Death</option>
