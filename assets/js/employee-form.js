@@ -167,7 +167,10 @@ function showStep(step, scrollToTop = true) {
 
     if (prevBtn) prevBtn.style.display = (step === 1) ? 'none' : 'inline-block';
     if (nextBtn) nextBtn.style.display = (step === TOTAL_STEPS) ? 'none' : 'inline-block';
-    if (submitBtn) submitBtn.style.display = (step === TOTAL_STEPS) ? 'inline-block' : 'none';
+    if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.style.display = (step === TOTAL_STEPS) ? 'inline-block' : 'none';
+    }
 
     // Ensure has-wizard-footer class is added to body to prevent content overlapping
     document.body.classList.add('has-wizard-footer');
@@ -1491,8 +1494,30 @@ function getChangeConfirmationModal() {
     return modalElement;
 }
 
+function showNoChangesNotice(form) {
+    let notice = document.getElementById('employeeNoChangesNotice');
+    if (!notice) {
+        notice = document.createElement('div');
+        notice.id = 'employeeNoChangesNotice';
+        notice.className = 'alert alert-info d-flex align-items-center gap-2 mb-3';
+        notice.setAttribute('role', 'status');
+        notice.innerHTML = '<i class="fas fa-circle-info"></i><span></span>';
+
+        const footer = form ? form.querySelector('.wizard-footer') : null;
+        if (footer) footer.parentNode.insertBefore(notice, footer);
+        else if (form) form.prepend(notice);
+    }
+
+    const message = notice.querySelector('span');
+    if (message) message.textContent = 'No changes were made. The original employee information was restored, so there is nothing to save.';
+    notice.hidden = false;
+}
+
 // Automatically navigate to the step containing an invalid required field
 document.addEventListener("DOMContentLoaded", function () {
+    bindJobTitleRankAutofill();
+    window.employeeAddressReady = initPhAddresses();
+
     // Initialize repeater accordions for mobile view
     initRepeaterAccordions();
 
@@ -1792,6 +1817,18 @@ document.addEventListener("DOMContentLoaded", function () {
     const employeeId = isEdit ? (new URLSearchParams(window.location.search)).get('id') : 'new';
     const DRAFT_KEY = `hris_employee_draft_${employeeId}`;
     const initialComparisonSnapshot = (employeeForm && isEdit) ? serializeFormForComparison(employeeForm) : null;
+    if (initialComparisonSnapshot && window.employeeAddressReady) {
+        window.employeeAddressReady.then(function () {
+            const hydratedSnapshot = serializeFormForComparison(employeeForm);
+            ['res_region', 'res_province', 'res_city', 'res_barangay', 'res_zip_code',
+                'perm_region', 'perm_province', 'perm_city', 'perm_barangay', 'perm_zip_code'
+            ].forEach(function (fieldName) {
+                if (hydratedSnapshot.values[fieldName]) {
+                    initialComparisonSnapshot.values[fieldName] = hydratedSnapshot.values[fieldName];
+                }
+            });
+        });
+    }
     let allowEditSubmit = false;
 
     // Intercept native browser invalid events to smoothly focus & scroll to the exact faulty element
@@ -1842,6 +1879,20 @@ document.addEventListener("DOMContentLoaded", function () {
             const summaryList = modalElement.querySelector('#employeeChangeSummaryList');
             const confirmButton = modalElement.querySelector('#confirmEmployeeUpdateBtn');
 
+            modalElement.addEventListener('hidden.bs.modal', () => {
+                allowEditSubmit = false;
+                isSubmitting = false;
+                const saveButton = document.getElementById('submitBtn');
+                if (saveButton) {
+                    saveButton.disabled = false;
+                    saveButton.style.pointerEvents = 'auto';
+                    saveButton.style.opacity = '1';
+                }
+                document.querySelectorAll('.modal-backdrop').forEach((backdrop) => backdrop.remove());
+                document.body.classList.remove('modal-open');
+                document.body.style.removeProperty('padding-right');
+            });
+
             employeeForm.addEventListener('submit', (event) => {
                 if (allowEditSubmit) return;
 
@@ -1857,7 +1908,8 @@ document.addEventListener("DOMContentLoaded", function () {
                 const changes = buildChangedFieldList(initialComparisonSnapshot, currentSnapshot);
 
                 if (changes.length === 0) {
-                    window.alert('No changes detected.');
+                    localStorage.removeItem(DRAFT_KEY);
+                    showNoChangesNotice(employeeForm);
                     return;
                 }
 
@@ -2070,17 +2122,12 @@ function bindJobTitleRankAutofill() {
     }
 }
 
-document.addEventListener('DOMContentLoaded', function () {
-    bindJobTitleRankAutofill();
-    initPhAddresses();
-});
-
 /**
  * Modern Cascading Address Dropdowns for Philippines (Region -> Province -> City -> Barangay -> Zip)
  */
 function initPhAddresses() {
     var regSelects = document.querySelectorAll('.ph-region-select');
-    if (!regSelects.length) return;
+    if (!regSelects.length) return Promise.resolve();
 
     var basePath = '';
     if (typeof window.APP_BASE_URL !== 'undefined' && window.APP_BASE_URL) {
@@ -2101,7 +2148,7 @@ function initPhAddresses() {
     var locUrl = basePath + '/assets/data/ph_locations.json';
     var zipUrl = basePath + '/assets/data/zip_codes.json';
 
-    Promise.all([
+    return Promise.all([
         fetch(locUrl).then(function (r) { return r.json(); }),
         fetch(zipUrl).then(function (r) { return r.json(); }).catch(function () { return {}; })
     ]).then(function (results) {

@@ -1545,6 +1545,16 @@ select option.position-group-label {
     min-width: 100px;
 }
 
+.wizard-footer #submitBtn,
+.wizard-footer #submitBtn:not(:disabled) {
+    background: #198754 !important;
+    border-color: #198754 !important;
+    color: #fff !important;
+    opacity: 1 !important;
+    cursor: pointer;
+    pointer-events: auto;
+}
+
 /* Repeater row styles for dynamic add/remove */
 .repeater-row {
     background: var(--bg-gray);

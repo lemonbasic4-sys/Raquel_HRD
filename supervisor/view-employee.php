@@ -162,6 +162,7 @@ $discList = [
 ];
 
 require_once '../includes/header.php';
+echo '<link rel="stylesheet" href="' . BASE_URL . '/assets/css/employee-profile-reference.css">';
 
 // Helper
 function field($label, $value, $escape = true)
@@ -258,12 +259,7 @@ $rankBadgeClass = $rankBadgeClassMap[$emp['rank_name'] ?? ''] ?? 'rank-badge-def
         padding: 1.5rem;
     }
 
-    .performance-career-tabs { display: flex; gap: 0.35rem; overflow-x: auto; border-bottom: 1px solid #e2e8f0; padding: 0 1.5rem; scrollbar-width: thin; }
-    .performance-career-tab { appearance: none; flex: 0 0 auto; border: 0; border-bottom: 3px solid transparent; background: transparent; color: var(--text-muted); font-size: 0.9rem; font-weight: 700; padding: 0.95rem 1rem 0.8rem; transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease; }
-    .performance-career-tab:hover, .performance-career-tab:focus-visible { background: #f8fafc; color: var(--primary-blue); outline: none; }
-    .performance-career-tab[aria-selected="true"] { border-bottom-color: #bd9414; color: var(--text-dark); }
     .performance-career-panel { animation: performance-career-panel-in 0.2s ease-out; }
-    .performance-career-panel[hidden] { display: none !important; }
     @keyframes performance-career-panel-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 
     .employee-subsection {
@@ -518,8 +514,6 @@ $rankBadgeClass = $rankBadgeClassMap[$emp['rank_name'] ?? ''] ?? 'rank-badge-def
             padding: 1.1rem;
         }
 
-        .performance-career-tabs { padding: 0 1.1rem; }
-
         .employee-table-wrap,
         .employee-table-wrap table,
         .employee-table-wrap tbody,
@@ -565,13 +559,62 @@ $rankBadgeClass = $rankBadgeClassMap[$emp['rank_name'] ?? ''] ?? 'rank-badge-def
         <p class="text-muted mb-1">Employee Personal Data Sheet</p>
         <h1 class="employee-page-title mb-0">Employee Information</h1>
     </div>
-    <a href="<?php echo htmlspecialchars($return_to, ENT_QUOTES, 'UTF-8'); ?>" class="btn btn-secondary">
-        <i class="fas fa-arrow-left me-2"></i>Back
-    </a>
+    <div class="d-flex gap-2 flex-wrap">
+        <a href="<?php echo BASE_URL; ?>/supervisor/edit-employee.php?id=<?php echo $eid; ?>&return=<?php echo urlencode($return_to); ?>" class="btn btn-primary">
+            <i class="fas fa-pen me-2"></i>Edit Profile
+        </a>
+        <button type="button" class="btn btn-light border" onclick="window.print()"><i class="fas fa-print me-2"></i>Print</button>
+        <a href="<?php echo htmlspecialchars($return_to, ENT_QUOTES, 'UTF-8'); ?>" class="btn btn-light border" title="Back to employees"><i class="fas fa-arrow-left"></i></a>
+    </div>
 </div>
 
+<?php
+$heroName = trim($emp['first_name'] . ' ' . ($emp['middle_name'] ? $emp['middle_name'] . ' ' : '') . $emp['last_name'] . ($emp['name_extension'] ? ' ' . $emp['name_extension'] : ''));
+$heroHireDate = !empty($emp['hire_date']) ? new DateTime($emp['hire_date']) : null;
+$heroTenure = $heroHireDate ? (($diff = $heroHireDate->diff(new DateTime()))->y . ' years ' . $diff->m . ' months') : 'N/A';
+?>
+<div class="employee-reference-hero">
+    <div class="employee-reference-identity">
+        <div class="position-relative cursor-pointer" onclick="viewFullImage('<?php echo getEmployeeAvatar($emp['profile_picture']); ?>', '<?php echo e($heroName); ?>')">
+            <img src="<?php echo getEmployeeAvatar($emp['profile_picture']); ?>" class="employee-reference-avatar" alt="Employee profile photo">
+            <span class="position-absolute bottom-0 end-0 bg-dark text-white rounded-circle p-2 border border-white" style="font-size:.65rem;line-height:1;"><i class="fas fa-search-plus"></i></span>
+        </div>
+        <div class="employee-reference-copy">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <h2><?php echo e($heroName); ?></h2>
+                <span class="badge rounded-pill <?php echo $emp['is_active'] ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger'; ?>"><i class="fas fa-circle me-1" style="font-size:.45rem;vertical-align:middle;"></i><?php echo $emp['is_active'] ? 'Active' : 'Inactive'; ?></span>
+            </div>
+            <p><?php echo e($emp['job_title'] ?? $emp['job_title_display'] ?? 'N/A'); ?></p>
+            <p><?php echo e($emp['branch_name'] ?: 'N/A'); ?></p>
+            <div class="employee-reference-contact">
+                <span><i class="fas fa-id-badge me-1"></i><?php echo e(getEmployeeDisplayId($emp)); ?></span>
+                <span><i class="fas fa-envelope me-1"></i><?php echo e($emp['email'] ?: 'N/A'); ?></span>
+                <span><i class="fas fa-phone me-1"></i><?php echo e($emp['contact_number'] ?: 'N/A'); ?></span>
+            </div>
+        </div>
+        <div class="employee-reference-summary">
+            <div class="employee-reference-summary-item"><small><i class="fas fa-briefcase me-1"></i>Hire Date</small><strong><?php echo formatDate($emp['hire_date']); ?></strong></div>
+            <div class="employee-reference-summary-item"><small><i class="fas fa-calendar me-1"></i>Tenure</small><strong><?php echo e($heroTenure); ?></strong></div>
+            <div class="employee-reference-summary-item"><small><i class="fas fa-building me-1"></i>Department</small><strong><?php echo e($emp['department_name'] ?: 'N/A'); ?></strong></div>
+        </div>
+    </div>
+</div>
+
+<nav class="employee-information-tabs" role="tablist" aria-label="Employee information sections">
+    <button class="employee-information-tab" type="button" role="tab" aria-selected="true" tabindex="0" data-profile-tab="all"><i class="fas fa-th-large"></i>All Info</button>
+    <button class="employee-information-tab" type="button" role="tab" aria-selected="false" tabindex="-1" data-profile-tab="personal"><i class="fas fa-user"></i>Personal Info</button>
+    <button class="employee-information-tab" type="button" role="tab" aria-selected="false" tabindex="-1" data-profile-tab="employment"><i class="fas fa-briefcase"></i>Employment</button>
+    <button class="employee-information-tab" type="button" role="tab" aria-selected="false" tabindex="-1" data-profile-tab="contact"><i class="fas fa-envelope"></i>Contact</button>
+    <button class="employee-information-tab" type="button" role="tab" aria-selected="false" tabindex="-1" data-profile-tab="education"><i class="fas fa-graduation-cap"></i>Education</button>
+    <button class="employee-information-tab" type="button" role="tab" aria-selected="false" tabindex="-1" data-profile-tab="family"><i class="fas fa-users"></i>Family</button>
+    <button class="employee-information-tab" type="button" role="tab" aria-selected="false" tabindex="-1" data-profile-tab="training"><i class="fas fa-certificate"></i>Skills &amp; Training</button>
+    <button class="employee-information-tab" type="button" role="tab" aria-selected="false" tabindex="-1" data-profile-tab="performance"><i class="fas fa-chart-line"></i>Performance</button>
+    <button class="employee-information-tab" type="button" role="tab" aria-selected="false" tabindex="-1" data-profile-tab="documents"><i class="fas fa-folder"></i>Documents</button>
+    <button class="employee-information-tab" type="button" role="tab" aria-selected="false" tabindex="-1" data-profile-tab="timeline"><i class="fas fa-calendar"></i>Profile Audit Trail</button>
+</nav>
+
 <div class="row g-4">
-    <div class="col-lg-4 col-xl-3 profile-sticky-col">
+    <div class="col-lg-4 col-xl-3 profile-sticky-col legacy-profile-rail">
         <div class="content-card employee-profile-card text-center">
             <div class="card-body py-4">
                 <div class="position-relative d-inline-block cursor-pointer mb-3"
@@ -685,7 +728,7 @@ $rankBadgeClass = $rankBadgeClassMap[$emp['rank_name'] ?? ''] ?? 'rank-badge-def
         </div>
     </div>
 
-    <div class="col-lg-8 col-xl-9">
+    <div class="col-12">
         <?php
         // Query approved evaluations for 5-Year performance trend
         $perf_history_q = $conn->prepare("
@@ -766,11 +809,7 @@ $rankBadgeClass = $rankBadgeClassMap[$emp['rank_name'] ?? ''] ?? 'rank-badge-def
                     <h5 class="mb-0">Performance &amp; Career</h5>
                 </div>
             </div>
-            <div class="performance-career-tabs" role="tablist" aria-label="Performance and career information">
-                <button class="performance-career-tab" id="performance-tab" type="button" role="tab" aria-selected="true" aria-controls="performance-panel" tabindex="0"><i class="fas fa-chart-line me-2" aria-hidden="true"></i>Performance Analytics</button>
-                <button class="performance-career-tab" id="career-tab" type="button" role="tab" aria-selected="false" aria-controls="career-panel" tabindex="-1"><i class="fas fa-route me-2" aria-hidden="true"></i>Career Progression</button>
-            </div>
-            <div class="performance-career-panel" id="performance-panel" role="tabpanel" aria-labelledby="performance-tab" tabindex="0">
+            <div class="performance-career-panel" id="performance-panel">
                 <div class="employee-section-header">
                     <div><div class="employee-section-kicker"><i class="fas fa-chart-line text-warning"></i>Performance Analytics</div><h5 class="mb-0">5-Year Historical Performance Trend</h5></div>
                     <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
@@ -854,7 +893,7 @@ $rankBadgeClass = $rankBadgeClassMap[$emp['rank_name'] ?? ''] ?? 'rank-badge-def
                 <?php endif; ?>
                 </div>
             </div>
-            <div class="performance-career-panel" id="career-panel" role="tabpanel" aria-labelledby="career-tab" tabindex="0" hidden>
+            <div class="performance-career-panel" id="career-panel">
                 <div class="employee-section-header">
                     <div><div class="employee-section-kicker"><i class="fas fa-route text-warning me-1"></i>Career Progression</div><h5 class="mb-0">Career Movement History</h5></div>
                     <span class="badge bg-secondary px-3 py-2"><?php echo count($cm_history); ?> Record<?php echo count($cm_history) !== 1 ? 's' : ''; ?></span>
@@ -1650,28 +1689,7 @@ $rankBadgeClass = $rankBadgeClassMap[$emp['rank_name'] ?? ''] ?? 'rank-badge-def
         }
     }
 
-    document.addEventListener('DOMContentLoaded', function () {
-        const tabs = Array.from(document.querySelectorAll('.performance-career-tab'));
-        const panels = Array.from(document.querySelectorAll('.performance-career-panel'));
-        function activateTab(tab, moveFocus) {
-            const panelId = tab.getAttribute('aria-controls');
-            tabs.forEach(function (item) { const active = item === tab; item.setAttribute('aria-selected', active ? 'true' : 'false'); item.tabIndex = active ? 0 : -1; });
-            panels.forEach(function (panel) { panel.hidden = panel.id !== panelId; });
-            if (moveFocus) tab.focus();
-            window.dispatchEvent(new Event('resize'));
-        }
-        tabs.forEach(function (tab, index) {
-            tab.addEventListener('click', function () { activateTab(tab, false); });
-            tab.addEventListener('keydown', function (event) {
-                let nextIndex = null;
-                if (event.key === 'ArrowRight') nextIndex = (index + 1) % tabs.length;
-                if (event.key === 'ArrowLeft') nextIndex = (index - 1 + tabs.length) % tabs.length;
-                if (event.key === 'Home') nextIndex = 0;
-                if (event.key === 'End') nextIndex = tabs.length - 1;
-                if (nextIndex !== null) { event.preventDefault(); activateTab(tabs[nextIndex], true); }
-            });
-        });
-    });
 </script>
 
+<script src="<?php echo BASE_URL; ?>/assets/js/employee-profile-tabs.js"></script>
 <?php require_once '../includes/footer.php'; ?>
