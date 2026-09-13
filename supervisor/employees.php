@@ -1,8 +1,42 @@
 <?php
+/**
+ * Returns the CSS class for a job title badge based on rank_category_id.
+ *  1 = Executives      → gold
+ *  2 = Management Team → purple
+ *  3 = Manager         → blue
+ *  4 = Supervisor      → teal
+ *  5 = R&F / Staff     → green
+ */
+function getJobTitleBadgeClass(int $rankId): string {
+    return match ($rankId) {
+        1 => 'job-badge-executive',
+        2 => 'job-badge-mgmt-team',
+        3 => 'job-badge-manager',
+        4 => 'job-badge-supervisor',
+        5 => 'job-badge-rf',
+        default => 'job-badge-default',
+    };
+}
+?>
+<?php
 $page_title = 'Employee Information';
 require_once '../includes/session-check.php';
 checkRole(['HR Supervisor']);
 require_once '../includes/functions.php';
+
+// Resolve the user's assigned branch name for auto-filtering
+$user_assigned_branch_name = '';
+$branch_id = $_SESSION['branch_id'];
+if (!empty($branch_id)) {
+    $br_stmt = $conn->prepare("SELECT branch_name FROM branches WHERE branch_id = ? LIMIT 1");
+    $br_stmt->bind_param("i", $branch_id);
+    $br_stmt->execute();
+    $br_res = $br_stmt->get_result();
+    if ($br_row = $br_res->fetch_assoc()) {
+        $user_assigned_branch_name = $br_row['branch_name'];
+    }
+    $br_stmt->close();
+}
 
 // Helper to preserve active filter parameters upon redirect
 $get_params = $_GET;
@@ -82,10 +116,11 @@ require_once '../includes/header.php';
 
 // Fetch all non-admin employees so the supervisor directory matches HR Manager visibility.
 $employees = $conn->query("
-    SELECT e.*, b.branch_name, d.department_name 
-    FROM employees e 
-    LEFT JOIN branches b ON e.branch_id = b.branch_id 
-    LEFT JOIN departments d ON e.department_id = d.department_id 
+    SELECT e.*, b.branch_name, d.department_name, jt.job_title, jt.rank_category_id
+    FROM employees e
+    LEFT JOIN branches b ON e.branch_id = b.branch_id
+    LEFT JOIN departments d ON e.department_id = d.department_id
+    LEFT JOIN job_titles jt ON e.job_title_id = jt.job_title_id
     WHERE e.employee_id NOT IN (
         SELECT employee_id
         FROM users
@@ -104,10 +139,39 @@ $employee_active = (int) $conn->query("
 $employee_inactive = max(0, $employee_total - $employee_active);
 
 // Fetch distinct values for filter dropdowns to mirror the HR Manager employee table.
-$job_titles_res = $conn->query("SELECT DISTINCT job_title FROM employees WHERE job_title IS NOT NULL AND job_title != '' ORDER BY job_title ASC");
+$job_titles_res = $conn->query("
+    SELECT 
+        jt.job_title_id,
+        jt.job_title,
+        d.department_id,
+        d.department_name,
+        rc.rank_name,
+        parent.job_title AS reports_to_title,
+        (
+            SELECT COUNT(*) 
+            FROM employees e 
+            WHERE e.job_title_id = jt.job_title_id
+        ) AS employee_count
+    FROM job_titles jt
+    LEFT JOIN departments d
+        ON jt.department_id = d.department_id
+    LEFT JOIN rank_categories rc
+        ON jt.rank_category_id = rc.rank_category_id
+    LEFT JOIN job_titles parent
+        ON jt.reports_to = parent.job_title_id
+    WHERE jt.job_title IS NOT NULL 
+      AND jt.job_title != ''
+    ORDER BY d.department_name ASC, jt.job_title ASC
+");
 $job_titles = [];
+$job_titles_by_dept = [];
 while ($r = $job_titles_res->fetch_assoc()) {
     $job_titles[] = $r['job_title'];
+    $dept_name = $r['department_name'] ?? 'Unassigned';
+    if (!isset($job_titles_by_dept[$dept_name])) {
+        $job_titles_by_dept[$dept_name] = [];
+    }
+    $job_titles_by_dept[$dept_name][] = $r;
 }
 
 $departments_res = $conn->query("SELECT d.department_name FROM departments d ORDER BY d.department_name ASC");
@@ -137,9 +201,29 @@ while ($r = $dept_job_map_res->fetch_assoc()) {
 }
 
 $statuses = ['OJT', 'Probationary', 'Project Based', 'Regular', 'Separated', 'Trainee', 'AWOL', 'Retirement', 'Death', 'Permanent or Total Disability', 'Resignation', 'Failed in Training', 'Termination for Cause'];
+$selected_branch = $_GET['branch'] ?? $user_assigned_branch_name;
 ?>
 
 <style>
+    /* ── Job Title Rank Badges ───────────────────────── */
+    .job-badge {
+        display: inline-block;
+        padding: 2px 9px;
+        border-radius: 12px;
+        font-size: .72rem;
+        font-weight: 600;
+        letter-spacing: .3px;
+        white-space: normal;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+    }
+    .job-badge-executive   { background: #fff3cd; color: #856404; border: 1px solid #ffc107; }
+    .job-badge-mgmt-team   { background: #ede7f6; color: #5e35b1; border: 1px solid #9c77e0; }
+    .job-badge-manager     { background: #dbeafe; color: #1d4ed8; border: 1px solid #60a5fa; }
+    .job-badge-supervisor  { background: #ccfbf1; color: #0f766e; border: 1px solid #2dd4bf; }
+    .job-badge-rf          { background: #f0fdf4; color: #166534; border: 1px solid #86efac; }
+    .job-badge-default     { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
+
     .supervisor-employee-page .card-header {
         gap: 12px;
     }
@@ -317,19 +401,12 @@ $statuses = ['OJT', 'Probationary', 'Project Based', 'Regular', 'Separated', 'Tr
     <div class="page-hero fadeup mb-4">
         <div class="d-flex flex-wrap align-items-center justify-content-between mb-4 gap-3">
             <div>
-                <div style="font-size:.72rem;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,.55);">
-                    HR Supervisor · Employees</div>
-                <h4 class="text-white fw-bold mb-0 mt-1"><i class="fas fa-users me-2"
-                        style="color:#BD9414;"></i>Employee Information</h4>
-                <p class="text-white-50 small mb-0 mt-2">Review employee records within your assigned HR scope and keep their information ready for validation.</p>
+                <div style="font-size:.72rem;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,.55);">HR Supervisor · Employees</div>
+                <h4 class="text-white fw-bold mb-0 mt-1"><i class="fas fa-users me-2" style="color:#BD9414;"></i>All Employees</h4>
+                <p class="text-white-50 small mb-0 mt-2">View, search, and manage employee records, employment status, and assigned organizational details.</p>
             </div>
-            <div class="d-flex align-items-center gap-3 flex-wrap justify-content-end">
-                <div style="color:rgba(255,255,255,.6);font-size:.8rem;">
-                    <i class="fas fa-sync-alt me-1"></i>Data as of <?php echo date('F d, Y'); ?>
-                </div>
-                <a href="<?php echo BASE_URL; ?>/supervisor/add-employee.php" class="btn btn-warning btn-sm fw-semibold">
-                    <i class="fas fa-user-plus me-1"></i>Add Employee
-                </a>
+            <div style="color:rgba(255,255,255,.6);font-size:.8rem;">
+                <i class="fas fa-sync-alt me-1"></i>Data as of <?php echo date('F d, Y'); ?>
             </div>
         </div>
 
@@ -397,8 +474,22 @@ $statuses = ['OJT', 'Probationary', 'Project Based', 'Regular', 'Separated', 'Tr
                 <label><i class="fas fa-briefcase me-1"></i>Job Title</label>
                 <select id="filterJobTitle">
                     <option value="">All Titles</option>
-                    <?php foreach ($job_titles as $jt): ?>
-                        <option value="<?php echo e($jt); ?>"><?php echo e($jt); ?></option>
+                    <?php foreach ($job_titles_by_dept as $dept_name => $titles): ?>
+                        <optgroup label="<?php echo e($dept_name); ?>">
+                            <?php foreach ($titles as $jt): ?>
+                                <option value="<?php echo e($jt['job_title']); ?>"
+                                        data-job-title-id="<?php echo $jt['job_title_id']; ?>"
+                                        data-department="<?php echo e($jt['department_name'] ?? ''); ?>">
+                                    <?php echo e($jt['job_title']); ?>
+                                    <?php if (!empty($jt['rank_name'])): ?>
+                                        — [<?php echo e($jt['rank_name']); ?>]
+                                    <?php endif; ?>
+                                    <?php if ($jt['employee_count'] > 0): ?>
+                                        (<?php echo $jt['employee_count']; ?>)
+                                    <?php endif; ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </optgroup>
                     <?php endforeach; ?>
                 </select>
             </div>
@@ -416,7 +507,9 @@ $statuses = ['OJT', 'Probationary', 'Project Based', 'Regular', 'Separated', 'Tr
                 <select id="filterBranch">
                     <option value="">All Branches</option>
                     <?php foreach ($branches as $br): ?>
-                        <option value="<?php echo e($br); ?>"><?php echo e($br); ?></option>
+                        <option value="<?php echo e($br); ?>" <?php echo ($selected_branch === $br) ? 'selected' : ''; ?>>
+                            <?php echo e($br); ?>
+                        </option>
                     <?php endforeach; ?>
                 </select>
             </div>
@@ -453,7 +546,7 @@ $statuses = ['OJT', 'Probationary', 'Project Based', 'Regular', 'Separated', 'Tr
                             <th>Branch</th>
                             <th>Status</th>
                             <th>Hire Date</th>
-                            <th style="min-width: 100px;">Actions</th>
+                            <th style="min-width: 170px;">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -482,7 +575,13 @@ $statuses = ['OJT', 'Probationary', 'Project Based', 'Regular', 'Separated', 'Tr
                                             </div>
                                         </div>
                                     </td>
-                                    <td data-label="Job Title"><?php echo e($emp['job_title']); ?></td>
+                                    <td data-label="Job Title">
+                                        <?php
+                                            $rankId = (int)($emp['rank_category_id'] ?? 0);
+                                            $badgeClass = getJobTitleBadgeClass($rankId);
+                                        ?>
+                                        <span class="job-badge <?php echo $badgeClass; ?>"><?php echo e($emp['job_title'] ?? 'N/A'); ?></span>
+                                    </td>
                                     <td data-label="Department"><?php echo e($emp['department_name'] ?? 'N/A'); ?></td>
                                     <td data-label="Branch"><?php echo e($emp['branch_name'] ?? 'N/A'); ?></td>
                                     <td data-label="Status">
