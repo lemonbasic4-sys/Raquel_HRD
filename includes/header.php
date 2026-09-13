@@ -144,6 +144,7 @@ switch ($effective_role) {
                 ['icon' => 'fas fa-layer-group', 'label' => 'Team Evaluation Packages', 'url' => BASE_URL . '/employee/team-evaluation-packages.php', 'page' => 'team-evaluation-packages.php',
                  'badge' => $_sup_pkg_pending ?: null, 'badge_class' => 'bg-warning text-dark'],
                 ['icon' => 'fas fa-clipboard-check', 'label' => 'Pending Validations', 'url' => BASE_URL . '/supervisor/pending-endorsements.php', 'page' => 'pending-endorsements.php'],
+                ['icon' => 'fas fa-file-import', 'label' => 'Historical Import', 'url' => BASE_URL . '/supervisor/historical-import.php', 'page' => 'historical-import.php'],
                 ['icon' => 'fas fa-history', 'label' => 'Evaluation History', 'url' => BASE_URL . '/supervisor/evaluation-history.php', 'page' => 'evaluation-history.php'],
             ],
             'CAREER' => [

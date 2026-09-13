@@ -462,129 +462,129 @@ require_once '../includes/header.php';
     }
 </style>
 <div class="container-fluid py-4 historical-import-page">
-        <div class="row justify-content-center">
-            <div class="col-12 col-xxl-11">
-                <div class="page-hero mb-4">
-                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
-                        <div>
-                            <div class="text-uppercase small fw-bold" style="letter-spacing:1px; opacity:.72;">HR Manager • Historical Records</div>
-                            <h1 class="h3 mb-0 text-white fw-bold"><i class="fas fa-file-import me-2"></i>Historical Evaluation Import</h1>
-                        </div>
-                        <div class="d-flex gap-2 flex-wrap">
-                            <a href="historical-import.php?download=template" class="btn btn-light btn-sm fw-semibold"><i class="fas fa-download me-1"></i>Download CSV Template</a>
-                            <a href="evaluation-history.php" class="btn btn-outline-light btn-sm fw-semibold"><i class="fas fa-history me-1"></i>View History</a>
-                        </div>
+    <div class="row justify-content-center">
+        <div class="col-12 col-xxl-11">
+            <div class="page-hero mb-4">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+                    <div>
+                        <div class="text-uppercase small fw-bold" style="letter-spacing:1px; opacity:.72;">HR Supervisor • Historical Records</div>
+                        <h1 class="h3 mb-0 text-white fw-bold"><i class="fas fa-file-import me-2"></i>Historical Evaluation Import</h1>
+                    </div>
+                    <div class="d-flex gap-2 flex-wrap">
+                        <a href="historical-import.php?download=template" class="btn btn-light btn-sm fw-semibold"><i class="fas fa-download me-1"></i>Download CSV Template</a>
+                        <a href="evaluation-history.php" class="btn btn-outline-light btn-sm fw-semibold"><i class="fas fa-history me-1"></i>View History</a>
                     </div>
                 </div>
-
-                <?php if ($message): ?>
-                    <div class="alert alert-<?php echo e($message_type ?? 'info'); ?> rounded-4 border-0 shadow-sm">
-                        <i class="fas fa-<?php echo $message_type === 'success' ? 'check-circle' : ($message_type === 'warning' ? 'exclamation-triangle' : ($message_type === 'danger' ? 'times-circle' : 'info-circle')); ?> me-2"></i>
-                        <?php echo nl2br(e($message)); ?>
-                    </div>
-                <?php endif; ?>
-
-                <?php if ($import_summary): ?>
-                    <div class="row g-3 mb-4">
-                        <div class="col-md-4">
-                            <div class="card border-0 shadow-sm h-100">
-                                <div class="card-body">
-                                    <div class="text-muted small text-uppercase fw-bold">Total Rows</div>
-                                    <div class="display-6 fw-bold text-dark"><?php echo (int) $import_summary['total_rows']; ?></div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="card border-0 shadow-sm h-100">
-                                <div class="card-body">
-                                    <div class="text-muted small text-uppercase fw-bold">Imported</div>
-                                    <div class="display-6 fw-bold text-success"><?php echo (int) $import_summary['successful_rows']; ?></div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="card border-0 shadow-sm h-100">
-                                <div class="card-body">
-                                    <div class="text-muted small text-uppercase fw-bold">Failed</div>
-                                    <div class="display-6 fw-bold text-danger"><?php echo (int) $import_summary['failed_rows']; ?></div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                <?php endif; ?>
-
-                <div class="card border-0 shadow-sm mb-4">
-                    <div class="card-body p-4">
-                        <h2 class="h5 fw-bold mb-3"><i class="fas fa-upload me-2"></i>Upload CSV file</h2>
-                        <form method="post" enctype="multipart/form-data">
-                            <?php echo csrfField(); ?>
-                            <div class="row g-3 align-items-end">
-                                <div class="col-md-8">
-                                    <label class="form-label fw-semibold">Historical evaluation CSV</label>
-                                    <input type="file" name="historical_csv" class="form-control" accept=".csv,text/csv" required>
-                                </div>
-                                <div class="col-md-4">
-                                    <button type="submit" class="btn btn-primary w-100 fw-semibold"><i class="fas fa-file-import me-1"></i>Validate & Import</button>
-                                </div>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-
-                <?php if (!empty($preview_rows)): ?>
-                    <div class="card border-0 shadow-sm">
-                        <div class="card-body p-4">
-                            <h2 class="h5 fw-bold mb-3"><i class="fas fa-table me-2"></i>Validation results</h2>
-                            <div class="table-responsive">
-                                <table class="table table-bordered align-middle">
-                                    <thead class="table-light">
-                                        <tr>
-                                            <th>Row</th>
-                                            <th>Employee</th>
-                                            <th>Type</th>
-                                            <th>Period</th>
-                                            <th>Total</th>
-                                            <th>Status</th>
-                                            <th>Notes</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <?php foreach ($preview_rows as $row): ?>
-                                            <tr class="<?php echo $row['valid'] ? 'table-success-subtle' : 'table-danger-subtle'; ?>">
-                                                <td><?php echo (int) $row['row_number']; ?></td>
-                                                <td>
-                                                    <div class="fw-semibold"><?php echo e($row['employee_code'] ?: ''); ?></div>
-                                                    <?php if (!empty($row['employee_name'])): ?><div class="small text-muted"><?php echo e($row['employee_name']); ?></div><?php endif; ?>
-                                                </td>
-                                                <td><?php echo e($row['evaluation_type']); ?></td>
-                                                <td><?php echo e($row['evaluation_period_start'] ?: '-') . ' to ' . e($row['evaluation_period_end'] ?: '-'); ?></td>
-                                                <td><?php echo e($row['total_score'] ?: '-'); ?></td>
-                                                <td>
-                                                    <?php if ($row['valid']): ?>
-                                                        <span class="badge bg-success-subtle text-success-emphasis border border-success-subtle">Valid</span>
-                                                    <?php else: ?>
-                                                        <span class="badge bg-danger-subtle text-danger-emphasis border border-danger-subtle">Rejected</span>
-                                                    <?php endif; ?>
-                                                </td>
-                                                <td>
-                                                    <?php if (!empty($row['errors'])): ?>
-                                                        <ul class="mb-0 ps-3 small">
-                                                            <?php foreach ($row['errors'] as $error): ?>
-                                                                <li><?php echo e($error); ?></li>
-                                                            <?php endforeach; ?>
-                                                        </ul>
-                                                    <?php else: ?>
-                                                        <span class="small text-muted">Ready for historical import.</span>
-                                                    <?php endif; ?>
-                                                </td>
-                                            </tr>
-                                        <?php endforeach; ?>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                <?php endif; ?>
             </div>
+
+            <?php if ($message): ?>
+                <div class="alert alert-<?php echo e($message_type ?? 'info'); ?> rounded-4 border-0 shadow-sm">
+                    <i class="fas fa-<?php echo $message_type === 'success' ? 'check-circle' : ($message_type === 'warning' ? 'exclamation-triangle' : ($message_type === 'danger' ? 'times-circle' : 'info-circle')); ?> me-2"></i>
+                    <?php echo nl2br(e($message)); ?>
+                </div>
+            <?php endif; ?>
+
+            <?php if ($import_summary): ?>
+                <div class="row g-3 mb-4">
+                    <div class="col-md-4">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-body">
+                                <div class="text-muted small text-uppercase fw-bold">Total Rows</div>
+                                <div class="display-6 fw-bold text-dark"><?php echo (int) $import_summary['total_rows']; ?></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-body">
+                                <div class="text-muted small text-uppercase fw-bold">Imported</div>
+                                <div class="display-6 fw-bold text-success"><?php echo (int) $import_summary['successful_rows']; ?></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-body">
+                                <div class="text-muted small text-uppercase fw-bold">Failed</div>
+                                <div class="display-6 fw-bold text-danger"><?php echo (int) $import_summary['failed_rows']; ?></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            <?php endif; ?>
+
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-body p-4">
+                    <h2 class="h5 fw-bold mb-3"><i class="fas fa-upload me-2"></i>Upload CSV file</h2>
+                    <form method="post" enctype="multipart/form-data">
+                        <?php echo csrfField(); ?>
+                        <div class="row g-3 align-items-end">
+                            <div class="col-md-8">
+                                <label class="form-label fw-semibold">Historical evaluation CSV</label>
+                                <input type="file" name="historical_csv" class="form-control" accept=".csv,text/csv" required>
+                            </div>
+                            <div class="col-md-4">
+                                <button type="submit" class="btn btn-primary w-100 fw-semibold"><i class="fas fa-file-import me-1"></i>Validate & Import</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <?php if (!empty($preview_rows)): ?>
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body p-4">
+                        <h2 class="h5 fw-bold mb-3"><i class="fas fa-table me-2"></i>Validation results</h2>
+                        <div class="table-responsive">
+                            <table class="table table-bordered align-middle">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Row</th>
+                                        <th>Employee</th>
+                                        <th>Type</th>
+                                        <th>Period</th>
+                                        <th>Total</th>
+                                        <th>Status</th>
+                                        <th>Notes</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($preview_rows as $row): ?>
+                                        <tr class="<?php echo $row['valid'] ? 'table-success-subtle' : 'table-danger-subtle'; ?>">
+                                            <td><?php echo (int) $row['row_number']; ?></td>
+                                            <td>
+                                                <div class="fw-semibold"><?php echo e($row['employee_code'] ?: ''); ?></div>
+                                                <?php if (!empty($row['employee_name'])): ?><div class="small text-muted"><?php echo e($row['employee_name']); ?></div><?php endif; ?>
+                                            </td>
+                                            <td><?php echo e($row['evaluation_type']); ?></td>
+                                            <td><?php echo e($row['evaluation_period_start'] ?: '-') . ' to ' . e($row['evaluation_period_end'] ?: '-'); ?></td>
+                                            <td><?php echo e($row['total_score'] ?: '-'); ?></td>
+                                            <td>
+                                                <?php if ($row['valid']): ?>
+                                                    <span class="badge bg-success-subtle text-success-emphasis border border-success-subtle">Valid</span>
+                                                <?php else: ?>
+                                                    <span class="badge bg-danger-subtle text-danger-emphasis border border-danger-subtle">Rejected</span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td>
+                                                <?php if (!empty($row['errors'])): ?>
+                                                    <ul class="mb-0 ps-3 small">
+                                                        <?php foreach ($row['errors'] as $error): ?>
+                                                            <li><?php echo e($error); ?></li>
+                                                        <?php endforeach; ?>
+                                                    </ul>
+                                                <?php else: ?>
+                                                    <span class="small text-muted">Ready for historical import.</span>
+                                                <?php endif; ?>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            <?php endif; ?>
         </div>
     </div>
+</div>
