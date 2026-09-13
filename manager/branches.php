@@ -228,6 +228,84 @@ $branch_user_total = (int) $conn->query("SELECT COUNT(*) as cnt FROM users WHERE
 ?>
 
 <style>
+    /* Keep branch dialogs legible against the dimmed page backdrop. */
+    #addBranchModal .modal-content,
+    #editBranchModal .modal-content,
+    #importBranchModal .modal-content {
+        overflow: hidden;
+        border: 1px solid #bd9414;
+        box-shadow: 0 24px 70px rgba(8, 46, 6, .38);
+    }
+    #addBranchModal .modal-header,
+    #editBranchModal .modal-header,
+    #importBranchModal .modal-header {
+        background: linear-gradient(135deg, #082e06 0%, #234d08 100%) !important;
+        color: #fff;
+        border-bottom: 3px solid #bd9414;
+        padding: 1.1rem 1.35rem;
+    }
+    #addBranchModal .modal-title,
+    #editBranchModal .modal-title,
+    #importBranchModal .modal-title {
+        color: #fff;
+        font-size: 1.05rem;
+        letter-spacing: .01em;
+    }
+    #addBranchModal .modal-body,
+    #editBranchModal .modal-body,
+    #importBranchModal .modal-body {
+        background: #f4f7ef;
+        padding: 1.35rem;
+    }
+    #addBranchModal .form-label,
+    #editBranchModal .form-label,
+    #importBranchModal .form-label {
+        color: #234d08;
+        font-size: .82rem;
+        font-weight: 800;
+        letter-spacing: .02em;
+    }
+    #addBranchModal .form-control,
+    #editBranchModal .form-control,
+    #importBranchModal .form-control {
+        background: #fff;
+        border: 1px solid #aab99a;
+        color: #1d2d18;
+        min-height: 44px;
+    }
+    #addBranchModal .form-control::placeholder,
+    #editBranchModal .form-control::placeholder {
+        color: #66745f;
+        opacity: 1;
+    }
+    #addBranchModal .form-control:focus,
+    #editBranchModal .form-control:focus,
+    #importBranchModal .form-control:focus {
+        border-color: #bd9414;
+        box-shadow: 0 0 0 3px rgba(189, 148, 20, .2);
+    }
+    #addBranchModal .modal-footer,
+    #editBranchModal .modal-footer,
+    #importBranchModal .modal-footer {
+        background: #e7eedf;
+        border-top: 1px solid #bdcba9;
+        padding: .9rem 1.35rem;
+    }
+    #addBranchModal .btn-primary,
+    #editBranchModal .btn-primary,
+    #importBranchModal .btn-primary {
+        background: #bd9414;
+        border-color: #bd9414;
+        color: #17310d;
+        font-weight: 700;
+    }
+    #addBranchModal .btn-primary:hover,
+    #editBranchModal .btn-primary:hover,
+    #importBranchModal .btn-primary:hover {
+        background: #d2ad35;
+        border-color: #d2ad35;
+        color: #17310d;
+    }
     @media (max-width: 768px) {
         #paginationWrapper {
             flex-direction: column;
@@ -536,7 +614,7 @@ $branch_user_total = (int) $conn->query("SELECT COUNT(*) as cnt FROM users WHERE
                 <?php echo csrfField(); ?>
                 <input type="hidden" name="action" value="edit">
                 <input type="hidden" name="branch_id" id="editBranchId">
-                <div class="modal-header" style="background:var(--primary);color:#fff;">
+                <div class="modal-header">
                     <h5 class="modal-title"><i class="fas fa-edit me-2"></i>Edit Branch</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>

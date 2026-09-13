@@ -37,15 +37,30 @@
 }
 
 .evaluation-packages .package-hero {
-    background: linear-gradient(135deg, var(--rp-forest-green) 0%, #12480E 100%);
+    background: linear-gradient(135deg, #082e06 0%, #294306 52%, #183a03 100%);
     border-left: 6px solid var(--rp-primary-gold);
-    border-radius: 16px;
+    border-radius: 0 16px 16px 0;
     box-shadow: 0 8px 24px rgba(8, 46, 6, 0.18);
     color: #FFFFFF;
     margin-bottom: 1.75rem;
     padding: 1.75rem 2rem;
+    position: relative;
+    overflow: hidden;
     width: 100%;
     box-sizing: border-box;
+}
+
+.evaluation-packages .package-hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+    pointer-events: none;
+}
+
+.evaluation-packages .package-hero > * {
+    position: relative;
+    z-index: 1;
 }
 
 .evaluation-packages .package-hero h1 {
@@ -83,8 +98,8 @@
 
 /* ── Cards & Structure ─────────────────────────────────────────────────────── */
 .evaluation-packages .package-card {
-    background: var(--rp-bg-card);
-    border: 1px solid var(--rp-border-color);
+    background: #ffffff;
+    border: 1px solid #bdcba9;
     border-radius: 14px;
     box-shadow: 0 4px 16px rgba(15, 23, 42, 0.05);
     margin-bottom: 1.75rem;
@@ -675,4 +690,3 @@
         width: 100%;
     }
 }
-

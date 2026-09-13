@@ -1969,6 +1969,29 @@ function getEvaluationsTableColumns($conn)
     return $columns;
 }
 
+function getTableColumns($conn, $table_name)
+{
+    $columns = [];
+    $safe_table = preg_replace('/[^A-Za-z0-9_]/', '', $table_name);
+    if ($safe_table === '') {
+        return $columns;
+    }
+
+    try {
+        $result = $conn->query("SHOW COLUMNS FROM `{$safe_table}`");
+        if ($result) {
+            while ($row = $result->fetch_assoc()) {
+                $columns[$row['Field']] = true;
+            }
+            $result->free();
+        }
+    } catch (mysqli_sql_exception $e) {
+        return [];
+    }
+
+    return $columns;
+}
+
 
 
 function getEvaluationCriteriaTableColumns($conn)
@@ -2017,6 +2040,67 @@ function evaluationsStatusSupports($conn, $required_statuses)
 }
 
 
+
+function ensureHistoricalImportSchema($conn)
+{
+    try {
+        $columns = getEvaluationsTableColumns($conn);
+        $historical_columns = [
+            'is_historical' => "ALTER TABLE evaluations ADD COLUMN is_historical TINYINT(1) NOT NULL DEFAULT 0 AFTER deleted_at",
+            'record_source' => "ALTER TABLE evaluations ADD COLUMN record_source VARCHAR(40) NOT NULL DEFAULT 'System Workflow' AFTER is_historical",
+            'import_batch_id' => "ALTER TABLE evaluations ADD COLUMN import_batch_id INT NULL AFTER record_source",
+            'legacy_reference' => "ALTER TABLE evaluations ADD COLUMN legacy_reference VARCHAR(150) NULL AFTER import_batch_id",
+            'historical_remarks' => "ALTER TABLE evaluations ADD COLUMN historical_remarks TEXT NULL AFTER legacy_reference",
+        ];
+
+        foreach ($historical_columns as $column => $sql) {
+            if (!isset($columns[$column])) {
+                $conn->query($sql);
+            }
+        }
+
+        $batch_columns = getTableColumns($conn, 'evaluation_import_batches');
+        if (!isset($batch_columns['import_batch_id'])) {
+            $conn->query("CREATE TABLE IF NOT EXISTS evaluation_import_batches (
+                import_batch_id INT AUTO_INCREMENT PRIMARY KEY,
+                uploaded_filename VARCHAR(255) NOT NULL,
+                import_mode ENUM('Summary','Detailed') NOT NULL,
+                imported_by INT NOT NULL,
+                imported_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                total_rows INT NOT NULL DEFAULT 0,
+                successful_rows INT NOT NULL DEFAULT 0,
+                failed_rows INT NOT NULL DEFAULT 0,
+                status ENUM('Preview','Imported','Cancelled','Rolled Back') NOT NULL DEFAULT 'Preview',
+                error_log LONGTEXT NULL,
+                INDEX idx_import_batch_user (imported_by),
+                INDEX idx_import_batch_status (status)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        }
+
+        $error_columns = getTableColumns($conn, 'evaluation_import_errors');
+        if (!isset($error_columns['error_id'])) {
+            $conn->query("CREATE TABLE IF NOT EXISTS evaluation_import_errors (
+                error_id INT AUTO_INCREMENT PRIMARY KEY,
+                import_batch_id INT NOT NULL,
+                row_number INT NOT NULL,
+                employee_code VARCHAR(50) NULL,
+                error_message TEXT NOT NULL,
+                raw_data LONGTEXT NULL,
+                INDEX idx_import_error_batch (import_batch_id),
+                CONSTRAINT fk_import_error_batch FOREIGN KEY (import_batch_id) REFERENCES evaluation_import_batches(import_batch_id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        }
+
+        $existing_columns = getTableColumns($conn, 'evaluations');
+        if (isset($existing_columns['is_historical']) && !isset($existing_columns['record_source'])) {
+            $conn->query("ALTER TABLE evaluations ADD COLUMN record_source VARCHAR(40) NOT NULL DEFAULT 'System Workflow' AFTER is_historical");
+        }
+
+        return true;
+    } catch (mysqli_sql_exception $e) {
+        return false;
+    }
+}
 
 function ensureEvaluationWorkflowSchema($conn)
 {
@@ -2162,6 +2246,8 @@ function ensureEvaluationWorkflowSchema($conn)
             SET link = REPLACE(link, '/staff/my-submissions.php', '/staff/evaluation-history.php')
             WHERE link LIKE '%/staff/my-submissions.php%'
         ");
+
+        ensureHistoricalImportSchema($conn);
 
         return true;
 

@@ -100,6 +100,7 @@ switch ($effective_role) {
                  'badge' => (function() use ($conn) {
                      try { $r = $conn->query("SELECT COUNT(*) as c FROM employee_change_requests WHERE status='Pending'"); return $r ? (int)($r->fetch_assoc()['c'] ?? 0) : 0; } catch(Exception $e){ return 0; }
                  })(), 'badge_class' => 'bg-warning text-dark'],
+                ['icon' => 'fas fa-file-import', 'label' => 'Historical Import', 'url' => BASE_URL . '/manager/historical-import.php', 'page' => 'historical-import.php'],
                 ['icon' => 'fas fa-history', 'label' => 'Evaluation History', 'url' => BASE_URL . '/manager/evaluation-history.php', 'page' => 'evaluation-history.php'],
             ],
 

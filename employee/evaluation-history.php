@@ -4,6 +4,7 @@ require_once '../includes/session-check.php';
 require_once '../includes/functions.php';
 
 ensureEvaluationWorkflowSchema($conn);
+ensureHistoricalImportSchema($conn);
 ensureOrganizationEvaluationPackageSchema($conn);
 $user_id = (int) ($_SESSION['user_id'] ?? 0);
 $employee_stmt = $conn->prepare('SELECT employee_id FROM users WHERE user_id = ? LIMIT 1');
@@ -42,6 +43,9 @@ if ($employee_id > 0) {
     $evaluations = $history_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $history_stmt->close();
 }
+$history_ongoing = count(array_filter($evaluations, static function (array $evaluation): bool {
+    return !in_array($evaluation['status'] ?? '', ['Approved', 'Rejected'], true);
+}));
 
 require_once '../includes/header.php';
 ?>
@@ -125,17 +129,62 @@ require_once '../includes/header.php';
         .eh-card__cta { width: 100%; }
         .eh-audit-btn { width: 100%; justify-content: center; }
     }
+    .evaluation-history-hero {
+        background: linear-gradient(135deg, #244d08 0%, #183d04 100%);
+        border-left: 0;
+        border-radius: 0 16px 16px 0;
+        box-shadow: 0 8px 24px rgba(8, 46, 6, .18);
+        padding: 1.75rem 2rem;
+    }
+    .evaluation-history-kicker {
+        color: rgba(255,255,255,.68);
+        font-size: .72rem;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+    }
+    .evaluation-history-hero h1 { font-size: 1.55rem; }
+    .evaluation-history-actions .badge {
+        background: #cba135;
+        color: #1c271b;
+        border-radius: 8px;
+        font-weight: 700;
+    }
+    .evaluation-history-mobile-status {
+        border-radius: 10px;
+        font-size: .8rem;
+        color: #64748b;
+    }
+    @media (max-width: 767px) {
+        .evaluation-history-hero { padding: 1.25rem; border-radius: 0 14px 14px 0; }
+        .evaluation-history-hero h1 { font-size: 1.25rem; }
+        .evaluation-history-hero p { font-size: .8rem; }
+    }
 </style>
 <main class="evaluation-packages container-fluid py-4">
-    <section class="package-hero">
-        <p class="mb-1 text-uppercase fw-bold" style="letter-spacing:1px; color:var(--rp-primary-gold-light); font-size:0.85rem;">
-            Performance Audit Trail &amp; Revision Log
-        </p>
-        <h1 class="h3 mb-2 fw-bold">My Evaluation History &amp; Audit Trail</h1>
-        <p class="mb-0">
-            Audit and review your past and active evaluation cycles. Transparently inspect your original submitted self-ratings alongside supervisor adjustments, reviewer remarks, and sequential workflow progress.
+    <section class="page-hero fadeup evaluation-history-hero">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div>
+                <div class="evaluation-history-kicker">Employee Portal · Evaluation</div>
+                <h1 class="text-white fw-bold mb-0 mt-1">
+                    <i class="fas fa-history me-2"></i>My Evaluation History &amp; Audit Trail
+                </h1>
+            </div>
+            <div class="evaluation-history-actions d-none d-md-block text-end">
+                <a href="<?php echo BASE_URL; ?>/employee/dashboard.php" class="btn btn-outline-light btn-sm rounded-pill px-3">
+                    <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+                </a>
+            </div>
+        </div>
+        <p class="text-white-50 small mb-0 mt-3">
+            <i class="fas fa-info-circle me-1"></i>Review your submitted evaluations, scores, and audit details.
         </p>
     </section>
+
+    <div class="d-md-none d-flex justify-content-between align-items-center mt-3 mb-4 flex-wrap gap-3">
+        <a href="<?php echo BASE_URL; ?>/employee/dashboard.php" class="btn btn-primary btn-sm rounded-pill px-3 shadow-sm">
+            <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+        </a>
+    </div>
 
     <?php if (!$evaluations): ?>
         <section class="package-empty">
@@ -190,6 +239,9 @@ require_once '../includes/header.php';
                                 <?php else: ?>
                                     <span class="badge <?php echo $ev['status'] === 'Approved' ? 'bg-success' : 'bg-secondary'; ?>"><?php echo e($ev['status']); ?></span>
                                 <?php endif; ?>
+                                <?php if (!empty($ev['is_historical'])): ?>
+                                    <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle"><i class="fas fa-history me-1"></i>Historical Import</span>
+                                <?php endif; ?>
                                 <?php if ($show_adjustments): ?>
                                     <span class="eh-adj-chip"><i class="fas fa-pen-fancy"></i>Score Adjustments Recorded</span>
                                 <?php endif; ?>
@@ -231,4 +283,3 @@ require_once '../includes/header.php';
     <?php endif; ?>
 </main>
 <?php require_once '../includes/footer.php'; ?>
-

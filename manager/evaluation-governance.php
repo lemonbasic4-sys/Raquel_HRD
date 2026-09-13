@@ -433,9 +433,35 @@ foreach ($approvers as $a) {
         color: #166534 !important;
         border-color: #86efac !important;
     }
+    .governance-page .dept-matrix-card,
+    .governance-page .corp-card {
+        border-color: #b9c98f;
+        background: #edf3df;
+    }
+    .governance-page .dept-matrix-card .dept-name,
+    .governance-page .corp-card .corp-name { color: #234d08; }
+    .governance-page .dept-matrix-card .official-name { color: #6b5410; }
+    .governance-page .custom-eval-tabs { border-color: #bdcba9 !important; }
+    .governance-page .custom-eval-tabs .nav-link:hover {
+        background: #edf3df !important;
+        color: #234d08 !important;
+        border-color: #bdcba9 !important;
+    }
+    .governance-page .custom-eval-tabs .nav-link.active {
+        background: #082e06 !important;
+        border-color: #082e06 !important;
+    }
+    .governance-page .badge-gov-vp,
+    .governance-page .badge-gov-president,
+    .governance-page .badge-gov-audit,
+    .governance-page .badge-gov-board {
+        background: #e7eedf !important;
+        color: #234d08 !important;
+        border-color: #bd9414 !important;
+    }
 </style>
 
-<main class="evaluation-packages container-fluid py-4">
+<main class="evaluation-packages governance-page container-fluid py-4">
 
     <!-- Hero Header -->
     <section class="package-hero fadeup">

@@ -3,6 +3,7 @@ $page_title = 'Evaluation History';
 require_once '../includes/session-check.php';
 checkRole(['HR Supervisor']);
 require_once '../includes/functions.php';
+ensureHistoricalImportSchema($conn);
 require_once '../includes/header.php';
 
 // Fetch evaluation history 

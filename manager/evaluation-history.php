@@ -3,6 +3,7 @@ $page_title = 'Evaluation History';
 require_once '../includes/session-check.php';
 checkRole(['HR Manager']);
 require_once '../includes/functions.php';
+ensureHistoricalImportSchema($conn);
 require_once '../includes/header.php';
 
 // Fetch evaluation history
@@ -58,8 +59,13 @@ ksort($existing_templates);
             <h4 class="text-white fw-bold mb-0 mt-1"><i class="fas fa-history me-2" style="color:#BD9414;"></i>Evaluation History</h4>
             <p class="text-white-50 small mb-0 mt-2">Review completed and in-progress performance evaluations across employees, templates, and evaluation periods.</p>
         </div>
-        <div style="color:rgba(255,255,255,.6);font-size:.8rem;">
-            <i class="fas fa-sync-alt me-1"></i>Data as of <?php echo date('F d, Y'); ?>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <span style="color:rgba(255,255,255,.6);font-size:.8rem;">
+                <i class="fas fa-sync-alt me-1"></i>Data as of <?php echo date('F d, Y'); ?>
+            </span>
+            <a href="historical-import.php" class="btn btn-light btn-sm fw-semibold rounded-pill">
+                <i class="fas fa-file-import me-1"></i>Import Historical
+            </a>
         </div>
     </div>
 
@@ -297,6 +303,7 @@ ksort($existing_templates);
                 'Returned' => 'fa-rotate-left',
                 default    => 'fa-circle',
             };
+            $is_historical = !empty($row['is_historical']);
             $initials_h = strtoupper(
                 substr($row['employee_name'], 0, 1) .
                 substr(explode(' ', $row['employee_name'])[1] ?? '', 0, 1)
@@ -343,6 +350,11 @@ ksort($existing_templates);
                 <?php else: ?>
                     <span class="hist-status-badge <?php echo $status_lc; ?>">
                         <i class="fas <?php echo $status_icon; ?>"></i><?php echo e($row['status']); ?>
+                    </span>
+                <?php endif; ?>
+                <?php if ($is_historical): ?>
+                    <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle ms-2">
+                        <i class="fas fa-history me-1"></i>Historical Import
                     </span>
                 <?php endif; ?>
             </div>
