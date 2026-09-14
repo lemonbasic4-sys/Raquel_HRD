@@ -58,8 +58,13 @@ ksort($existing_templates);
             <h4 class="text-white fw-bold mb-0 mt-1"><i class="fas fa-history me-2" style="color:#BD9414;"></i>Evaluation History</h4>
             <p class="text-white-50 small mb-0 mt-2">Review evaluation progress and completed results for employees within your assigned responsibilities.</p>
         </div>
-        <div style="color:rgba(255,255,255,.6);font-size:.8rem;">
-            <i class="fas fa-archive me-1"></i><?php echo $total_c; ?> records
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <span style="color:rgba(255,255,255,.6);font-size:.8rem;">
+                <i class="fas fa-archive me-1"></i><?php echo $total_c; ?> records
+            </span>
+            <a href="historical-import.php" class="btn btn-light btn-sm fw-semibold rounded-pill">
+                <i class="fas fa-file-import me-1" style="color:#082E06;"></i>Import Historical
+            </a>
         </div>
     </div>
     <p class="text-white-50 small mb-0"><i class="fas fa-clipboard-list me-1"></i>Track completed evaluations, returned submissions, and approval outcomes across employee records.</p>

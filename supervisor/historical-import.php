@@ -472,7 +472,7 @@ require_once '../includes/header.php';
                     </div>
                     <div class="d-flex gap-2 flex-wrap">
                         <a href="historical-import.php?download=template" class="btn btn-light btn-sm fw-semibold"><i class="fas fa-download me-1"></i>Download CSV Template</a>
-                        <a href="evaluation-history.php" class="btn btn-outline-light btn-sm fw-semibold"><i class="fas fa-history me-1"></i>View History</a>
+                        <a href="evaluation-history.php" class="btn btn-outline-light btn-sm fw-semibold"><i class="fas fa-arrow-left me-1"></i>Back to Evaluation History</a>
                     </div>
                 </div>
             </div>
