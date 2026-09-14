@@ -158,12 +158,12 @@ Open `config/database.php` and update the database connection settings to match 
 define('DB_HOST', 'localhost');
 define('DB_USER', 'root');
 define('DB_PASS', '');
-define('DB_NAME', 'raquel_hris_test');
+define('DB_NAME', 'raquel_hris');
 
 date_default_timezone_set('Asia/Manila');
 ```
 
-The project is currently configured for a local database named `raquel_hris_test`. If your database name is different, update `DB_NAME` accordingly.
+The project is currently configured for a local database named `raquel_hris`. If your database name is different, update `DB_NAME` accordingly.
 
 ### 3. Import the SQL files
 

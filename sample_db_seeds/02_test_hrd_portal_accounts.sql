@@ -5,7 +5,7 @@
 -- 2) Skip first-login PDS friction for test accounts.
 -- Portal password for these accounts: password
 -- ============================================================================
-USE raquel_hris_Test;
+USE raquel_hris;
 
 INSERT INTO users (
     employee_id, username, email, password_hash, full_name, role, branch_id, is_active, first_login_completed
