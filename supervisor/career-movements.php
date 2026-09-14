@@ -488,7 +488,7 @@ $emp_sql_params = "";
 $emp_sql_where  = "e.is_active = 1
       AND e.employee_id NOT IN (SELECT employee_id FROM users WHERE role='Admin' AND employee_id IS NOT NULL)";
 if ($sup_branch_id > 0) {
-    $emp_sql_where .= " AND e.branch_id = {$sup_branch_id}";
+    $emp_sql_where .= " AND (e.branch_id = {$sup_branch_id} OR e.branch_id IS NULL OR e.branch_id = 0)";
 }
 $emp_result = $conn->query("
     SELECT e.employee_id, e.employee_code, e.first_name, e.last_name, e.job_title, e.job_title_id,
@@ -502,10 +502,13 @@ $emp_result = $conn->query("
     WHERE {$emp_sql_where}
     ORDER BY e.last_name, e.first_name
 ");
-$dept_employees = []; // dept_id => [employees]
+$dept_employees = []; // dept_id => [employees]; key 0 = employees with no department
 $all_employees  = [];
 while ($row = $emp_result->fetch_assoc()) {
-    $did = (int)$row['department_id'];
+    // Employees without a department (e.g. freshly CSV-imported) go under key 0.
+    // The JS "All Departments" path iterates Object.keys(deptEmployees) and will
+    // include key "0", so these employees are always reachable via that option.
+    $did = !empty($row['department_id']) ? (int)$row['department_id'] : 0;
     $dept_employees[$did][] = $row;
     $all_employees[$row['employee_id']] = $row;
 }
@@ -1469,6 +1472,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
         updateFilteredPositions();
     });
+
+    // ── Populate employees immediately on page load (default = All Departments) ─
+    // Without this, the Select Employee dropdown is always blank until the user
+    // manually touches the department filter, which made CSV-imported employees
+    // appear missing even when they were correctly in the database.
+    deptSel.dispatchEvent(new Event('change'));
 
     // ── Avatar color palette (initials-based) ─────────────────────────────────
     const avatarGradients = [

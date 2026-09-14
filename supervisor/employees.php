@@ -722,29 +722,120 @@ $selected_branch = $_GET['branch'] ?? $user_assigned_branch_name;
     </div>
 </div>
 
+<!-- Separation (Deactivate) Confirmation Modal -->
+<div class="modal fade" id="deactivateModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title"><i class="fas fa-user-slash me-2"></i>Employee Separation</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="text-center mb-3">
+                    <p class="mb-1">Select separation details for <strong id="deactivateEmpName"></strong>:</p>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Reason for Separation <span class="text-danger">*</span></label>
+                    <select id="separationReason" class="form-select" required>
+                        <option value="" selected disabled>Select a reason</option>
+                        <option value="AWOL">AWOL</option>
+                        <option value="Retirement">Retirement</option>
+                        <option value="Death">Death</option>
+                        <option value="Permanent or Total Disability">Permanent or Total Disability</option>
+                        <option value="Resignation">Resignation</option>
+                        <option value="Failed in Training">Failed in Training</option>
+                        <option value="Termination for Cause">Termination for Cause</option>
+                        <option value="Others">Others</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Effective Date <span class="text-danger">*</span></label>
+                    <input type="date" id="separationDate" class="form-control" value="<?php echo date('Y-m-d'); ?>" required>
+                    <div class="form-text small">Date when the separation takes official effect.</div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Separation Remarks / Notes <span class="text-muted fw-normal">(Optional)</span></label>
+                    <textarea id="separationRemarks" class="form-control" rows="2" placeholder="e.g. Clearance processed, voluntary resignation, etc."></textarea>
+                </div>
+                <p class="text-muted small text-center mb-0"><i class="fas fa-info-circle me-1"></i>This will mark the employee as inactive, record the separation effective date, and update their employment status.</p>
+            </div>
+            <div class="modal-footer justify-content-center">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" id="deactivateConfirmBtn" class="btn btn-warning">
+                    <i class="fas fa-user-slash me-1"></i>Confirm Separation
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Activate Confirmation Modal -->
+<div class="modal fade" id="activateModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title"><i class="fas fa-user-check me-2"></i>Activate Employee</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center">
+                <p>Reactivate <strong id="activateEmpName"></strong>?</p>
+                <p class="text-muted small">This will mark them as an active employee again and reset their status to <strong>Regular</strong>.</p>
+            </div>
+            <div class="modal-footer justify-content-center">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <a href="#" id="activateConfirmBtn" class="btn btn-success"><i class="fas fa-user-check me-1"></i>Activate</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title"><i class="fas fa-exclamation-triangle me-2"></i>Delete Employee</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center">
+                <p>Permanently delete <strong id="deleteEmpName"></strong>?</p>
+                <p class="text-danger small"><i class="fas fa-exclamation-circle me-1"></i>This will remove all their records including evaluations. This cannot be undone!</p>
+            </div>
+            <div class="modal-footer justify-content-center">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <a href="#" id="deleteConfirmBtn" class="btn btn-danger"><i class="fas fa-trash me-1"></i>Delete Permanently</a>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
     let deactivateTargetId = null;
     function setDeactivateTarget(id, name) {
         deactivateTargetId = id;
-        document.getElementById('deactivateEmpName').textContent = name;
-        document.getElementById('separationReason').value = '';
-        document.getElementById('separationDate').value = '<?php echo date('Y-m-d'); ?>';
-        document.getElementById('separationRemarks').value = '';
+        const nameEl = document.getElementById('deactivateEmpName');
+        if (nameEl) nameEl.textContent = name;
+        const reasonEl = document.getElementById('separationReason');
+        if (reasonEl) reasonEl.value = '';
+        const dateEl = document.getElementById('separationDate');
+        if (dateEl) dateEl.value = '<?php echo date('Y-m-d'); ?>';
+        const remEl = document.getElementById('separationRemarks');
+        if (remEl) remEl.value = '';
     }
 
-    document.getElementById('deactivateConfirmBtn').addEventListener('click', function() {
-        const reason = document.getElementById('separationReason').value;
-        const effDate = document.getElementById('separationDate').value;
-        const remarks = document.getElementById('separationRemarks').value.trim();
+    document.getElementById('deactivateConfirmBtn')?.addEventListener('click', function() {
+        const reason = document.getElementById('separationReason')?.value;
+        const effDate = document.getElementById('separationDate')?.value;
+        const remarks = document.getElementById('separationRemarks')?.value.trim() || '';
 
         if (!reason) {
             alert('Please select a reason for separation.');
-            document.getElementById('separationReason').focus();
+            document.getElementById('separationReason')?.focus();
             return;
         }
         if (!effDate) {
             alert('Please select an effective date.');
-            document.getElementById('separationDate').focus();
+            document.getElementById('separationDate')?.focus();
             return;
         }
         if (deactivateTargetId) {
@@ -762,53 +853,98 @@ $selected_branch = $_GET['branch'] ?? $user_assigned_branch_name;
     });
 
     function setActivateTarget(id, name) {
-        document.getElementById('activateEmpName').textContent = name;
+        const nameEl = document.getElementById('activateEmpName');
+        if (nameEl) nameEl.textContent = name;
         const params = new URLSearchParams(window.location.search);
         params.set('activate', id);
-        document.getElementById('activateConfirmBtn').href = '?' + params.toString();
+        const btn = document.getElementById('activateConfirmBtn');
+        if (btn) btn.href = '?' + params.toString();
     }
 
     function setDeleteTarget(id, name) {
-        document.getElementById('deleteEmpName').textContent = name;
+        const nameEl = document.getElementById('deleteEmpName');
+        if (nameEl) nameEl.textContent = name;
         const params = new URLSearchParams(window.location.search);
         params.set('delete', id);
-        document.getElementById('deleteConfirmBtn').href = '?' + params.toString();
+        const btn = document.getElementById('deleteConfirmBtn');
+        if (btn) btn.href = '?' + params.toString();
     }
 
     // State Variables
     let currentPage = 1;
     const ITEMS_PER_PAGE = 10;
 
-    document.getElementById('customSearchEmp').addEventListener('input', function () {
-        currentPage = 1;
-        syncFiltersToUrl();
-        renderTable();
-    });
-
     // Dropdown Filter Logic
     const filterSelects = ['filterJobTitle', 'filterDepartment', 'filterBranch', 'filterStatus'];
     const filterLabels = { filterJobTitle: 'Job Title', filterDepartment: 'Department', filterBranch: 'Branch', filterStatus: 'Status' };
     const filterParams = { filterJobTitle: 'job_title', filterDepartment: 'department', filterBranch: 'branch', filterStatus: 'status' };
 
+    const jobTitleCache = {};
+
+    function initJobTitleSelectCache() {
+        ['filterJobTitle'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el && !jobTitleCache[id]) {
+                jobTitleCache[id] = Array.from(el.children).map(child => child.cloneNode(true));
+            }
+        });
+    }
+
+    function filterJobTitleOptgroups(selectedDept) {
+        initJobTitleSelectCache();
+        ['filterJobTitle'].forEach(id => {
+            const select = document.getElementById(id);
+            if (select && jobTitleCache[id]) {
+                const curVal = select.value;
+                select.innerHTML = '';
+                jobTitleCache[id].forEach(node => {
+                    if (node.tagName.toLowerCase() === 'option') {
+                        select.appendChild(node.cloneNode(true));
+                    } else if (node.tagName.toLowerCase() === 'optgroup') {
+                        const groupLabel = node.getAttribute('label') || '';
+                        if (selectedDept === '' || groupLabel === selectedDept) {
+                            select.appendChild(node.cloneNode(true));
+                        }
+                    }
+                });
+                select.value = curVal;
+                if (select.selectedIndex === -1) select.value = '';
+            }
+        });
+    }
+
     function applyFiltersFromUrl() {
         const params = new URLSearchParams(window.location.search);
-        document.getElementById('customSearchEmp').value = params.get('search') || '';
+        const searchInput = document.getElementById('customSearchEmp');
+        if (searchInput) {
+            searchInput.value = params.get('search') || '';
+        }
+
         filterSelects.forEach(id => {
             const el = document.getElementById(id);
-            const value = params.get(filterParams[id]) || '';
-            el.value = value;
-            el.classList.toggle('active-filter', value !== '');
+            if (el) {
+                const value = params.get(filterParams[id]) || '';
+                el.value = value;
+                el.classList.toggle('active-filter', value !== '');
+            }
         });
+
+        const selectedDept = params.get('department') || '';
+        filterJobTitleOptgroups(selectedDept);
     }
 
     function syncFiltersToUrl() {
         const params = new URLSearchParams();
-        const search = document.getElementById('customSearchEmp').value.trim();
+        const searchInput = document.getElementById('customSearchEmp');
+        const search = searchInput ? searchInput.value.trim() : '';
         if (search !== '') params.set('search', search);
 
         filterSelects.forEach(id => {
-            const value = document.getElementById(id).value;
-            if (value !== '') params.set(filterParams[id], value);
+            const el = document.getElementById(id);
+            if (el) {
+                const value = el.value;
+                if (value !== '') params.set(filterParams[id], value);
+            }
         });
 
         const query = params.toString();
@@ -827,56 +963,37 @@ $selected_branch = $_GET['branch'] ?? $user_assigned_branch_name;
         });
     }
 
-    const DEPT_JOB_MAP = <?php echo json_encode($dept_job_map ?? []); ?>;
-    const ALL_JOB_TITLES = <?php echo json_encode($job_titles ?? []); ?>;
+    function handleDepartmentChange(selectedDept) {
+        filterJobTitleOptgroups(selectedDept);
 
-    function updateJobTitleDropdown(selectedDept) {
-        const jtSelect = document.getElementById('filterJobTitle');
-        const currentVal = jtSelect.value;
-        jtSelect.innerHTML = '<option value="">All Titles</option>';
-
-        let validTitles = ALL_JOB_TITLES;
-        if (selectedDept && DEPT_JOB_MAP[selectedDept]) {
-            validTitles = DEPT_JOB_MAP[selectedDept];
+        const mainDept = document.getElementById('filterDepartment');
+        if (mainDept) {
+            mainDept.value = selectedDept;
+            mainDept.classList.toggle('active-filter', mainDept.value !== '');
         }
 
-        validTitles.forEach(function (jt) {
-            const opt = document.createElement('option');
-            opt.value = jt;
-            opt.textContent = jt;
-            if (jt === currentVal) opt.selected = true;
-            jtSelect.appendChild(opt);
-        });
-
-        if (currentVal && !validTitles.includes(currentVal)) {
-            jtSelect.value = '';
-            jtSelect.classList.remove('active-filter');
+        const mainJT = document.getElementById('filterJobTitle');
+        if (mainJT && mainJT.selectedIndex === -1) {
+            mainJT.value = '';
+            mainJT.classList.remove('active-filter');
         }
+
+        currentPage = 1;
+        syncFiltersToUrl();
+        renderTable();
+        updateFilterChips();
     }
-
-    document.getElementById('filterDepartment').addEventListener('change', function () {
-        updateJobTitleDropdown(this.value);
-    });
-
-    filterSelects.forEach(id => {
-        document.getElementById(id).addEventListener('change', function () {
-            currentPage = 1;
-            this.classList.toggle('active-filter', this.value !== '');
-            syncFiltersToUrl();
-            renderTable();
-            updateFilterChips();
-        });
-    });
 
     function updateFilterChips() {
         const chipsContainer = document.getElementById('filterChips');
         const summary = document.getElementById('filterSummary');
+        if (!chipsContainer || !summary) return;
         let html = '';
         let hasAny = false;
 
         filterSelects.forEach(id => {
             const el = document.getElementById(id);
-            if (el.value !== '') {
+            if (el && el.value !== '') {
                 hasAny = true;
                 html += `<span class="filter-chip"><span class="chip-category">${filterLabels[id]}:</span> ${el.value} <i class="fas fa-times remove-chip" data-filter="${id}"></i></span>`;
             }
@@ -889,8 +1006,15 @@ $selected_branch = $_GET['branch'] ?? $user_assigned_branch_name;
             btn.addEventListener('click', function () {
                 const filterId = this.dataset.filter;
                 const select = document.getElementById(filterId);
-                select.value = '';
-                select.classList.remove('active-filter');
+                if (select) {
+                    select.value = '';
+                    select.classList.remove('active-filter');
+                }
+
+                if (filterId === 'filterDepartment') {
+                    filterJobTitleOptgroups('');
+                }
+
                 currentPage = 1;
                 syncFiltersToUrl();
                 renderTable();
@@ -898,18 +1022,6 @@ $selected_branch = $_GET['branch'] ?? $user_assigned_branch_name;
             });
         });
     }
-
-    document.getElementById('clearAllFilters').addEventListener('click', function () {
-        filterSelects.forEach(id => {
-            const el = document.getElementById(id);
-            el.value = '';
-            el.classList.remove('active-filter');
-        });
-        currentPage = 1;
-        syncFiltersToUrl();
-        renderTable();
-        updateFilterChips();
-    });
 
     function goToPage(page) {
         currentPage = page;
@@ -921,12 +1033,13 @@ $selected_branch = $_GET['branch'] ?? $user_assigned_branch_name;
         const mobileList = document.querySelector(".mobile-list-view .student-list");
         const allRows = tbody ? Array.from(tbody.querySelectorAll("tr:not(.no-results-row)")) : [];
         const allCards = mobileList ? Array.from(mobileList.querySelectorAll(".student-item")) : [];
-        const filterInput = document.getElementById('customSearchEmp').value.toLowerCase().trim();
+        const searchInput = document.getElementById('customSearchEmp');
+        const filterInput = searchInput ? searchInput.value.toLowerCase().trim() : '';
 
-        const fJobTitle = document.getElementById('filterJobTitle').value;
-        const fDepartment = document.getElementById('filterDepartment').value;
-        const fBranch = document.getElementById('filterBranch').value;
-        const fStatus = document.getElementById('filterStatus').value;
+        const fJobTitle = document.getElementById('filterJobTitle')?.value || '';
+        const fDepartment = document.getElementById('filterDepartment')?.value || '';
+        const fBranch = document.getElementById('filterBranch')?.value || '';
+        const fStatus = document.getElementById('filterStatus')?.value || '';
 
         let visibleRows = [];
 
@@ -952,7 +1065,7 @@ $selected_branch = $_GET['branch'] ?? $user_assigned_branch_name;
             }
         });
 
-        // Filter mobile cards (mirrors desktop) and gather visible ones
+        // Filter mobile cards
         let visibleCards = [];
         allCards.forEach(card => {
             const cardText = (card.dataset.search || card.textContent).toLowerCase();
@@ -988,7 +1101,6 @@ $selected_branch = $_GET['branch'] ?? $user_assigned_branch_name;
                 } else {
                     row.classList.add('even-row');
                 }
-                // Renumber the # column based on current page position
                 const numCell = row.querySelector('td:first-child strong');
                 if (numCell) numCell.textContent = startIdx + visibleCount + 1;
                 visibleCount++;
@@ -1080,7 +1192,10 @@ $selected_branch = $_GET['branch'] ?? $user_assigned_branch_name;
 
     function handleNoResults(totalItems, filterInput, tbody) {
         if (!tbody) return;
-        const hasDropdownFilter = filterSelects.some(id => document.getElementById(id).value !== '');
+        const hasDropdownFilter = filterSelects.some(id => {
+            const el = document.getElementById(id);
+            return el && el.value !== '';
+        });
         let noResultsRow = tbody.querySelector('.no-results-row.search-empty');
         if (totalItems === 0 && (filterInput !== "" || hasDropdownFilter)) {
             if (!noResultsRow) {
@@ -1097,99 +1212,50 @@ $selected_branch = $_GET['branch'] ?? $user_assigned_branch_name;
         }
     }
 
-    // Initial Render on Load
+    // Attach event listeners and run initial setup on DOM ready
     document.addEventListener("DOMContentLoaded", function () {
+        initJobTitleSelectCache();
         applyFiltersFromUrl();
+
+        document.getElementById('customSearchEmp')?.addEventListener('input', function () {
+            currentPage = 1;
+            syncFiltersToUrl();
+            renderTable();
+        });
+
+        document.getElementById('filterDepartment')?.addEventListener('change', function () {
+            handleDepartmentChange(this.value);
+        });
+
+        ['filterJobTitle', 'filterBranch', 'filterStatus'].forEach(id => {
+            document.getElementById(id)?.addEventListener('change', function () {
+                currentPage = 1;
+                this.classList.toggle('active-filter', this.value !== '');
+                syncFiltersToUrl();
+                renderTable();
+                updateFilterChips();
+            });
+        });
+
+        document.getElementById('clearAllFilters')?.addEventListener('click', function () {
+            filterSelects.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.value = '';
+                    el.classList.remove('active-filter');
+                }
+            });
+            filterJobTitleOptgroups('');
+            currentPage = 1;
+            syncFiltersToUrl();
+            renderTable();
+            updateFilterChips();
+        });
+
         updateEmployeeActionLinks();
         renderTable();
         updateFilterChips();
     });
 </script>
-
-<!-- Separation (Deactivate) Confirmation Modal -->
-<div class="modal fade" id="deactivateModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header bg-warning">
-                <h5 class="modal-title"><i class="fas fa-user-slash me-2"></i>Employee Separation</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div class="text-center mb-3">
-                    <p class="mb-1">Select separation details for <strong id="deactivateEmpName"></strong>:</p>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label fw-bold">Reason for Separation <span class="text-danger">*</span></label>
-                    <select id="separationReason" class="form-select" required>
-                        <option value="" selected disabled>Select a reason</option>
-                        <option value="AWOL">AWOL</option>
-                        <option value="Retirement">Retirement</option>
-                        <option value="Death">Death</option>
-                        <option value="Permanent or Total Disability">Permanent or Total Disability</option>
-                        <option value="Resignation">Resignation</option>
-                        <option value="Failed in Training">Failed in Training</option>
-                        <option value="Termination for Cause">Termination for Cause</option>
-                    </select>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label fw-bold">Effective Date <span class="text-danger">*</span></label>
-                    <input type="date" id="separationDate" class="form-control" value="<?php echo date('Y-m-d'); ?>" required>
-                    <div class="form-text small">Date when the separation takes official effect.</div>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label fw-bold">Separation Remarks / Notes <span class="text-muted fw-normal">(Optional)</span></label>
-                    <textarea id="separationRemarks" class="form-control" rows="2" placeholder="e.g. Clearance processed, voluntary resignation, etc."></textarea>
-                </div>
-                <p class="text-muted small text-center mb-0"><i class="fas fa-info-circle me-1"></i>This will mark the employee as inactive, record the separation effective date, and update their employment status.</p>
-            </div>
-            <div class="modal-footer justify-content-center">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" id="deactivateConfirmBtn" class="btn btn-warning">
-                    <i class="fas fa-user-slash me-1"></i>Confirm Separation
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Activate Confirmation Modal -->
-<div class="modal fade" id="activateModal" tabindex="-1">
-    <div class="modal-dialog modal-sm">
-        <div class="modal-content">
-            <div class="modal-header bg-success text-white">
-                <h5 class="modal-title"><i class="fas fa-user-check me-2"></i>Activate Employee</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body text-center">
-                <p>Reactivate <strong id="activateEmpName"></strong>?</p>
-                <p class="text-muted small">This will mark them as an active employee again and reset their status to <strong>Regular</strong>.</p>
-            </div>
-            <div class="modal-footer justify-content-center">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <a href="#" id="activateConfirmBtn" class="btn btn-success"><i class="fas fa-user-check me-1"></i>Activate</a>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Delete Confirmation Modal -->
-<div class="modal fade" id="deleteModal" tabindex="-1">
-    <div class="modal-dialog modal-sm">
-        <div class="modal-content">
-            <div class="modal-header bg-danger text-white">
-                <h5 class="modal-title"><i class="fas fa-exclamation-triangle me-2"></i>Delete Employee</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body text-center">
-                <p>Permanently delete <strong id="deleteEmpName"></strong>?</p>
-                <p class="text-danger small"><i class="fas fa-exclamation-circle me-1"></i>This will remove all their records including evaluations. This cannot be undone!</p>
-            </div>
-            <div class="modal-footer justify-content-center">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <a href="#" id="deleteConfirmBtn" class="btn btn-danger"><i class="fas fa-trash me-1"></i>Delete Permanently</a>
-            </div>
-        </div>
-    </div>
-</div>
 
 <?php require_once '../includes/footer.php'; ?>

@@ -21,6 +21,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['import_csv'])) {
     require_once '../includes/functions.php';
+
+    // The uploader's own branch — used as a safe fallback when the CSV
+    // Branch column is blank or does not match any existing branch name.
+    $uploader_branch_id = !empty($_SESSION['branch_id']) ? (int)$_SESSION['branch_id'] : null;
+    if (!$uploader_branch_id && !empty($_SESSION['user_id'])) {
+        $u_b_stmt = $conn->prepare("SELECT branch_id FROM users WHERE user_id = ? LIMIT 1");
+        $u_b_stmt->bind_param("i", $_SESSION['user_id']);
+        $u_b_stmt->execute();
+        $u_b_res = $u_b_stmt->get_result()->fetch_assoc();
+        $u_b_stmt->close();
+        if (!empty($u_b_res['branch_id'])) {
+            $uploader_branch_id = (int)$u_b_res['branch_id'];
+        }
+    }
+    if (!$uploader_branch_id) {
+        $b_main = $conn->query("SELECT branch_id FROM branches WHERE branch_name LIKE '%Main Office%' LIMIT 1");
+        if ($b_main && ($b_row = $b_main->fetch_assoc())) {
+            $uploader_branch_id = (int)$b_row['branch_id'];
+        } else {
+            $uploader_branch_id = 102;
+        }
+    }
     if (!isset($_FILES['employee_csv']) || $_FILES['employee_csv']['error'] !== UPLOAD_ERR_OK) {
         redirectWith($employee_portal_base . '/add-employee.php', 'danger', 'Please upload a valid CSV file.');
     }
@@ -187,22 +209,53 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['import_csv'])) {
             $jc->close();
         }
 
+        // ── Branch resolution ─────────────────────────────────────────────────
+        // Priority:
+        //   1. Exact match on branch_name in the CSV (case-sensitive lookup)
+        //   2. Case-insensitive match (handles minor capitalisation differences)
+        //   3. Fallback to the uploader's own branch so the employee is always
+        //      visible to the person who imported them (avoids the Career
+        //      Movements "Select Employee" blank-list problem).
+        // We intentionally do NOT auto-create new branches from CSV data.
         $bid = null;
+        $branch_warning = null;
         if (!empty($branch_name)) {
-            $bc = $conn->prepare("SELECT branch_id FROM branches WHERE branch_name = ?");
+            // 1. Exact match
+            $bc = $conn->prepare("SELECT branch_id FROM branches WHERE branch_name = ? AND is_active = 1 LIMIT 1");
             $bc->bind_param("s", $branch_name);
             $bc->execute();
             $br = $bc->get_result();
-            if ($b = $br->fetch_assoc())
-                $bid = $b['branch_id'];
-            else {
-                $bi = $conn->prepare("INSERT INTO branches (branch_name, location) VALUES (?, 'TBD')");
-                $bi->bind_param("s", $branch_name);
-                $bi->execute();
-                $bid = $bi->insert_id;
-                $bi->close();
+            if ($b = $br->fetch_assoc()) {
+                $bid = (int)$b['branch_id'];
             }
             $bc->close();
+
+            // 2. Case-insensitive fallback
+            if (!$bid) {
+                $bc2 = $conn->prepare("SELECT branch_id FROM branches WHERE LOWER(TRIM(branch_name)) = LOWER(TRIM(?)) AND is_active = 1 LIMIT 1");
+                $bc2->bind_param("s", $branch_name);
+                $bc2->execute();
+                $br2 = $bc2->get_result();
+                if ($b2 = $br2->fetch_assoc()) {
+                    $bid = (int)$b2['branch_id'];
+                }
+                $bc2->close();
+            }
+
+            // 3. Uploader branch fallback — keep employee visible to the importer
+            if (!$bid) {
+                $bid = $uploader_branch_id;
+                $branch_warning = "Row ($first_name $last_name): Branch \"$branch_name\" not found — assigned to your branch instead.";
+            }
+        } else {
+            // CSV Branch column is blank — default to uploader's branch
+            $bid = $uploader_branch_id;
+            if ($uploader_branch_id) {
+                $branch_warning = "Row ($first_name $last_name): Branch column was blank — assigned to your branch.";
+            }
+        }
+        if ($branch_warning) {
+            $errors[] = $branch_warning;
         }
 
         // Robust Rank Category Resolution

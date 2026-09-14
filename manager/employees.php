@@ -777,6 +777,7 @@ $selected_branch = $_GET['branch'] ?? $user_assigned_branch_name;
                         <option value="Resignation">Resignation</option>
                         <option value="Failed in Training">Failed in Training</option>
                         <option value="Termination for Cause">Termination for Cause</option>
+                        <option value="Others">Others</option>
                     </select>
                 </div>
                 <div class="mb-3">

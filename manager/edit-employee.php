@@ -202,7 +202,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $is_active = $_SESSION['role'] === 'HR Supervisor'
         ? (int) ($emp['is_active'] ?? 1)
         : (isset($_POST['is_active']) ? 1 : 0);
-    $separationStatuses = ['Separated', 'AWOL', 'Retirement', 'Death', 'Permanent or Total Disability', 'Resignation', 'Failed in Training', 'Termination for Cause'];
+    $separationStatuses = ['Separated', 'AWOL', 'Retirement', 'Death', 'Permanent or Total Disability', 'Resignation', 'Failed in Training', 'Termination for Cause', 'Others'];
     $is_separation_status = in_array($employment_status, $separationStatuses, true);
     if ($is_separation_status) $is_active = 0;
     // emergency contact fields are now arrays — handled in the save block below
