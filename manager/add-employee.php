@@ -96,6 +96,54 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['import_csv'])) {
 
     $allowed_statuses = ['OJT', 'Probationary', 'Project Based', 'Project-Based', 'Regular', 'Separated', 'Trainee', 'AWOL', 'Retirement', 'Death', 'Permanent or Total Disability', 'Resignation', 'Failed in Training', 'Termination for Cause'];
 
+    // Pre-load all existing departments for intelligent resolution and typo-prevention
+    $all_existing_depts = [];
+    $depts_res = $conn->query("SELECT department_id, department_name FROM departments");
+    if ($depts_res) {
+        while ($drow = $depts_res->fetch_assoc()) {
+            $all_existing_depts[(int)$drow['department_id']] = $drow['department_name'];
+        }
+    }
+
+    // Common department aliases, acronyms, and shorthand
+    $dept_aliases = [
+        'it' => 'Information Technology',
+        'i.t.' => 'Information Technology',
+        'info tech' => 'Information Technology',
+        'information tech' => 'Information Technology',
+        'it department' => 'Information Technology',
+        'it dept' => 'Information Technology',
+        'hr' => 'Human Resources',
+        'h.r.' => 'Human Resources',
+        'hrd' => 'Human Resources',
+        'human resource' => 'Human Resources',
+        'hr department' => 'Human Resources',
+        'hr dept' => 'Human Resources',
+        'acct' => 'Finance',
+        'accounting' => 'Finance',
+        'fin' => 'Finance',
+        'finance & accounting' => 'Finance',
+        'audit' => 'Audit',
+        'internal audit' => 'Audit',
+        'ops' => 'Operations',
+        'operation' => 'Operations',
+        'operations dept' => 'Operations',
+        'procurement' => 'Purchasing',
+        'purchasing dept' => 'Purchasing',
+        'mktg' => 'Marketing',
+        'marketing & sales' => 'Marketing',
+        'gsd' => 'General Services',
+        'general service' => 'General Services',
+        'general services dept' => 'General Services',
+        'bizdev' => 'Business Development',
+        'business dev' => 'Business Development',
+        'legal & compliance' => 'Compliance',
+        'compliance dept' => 'Compliance',
+        'president' => 'Office of the President',
+        'presidents office' => 'Office of the President',
+        'op' => 'Office of the President',
+    ];
+
     while (($row = fgetcsv($file)) !== false) {
         if (empty(array_filter($row)))
             continue;
@@ -158,41 +206,102 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['import_csv'])) {
         }
 
         $existing_id = null;
+        $existing_dept_id = null;
         if (!empty($employee_code)) {
-            $dc = $conn->prepare("SELECT employee_id FROM employees WHERE employee_code = ?");
+            $dc = $conn->prepare("SELECT employee_id, department_id FROM employees WHERE employee_code = ?");
             $dc->bind_param("s", $employee_code);
             $dc->execute();
             $dr = $dc->get_result();
-            if ($d = $dr->fetch_assoc())
+            if ($d = $dr->fetch_assoc()) {
                 $existing_id = $d['employee_id'];
+                $existing_dept_id = $d['department_id'];
+            }
             $dc->close();
         }
         if (!$existing_id) {
-            $dc = $conn->prepare("SELECT employee_id FROM employees WHERE first_name = ? AND last_name = ?");
+            $dc = $conn->prepare("SELECT employee_id, department_id FROM employees WHERE first_name = ? AND last_name = ?");
             $dc->bind_param("ss", $first_name, $last_name);
             $dc->execute();
             $dr = $dc->get_result();
-            if ($d = $dr->fetch_assoc())
+            if ($d = $dr->fetch_assoc()) {
                 $existing_id = $d['employee_id'];
+                $existing_dept_id = $d['department_id'];
+            }
             $dc->close();
         }
 
+        // ── Department resolution ─────────────────────────────────────────────
+        // Priority:
+        //   1. Exact case-insensitive match against existing departments
+        //   2. Common aliases & acronyms (e.g. 'IT' -> 'Information Technology', 'HR' -> 'Human Resources')
+        //   3. Smart fuzzy matching (Levenshtein distance <= 2 or similarity >= 82%) to automatically
+        //      catch & correct typos (e.g. 'Information Technoogy' -> 'Information Technology')
+        //   4. Fallback to existing department if updating an existing record
+        //   5. Strict prevention: We do NOT auto-create new departments from CSV typos.
+        //      If unrecognised, department is left unassigned and an informative warning is logged.
         $did = null;
         if (!empty($dept_name)) {
-            $dc = $conn->prepare("SELECT department_id FROM departments WHERE department_name = ?");
-            $dc->bind_param("s", $dept_name);
-            $dc->execute();
-            $dr = $dc->get_result();
-            if ($d = $dr->fetch_assoc())
-                $did = $d['department_id'];
-            else {
-                $di = $conn->prepare("INSERT INTO departments (department_name, description) VALUES (?, 'Imported via CSV')");
-                $di->bind_param("s", $dept_name);
-                $di->execute();
-                $did = $di->insert_id;
-                $di->close();
+            $norm_dept_input = strtolower(trim($dept_name));
+
+            // 1. Exact case-insensitive match
+            foreach ($all_existing_depts as $dept_id => $dname) {
+                if (strtolower(trim($dname)) === $norm_dept_input) {
+                    $did = $dept_id;
+                    break;
+                }
             }
-            $dc->close();
+
+            // 2. Common aliases & acronyms
+            if (!$did && isset($dept_aliases[$norm_dept_input])) {
+                $target_name = strtolower($dept_aliases[$norm_dept_input]);
+                foreach ($all_existing_depts as $dept_id => $dname) {
+                    if (strtolower(trim($dname)) === $target_name) {
+                        $did = $dept_id;
+                        break;
+                    }
+                }
+            }
+
+            // 3. Smart fuzzy matching (Levenshtein distance <= 2 or similarity >= 82%)
+            if (!$did) {
+                $best_match_id = null;
+                $best_sim = 0;
+                $best_dist = 999;
+                $matched_dept_name = '';
+
+                foreach ($all_existing_depts as $dept_id => $dname) {
+                    $dlower = strtolower(trim($dname));
+                    $dist = levenshtein($norm_dept_input, $dlower);
+                    similar_text($norm_dept_input, $dlower, $sim);
+
+                    if ($dist <= 2 || $sim >= 82) {
+                        if ($sim > $best_sim || ($sim == $best_sim && $dist < $best_dist)) {
+                            $best_sim = $sim;
+                            $best_dist = $dist;
+                            $best_match_id = $dept_id;
+                            $matched_dept_name = $dname;
+                        }
+                    }
+                }
+
+                if ($best_match_id !== null) {
+                    $did = $best_match_id;
+                    $errors[] = "Row ($first_name $last_name): Department typo \"$dept_name\" automatically matched to \"$matched_dept_name\".";
+                }
+            }
+
+            // 4. Fallback to existing employee department if updating
+            if (!$did && $existing_dept_id !== null) {
+                $did = (int)$existing_dept_id;
+                $errors[] = "Row ($first_name $last_name): Department \"$dept_name\" not recognized — kept existing department.";
+            }
+
+            // 5. Strict typo prevention: do NOT auto-create unknown departments
+            if (!$did) {
+                $errors[] = "Row ($first_name $last_name): Department \"$dept_name\" not recognized — left unassigned. Please assign or create the department in Departments.";
+            }
+        } elseif ($existing_dept_id !== null) {
+            $did = (int)$existing_dept_id;
         }
 
         $job_title_id = null;
