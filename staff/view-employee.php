@@ -18,7 +18,7 @@ $stmt = $conn->prepare("SELECT e.*, b.branch_name, d.department_name,
     LEFT JOIN employee_details ed ON e.employee_id = ed.employee_id
     LEFT JOIN employee_government_ids eg ON e.employee_id = eg.employee_id
     LEFT JOIN employee_contacts ec ON e.employee_id = ec.employee_id
-    WHERE e.employee_id = ? AND e.is_active = 1");
+    WHERE e.employee_id = ?");
 $stmt->bind_param("i", $eid);
 $stmt->execute();
 $emp = $stmt->get_result()->fetch_assoc();
@@ -458,11 +458,35 @@ $heroTenure = $heroHireDate ? (($diff = $heroHireDate->diff(new DateTime()))->y 
                 <p class="text-muted mb-2"><?php echo e($emp['job_title']); ?></p>
                 <p class="company-id-text small mb-3">Company ID: <span class="company-id-value"><?php echo e($emp['employee_code'] ?: 'N/A'); ?></span></p>
                 <div class="d-flex justify-content-center flex-wrap gap-2 mb-3">
-                    <span class="badge bg-success px-3 py-2">Active</span>
-                    <?php if (!empty($emp['employment_status'])): ?>
-                        <span class="badge bg-primary px-3 py-2"><?php echo e($emp['employment_status']); ?></span>
-                    <?php endif; ?>
+                   <span class="badge <?php echo $emp['is_active'] ? 'bg-success' : 'bg-danger'; ?> px-3 py-2">
+                       <?php echo $emp['is_active'] ? 'Active' : 'Inactive'; ?>
+                   </span>
+                   <?php if (!empty($emp['employment_status'])): ?>
+                       <span class="badge bg-primary px-3 py-2"><?php echo e($emp['employment_status']); ?></span>
+                   <?php endif; ?>
                 </div>
+                <?php if (!$emp['is_active'] || !empty($emp['separation_date'])): ?>
+                   <div class="alert alert-warning text-start py-2 px-3 mt-2 mb-3 border-start border-4 border-warning shadow-sm" style="background-color:#fff9db;border-color:#f59f00 !important;">
+                       <div class="fw-bold text-dark mb-1" style="font-size:.85rem;">
+                           <i class="fas fa-user-slash text-warning me-1"></i>Separation Notice
+                       </div>
+                       <div class="d-flex justify-content-between gap-2 small mb-1">
+                           <span class="text-muted">Status:</span>
+                           <span class="fw-bold text-dark"><?php echo e($emp['employment_status']); ?></span>
+                       </div>
+                       <?php if (!empty($emp['separation_date'])): ?>
+                           <div class="d-flex justify-content-between gap-2 small mb-1">
+                               <span class="text-muted">Effective:</span>
+                               <span class="fw-bold text-danger"><?php echo formatDate($emp['separation_date']); ?></span>
+                           </div>
+                       <?php endif; ?>
+                       <?php if (!empty($emp['separation_remarks'])): ?>
+                           <div class="small mt-1 pt-1 border-top border-warning-subtle text-muted" style="font-size:.75rem;">
+                               <strong>Notes:</strong> <?php echo nl2br(e($emp['separation_remarks'])); ?>
+                           </div>
+                       <?php endif; ?>
+                   </div>
+                <?php endif; ?>
                 <div class="profile-meta-list">
                     <div class="profile-meta-item">
                         <span class="profile-meta-icon"><i class="fas fa-envelope"></i></span>

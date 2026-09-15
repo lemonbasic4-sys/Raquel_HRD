@@ -811,6 +811,14 @@
     transform: translateY(0);
 }
 
+/* The bottom-sheet filter is only part of the mobile layout. */
+@media (min-width: 769px) {
+    .hr-filter-backdrop,
+    .hr-filter-sheet {
+        display: none !important;
+    }
+}
+
 /* Drag handle */
 .hr-filter-sheet-handle {
     display: flex;
