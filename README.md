@@ -251,3 +251,9 @@ No explicit license file was found in the repository at the time of review. If t
 ## Summary
 
 Raquel HRD is a full-featured HRIS for managing organization structure, employee records, portal access, evaluation processes, career movements, and reporting. It is built for a role-based enterprise workflow and is intended to run in a local PHP/MySQL environment during development and testing.
+
+
+
+
+
+https://canva.link/ecv3vthcbr5jyt4
