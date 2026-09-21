@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 require_once '../includes/session-check.php';
 // Allow Manager, Supervisor, and Staff to print their own/relevant evaluations
 checkRole(['HR Manager', 'HR Supervisor', 'HR Staff']);
@@ -487,7 +487,7 @@ if ((float)($row['total_score'] ?? 0) > 0 && (empty($pl) || $pl === '0')) {
     <div style="border:1px solid #000; display:flex; margin-bottom:0;">
       <div
         style="width:155px; border-right:1px solid #000; display:flex; align-items:center; justify-content:center; padding:4px;">
-        <img src="https://raquelpawnshop.com/wp-content/uploads/2023/05/png-logo.png"
+        <img src="<?php echo BASE_URL; ?>/assets/img/logo/logo.png"
           style="max-width:140px; max-height:55px; object-fit:contain;" alt="Logo">
       </div>
       <div style="flex:1; border-right:1px solid #000;">
@@ -574,22 +574,22 @@ if ((float)($row['total_score'] ?? 0) > 0 && (empty($pl) || $pl === '0')) {
       <tbody>
         <?php /* $pl already resolved above with fallback */ ?>
         <tr <?php echo ($pl === 'Outstanding') ? 'style="background-color:#d4edda !important; -webkit-print-color-adjust: exact; print-color-adjust: exact;"' : ''; ?>>
-          <td>3.60 – 4.00</td>
+          <td>3.60 â€“ 4.00</td>
           <td>Outstanding</td>
           <td>Performance significantly exceeds standards and expectations</td>
         </tr>
         <tr <?php echo ($pl === 'Exceeds Expectations') ? 'style="background-color:#cce5ff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact;"' : ''; ?>>
-          <td>2.60 – 3.59</td>
+          <td>2.60 â€“ 3.59</td>
           <td>Exceeds Expectations</td>
           <td>Performance exceeds standards and expectations</td>
         </tr>
         <tr <?php echo ($pl === 'Meets Expectations') ? 'style="background-color:#fff3cd !important; -webkit-print-color-adjust: exact; print-color-adjust: exact;"' : ''; ?>>
-          <td>2.00 – 2.59</td>
+          <td>2.00 â€“ 2.59</td>
           <td>Meets Expectations</td>
           <td>Performance meets standards and expectations</td>
         </tr>
         <tr <?php echo ($pl === 'Needs Improvement') ? 'style="background-color:#f8d7da !important; -webkit-print-color-adjust: exact; print-color-adjust: exact;"' : ''; ?>>
-          <td>1.00 – 1.99</td>
+          <td>1.00 â€“ 1.99</td>
           <td>Needs Improvement</td>
           <td>Performance did not meet standards and expectations</td>
         </tr>
@@ -718,7 +718,7 @@ if ((float)($row['total_score'] ?? 0) > 0 && (empty($pl) || $pl === '0')) {
     <div style="border:1px solid #000; display:flex; margin-bottom:6px;">
       <div
         style="width:155px; border-right:1px solid #000; display:flex; align-items:center; justify-content:center; padding:4px;">
-        <img src="https://raquelpawnshop.com/wp-content/uploads/2023/05/png-logo.png"
+        <img src="<?php echo BASE_URL; ?>/assets/img/logo/logo.png"
           style="max-width:140px; max-height:55px; object-fit:contain;" alt="Logo">
       </div>
       <div style="flex:1; border-right:1px solid #000;">

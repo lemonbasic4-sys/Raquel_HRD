@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 require_once '../includes/session-check.php';
 checkRole(['HR Manager']);
 require_once '../includes/functions.php';
@@ -222,7 +222,7 @@ $sys_logo = getSetting($conn, 'system_logo', 'assets/img/logo/logo.png');
     <div class="page">
         <div class="header-box">
             <div class="header-logo">
-                <img src="https://raquelpawnshop.com/wp-content/uploads/2023/05/png-logo.png"
+                <img src="<?php echo BASE_URL; ?>/assets/img/logo/logo.png"
                     style="max-width:140px; max-height:55px; object-fit:contain;" alt="Logo">
             </div>
             <div class="header-main">
@@ -299,3 +299,4 @@ $sys_logo = getSetting($conn, 'system_logo', 'assets/img/logo/logo.png');
     </div>
 </body>
 </html>
+

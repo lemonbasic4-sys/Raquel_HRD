@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 $page_title = 'View Employee';
 require_once '../includes/session-check.php';
 checkRole(['HR Staff']);
@@ -7,7 +7,7 @@ require_once '../includes/functions.php';
 $eid = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 if ($eid <= 0) redirectWith(BASE_URL . '/staff/search-employees.php', 'danger', 'Invalid employee ID.');
 
-// Fetch employee details (no branch restriction for staff — read-only access to all)
+// Fetch employee details (no branch restriction for staff â€” read-only access to all)
 $stmt = $conn->prepare("SELECT e.*, b.branch_name, d.department_name,
     ed.height_m, ed.weight_kg, ed.blood_type, ed.citizenship,
     eg.sss_number, eg.philhealth_number, eg.pagibig_number, eg.tin_number,
@@ -112,7 +112,7 @@ function govField($label, $value)
 {
     $has_val = !empty(trim((string)$value));
     $raw = $has_val ? e(trim($value)) : '<span class="text-muted">N/A</span>';
-    $masked = $has_val ? '••••••••••••' : '<span class="text-muted">N/A</span>';
+    $masked = $has_val ? 'â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢' : '<span class="text-muted">N/A</span>';
     $eye_btn = $has_val ? '<i class="fas fa-eye text-muted cursor-pointer single-id-toggle ms-auto" onclick="toggleSingleId(this)" title="Toggle '.$label.'" style="font-size:0.82rem; opacity: 0.55; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.opacity=\'1\'" onmouseout="this.style.opacity=\'0.55\'"></i>' : '';
 
     return "<div class='detail-item'>
@@ -543,7 +543,7 @@ $heroTenure = $heroHireDate ? (($diff = $heroHireDate->diff(new DateTime()))->y 
                                 <?php endforeach; ?>
                             </div></div>
                         </div>
-                        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+                        <script src="<?php echo BASE_URL; ?>/assets/vendor/chartjs/chart.umd.min.js"></script>
                         <script>document.addEventListener('DOMContentLoaded', function () { const ctx = document.getElementById('empPerformanceTrendChartStaff').getContext('2d'); new Chart(ctx, { type: 'line', data: { labels: <?php echo json_encode($chart_labels); ?>, datasets: [{ label: 'Evaluation Score (1.00 - 4.00)', data: <?php echo json_encode($chart_scores); ?>, borderColor: '#BD9414', backgroundColor: 'rgba(189, 148, 20, 0.15)', borderWidth: 3, fill: true, tension: 0.35, pointBackgroundColor: '#294306', pointRadius: 5, pointHoverRadius: 7 }] }, options: { responsive: true, maintainAspectRatio: false, scales: { y: { min: 1.0, max: 4.0, ticks: { stepSize: 0.5 } } }, plugins: { legend: { display: false } } } }); });</script>
                     <?php endif; ?>
                 </div>
@@ -556,7 +556,7 @@ $heroTenure = $heroHireDate ? (($diff = $heroHireDate->diff(new DateTime()))->y 
                     <?php else: ?>
                         <div class="employee-table-wrap"><table class="table table-sm align-middle mb-0"><thead><tr><th>Effective Date</th><th>Type</th><th>From Position</th><th>To Position</th><th>From Branch</th><th>To Branch</th><th>Processed By</th><th>Reason</th></tr></thead><tbody>
                         <?php foreach ($cm_history as $cm): $typeBadge = match($cm['movement_type']) { 'Promotion' => 'bg-success', 'Transfer' => 'bg-info text-dark', 'Demotion' => 'bg-danger', 'Role Change' => 'bg-primary', default => 'bg-secondary' }; ?>
-                            <tr><td data-label="Effective Date" class="fw-semibold"><?php echo formatDate($cm['effective_date']); ?></td><td data-label="Type"><span class="badge <?php echo $typeBadge; ?>"><?php echo e($cm['movement_type']); ?></span></td><td data-label="From Position" class="text-muted small"><?php echo e($cm['previous_position'] ?: '—'); ?></td><td data-label="To Position" class="fw-bold text-success"><?php echo e($cm['new_position']); ?></td><td data-label="From Branch" class="text-muted small"><?php echo e($cm['from_branch_name'] ?: 'N/A'); ?></td><td data-label="To Branch" class="fw-semibold"><?php echo e($cm['to_branch_name'] ?: 'Same Branch'); ?></td><td data-label="Processed By" class="small"><?php echo e($cm['approved_by_name'] ?: ($cm['logged_by_name'] ?: 'HR Manager')); ?></td><td data-label="Reason" class="small"><?php echo e($cm['reason'] ?: 'N/A'); ?></td></tr>
+                            <tr><td data-label="Effective Date" class="fw-semibold"><?php echo formatDate($cm['effective_date']); ?></td><td data-label="Type"><span class="badge <?php echo $typeBadge; ?>"><?php echo e($cm['movement_type']); ?></span></td><td data-label="From Position" class="text-muted small"><?php echo e($cm['previous_position'] ?: 'â€”'); ?></td><td data-label="To Position" class="fw-bold text-success"><?php echo e($cm['new_position']); ?></td><td data-label="From Branch" class="text-muted small"><?php echo e($cm['from_branch_name'] ?: 'N/A'); ?></td><td data-label="To Branch" class="fw-semibold"><?php echo e($cm['to_branch_name'] ?: 'Same Branch'); ?></td><td data-label="Processed By" class="small"><?php echo e($cm['approved_by_name'] ?: ($cm['logged_by_name'] ?: 'HR Manager')); ?></td><td data-label="Reason" class="small"><?php echo e($cm['reason'] ?: 'N/A'); ?></td></tr>
                         <?php endforeach; ?>
                         </tbody></table></div>
                     <?php endif; ?>
@@ -898,3 +898,4 @@ $heroTenure = $heroHireDate ? (($diff = $heroHireDate->diff(new DateTime()))->y 
 
 <script src="<?php echo BASE_URL; ?>/assets/js/employee-profile-tabs.js"></script>
 <?php require_once '../includes/footer.php'; ?>
+

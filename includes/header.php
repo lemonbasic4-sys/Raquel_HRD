@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 /**
  * Common Header - includes navbar, sidebar, and CDN links
  * Usage: include this file at the top of every dashboard page
@@ -323,19 +323,19 @@ switch ($effective_role) {
             $_hdr_viewer_hr_role = getEmployeeHRRole($conn, $_hdr_emp_id);
         }
 
-        // ── Section 1: My Profile ───────────────────────────────────────────
+        // â”€â”€ Section 1: My Profile â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         $menu_my_profile = [
             ['icon' => 'fas fa-briefcase', 'label' => 'My Employment', 'url' => BASE_URL . '/employee/my-employment.php', 'page' => 'my-employment.php'],
         ];
 
-        // ── Section 2: Evaluations ──────────────────────────────────────────
+        // â”€â”€ Section 2: Evaluations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         $menu_evaluations = [
             ['icon' => 'fas fa-star',        'label' => 'Self Rating',        'url' => BASE_URL . '/employee/self-rating.php',      'page' => 'self-rating.php',      'badge' => $m_pending_template_count],
             ['icon' => 'fas fa-history',     'label' => 'Evaluation History', 'url' => BASE_URL . '/employee/evaluation-history.php', 'page' => 'evaluation-history.php'],
             ['icon' => 'fas fa-chart-line',  'label' => 'My Performance',     'url' => BASE_URL . '/employee/my-performance.php',   'page' => 'my-performance.php'],
         ];
 
-        // ── Section 3: My Team (supervisors/managers & assigned package reviewers) ──
+        // â”€â”€ Section 3: My Team (supervisors/managers & assigned package reviewers) â”€â”€
         $m_pending_pkg_count = countPendingOrganizationPackagesForUser($conn, (int)($_SESSION['user_id'] ?? 0));
         $menu_my_team = [];
         $is_hr_personnel = (strcasecmp($_hdr_emp_dept ?? '', 'Human Resources') === 0) 
@@ -347,11 +347,11 @@ switch ($effective_role) {
             $menu_my_team[] = ['icon' => 'fas fa-history',     'label' => 'Team Evaluation History',  'url' => BASE_URL . '/employee/team-evaluation-history.php', 'page' => 'team-evaluation-history.php'];
         }
 
-        // ── Section 4: Career (rank-based) ─────────────────────────────────
+        // â”€â”€ Section 4: Career (rank-based) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         $menu_career = [];
         // Branch Manager (rank 3): can approve/reject Transfer requests from their branch
         if ($_hdr_emp_rank === 3) {
-            // Count pending BM approvals for badge — guarded in case schema migration hasn't run yet
+            // Count pending BM approvals for badge â€” guarded in case schema migration hasn't run yet
             $_hdr_bm_pending = 0;
             if ($_hdr_emp_branch_id > 0) {
                 try {
@@ -365,14 +365,14 @@ switch ($effective_role) {
                     $_hdr_bm_pending = (int)($_hdr_bm_stmt->get_result()->fetch_assoc()['cnt'] ?? 0);
                     $_hdr_bm_stmt->close();
                 } catch (mysqli_sql_exception $e) {
-                    // Column not yet migrated — badge shows 0
+                    // Column not yet migrated â€” badge shows 0
                     $_hdr_bm_pending = 0;
                 }
             }
             $menu_career[] = ['icon' => 'fas fa-clipboard-check', 'label' => 'Transfer Approvals', 'url' => BASE_URL . '/employee/branch-manager-approvals.php', 'page' => 'branch-manager-approvals.php', 'badge' => $_hdr_bm_pending];
         }
 
-        // ── Build sidebar with grouped sections ─────────────────────────────
+        // â”€â”€ Build sidebar with grouped sections â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         $sidebar_menus = [
             'MAIN' => [
                 ['icon' => 'fas fa-tachometer-alt', 'label' => 'Dashboard', 'url' => BASE_URL . '/employee/dashboard.php', 'page' => 'dashboard.php'],
@@ -412,18 +412,18 @@ switch ($effective_role) {
     <link rel="icon" type="image/png" href="<?php echo BASE_URL . '/' . htmlspecialchars($sys_logo ?? 'assets/img/logo/logo.png'); ?>">
     <link rel="shortcut icon" href="<?php echo BASE_URL . '/' . htmlspecialchars($sys_logo ?? 'assets/img/logo/logo.png'); ?>">
     <link rel="apple-touch-icon" href="<?php echo BASE_URL . '/' . htmlspecialchars($sys_logo ?? 'assets/img/logo/logo.png'); ?>">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link href="<?php echo BASE_URL; ?>/assets/vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
+    <link href="<?php echo BASE_URL; ?>/assets/vendor/fontawesome/css/all.min.css" rel="stylesheet">
+    
+    
+    <link href="<?php echo BASE_URL; ?>/assets/vendor/fonts/fonts.css" rel="stylesheet">
     <link href="<?php echo BASE_URL; ?>/assets/css/style.css?v=<?php echo time(); ?>" rel="stylesheet">
     <?php if (in_array($effective_role, ['HR Manager', 'HR Supervisor', 'HR Staff', 'Admin'])): ?>
-    <!-- HR Department Mobile View — exclusive CSS for HR roles on mobile -->
+    <!-- HR Department Mobile View â€” exclusive CSS for HR roles on mobile -->
     <link href="<?php echo BASE_URL; ?>/assets/css/hr-department-mobile.css?v=<?php echo time(); ?>" rel="stylesheet">
     <?php endif; ?>
     <?php if ($effective_role === 'Employee'): ?>
-    <!-- Employee Portal UX Revamp CSS — loaded for Employee role only -->
+    <!-- Employee Portal UX Revamp CSS â€” loaded for Employee role only -->
     <!-- Critical CSS inlined for above-the-fold render speed (Task 24.4) -->
     <style>
     *,*::before,*::after{box-sizing:border-box;max-width:100%;}
@@ -444,11 +444,11 @@ switch ($effective_role) {
     <link href="<?php echo BASE_URL; ?>/assets/css/employee-portal-progress.css?v=<?php echo time(); ?>" rel="stylesheet">
     <link href="<?php echo BASE_URL; ?>/assets/css/employee-portal-notifications.css?v=<?php echo time(); ?>" rel="stylesheet">
     <?php endif; ?>
-    <!-- Feedback & Sound Effects System CSS — loaded for all roles -->
+    <!-- Feedback & Sound Effects System CSS â€” loaded for all roles -->
     <link href="<?php echo BASE_URL; ?>/assets/css/employee-portal-feedback.css?v=<?php echo time(); ?>" rel="stylesheet">
     <link href="<?php echo BASE_URL; ?>/assets/css/evaluation-packages.css?v=<?php echo time(); ?>" rel="stylesheet">
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
+    <script src="<?php echo BASE_URL; ?>/assets/vendor/chartjs/chart.umd.min.js" defer></script>
     <script src="<?php echo BASE_URL; ?>/assets/js/pjax.js?v=<?php echo time(); ?>" defer></script>
     <script>
         // Prevent FOUC for collapsed sidebar
@@ -464,62 +464,132 @@ switch ($effective_role) {
 
 <body class="<?php echo ($current_dir === 'admin' ? 'admin-area' : '') . ($effective_role === 'Employee' ? ' role-employee' : ''); ?>">
 
-    <!-- ── Network Offline Banner ─────────────────────────────────────────────
-         Shows when device loses connectivity (APK WebView + browser).
-         Prevents white-screen freeze; auto-hides on reconnect.
-    ──────────────────────────────────────────────────────────────────────── -->
-    <div id="networkOfflineBanner" style="
-        display:none;
-        position:fixed;
-        top:0;left:0;right:0;
-        z-index:99999;
-        background:#1a1a2e;
-        color:#fff;
-        padding:10px 16px;
-        font-size:0.82rem;
-        font-family:'Inter',sans-serif;
-        font-weight:600;
-        text-align:center;
-        box-shadow:0 2px 12px rgba(0,0,0,.45);
-        letter-spacing:.3px;
-        align-items:center;
-        justify-content:center;
-        gap:10px;
-        flex-wrap:wrap;
-    ">
-        <span id="networkOfflineIcon" style="font-size:1rem;">📵</span>
-        <span id="networkOfflineMsg">No internet connection. Waiting to reconnect…</span>
-        <button onclick="location.reload()" style="
-            background:rgba(255,255,255,.15);
-            border:1px solid rgba(255,255,255,.3);
-            color:#fff;
-            border-radius:20px;
-            padding:4px 14px;
-            font-size:0.78rem;
-            font-weight:700;
-            cursor:pointer;
-        ">Retry</button>
+        <!-- __ Connection Status Toast ______________________________________________
+         Modern toast-style offline/reconnect indicator (bottom-right).
+         Shows on disconnect, auto-reloads on reconnect. No CDN required.
+    ___________________________________________________________________________ -->
+    <style>
+    #connToast {
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        z-index: 99999;
+        min-width: 280px;
+        max-width: 340px;
+        background: #0f172a;
+        border-radius: 14px;
+        box-shadow: 0 8px 32px rgba(0,0,0,.45), 0 0 0 1px rgba(255,255,255,.07);
+        padding: 14px 18px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-family: 'Inter', system-ui, sans-serif;
+        font-size: 0.84rem;
+        font-weight: 500;
+        color: #e2e8f0;
+        transform: translateY(120px);
+        opacity: 0;
+        transition: transform .35s cubic-bezier(.34,1.56,.64,1), opacity .3s ease;
+        pointer-events: none;
+    }
+    #connToast.ct-show {
+        transform: translateY(0);
+        opacity: 1;
+        pointer-events: auto;
+    }
+    #connToast.ct-offline { border-left: 4px solid #ef4444; }
+    #connToast.ct-online  { border-left: 4px solid #22c55e; background: #052e16; }
+    .ct-icon-wrap {
+        width: 36px; height: 36px;
+        border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        flex-shrink: 0;
+        font-size: 1.1rem;
+    }
+    #connToast.ct-offline .ct-icon-wrap { background: rgba(239,68,68,.15); }
+    #connToast.ct-online  .ct-icon-wrap { background: rgba(34,197,94,.15); }
+    .ct-body { flex: 1; }
+    .ct-title { font-weight: 700; font-size: 0.86rem; letter-spacing: .2px; margin-bottom: 2px; }
+    .ct-sub   { font-size: 0.75rem; opacity: .65; }
+    .ct-pulse {
+        width: 8px; height: 8px; border-radius: 50%;
+        background: #ef4444;
+        flex-shrink: 0;
+        animation: ctPulse 1.4s ease-in-out infinite;
+    }
+    #connToast.ct-online .ct-pulse { background: #22c55e; animation: none; }
+    @keyframes ctPulse {
+        0%,100% { transform: scale(1); opacity: 1; }
+        50%      { transform: scale(1.6); opacity: .5; }
+    }
+    .ct-retry {
+        background: rgba(239,68,68,.2);
+        border: 1px solid rgba(239,68,68,.4);
+        color: #fca5a5;
+        border-radius: 20px;
+        padding: 4px 12px;
+        font-size: 0.74rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: background .2s;
+        white-space: nowrap;
+    }
+    .ct-retry:hover { background: rgba(239,68,68,.35); }
+    @media (max-width: 480px) {
+        #connToast { right: 12px; left: 12px; min-width: unset; max-width: unset; bottom: 16px; }
+    }
+    </style>
+
+    <div id="connToast" role="status" aria-live="polite" aria-atomic="true">
+        <div class="ct-icon-wrap" id="ctIcon">ðŸ“¶</div>
+        <div class="ct-body">
+            <div class="ct-title" id="ctTitle">No Connection</div>
+            <div class="ct-sub"   id="ctSub">Waiting to reconnect...</div>
+        </div>
+        <div class="ct-pulse" id="ctPulse"></div>
+        <button class="ct-retry" id="ctRetry" onclick="location.reload()">Retry</button>
     </div>
     <script>
     (function(){
-        var banner = document.getElementById('networkOfflineBanner');
-        var msg    = document.getElementById('networkOfflineMsg');
-        var icon   = document.getElementById('networkOfflineIcon');
+        var toast = document.getElementById('connToast');
+        var icon  = document.getElementById('ctIcon');
+        var title = document.getElementById('ctTitle');
+        var sub   = document.getElementById('ctSub');
+        var pulse = document.getElementById('ctPulse');
+        var retry = document.getElementById('ctRetry');
+        var hideTimer = null;
+
         function showOffline(){
-            if(!banner) return;
-            banner.style.display = 'flex';
-            msg.textContent  = 'No internet connection. Waiting to reconnect…';
-            icon.textContent = '📵';
+            if(!toast) return;
+            clearTimeout(hideTimer);
+            toast.className = 'ct-offline';
+            icon.textContent  = String.fromCodePoint(0x1F4F5);
+            title.textContent = 'No Connection';
+            sub.textContent   = 'Check your network. Some features may be unavailable.';
+            pulse.style.display = 'block';
+            retry.style.display = 'block';
+            void toast.offsetWidth;
+            toast.classList.add('ct-show');
         }
+
         function showOnline(){
-            if(!banner) return;
-            icon.textContent = '✅';
-            msg.textContent  = 'Connection restored! Reloading…';
-            setTimeout(function(){ banner.style.display='none'; }, 2000);
+            if(!toast) return;
+            clearTimeout(hideTimer);
+            toast.className = 'ct-online ct-show';
+            icon.textContent  = String.fromCodePoint(0x2705);
+            title.textContent = 'Back Online';
+            sub.textContent   = 'Connection restored. Reloading page...';
+            pulse.style.display = 'none';
+            retry.style.display = 'none';
+            hideTimer = setTimeout(function(){
+                toast.classList.remove('ct-show');
+                setTimeout(function(){ location.reload(); }, 350);
+            }, 1800);
         }
+
         window.addEventListener('offline', showOffline);
         window.addEventListener('online',  showOnline);
-        if(!navigator.onLine){ showOffline(); }
+        if (!navigator.onLine) { showOffline(); }
     })();
     </script>
 
@@ -538,7 +608,7 @@ switch ($effective_role) {
             <?php if ($effective_role === 'Employee'): ?>
                 <small>Your HRIS Employee Portal</small>
             <?php else: ?>
-                <small>HRIS • <?php echo e($effective_role); ?></small>
+                <small>HRIS â€¢ <?php echo e($effective_role); ?></small>
             <?php endif; ?>
         </div>
 
@@ -757,7 +827,7 @@ switch ($effective_role) {
                         ?>
                         <?php endif; ?>
                         <?php
-                        // Confirm Rating — for immediate heads outside HR department
+                        // Confirm Rating â€” for immediate heads outside HR department
                         $_g_is_sup = false;
                         $_g_dept_name = '';
                         if ($_g_emp_id > 0 && $conn) {
@@ -836,8 +906,8 @@ switch ($effective_role) {
         <?php
         // Always consume the flash session to prevent it leaking to the next page.
         // Suppress the visual banner on pages that have their own inline feedback:
-        //   - employee-accounts.php  → Portal Accounts (uses credential slip modal)
-        //   - users.php              → User Management (has its own inline alerts)
+        //   - employee-accounts.php  â†’ Portal Accounts (uses credential slip modal)
+        //   - users.php              â†’ User Management (has its own inline alerts)
         $suppress_flash_pages = ['employee-accounts.php', 'users.php'];
         if (isset($_SESSION['flash_message'])) {
             if (!in_array($current_page, $suppress_flash_pages, true)) {
@@ -860,3 +930,5 @@ switch ($effective_role) {
                . "</div>";
         }
         ?>
+
+

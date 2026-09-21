@@ -106,22 +106,29 @@ function confirmDelete(message) {
  * Initialize components that need re-binding after PJAX load
  */
 function initDynamicComponents() {
+    // Move PHP-rendered flash banners into the unified toast stack
+    const stack = getHrdToastStack();
     document.querySelectorAll('.flash-message-banner').forEach(function (toast) {
-        if (toast.parentElement !== document.body) {
-            document.body.appendChild(toast);
+        if (toast.parentElement !== stack) {
+            stack.appendChild(toast);
         }
         if (!toast.dataset.animated) {
             toast.dataset.animated = 'true';
             toast.classList.remove('show');
-            // Force a layout reflow
-            void toast.offsetWidth;
+            void toast.offsetWidth; // Force reflow
             toast.classList.add('show');
+            // Auto-dismiss after 5s (success/info) or 8s (danger/warning)
+            const isDanger = toast.classList.contains('flash-message-danger') ||
+                             toast.classList.contains('flash-message-warning');
+            const delay = isDanger ? 8000 : 5000;
+            setTimeout(function () {
+                _hrdDismissToast(toast);
+            }, delay);
         }
     });
 
-    // 1. Close alert after 5 seconds
-    const alerts = document.querySelectorAll('.alert-dismissible');
-    alerts.forEach(function (alert) {
+    // Bootstrap alert-dismissible still gets auto-closed (non-flash alerts)
+    document.querySelectorAll('.alert-dismissible:not(.flash-message-banner)').forEach(function (alert) {
         if (alert.dataset.init) return;
         alert.dataset.init = 'true';
         setTimeout(function () {
@@ -258,39 +265,41 @@ function viewFullImage(src, name) {
 window.lastSeenNotifId = 0;
 
 function showLiveToast(title, message, link) {
+    // Build a dark-card notification toast matching #connToast style
     const toast = document.createElement('div');
-    toast.className = 'flash-message-banner flash-message-info fade';
-    
-    let onclickAttr = '';
-    let cursorStyle = '';
-    if (link) {
-        onclickAttr = `onclick="window.location.href='${link}'"`;
-        cursorStyle = 'cursor: pointer;';
-    }
-    
+    toast.className = 'flash-message-banner flash-message-info';
+    toast.setAttribute('role', 'status');
+    toast.setAttribute('aria-live', 'polite');
+
+    const clickable = !!link;
+    const cursorStyle = clickable ? 'cursor:pointer;' : '';
+
     toast.innerHTML = `
-        <div class="flash-message-icon" style="${cursorStyle}" ${onclickAttr}><i class="fas fa-bell"></i></div>
-        <div class="flash-message-copy" style="${cursorStyle}" ${onclickAttr}>
+        <div class="flash-message-icon" style="${cursorStyle}" ${clickable ? `onclick="window.location.href='${link}'"` : ''}>
+            <i class="fas fa-bell" aria-hidden="true"></i>
+        </div>
+        <div class="flash-message-copy" style="${cursorStyle}" ${clickable ? `onclick="window.location.href='${link}'"` : ''}>
             <span class="flash-message-app">Notification</span>
             <span class="flash-message-title">${title}</span>
             <span class="flash-message-text">${message}</span>
         </div>
-        <button type="button" class="btn-close" onclick="this.parentElement.classList.remove('show'); setTimeout(() => this.parentElement.remove(), 400); event.stopPropagation();" aria-label="Close"></button>
+        <div class="hrd-toast__dot" aria-hidden="true"></div>
+        <button type="button" class="btn-close" aria-label="Close"></button>
     `;
-    
-    document.body.appendChild(toast);
-    
+
+    // Wire close button
+    toast.querySelector('.btn-close').addEventListener('click', function (e) {
+        e.stopPropagation();
+        _hrdDismissToast(toast);
+    });
+
+    // Add to unified stack
+    getHrdToastStack().appendChild(toast);
     void toast.offsetWidth;
     toast.classList.add('show');
-    
-    setTimeout(() => {
-        if (toast.parentNode) {
-            toast.classList.remove('show');
-            setTimeout(() => {
-                if (toast.parentNode) toast.remove();
-            }, 400);
-        }
-    }, 8000);
+
+    // Auto-dismiss after 8s
+    setTimeout(function () { _hrdDismissToast(toast); }, 8000);
 }
 
 function getNotifIconInfoJS(title) {
@@ -492,3 +501,100 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 });
+
+/* ================================================================
+   HRD TOAST STACK — shared helpers
+   getHrdToastStack()  creates/returns the stacking container
+   _hrdDismissToast()  animates a toast out then removes it
+   window.alert        override → routes ALL alert() calls through
+                       showToast() (if loaded) or the inline fallback
+================================================================ */
+
+/**
+ * Returns (or creates) the #hrdToastStack container in <body>.
+ * All toast types (PHP flash, live notifications, showToast) render here.
+ */
+function getHrdToastStack() {
+    var stack = document.getElementById('hrdToastStack');
+    if (!stack) {
+        stack = document.createElement('div');
+        stack.id = 'hrdToastStack';
+        stack.className = 'hrd-toast-stack';
+        stack.setAttribute('aria-live', 'polite');
+        stack.setAttribute('aria-atomic', 'false');
+        stack.setAttribute('role', 'region');
+        stack.setAttribute('aria-label', 'Notifications');
+        document.body.appendChild(stack);
+    }
+    return stack;
+}
+
+/**
+ * Animate a toast out and remove it from the DOM.
+ * @param {HTMLElement} toast
+ */
+function _hrdDismissToast(toast) {
+    if (!toast || !toast.parentNode) return;
+    toast.classList.remove('show');
+    setTimeout(function () {
+        if (toast.parentNode) toast.parentNode.removeChild(toast);
+    }, 380);
+}
+
+/**
+ * Override window.alert so every native alert() call is routed
+ * through the unified toast system instead of the browser dialog.
+ */
+(function () {
+    var _nativeAlert = window.alert;
+    window.alert = function (msg) {
+        // Detect type from message text
+        var str = String(msg || '');
+        var type = 'info';
+        var lcStr = str.toLowerCase();
+        if (/error|fail|invalid|not found|unable|could not|unexpected/i.test(lcStr)) {
+            type = 'error';
+        } else if (/warning|caution|careful/i.test(lcStr)) {
+            type = 'warning';
+        } else if (/success|saved|updated|created|approved|endorsed|confirmed/i.test(lcStr)) {
+            type = 'success';
+        }
+
+        // Use ep-toast showToast if loaded (Employee portal)
+        if (typeof window.showToast === 'function') {
+            window.showToast(str, type);
+            return;
+        }
+
+        // Fallback: build an inline hrd-toast
+        var iconMap = { success: '✓', error: '⚠', warning: '⚠', info: 'ℹ' };
+        var labelMap = { success: 'Success', error: 'Error', warning: 'Warning', info: 'Notice' };
+        var borderMap = { success: 'flash-message-success', error: 'flash-message-danger',
+                          warning: 'flash-message-warning', info: 'flash-message-info' };
+
+        var toast = document.createElement('div');
+        toast.className = 'flash-message-banner ' + (borderMap[type] || 'flash-message-info');
+        toast.setAttribute('role', type === 'error' ? 'alert' : 'status');
+        toast.innerHTML =
+            '<div class="flash-message-icon">' + (iconMap[type] || 'ℹ') + '</div>' +
+            '<div class="flash-message-copy">' +
+            '  <span class="flash-message-app">Raquel HRIS</span>' +
+            '  <span class="flash-message-title">' + (labelMap[type] || 'Notice') + '</span>' +
+            '  <span class="flash-message-text">' + str + '</span>' +
+            '</div>' +
+            '<div class="hrd-toast__dot" aria-hidden="true"></div>' +
+            '<button type="button" class="btn-close" aria-label="Close"></button>';
+
+        var closeBtn = toast.querySelector('.btn-close');
+        closeBtn.addEventListener('click', function () { _hrdDismissToast(toast); });
+
+        getHrdToastStack().appendChild(toast);
+        void toast.offsetWidth;
+        toast.classList.add('show');
+
+        var autoDismissMs = (type === 'error') ? 0 : 5000;
+        if (autoDismissMs > 0) {
+            setTimeout(function () { _hrdDismissToast(toast); }, autoDismissMs);
+        }
+    };
+})();

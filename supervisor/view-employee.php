@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 $page_title = 'View Employee';
 require_once '../includes/session-check.php';
 checkRole(['HR Supervisor']);
@@ -174,7 +174,7 @@ function govField($label, $value)
 {
     $has_val = !empty(trim((string)$value));
     $raw = $has_val ? e(trim($value)) : '<span class="text-muted">N/A</span>';
-    $masked = $has_val ? '••••••••••••' : '<span class="text-muted">N/A</span>';
+    $masked = $has_val ? 'â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢' : '<span class="text-muted">N/A</span>';
     $eye_btn = $has_val ? '<i class="fas fa-eye text-muted cursor-pointer single-id-toggle ms-auto" onclick="toggleSingleId(this)" title="Toggle '.$label.'" style="font-size:0.82rem; opacity: 0.55; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.opacity=\'1\'" onmouseout="this.style.opacity=\'0.55\'"></i>' : '';
 
     return "<div class='detail-item'>
@@ -852,7 +852,7 @@ $heroTenure = $heroHireDate ? (($diff = $heroHireDate->diff(new DateTime()))->y 
                             </div>
                         </div>
                     </div>
-                    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+                    <script src="<?php echo BASE_URL; ?>/assets/vendor/chartjs/chart.umd.min.js"></script>
                     <script>
                     document.addEventListener('DOMContentLoaded', function() {
                         const ctx = document.getElementById('empPerformanceTrendChartSup').getContext('2d');
@@ -904,7 +904,7 @@ $heroTenure = $heroHireDate ? (($diff = $heroHireDate->diff(new DateTime()))->y 
                     <?php else: ?>
                         <div class="employee-table-wrap"><table class="table table-sm align-middle mb-0"><thead><tr><th>Effective Date</th><th>Type</th><th>From Position</th><th>To Position</th><th>From Branch</th><th>To Branch</th><th>Processed By</th><th>Reason</th></tr></thead><tbody>
                         <?php foreach ($cm_history as $cm): $typeBadge = match($cm['movement_type']) { 'Promotion' => 'bg-success', 'Transfer' => 'bg-info text-dark', 'Demotion' => 'bg-danger', 'Role Change' => 'bg-primary', default => 'bg-secondary' }; ?>
-                            <tr><td data-label="Effective Date" class="fw-semibold"><?php echo formatDate($cm['effective_date']); ?></td><td data-label="Type"><span class="badge <?php echo $typeBadge; ?>"><?php echo e($cm['movement_type']); ?></span></td><td data-label="From Position" class="text-muted small"><?php echo e($cm['previous_position'] ?: '—'); ?></td><td data-label="To Position" class="fw-bold text-success"><?php echo e($cm['new_position']); ?></td><td data-label="From Branch" class="text-muted small"><?php echo e($cm['from_branch_name'] ?: 'N/A'); ?></td><td data-label="To Branch" class="fw-semibold"><?php echo e($cm['to_branch_name'] ?: 'Same Branch'); ?></td><td data-label="Processed By" class="small"><?php echo e($cm['approved_by_name'] ?: ($cm['logged_by_name'] ?: 'HR Supervisor')); ?></td><td data-label="Reason" class="small"><?php echo e($cm['reason'] ?: 'N/A'); ?></td></tr>
+                            <tr><td data-label="Effective Date" class="fw-semibold"><?php echo formatDate($cm['effective_date']); ?></td><td data-label="Type"><span class="badge <?php echo $typeBadge; ?>"><?php echo e($cm['movement_type']); ?></span></td><td data-label="From Position" class="text-muted small"><?php echo e($cm['previous_position'] ?: 'â€”'); ?></td><td data-label="To Position" class="fw-bold text-success"><?php echo e($cm['new_position']); ?></td><td data-label="From Branch" class="text-muted small"><?php echo e($cm['from_branch_name'] ?: 'N/A'); ?></td><td data-label="To Branch" class="fw-semibold"><?php echo e($cm['to_branch_name'] ?: 'Same Branch'); ?></td><td data-label="Processed By" class="small"><?php echo e($cm['approved_by_name'] ?: ($cm['logged_by_name'] ?: 'HR Supervisor')); ?></td><td data-label="Reason" class="small"><?php echo e($cm['reason'] ?: 'N/A'); ?></td></tr>
                         <?php endforeach; ?>
                         </tbody></table></div>
                     <?php endif; ?>
@@ -1185,7 +1185,7 @@ $heroTenure = $heroHireDate ? (($diff = $heroHireDate->diff(new DateTime()))->y 
                                                     <div class="text-muted small"><i class="fas fa-building me-1"></i><?php echo e($w['company_name']); ?></div>
                                                 </td>
                                                 <td data-label="Details">
-                                                    <div class="small"><strong>Salary:</strong> <?php echo $w['monthly_salary'] ? '₱' . number_format($w['monthly_salary'], 2) : 'N/A'; ?></div>
+                                                    <div class="small"><strong>Salary:</strong> <?php echo $w['monthly_salary'] ? 'â‚±' . number_format($w['monthly_salary'], 2) : 'N/A'; ?></div>
                                                     <div class="small"><strong>Status:</strong> <?php echo e($w['appointment_status'] ?: 'N/A'); ?></div>
                                                     <?php if ($w['reason_for_leaving']): ?>
                                                         <div class="small text-danger"><strong>Leaving:</strong> <?php echo e($w['reason_for_leaving']); ?></div>
@@ -1490,12 +1490,12 @@ $heroTenure = $heroHireDate ? (($diff = $heroHireDate->diff(new DateTime()))->y 
                                                     </td>
                                                     <td data-label="Location"><?php echo e($rp['exact_location']); ?></td>
                                                     <td data-label="Values">
-                                                        <div class="small">Assessed: ₱<?php echo number_format($rp['assessed_value'], 2); ?></div>
-                                                        <div class="small">Market: ₱<?php echo number_format($rp['market_value'], 2); ?></div>
+                                                        <div class="small">Assessed: â‚±<?php echo number_format($rp['assessed_value'], 2); ?></div>
+                                                        <div class="small">Market: â‚±<?php echo number_format($rp['market_value'], 2); ?></div>
                                                     </td>
                                                     <td data-label="Acquisition">
                                                         <div class="small"><?php echo e($rp['acquisition_year_mode']); ?></div>
-                                                        <div class="small fw-bold">Cost: ₱<?php echo number_format($rp['acquisition_cost'], 2); ?></div>
+                                                        <div class="small fw-bold">Cost: â‚±<?php echo number_format($rp['acquisition_cost'], 2); ?></div>
                                                     </td>
                                                 </tr>
                                             <?php endforeach; ?>
@@ -1524,7 +1524,7 @@ $heroTenure = $heroHireDate ? (($diff = $heroHireDate->diff(new DateTime()))->y 
                                                 <tr>
                                                     <td data-label="Description"><?php echo e($pp['description']); ?></td>
                                                     <td data-label="Year Acquired"><?php echo e($pp['year_acquired']); ?></td>
-                                                    <td data-label="Acquisition Cost">₱<?php echo number_format($pp['acquisition_cost'], 2); ?></td>
+                                                    <td data-label="Acquisition Cost">â‚±<?php echo number_format($pp['acquisition_cost'], 2); ?></td>
                                                 </tr>
                                             <?php endforeach; ?>
                                         </tbody>
@@ -1552,7 +1552,7 @@ $heroTenure = $heroHireDate ? (($diff = $heroHireDate->diff(new DateTime()))->y 
                                                 <tr>
                                                     <td data-label="Nature of Liability"><?php echo e($liab['nature_of_liability']); ?></td>
                                                     <td data-label="Name of Creditor"><?php echo e($liab['creditor_name']); ?></td>
-                                                    <td data-label="Outstanding Balance">₱<?php echo number_format($liab['outstanding_balance'], 2); ?></td>
+                                                    <td data-label="Outstanding Balance">â‚±<?php echo number_format($liab['outstanding_balance'], 2); ?></td>
                                                 </tr>
                                             <?php endforeach; ?>
                                         </tbody>
@@ -1693,3 +1693,4 @@ $heroTenure = $heroHireDate ? (($diff = $heroHireDate->diff(new DateTime()))->y 
 
 <script src="<?php echo BASE_URL; ?>/assets/js/employee-profile-tabs.js"></script>
 <?php require_once '../includes/footer.php'; ?>
+

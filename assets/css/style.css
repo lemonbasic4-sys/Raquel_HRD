@@ -866,298 +866,272 @@ select option.position-group-label {
     background: #eef5e8;
 }
 
-/* ---------- Sticky Flash Notifications ---------- */
-.flash-message-banner {
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   HRD UNIFIED TOAST NOTIFICATION SYSTEM
+   Matches #connToast design: dark card · bottom-right ·
+   spring animation · colored left border · pulsing dot
+   Used by: PHP flash messages, live notification toasts,
+            alert() override, showToast(), ep-toast system
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+/* Stack container — all toasts live here */
+.hrd-toast-stack {
     position: fixed;
+    bottom: 80px;       /* above mobile bottom-nav */
     right: 24px;
-    top: calc(82px + env(safe-area-inset-top, 0px));
-    bottom: auto;
-    left: auto;
-    z-index: 3000;
+    z-index: 9998;      /* just below connToast (99999) */
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    pointer-events: none;
+    max-width: 360px;
+    width: min(360px, calc(100vw - 32px));
+}
+
+/* ── Base toast card ── */
+.flash-message-banner,
+.hrd-toast {
+    pointer-events: auto;
+    position: relative;
     display: flex;
     align-items: center;
-    gap: 14px;
-    width: min(400px, calc(100vw - 48px));
-    margin: 0;
-    padding: 0;
-    will-change: transform, opacity;
-
-    /* Default / Outro State */
-    opacity: 0;
-    transform: translate3d(56px, 0, 0) scale(0.95);
-    transition: opacity 0.32s cubic-bezier(0.4, 0, 1, 1), transform 0.32s cubic-bezier(0.4, 0, 1, 1);
-
-    /* Desktop card — brand-aligned */
-    background: #ffffff;
-    border: 1px solid #D1D5CE;
-    border-top: 4px solid #082E06;
-    border-radius: 12px;
-    box-shadow:
-        0 4px 20px rgba(8, 46, 6, 0.14),
-        0 1px 4px  rgba(8, 46, 6, 0.08);
-    overflow: hidden;
-    padding: 14px 44px 14px 14px;
     gap: 12px;
-    min-height: 0;
-}
-
-.flash-message-banner.show {
-    opacity: 1;
-    transform: translate3d(0, 0, 0) scale(1);
-    transition: opacity 0.42s cubic-bezier(0.34, 1.5, 0.64, 1), transform 0.42s cubic-bezier(0.34, 1.5, 0.64, 1);
-}
-
-/* Subtle colour wash under top bar */
-.flash-message-banner::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 46px;
-    pointer-events: none;
-    background: linear-gradient(180deg, rgba(8, 46, 6, 0.045) 0%, transparent 100%);
-    border-radius: 10px 10px 0 0;
-}
-
-.flash-message-icon {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex: 0 0 40px;
-    font-size: 1.1rem;
-    background: rgba(8, 46, 6, 0.10);
-    color: #082E06;
-    transition: transform 0.3s ease;
-    position: relative;
-    z-index: 1;
-}
-
-.flash-message-banner:hover .flash-message-icon {
-    transform: scale(1.08);
-}
-
-.flash-message-copy {
+    width: 100%;
     min-width: 0;
+    background: #0f172a;
+    border-radius: 14px;
+    box-shadow: 0 8px 32px rgba(0,0,0,.45), 0 0 0 1px rgba(255,255,255,.07);
+    padding: 14px 16px 14px 18px;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 0.84rem;
+    font-weight: 500;
+    color: #e2e8f0;
+    border-left: 4px solid #64748b;
+    will-change: transform, opacity;
+    overflow: hidden;
+    /* Entry: slide up from below with spring */
+    transform: translateY(80px);
+    opacity: 0;
+    transition: transform .35s cubic-bezier(.34,1.56,.64,1),
+                opacity .3s ease;
+}
+
+.flash-message-banner.show,
+.hrd-toast.show {
+    transform: translateY(0);
+    opacity: 1;
+}
+
+/* ── Type → left border colour ── */
+.flash-message-success, .hrd-toast--success { border-left-color: #22c55e; }
+.flash-message-danger,  .hrd-toast--error   { border-left-color: #ef4444; }
+.flash-message-warning, .hrd-toast--warning  { border-left-color: #f59e0b; }
+.flash-message-info, .flash-message-primary, .hrd-toast--info { border-left-color: #38bdf8; }
+
+/* ── Icon circle ── */
+.flash-message-icon,
+.hrd-toast__icon {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    font-size: 1rem;
+    background: rgba(255,255,255,.07);
+    color: #e2e8f0;
+    transition: transform .3s ease;
+}
+.flash-message-banner:hover .flash-message-icon { transform: scale(1.08); }
+.flash-message-success .flash-message-icon, .hrd-toast--success .hrd-toast__icon
+    { background: rgba(34,197,94,.15);  color: #86efac; }
+.flash-message-danger .flash-message-icon,  .hrd-toast--error .hrd-toast__icon
+    { background: rgba(239,68,68,.15);  color: #fca5a5; }
+.flash-message-warning .flash-message-icon, .hrd-toast--warning .hrd-toast__icon
+    { background: rgba(245,158,11,.15); color: #fde68a; }
+.flash-message-info .flash-message-icon,
+.flash-message-primary .flash-message-icon,
+.hrd-toast--info .hrd-toast__icon
+    { background: rgba(56,189,248,.15); color: #7dd3fc; }
+
+/* ── Content body ── */
+.flash-message-copy,
+.hrd-toast__body {
     flex: 1;
+    min-width: 0;
     display: flex;
     flex-direction: column;
     gap: 2px;
-    position: relative;
-    z-index: 1;
 }
 
-.flash-message-app {
-    font-size: 0.62rem;
+/* Small uppercase label above title */
+.flash-message-app,
+.hrd-toast__label {
+    font-size: 0.65rem;
     font-weight: 800;
     text-transform: uppercase;
-    letter-spacing: 0.09em;
-    padding: 0;
-    width: fit-content;
-    margin-bottom: 2px;
-    display: inline-block;
+    letter-spacing: .09em;
+    color: rgba(226,232,240,.55);
     line-height: 1;
-    color: #5E6B5C;
+    margin-bottom: 2px;
 }
 
-.flash-message-title {
-    color: #1C271B;
-    font-size: 0.9rem;
+/* Title */
+.flash-message-title,
+.hrd-toast__title {
+    font-size: 0.86rem;
     font-weight: 700;
+    color: #f8fafc;
     line-height: 1.2;
+    letter-spacing: .15px;
 }
 
-.flash-message-text {
-    color: #3D4D3A;
-    font-size: 0.82rem;
-    font-weight: 500;
-    line-height: 1.35;
+/* Subtitle / body text */
+.flash-message-text,
+.hrd-toast__text {
+    font-size: 0.78rem;
+    color: #94a3b8;
+    line-height: 1.4;
     overflow-wrap: anywhere;
 }
 
-.flash-message-banner .btn-close {
-    position: absolute;
-    top: 12px;
-    right: 12px;
-    padding: 5px;
+/* ── Pulsing status dot ── */
+.hrd-toast__dot {
+    width: 8px; height: 8px;
     border-radius: 50%;
-    width: 26px;
-    height: 26px;
-    background-color: rgba(8, 46, 6, 0.06);
-    transition: background-color 0.2s, transform 0.2s, opacity 0.2s;
-    opacity: 0.5;
-    filter: none !important;
-    z-index: 2;
+    flex-shrink: 0;
+    background: #64748b;
+    animation: hrdDotPulse 1.4s ease-in-out infinite;
+}
+.hrd-toast--success .hrd-toast__dot { background: #22c55e; }
+.hrd-toast--error   .hrd-toast__dot { background: #ef4444; }
+.hrd-toast--warning .hrd-toast__dot { background: #f59e0b; }
+.hrd-toast--info    .hrd-toast__dot { background: #38bdf8; }
+
+@keyframes hrdDotPulse {
+    0%,100% { transform: scale(1);   opacity: 1; }
+    50%      { transform: scale(1.6); opacity: .5; }
 }
 
+/* ── Close button ── */
+.flash-message-banner .btn-close,
+.hrd-toast__close {
+    position: static !important;
+    flex-shrink: 0;
+    width: 24px; height: 24px;
+    display: flex; align-items: center; justify-content: center;
+    border: none;
+    background: rgba(255,255,255,.08) !important;
+    border-radius: 6px;
+    cursor: pointer;
+    color: #94a3b8;
+    font-size: .85rem;
+    padding: 0;
+    filter: invert(1) !important;
+    opacity: .65 !important;
+    transition: background .2s, opacity .2s;
+}
 .flash-message-banner .btn-close:hover,
-.flash-message-banner .btn-close:focus {
-    background-color: rgba(8, 46, 6, 0.12);
-    transform: rotate(90deg);
-    opacity: 0.9;
+.hrd-toast__close:hover {
+    background: rgba(255,255,255,.18) !important;
+    opacity: 1 !important;
+    transform: none;
     box-shadow: none;
     outline: none;
 }
 
-/* ── Type Variants — top bar + icon + label colours ── */
-
-/* Success */
-.flash-message-success { border-top-color: #0F6B2E !important; }
-.flash-message-success::before { background: linear-gradient(180deg, rgba(15,107,46,0.05) 0%, transparent 100%) !important; }
-.flash-message-success .flash-message-icon { background: rgba(15,107,46,0.12); color: #0F6B2E; }
-.flash-message-success .flash-message-app  { color: #0F6B2E; }
-
-/* Danger */
-.flash-message-danger { border-top-color: #991B1B !important; }
-.flash-message-danger::before { background: linear-gradient(180deg, rgba(153,27,27,0.05) 0%, transparent 100%) !important; }
-.flash-message-danger .flash-message-icon { background: rgba(153,27,27,0.12); color: #991B1B; }
-.flash-message-danger .flash-message-app  { color: #991B1B; }
-
-/* Warning */
-.flash-message-warning { border-top-color: #7F5C00 !important; }
-.flash-message-warning::before { background: linear-gradient(180deg, rgba(127,92,0,0.05) 0%, transparent 100%) !important; }
-.flash-message-warning .flash-message-icon { background: rgba(127,92,0,0.12); color: #7F5C00; }
-.flash-message-warning .flash-message-app  { color: #7F5C00; }
-
-/* Info / Primary */
-.flash-message-info,
-.flash-message-primary { border-top-color: #065F73 !important; }
-.flash-message-info::before,
-.flash-message-primary::before { background: linear-gradient(180deg, rgba(6,95,115,0.05) 0%, transparent 100%) !important; }
-.flash-message-info .flash-message-icon,
-.flash-message-primary .flash-message-icon { background: rgba(6,95,115,0.12); color: #065F73; }
-.flash-message-info .flash-message-app,
-.flash-message-primary .flash-message-app  { color: #065F73; }
-
-/* ── Fade class (used by PJAX / live toasts) ── */
+/* ── Fade class (used by JS animation cycle) ── */
 .flash-message-banner.fade {
-    transition: opacity 0.32s cubic-bezier(0.4, 0, 1, 1), transform 0.32s cubic-bezier(0.4, 0, 1, 1);
+    transition: transform .35s cubic-bezier(.34,1.56,.64,1), opacity .3s ease;
 }
-
-.flash-message-banner.fade:not(.show) {
+.flash-message-banner.fade:not(.show),
+.hrd-toast.fade:not(.show) {
+    transform: translateY(60px) scale(0.96);
     opacity: 0;
-    transform: translate3d(56px, 0, 0) scale(0.95);
 }
 
 /* ═══════════════════════════════════════════════════════
-   MOBILE  ≤ 576px — Dynamic Island pill
-   Dark brand-green glass, gold rim, LED dot, spring drop
+   MOBILE  ≤ 576px — Dynamic Island pill (top-centre)
+   Dark slate, spring drop, pulsing LED dot
 ═══════════════════════════════════════════════════════ */
 @media (max-width: 576px) {
-    .flash-message-banner {
-        /* Position: centred at top */
+    .hrd-toast-stack {
+        bottom: auto;
+        top: calc(16px + env(safe-area-inset-top, 0px));
         left: 50%;
         right: auto;
-        top: calc(16px + env(safe-area-inset-top, 0px));
-        transform: translateX(-50%) scaleX(0.26) scaleY(0.4) translateY(-16px);
+        transform: translateX(-50%);
+        align-items: center;
         width: max-content;
         max-width: calc(100vw - 28px);
-        opacity: 0;
+    }
 
-        /* Pill shape */
-        border-radius: 999px !important;
-        border: none !important;
-        border-top: none !important;
-        overflow: visible;
-
-        /* Brand dark-green glass */
-        background: linear-gradient(135deg, #082E06 0%, #041D03 100%) !important;
-        box-shadow:
-            inset 0 0 0 1px rgba(203,161,53,0.22),
-            inset 0 0 0 2px rgba(255,255,255,0.05),
-            0 14px 40px rgba(4,29,3,0.55),
-            0 4px 12px  rgba(4,29,3,0.32) !important;
-
-        /* Compact layout */
-        padding: 10px 14px 10px 11px !important;
+    .flash-message-banner,
+    .hrd-toast {
+        border-radius: 999px;
+        border: none;
+        padding: 10px 14px 10px 11px;
         gap: 8px;
-        min-height: 0;
-        align-items: center;
+        background: linear-gradient(135deg, #0f172a 0%, #020617 100%);
+        box-shadow:
+            inset 0 0 0 1px rgba(148,163,184,.18),
+            inset 0 0 0 2px rgba(255,255,255,.04),
+            0 12px 36px rgba(2,6,23,.6),
+            0 4px 10px rgba(2,6,23,.35);
+        min-width: unset;
+        width: max-content;
+        overflow: visible;
+        transform: scaleX(0.25) scaleY(0.4) translateY(-14px);
+        opacity: 0;
+        transition: transform .46s cubic-bezier(.34,1.56,.64,1),
+                    opacity .28s ease;
     }
 
-    .flash-message-banner.show {
-        transform: translateX(-50%) scaleX(1) scaleY(1) translateY(0) !important;
-        opacity: 1 !important;
-        transition:
-            transform 0.46s cubic-bezier(0.34, 1.5, 0.64, 1),
-            opacity   0.28s ease !important;
+    .flash-message-banner.show,
+    .hrd-toast.show {
+        transform: scaleX(1) scaleY(1) translateY(0);
+        opacity: 1;
     }
 
-    /* Remove desktop top-bar wash on mobile */
-    .flash-message-banner::before { display: none !important; }
+    /* Hide verbose text on pill */
+    .flash-message-text, .hrd-toast__text,
+    .flash-message-app,  .hrd-toast__label { display: none !important; }
 
-    /* LED dot via ::after */
-    .flash-message-banner::after {
-        content: '';
-        display: block;
-        flex-shrink: 0;
-        order: -1;
-        width: 7px;
-        height: 7px;
-        border-radius: 50%;
-        background: #CBA135;
-        box-shadow: 0 0 7px 2px rgba(203,161,53,0.6);
-        animation: fm-di-pulse 2.2s ease-in-out infinite;
-    }
-    .flash-message-success::after { background: #4ade80 !important; box-shadow: 0 0 8px 3px rgba(74,222,128,0.6) !important; }
-    .flash-message-danger::after   { background: #f87171 !important; box-shadow: 0 0 8px 3px rgba(248,113,113,0.6) !important; }
-    .flash-message-warning::after  { background: #fbbf24 !important; box-shadow: 0 0 8px 3px rgba(251,191,36,0.6) !important; }
-    .flash-message-info::after,
-    .flash-message-primary::after  { background: #38bdf8 !important; box-shadow: 0 0 8px 3px rgba(56,189,248,0.6) !important; }
-
-    /* Icon: small white circle */
-    .flash-message-icon {
-        width: 26px !important;
-        height: 26px !important;
+    /* Compact icon */
+    .flash-message-icon, .hrd-toast__icon {
+        width: 26px !important; height: 26px !important;
         flex: 0 0 26px !important;
-        font-size: 0.82rem;
-        background: rgba(255,255,255,0.1) !important;
-        color: rgba(255,255,255,0.85) !important;
+        font-size: .8rem;
+        background: rgba(255,255,255,.1) !important;
+        color: rgba(255,255,255,.85) !important;
     }
 
-    /* Hide label — too compact for pill */
-    .flash-message-app { display: none !important; }
-
-    /* White title text */
-    .flash-message-title {
-        color: #E8EBE6 !important;
-        font-size: 0.82rem;
-        font-weight: 700;
+    /* Mobile LED dot */
+    .hrd-toast__dot { width: 7px; height: 7px; animation-name: hrdMobileDot; }
+    @keyframes hrdMobileDot {
+        0%, 100% { opacity: 1; }
+        50%       { opacity: .4; }
     }
 
-    /* Body text hidden on pill */
-    .flash-message-text { display: none !important; }
-
-    /* Close button */
-    .flash-message-banner .btn-close {
-        background-color: rgba(255,255,255,0.08) !important;
-        opacity: 0.4;
-        filter: invert(1) !important;
-        top: 50%;
-        right: 10px;
-        width: 20px;
-        height: 20px;
-        transform: translateY(-50%);
+    /* White title */
+    .flash-message-title, .hrd-toast__title {
+        color: #e2e8f0 !important;
+        font-size: .82rem;
     }
-    .flash-message-banner .btn-close:hover {
-        background-color: rgba(203,161,53,0.22) !important;
-        opacity: 0.9;
-        filter: none !important;
-        transform: translateY(-50%) !important;
+
+    /* Close button on pill */
+    .flash-message-banner .btn-close,
+    .hrd-toast__close {
+        opacity: .45 !important;
+        width: 20px; height: 20px;
     }
 
     /* Collapse-out */
-    .flash-message-banner.fade:not(.show) {
+    .flash-message-banner.fade:not(.show),
+    .hrd-toast.fade:not(.show) {
         opacity: 0 !important;
-        transform: translateX(-50%) scaleX(0.25) scaleY(0.35) translateY(-14px) !important;
-    }
-
-    @keyframes fm-di-pulse {
-        0%, 100% { opacity: 1; }
-        50%       { opacity: 0.45; }
+        transform: scaleX(0.25) scaleY(0.35) translateY(-14px) !important;
     }
 }
+
 
 /* ---------- Admin Mobile Tables ---------- */
 
