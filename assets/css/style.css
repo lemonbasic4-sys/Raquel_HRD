@@ -6331,19 +6331,97 @@ body.has-wizard-footer {
     }
 }
 
-/* ── 8. LAPTOPS & STANDARD DESKTOPS (992px – 1199.98px) ──────────────── */
-@media (min-width: 992px) and (max-width: 1199.98px) {
-    .page-hero {
-        padding: 1.75rem 1.5rem !important;
-        border-radius: 14px !important;
+/* ── 8. LAPTOPS & SMALL MONITORS (992px – 1366.98px) ───────────────── */
+@media (min-width: 992px) and (max-width: 1366.98px) {
+    .main-content {
+        padding: 1.15rem 1.25rem !important;
+        gap: 1rem !important;
     }
 
+    .page-hero {
+        padding: 1.25rem 1.5rem !important;
+        border-radius: 12px !important;
+        margin-bottom: 1.15rem !important;
+    }
+
+    .page-hero h1,
+    .page-hero h2,
+    .page-hero h3,
     .page-hero h4 {
-        font-size: 1.3rem !important;
+        font-size: 1.35rem !important;
+    }
+
+    .page-hero p {
+        font-size: 0.88rem !important;
     }
 
     .stat-pill {
-        padding: 0.6rem 0.8rem !important;
+        padding: 0.5rem 0.75rem !important;
+    }
+
+    .card,
+    .section-card,
+    .pds-card {
+        border-radius: 10px !important;
+    }
+
+    .card-header,
+    .content-card-header {
+        padding: 0.85rem 1.15rem !important;
+    }
+
+    .card-body,
+    .content-card-body,
+    .section-card .card-body {
+        padding: 1rem 1.15rem !important;
+    }
+
+    .stat-card {
+        padding: 0.85rem 1rem !important;
+        border-radius: 10px !important;
+    }
+
+    .stat-card .stat-value,
+    .stat-value {
+        font-size: 1.35rem !important;
+    }
+
+    .stat-card .stat-label,
+    .stat-label {
+        font-size: 0.78rem !important;
+    }
+
+    .table-responsive {
+        margin-bottom: 1rem !important;
+        border-radius: 8px !important;
+    }
+
+    .table-responsive .table {
+        min-width: 100% !important;
+        width: 100% !important;
+    }
+
+    .table-responsive .table th {
+        font-size: 0.78rem !important;
+        padding: 0.5rem 0.65rem !important;
+        letter-spacing: 0.02em !important;
+    }
+
+    .table-responsive .table td {
+        font-size: 0.82rem !important;
+        padding: 0.5rem 0.65rem !important;
+    }
+
+    .table-responsive .btn,
+    .table .btn {
+        padding: 0.25rem 0.55rem !important;
+        font-size: 0.78rem !important;
+        min-height: 30px !important;
+    }
+
+    .badge {
+        font-size: 0.75rem !important;
+        padding: 0.25rem 0.5rem !important;
     }
 
     .employee-bottom-nav,
@@ -6352,11 +6430,17 @@ body.has-wizard-footer {
     }
 }
 
-/* ── 9. LARGE DESKTOPS & WIDESCREEN MONITORS (1200px – 1599.98px) ────── */
-@media (min-width: 1200px) and (max-width: 1599.98px) {
+/* ── 9. LARGE DESKTOPS & FULL HD MONITORS (1367px – 1599.98px) ───────── */
+@media (min-width: 1367px) and (max-width: 1599.98px) {
     .page-hero {
-        padding: 2rem !important;
+        padding: 1.85rem 2rem !important;
         border-radius: 16px !important;
+    }
+
+    .table-responsive .table th,
+    .table-responsive .table td {
+        padding: 0.65rem 0.85rem !important;
+        font-size: 0.88rem !important;
     }
 
     .employee-bottom-nav,

@@ -53,14 +53,19 @@ if (!$review_step) {
 if (!$review_step) {
     redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'This team-member evaluation is not currently assigned to you for review.');
 }
+$eval_status_check = $conn->query("SELECT status FROM evaluations WHERE evaluation_id = $evaluation_id LIMIT 1")->fetch_assoc();
+if (($eval_status_check['status'] ?? '') === 'Approved') {
+    redirectWith(BASE_URL . '/employee/package-member-view.php?package_id=' . $package_id . '&evaluation_id=' . $evaluation_id, 'info', 'This evaluation has already been approved and finalized. It cannot be edited.');
+}
+
 if (!$is_catchup_review && (($review_step['status'] ?? '') === 'Approved and Applied' || isOrganizationPackageLocked($conn, $package_id))) {
     redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'This package is locked after Board approval. Ratings can no longer be adjusted.');
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verifyCsrfToken();
-    if (!$is_catchup_review && isOrganizationPackageLocked($conn, $package_id)) {
-        redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'This package is locked after Board approval. Ratings can no longer be adjusted.');
+    if (($eval_status_check['status'] ?? '') === 'Approved' || (!_is_catchup_review && isOrganizationPackageLocked($conn, $package_id))) {
+        redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'This evaluation is locked and can no longer be edited.');
     }
     $ratings = $_POST['rating'] ?? [];
     $score_stmt = $conn->prepare("SELECT es.score_id, es.score_value, es.supervisor_override_score, ec.criterion_id, ec.criterion_name FROM evaluation_scores es JOIN evaluation_criteria ec ON ec.criterion_id = es.criterion_id WHERE es.evaluation_id = ?");

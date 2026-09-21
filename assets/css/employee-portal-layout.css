@@ -1,16 +1,17 @@
 /**
  * Employee Portal Layout CSS
  * 
- * Mobile-first responsive layout system with horizontal scroll prevention
- * Breakpoint: 768px (mobile vs desktop)
+ * Mobile-first responsive layout system with horizontal scroll prevention and auto-fit scaling
+ * Breakpoints: Mobile (<768px), Tablet/Small Laptop (768px-991px), Small Monitor/Laptop (992px-1366px), Desktop (1367px+)
  */
 
 /* Ensure no horizontal scroll on any screen size */
 .container-fluid {
-  max-width: 100vw;
+  max-width: 100%;
   overflow-x: hidden;
-  padding-left: var(--space-md);
-  padding-right: var(--space-md);
+  padding-left: var(--space-md, 1rem);
+  padding-right: var(--space-md, 1rem);
+  box-sizing: border-box;
 }
 
 /* Prevent content overflow on all screen sizes */
@@ -23,27 +24,99 @@ img {
   height: auto;
 }
 
-/* Mobile-first: single column by default */
+/* Base layout */
 .main-content {
   display: flex;
   flex-direction: column;
-  gap: var(--space-md);
+  gap: var(--space-md, 1rem);
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
 }
 
-/* Tablet and up: sidebar layout */
+/* ── 1. Tablet & Standard Desktop (min-width: 768px) ── */
 @media (min-width: 768px) {
   .main-content {
-    gap: var(--space-lg);
+    gap: var(--space-lg, 1.5rem);
     margin-left: 260px;
-    padding: var(--space-lg);
+    width: calc(100% - 260px);
+    padding: var(--space-lg, 1.5rem);
   }
 }
 
-
-/* Mobile adjustments */
-@media (max-width: 767px) {
+/* ── 2. Small Monitors & Laptops (992px – 1366px) ── */
+@media (min-width: 992px) and (max-width: 1366.98px) {
   .main-content {
-    padding: var(--space-sm);
+    padding: 1.15rem 1.25rem;
+    gap: 1rem;
+  }
+
+  .page-hero {
+    padding: 1.25rem 1.5rem !important;
+    margin-bottom: 1.15rem !important;
+  }
+
+  .page-hero h1,
+  .page-hero h2,
+  .page-hero h3,
+  .page-hero h4 {
+    font-size: 1.35rem !important;
+  }
+
+  .page-hero p {
+    font-size: 0.88rem !important;
+  }
+
+  .content-card-header,
+  .card-header {
+    padding: 0.85rem 1.15rem !important;
+  }
+
+  .content-card-body,
+  .card-body {
+    padding: 1rem 1.15rem !important;
+  }
+
+  .stat-card {
+    padding: 0.85rem 1rem !important;
+  }
+
+  .stat-card .stat-value,
+  .stat-value {
+    font-size: 1.35rem !important;
+  }
+
+  .stat-card .stat-label,
+  .stat-label {
+    font-size: 0.78rem !important;
+  }
+
+  .table-responsive {
+    margin-bottom: 1rem;
+  }
+
+  .table-responsive .table th,
+  .table-responsive .table td {
+    padding: 0.5rem 0.65rem !important;
+    font-size: 0.82rem !important;
+  }
+
+  .table-responsive .btn {
+    padding: 0.25rem 0.5rem !important;
+    font-size: 0.78rem !important;
+  }
+
+  .badge {
+    font-size: 0.75rem !important;
+    padding: 0.25rem 0.5rem !important;
+  }
+}
+
+/* ── 3. Mobile & Small Touch Screens (max-width: 767px) ── */
+@media (max-width: 767.98px) {
+  .main-content {
+    margin-left: 0;
+    padding: var(--space-sm, 0.75rem);
     width: 100%;
     min-width: 0;
   }
@@ -103,3 +176,20 @@ img {
     white-space: normal;
   }
 }
+
+/* ── 4. Global Smooth Table Scrollbars ── */
+.table-responsive::-webkit-scrollbar {
+  height: 5px;
+}
+.table-responsive::-webkit-scrollbar-track {
+  background: #F1F5F9;
+  border-radius: 4px;
+}
+.table-responsive::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 4px;
+}
+.table-responsive::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
+}
+

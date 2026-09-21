@@ -1790,10 +1790,10 @@ require_once '../includes/header.php';
                             <?php
                             // Rating scale definitions (1–4 matching the system's 0.00–4.00 range)
                             $rating_scale = [
-                                1 => ['label' => '1 - Needs Improvement',    'text' => 'Needs Improvement'],
-                                2 => ['label' => '2 - Exceeds Expectations', 'text' => 'Exceeds Expectations'],
-                                3 => ['label' => '3 - Meets Expectations',   'text' => 'Meets Expectations'],
                                 4 => ['label' => '4 - Outstanding',          'text' => 'Outstanding'],
+                                3 => ['label' => '3 - Exceeds Expectations', 'text' => 'Exceeds Expectations'],
+                                2 => ['label' => '2 - Meets Expectations',   'text' => 'Meets Expectations'],
+                                1 => ['label' => '1 - Needs Improvement',    'text' => 'Needs Improvement'],
                             ];
                             ?>
 
@@ -2178,7 +2178,7 @@ require_once '../includes/header.php';
                             <i class="fas fa-clipboard-check d-block"></i>
                             <p class="mb-0">No approvals recorded yet.</p>
                             <div class="small text-muted mt-1">Evaluations you confirm will appear here.</div>
-                        </div>
+                        </div>rating-section
                     <?php else: ?>
                         <div class="d-grid gap-3">
                             <?php foreach ($approvals_given as $appr):

@@ -37,15 +37,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $current_role    = $_SESSION['role'] ?? '';
         $current_emp_id  = (int)($_SESSION['employee_id'] ?? 0);
 
-        $endorser_role = in_array($current_role, ['HR Manager', 'HR Supervisor', 'Admin'], true) ? 'hr_manager' : 'supervisor';
+        // Fetch current member status to determine the appropriate endorser role
+        $m_stmt = $conn->prepare("SELECT member_status FROM evaluation_package_members WHERE package_id = ? AND evaluation_id = ? LIMIT 1");
+        $m_stmt->bind_param('ii', $catchup_pkg_id, $catchup_eval_id);
+        $m_stmt->execute();
+        $m_status = $m_stmt->get_result()->fetch_assoc()['member_status'] ?? '';
+        $m_stmt->close();
 
-        // If not HR and not consolidator, check if they are the current active package reviewer
-        // (e.g. AP Manager, VP, etc.) — allow them to endorse Pending HR Catchup directly
-        if ($endorser_role === 'supervisor') {
+        if ($m_status === 'Pending Supervisor Catchup') {
+            $endorser_role = 'supervisor';
+        } elseif (in_array($current_role, ['HR Manager', 'HR Supervisor', 'Admin'], true)) {
+            $endorser_role = 'hr_manager';
+        } else {
             $is_active_reviewer = (bool) $conn->query("SELECT 1 FROM evaluation_package_route_steps WHERE package_id = $catchup_pkg_id AND reviewer_employee_id = $current_emp_id AND action_status = 'Pending' LIMIT 1")->fetch_assoc();
-            if ($is_active_reviewer) {
-                $endorser_role = 'package_reviewer';
-            }
+            $endorser_role = $is_active_reviewer ? 'package_reviewer' : 'supervisor';
         }
 
         $res = endorseLatePackageMember($conn, $catchup_pkg_id, $catchup_eval_id, $endorser_role, $current_emp_id, $catchup_remarks);
@@ -85,8 +90,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $conn->query("UPDATE evaluations SET status = 'Returned' WHERE evaluation_id = $member_eval_id");
         $conn->query("DELETE FROM evaluation_package_members WHERE package_id = $package_id AND evaluation_id = $member_eval_id");
-        $conn->query("UPDATE evaluation_packages SET status = 'Pending Self-Ratings', current_step_order = NULL WHERE package_id = $package_id");
-        $conn->query("UPDATE evaluation_package_route_steps SET action_status = 'Waiting' WHERE package_id = $package_id AND step_order = 1");
+        $remaining_members = (int)($conn->query("SELECT COUNT(*) AS total FROM evaluation_package_members WHERE package_id = $package_id")->fetch_assoc()['total'] ?? 0);
+        if ($remaining_members > 0) {
+            recalculateOrganizationPackageBehaviorScore($conn, $package_id);
+            $msg = 'Member evaluation returned to employee for revision. Package consolidation remains active with remaining members.';
+        } else {
+            $conn->query("UPDATE evaluation_packages SET status = 'Pending Self-Ratings', current_step_order = NULL WHERE package_id = $package_id");
+            $conn->query("UPDATE evaluation_package_route_steps SET action_status = 'Waiting' WHERE package_id = $package_id AND step_order = 1");
+            $msg = 'Member evaluation returned to employee for revision. Package reset to Pending Self-Ratings.';
+        }
 
         $audit = $conn->prepare("INSERT INTO evaluation_package_audit (package_id, user_id, action, remarks) VALUES (?, ?, 'MEMBER_RETURNED', ?)");
         $audit_remark = 'Returned member evaluation (ID: ' . $member_eval_id . ') to employee for revision.';
@@ -98,67 +110,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($emp_user) {
             createNotification($conn, (int)$emp_user['user_id'], 'Self-Rating Returned for Revision', 'Your standing supervisor returned your self-rating for revision. Remarks: ' . ($comments ?: 'Please review and resubmit.'), BASE_URL . '/employee/self-rating.php?edit=' . $member_eval_id);
         }
-        redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'success', 'Member evaluation returned to employee for revision. Package reset to Pending Self-Ratings.');
+        redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'success', $msg);
     }
 
-    // F7 Action: Consolidator cancels / drops entire package
-    if ($action === 'cancel_package') {
-        if ((int)$step['step_order'] !== 1) {
-            redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'Only the initial consolidator can cancel or drop an evaluation package.');
-        }
 
-        // 1. Fetch affected members FIRST before any DELETE so we can notify them
-        $member_users_rs = $conn->query("
-            SELECT DISTINCT u.user_id, e.evaluation_id,
-                   CONCAT(emp.first_name, ' ', emp.last_name) AS emp_name
-            FROM evaluation_package_members pm
-            JOIN evaluations e ON e.evaluation_id = pm.evaluation_id
-            JOIN employees emp ON emp.employee_id = e.employee_id
-            JOIN users u ON u.employee_id = emp.employee_id
-            WHERE pm.package_id = $package_id
-        ");
-        $member_users = $member_users_rs ? $member_users_rs->fetch_all(MYSQLI_ASSOC) : [];
-
-        // Also fetch supervisor name for the notification message
-        $supervisor_row = $conn->query("SELECT CONCAT(e.first_name, ' ', e.last_name) AS sup_name FROM users u JOIN employees e ON e.employee_id = u.employee_id WHERE u.user_id = $user_id LIMIT 1")->fetch_assoc();
-        $supervisor_name = $supervisor_row ? $supervisor_row['sup_name'] : 'Your supervisor';
-        $drop_reason = $comments ?: 'No reason provided.';
-        $dept_name = $step['department_name'] ?? 'your department';
-
-        // 2. Cancel package and route steps
-        $conn->query("UPDATE evaluation_packages SET status = 'Cancelled', current_step_order = NULL WHERE package_id = $package_id");
-        $conn->query("UPDATE evaluation_package_route_steps SET action_status = 'Cancelled' WHERE package_id = $package_id");
-
-        // 3. Reset all member evaluations back to Pending Self-Rating
-        $conn->query("UPDATE evaluations e JOIN evaluation_package_members pm ON pm.evaluation_id = e.evaluation_id SET e.status = 'Pending Self-Rating', e.submitted_date = NULL WHERE pm.package_id = $package_id");
-        $conn->query("UPDATE evaluations e JOIN employees emp ON emp.employee_id = e.employee_id JOIN evaluation_packages ep ON ep.department_id = emp.department_id AND ep.template_id = e.template_id SET e.status = 'Pending Self-Rating', e.submitted_date = NULL WHERE ep.package_id = $package_id AND e.status IN ('Pending Team Consolidation', 'Submitted', 'Pending Supervisor', 'Pending HR Consolidation')");
-
-        // 4. Remove members from package
-        $conn->query("DELETE FROM evaluation_package_members WHERE package_id = $package_id");
-
-        $audit = $conn->prepare("INSERT INTO evaluation_package_audit (package_id, user_id, action, remarks) VALUES (?, ?, 'CANCELLED', ?)");
-        $audit_remark = 'Consolidator cancelled and dropped evaluation package. Reason: ' . $drop_reason;
-        $audit->bind_param('iis', $package_id, $user_id, $audit_remark);
-        $audit->execute();
-        $audit->close();
-
-        // 5. Notify each affected employee individually
-        foreach ($member_users as $mu) {
-            $notif_title = 'Evaluation Package Dropped — Self-Rating Reset';
-            $notif_body = "Your $dept_name evaluation package has been dropped by $supervisor_name. "
-                . "Your self-rating has been reset to Pending and is open for revision. "
-                . "Reason: $drop_reason";
-            createNotification(
-                $conn,
-                (int)$mu['user_id'],
-                $notif_title,
-                $notif_body,
-                BASE_URL . '/employee/self-rating.php?edit=' . (int)$mu['evaluation_id']
-            );
-        }
-
-        redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'warning', 'Evaluation package dropped. All ' . count($member_users) . ' team member(s) have been notified and their self-ratings reset.');
-    }
 
     // Catch-Up Endorsement: Supervisor -> HR Manager, or HR Manager -> Endorsed
     if ($action === 'endorse_catchup') {
@@ -239,13 +194,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($step['step_type'] === 'Consolidation') {
-        $pkg_summary = getOrganizationPackageSubmissionSummary($conn, $step);
-        $expected = (int) ($pkg_summary['required'] ?? 0);
-        $submitted = (int) ($pkg_summary['submitted'] ?? 0);
-
-        if ($submitted < $expected) {
-            redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', "Consolidation is blocked: $submitted of $expected required team self-ratings are submitted.");
-        }
+        // Recalculate shared behavior score from whoever submitted before the consolidator acts.
+        // Members who have not submitted will follow the late-joiner catch-up path automatically.
         recalculateOrganizationPackageBehaviorScore($conn, $package_id);
     }
 
@@ -376,18 +326,23 @@ $waiting_stmt->execute();
 $waiting_packages = $waiting_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $waiting_stmt->close();
 
-// Catch-Up Members: load based on role
+// Catch-Up Members: load based on role & employee assignments
 $current_employee_id = (int) ($_SESSION['employee_id'] ?? 0);
 $session_role = $_SESSION['role'] ?? '';
 $catchup_supervisor_members = [];
 $catchup_hr_members = [];
 $catchup_reviewer_members = []; // Pending HR Catchup visible to the current active package reviewer
-if (in_array($session_role, ['HR Manager', 'HR Supervisor', 'Admin'], true)) {
-    $catchup_hr_members = getLatePackageMembersForHRManager($conn);
-} elseif ($current_employee_id > 0) {
+
+if ($current_employee_id > 0) {
+    // If the employee is the department consolidator/supervisor for any package with late members
     $catchup_supervisor_members = getLatePackageMembersForSupervisor($conn, $current_employee_id);
     // Also show Pending HR Catchup for packages where this employee is the active reviewer
     $catchup_reviewer_members = getLatePackageMembersForCurrentReviewer($conn, $current_employee_id);
+}
+
+if (in_array($session_role, ['HR Manager', 'HR Supervisor', 'Admin'], true)) {
+    // HR managers/supervisors/admins can also endorse any package at the HR level
+    $catchup_hr_members = getLatePackageMembersForHRManager($conn);
 }
 ?>
 <div class="evaluation-packages">
@@ -429,7 +384,7 @@ if (in_array($session_role, ['HR Manager', 'HR Supervisor', 'Admin'], true)) {
     </section>
 
 
-    <?php if (!$packages && !$waiting_packages && !$catchup_supervisor_members && !$catchup_hr_members): ?>
+    <?php if (!$packages && !$waiting_packages && !$catchup_supervisor_members && !$catchup_hr_members && empty($catchup_reviewer_members)): ?>
         <section class="package-empty">
             <i class="fas fa-layer-group fa-3x text-muted mb-3" style="opacity:0.4;"></i>
             <h2 class="h5 fw-bold">No team package is currently waiting for your review</h2>
@@ -645,7 +600,7 @@ if (in_array($session_role, ['HR Manager', 'HR Supervisor', 'Admin'], true)) {
             FROM evaluation_package_members pm
             JOIN evaluations e ON e.evaluation_id = pm.evaluation_id
             JOIN employees emp ON emp.employee_id = e.employee_id
-            WHERE pm.package_id = ? AND pm.member_status IN ('Normal', 'Catchup Endorsed', 'Catchup Complete')
+            WHERE pm.package_id = ? AND e.status != 'Approved'
             ORDER BY emp.last_name, emp.first_name");
         $members_stmt->bind_param('i', $package['package_id']);
         $members_stmt->execute();
@@ -960,12 +915,7 @@ if (in_array($session_role, ['HR Manager', 'HR Supervisor', 'Admin'], true)) {
                             </button>
                         <?php endif; ?>
 
-                        <?php if ($package['step_type'] === 'Consolidation'): ?>
-                            <!-- F7: Drop / Cancel Package Action for Consolidator -->
-                            <button class="btn btn-outline-secondary px-3 py-2 fw-bold ms-auto" type="submit" onclick="document.getElementById('actionInput-<?php echo (int)$package['package_id']; ?>').value='cancel_package'; return confirm('WARNING: Are you sure you want to cancel and drop this entire evaluation package? This will cancel the evaluation cycle for all members.');" style="min-height:46px; border-radius:8px;">
-                                <i class="fas fa-ban me-1"></i>Cancel / Drop Package
-                            </button>
-                        <?php endif; ?>
+
                     </div>
 
                     <!-- F3: Pre-Submission Summary & Confirmation Modal -->
