@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 $page_title = 'My Performance';
 require_once '../includes/session-check.php';
 checkRole(['Employee']);
@@ -483,11 +483,15 @@ $score_label = $latest_eval['performance_level'] ?? 'N/A';
                     pointHoverRadius: 8,
                     tension: 0.4,
                     fill: true,
+                    clip: false,
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                layout: {
+                    padding: { top: 14, right: 16, bottom: 6, left: 6 }
+                },
                 plugins: {
                     legend: { display: false },
                     tooltip: {
@@ -509,7 +513,7 @@ $score_label = $latest_eval['performance_level'] ?? 'N/A';
                         ticks: { stepSize: 0.5, font: { size: 11 } },
                         grid: { color: '#f0f0f0' },
                     },
-                    x: { ticks: { font: { size: 11 } }, grid: { display: false } }
+                    x: { offset: true, ticks: { font: { size: 11 } }, grid: { display: false } }
                 }
             }
         });

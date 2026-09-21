@@ -2329,7 +2329,7 @@ function ensureOrganizationEvaluationPackageSchema($conn)
             status ENUM('Pending Self-Ratings','Pending Consolidation','Pending Review','Pending Audit Approval','Pending Board Approval','Approved and Applied','Returned','Cancelled') NOT NULL DEFAULT 'Pending Self-Ratings',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            UNIQUE KEY uq_evaluation_package (department_id, template_id, period_start, period_end),
+            INDEX idx_package_dept (department_id),
             INDEX idx_package_status (status, current_step_order),
             CONSTRAINT fk_package_department FOREIGN KEY (department_id) REFERENCES departments(department_id),
             CONSTRAINT fk_package_template FOREIGN KEY (template_id) REFERENCES evaluation_templates(template_id),
@@ -2376,14 +2376,23 @@ function ensureOrganizationEvaluationPackageSchema($conn)
             CONSTRAINT fk_package_audit_package FOREIGN KEY (package_id) REFERENCES evaluation_packages(package_id) ON DELETE CASCADE,
             CONSTRAINT fk_package_audit_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE SET NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-        // Late Member Catch-Up: add member_status and joined_at_step columns to existing installs.
+        // Member status and joined_at_step columns for late-joining tracking.
         try {
             $conn->query("ALTER TABLE evaluation_package_members
-                ADD COLUMN IF NOT EXISTS member_status ENUM('Normal','Pending Supervisor Catchup','Pending HR Catchup','Catchup Endorsed','Catchup Complete') NOT NULL DEFAULT 'Normal',
+                ADD COLUMN IF NOT EXISTS member_status ENUM('Normal','Late Rejoined','Pending Supervisor Catchup','Pending HR Catchup','Catchup Endorsed','Catchup Complete') NOT NULL DEFAULT 'Normal',
                 ADD COLUMN IF NOT EXISTS joined_at_step INT NULL COMMENT 'Package step_order when this member joined (NULL = normal, joined at Step 1 or before)'");
         } catch (mysqli_sql_exception $e) {
             // Column already exists or table unavailable — ignore silently.
         }
+        // Ensure index on department_id exists before dropping uq_evaluation_package (as foreign key requires it)
+        try {
+            $conn->query("ALTER TABLE evaluation_packages ADD INDEX idx_package_dept (department_id)");
+        } catch (mysqli_sql_exception $e) { /* Index may already exist. */ }
+        // Drop the old unique key that prevents multiple packages per dept/template/period
+        // (needed so that late-submission standalone packages can be created after an 'Approved and Applied' package).
+        try {
+            $conn->query("ALTER TABLE evaluation_packages DROP INDEX uq_evaluation_package");
+        } catch (mysqli_sql_exception $e) { /* Already dropped or doesn't exist. */ }
         $ensured = true;
         return true;
     } catch (mysqli_sql_exception $e) {
@@ -2963,10 +2972,31 @@ function getOrganizationPackagePipelineLabel($conn, $package_id)
     return 'Pending ' . $label . ' — ' . $name;
 }
 
-function renderOrganizationPipelineBadge($conn, $package_id, $extra_classes = '')
+function renderOrganizationPipelineBadge($conn, $package_id, $extra_classes = '', $evaluation_id = 0)
 {
     $package_id = (int) $package_id;
     if ($package_id <= 0) return '';
+
+    if ($evaluation_id > 0) {
+        $m_stmt = $conn->prepare("SELECT member_status FROM evaluation_package_members WHERE package_id = ? AND evaluation_id = ? LIMIT 1");
+        if ($m_stmt) {
+            $m_stmt->bind_param('ii', $package_id, $evaluation_id);
+            $m_stmt->execute();
+            $m_row = $m_stmt->get_result()->fetch_assoc();
+            $m_stmt->close();
+            $m_status = $m_row['member_status'] ?? 'Normal';
+            if ($m_status === 'Pending Supervisor Catchup') {
+                return '<span class="pipeline-badge pipeline-badge--waiting ' . e($extra_classes) . '"><i class="fas fa-user-clock me-1"></i>Pending Supervisor Catch-Up Review</span>';
+            }
+            if ($m_status === 'Pending HR Catchup') {
+                return '<span class="pipeline-badge pipeline-badge--pending ' . e($extra_classes) . '"><i class="fas fa-user-shield me-1"></i>Pending HR Catch-Up Review</span>';
+            }
+            if ($m_status === 'Catchup Endorsed') {
+                return '<span class="pipeline-badge pipeline-badge--approved ' . e($extra_classes) . '"><i class="fas fa-check-circle me-1"></i>Catch-Up Endorsed</span>';
+            }
+        }
+    }
+
     $stmt = $conn->prepare("SELECT ep.status, ep.current_step_order, rs.step_label, rs.step_type, rs.action_status, rs.reviewer_user_id, rs.reviewer_employee_id
         FROM evaluation_packages ep
         LEFT JOIN evaluation_package_route_steps rs ON rs.package_id = ep.package_id
@@ -3301,6 +3331,109 @@ function isEmployeeInOrganizationReviewHierarchy($conn, $employee_id)
     return false;
 }
 
+/**
+ * After a standalone late-member package has its last internal (non-Governance) step approved,
+ * check whether a sibling package for the same department/template/period is already in
+ * governance. If so, merge the late member(s) into that main package so governance reviewers
+ * (VP, President, Audit Committee, Board) see the complete team together with a unified
+ * shared behavior score.
+ *
+ * Returns the package_id that the caller should use for further processing:
+ *   - The main/sibling package_id if a merge occurred (the standalone is now Cancelled).
+ *   - The original package_id if no merge was needed.
+ */
+function tryMergeLateMemberPackageIntoSibling($conn, $package_id, $just_approved_step_order)
+{
+    $package_id    = (int) $package_id;
+    $next_order    = $just_approved_step_order + 1;
+
+    // Is the next step a Governance step?
+    $next_step_row = $conn->query("SELECT step_type FROM evaluation_package_route_steps
+        WHERE package_id = $package_id AND step_order = $next_order LIMIT 1")->fetch_assoc();
+    if (!$next_step_row || $next_step_row['step_type'] !== 'Governance') {
+        return $package_id; // Still in internal review — nothing to merge yet.
+    }
+
+    // Get this package's identity.
+    $pkg = $conn->query("SELECT department_id, template_id, period_start, period_end
+        FROM evaluation_packages WHERE package_id = $package_id LIMIT 1")->fetch_assoc();
+    if (!$pkg) return $package_id;
+
+    $dept_id = (int) $pkg['department_id'];
+    $tmpl_id = (int) $pkg['template_id'];
+    $pstart  = $conn->real_escape_string($pkg['period_start']);
+    $pend    = $conn->real_escape_string($pkg['period_end']);
+
+    // Look for a sibling package (same dept/template/period, different package_id)
+    // that is currently in governance (status Pending Review / Pending Audit Approval /
+    // Pending Board Approval) and NOT cancelled or finalized.
+    $sibling = $conn->query("
+        SELECT ep.package_id, ep.status, ep.current_step_order
+        FROM evaluation_packages ep
+        WHERE ep.department_id = $dept_id
+          AND ep.template_id   = $tmpl_id
+          AND ep.period_start  = '$pstart'
+          AND ep.period_end    = '$pend'
+          AND ep.package_id   != $package_id
+          AND ep.status IN ('Pending Review', 'Pending Audit Approval', 'Pending Board Approval')
+        ORDER BY ep.current_step_order DESC
+        LIMIT 1
+    ")->fetch_assoc();
+
+    if (!$sibling) return $package_id; // No eligible sibling — governance will review separately.
+
+    $main_id = (int) $sibling['package_id'];
+
+    // ── Move all members of the standalone package into the main package ──
+    $members_res = $conn->query("SELECT evaluation_id FROM evaluation_package_members WHERE package_id = $package_id");
+    $moved = 0;
+    $main_step = (int) ($sibling['current_step_order'] ?? 1);
+    while ($m = $members_res->fetch_assoc()) {
+        $eval_id = (int) $m['evaluation_id'];
+        $conn->query("INSERT INTO evaluation_package_members
+                (package_id, evaluation_id, member_status, joined_at_step)
+            VALUES ($main_id, $eval_id, 'Late Rejoined', $main_step)
+            ON DUPLICATE KEY UPDATE member_status = 'Late Rejoined', joined_at_step = $main_step");
+        $moved++;
+    }
+    if ($moved === 0) return $package_id; // Nothing to move.
+
+    // ── Recalculate the main package's shared behavior score ──
+    recalculateOrganizationPackageBehaviorScore($conn, $main_id);
+
+    // ── Cancel & skip the now-merged standalone package ──
+    $conn->query("UPDATE evaluation_packages SET status = 'Cancelled' WHERE package_id = $package_id");
+    $conn->query("UPDATE evaluation_package_route_steps
+        SET action_status = 'Skipped'
+        WHERE package_id = $package_id AND action_status IN ('Waiting', 'Pending')");
+
+    // ── Audit trail ──
+    $conn->query("INSERT INTO evaluation_package_audit (package_id, action, remarks)
+        VALUES ($package_id, 'MERGED',
+            'Standalone late-member package merged into Package #$main_id at governance stage. Members transferred; shared behavior score recalculated.')");
+    $conn->query("INSERT INTO evaluation_package_audit (package_id, action, remarks)
+        VALUES ($main_id, 'MEMBER_ADDED',
+            'Late member(s) merged from standalone Package #$package_id after completing all internal review steps. Shared behavior score updated.')");
+
+    // ── Notify the active governance reviewer on the main package ──
+    $pending_step = $conn->query("SELECT reviewer_user_id, reviewer_employee_id, step_label
+        FROM evaluation_package_route_steps
+        WHERE package_id = $main_id AND action_status = 'Pending'
+        ORDER BY step_order LIMIT 1")->fetch_assoc();
+    if ($pending_step) {
+        $rev_uid    = (int) ($pending_step['reviewer_user_id']    ?? 0);
+        $rev_emp_id = (int) ($pending_step['reviewer_employee_id'] ?? 0);
+        $msg = 'A late team member has completed internal review and been added to this package. The shared behavior score has been updated — please review the full team before approving.';
+        if ($rev_uid > 0) {
+            createNotification($conn, $rev_uid, 'Team Package Updated — Late Member Joined', $msg, BASE_URL . '/employee/team-evaluation-packages.php');
+        } elseif ($rev_emp_id > 0) {
+            notifyUsersForEmployee($conn, $rev_emp_id, 'Team Package Updated — Late Member Joined', $msg, BASE_URL . '/employee/team-evaluation-packages.php');
+        }
+    }
+
+    return $main_id;
+}
+
 function syncEvaluationToOrganizationPackage($conn, $evaluation_id)
 {
     if (!ensureOrganizationEvaluationPackageSchema($conn)) return null;
@@ -3364,49 +3497,134 @@ function syncEvaluationToOrganizationPackage($conn, $evaluation_id)
         $package_id = (int) $package['package_id'];
         $consolidator_id = !empty($package['consolidator_employee_id']) ? (int)$package['consolidator_employee_id'] : 0;
     }
-    $member = $conn->prepare('INSERT IGNORE INTO evaluation_package_members (package_id, evaluation_id) VALUES (?, ?)');
-    $member->bind_param('ii', $package_id, $evaluation_id); $member->execute(); $member->close();
-    $emp_fullname = trim(($evaluation['first_name'] ?? '') . ' ' . ($evaluation['last_name'] ?? ''));
-    $emp_job_title = $evaluation['job_title'] ?? '';
-    $tmpl_name = $evaluation['template_name'] ?? 'Evaluation';
 
-    // All members join the package as normal consolidating members
-    recalculateOrganizationPackageBehaviorScore($conn, $package_id);
-
-    // Trigger notification bell to the package consolidator upon member self-rating completion
-    $emp_fullname = trim(($evaluation['first_name'] ?? '') . ' ' . ($evaluation['last_name'] ?? ''));
-    $emp_job_title = $evaluation['job_title'] ?? '';
-    $tmpl_name = $evaluation['template_name'] ?? 'Evaluation';
-    $notif_title = 'Team Member Self-Rating Submitted';
-    $notif_body = $emp_fullname . ($emp_job_title ? ' (' . $emp_job_title . ')' : '') . ' submitted their self-evaluation for ' . $tmpl_name . '.';
-    $notif_link = BASE_URL . '/employee/team-evaluation-packages.php';
-
-    if ($consolidator_id > 0) {
-        notifyUsersForEmployee($conn, $consolidator_id, $notif_title, $notif_body, $notif_link);
-    }
-
-    // Unlock consolidation immediately on the FIRST member submission.
-    $dept_name = $evaluation['department_name'] ?? 'Department';
+    $pkg_info = $conn->query("SELECT status, current_step_order FROM evaluation_packages WHERE package_id = $package_id")->fetch_assoc();
+    $pkg_status = $pkg_info['status'] ?? 'Pending Self-Ratings';
+    $pkg_step = (int)($pkg_info['current_step_order'] ?? 0);
 
     $step1_row = $conn->query("SELECT action_status FROM evaluation_package_route_steps WHERE package_id = $package_id AND step_order = 1 LIMIT 1")->fetch_assoc();
     $step1_status = $step1_row['action_status'] ?? 'Waiting';
 
-    if ($step1_status === 'Waiting') {
-        // First submission for this package — open consolidation immediately.
-        $open = $conn->prepare("UPDATE evaluation_package_route_steps SET action_status = 'Pending' WHERE package_id = ? AND step_order = 1 AND action_status = 'Waiting'");
-        $open->bind_param('i', $package_id); $open->execute(); $open->close();
-        $status_upd = $conn->prepare("UPDATE evaluation_packages SET status = 'Pending Consolidation', current_step_order = 1 WHERE package_id = ? AND status = 'Pending Self-Ratings'");
-        $status_upd->bind_param('i', $package_id); $status_upd->execute(); $status_upd->close();
+    $emp_fullname = trim(($evaluation['first_name'] ?? '') . ' ' . ($evaluation['last_name'] ?? ''));
+    $emp_job_title = $evaluation['job_title'] ?? '';
+    $tmpl_name = $evaluation['template_name'] ?? 'Evaluation';
+    $dept_name = $evaluation['department_name'] ?? 'Department';
+
+    // ── Determine whether this is a "normal" or "late rejoining" submission ──
+    $is_normal = ($pkg_status === 'Pending Self-Ratings')
+               || ($pkg_status === 'Pending Consolidation' && $step1_status === 'Pending');
+    $is_approved_and_applied = ($pkg_status === 'Approved and Applied');
+
+    // ── Step-1 already consolidated/approved? ──────────────────────────────────
+    // If the package has already passed the supervisor's consolidation step (Step 1 = 'Approved'),
+    // the late member must NOT rewind the in-progress package (which would drag already-reviewed
+    // evaluations back to Step 1). Instead, create a brand-new standalone package just like we do
+    // for 'Approved and Applied'.
+    $step1_already_approved = ($step1_status === 'Approved');
+    if ($step1_already_approved && !$is_approved_and_applied) {
+        $is_approved_and_applied = true; // treat identically — spawn a new package
+    }
+
+    if ($is_approved_and_applied) {
+        // ── Package is fully finalized OR has already passed Step 1: create a brand-new standalone package ──
+        $new_consolidator = getOrganizationPackageConsolidator($conn, $department_id);
+        $new_consolidator_id = $new_consolidator ? (int)$new_consolidator['employee_id'] : $consolidator_id;
+        $insert_new = $conn->prepare('INSERT INTO evaluation_packages (department_id, template_id, evaluation_type, period_start, period_end, consolidator_employee_id) VALUES (?, ?, ?, ?, ?, NULLIF(?, 0))');
+        $insert_new->bind_param('iisssi', $department_id, $template_id, $type, $start, $end, $new_consolidator_id);
+        $insert_new->execute();
+        $new_package_id = (int)$insert_new->insert_id;
+        $insert_new->close();
+        if ($new_consolidator_id > 0) createOrganizationPackageRoute($conn, $new_package_id, $new_consolidator_id);
+        // Add the late member to the new package
+        $member = $conn->prepare('INSERT INTO evaluation_package_members (package_id, evaluation_id, member_status, joined_at_step) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE member_status = VALUES(member_status), joined_at_step = VALUES(joined_at_step)');
+        $late_status = 'Normal'; $late_step = 1;
+        $member->bind_param('iisi', $new_package_id, $evaluation_id, $late_status, $late_step);
+        $member->execute(); $member->close();
+        // Open step 1 immediately so consolidation can begin
+        $conn->query("UPDATE evaluation_package_route_steps SET action_status = 'Pending' WHERE package_id = $new_package_id AND step_order = 1 AND action_status = 'Waiting'");
+        $conn->query("UPDATE evaluation_packages SET status = 'Pending Consolidation', current_step_order = 1 WHERE package_id = $new_package_id AND status = 'Pending Self-Ratings'");
+        recalculateOrganizationPackageBehaviorScore($conn, $new_package_id);
+        $audit_new = $conn->prepare("INSERT INTO evaluation_package_audit (package_id, action, remarks) VALUES (?, 'CREATED', ?)");
+        $audit_remark_new = "Late submission by $emp_fullname — standalone package created because the original package had already passed Step 1 consolidation.";
+        $audit_new->bind_param('is', $new_package_id, $audit_remark_new); $audit_new->execute(); $audit_new->close();
+        // Notify the consolidator
+        if ($new_consolidator_id > 0) {
+            notifyUsersForEmployee($conn, $new_consolidator_id,
+                'Late Member Self-Rating — New Package Created',
+                "$emp_fullname submitted their self-rating for $tmpl_name ($dept_name). A new consolidation package has been created for your review (the original package is still progressing through approvals).",
+                BASE_URL . '/employee/team-evaluation-packages.php');
+        }
+        return $new_package_id;
+    }
+
+    if ($is_normal) {
+        // ── Standard path: member joins a package that is still at step 1 ──
+        $member_status = 'Normal';
+        $joined_step   = 1;
+    } else {
+        // ── Late path: package has already advanced past step 1 consolidation.
+        //    Re-open step 1 so the supervisor can review this member through the normal interface.
+        $member_status = 'Late Rejoined';
+        $joined_step   = 1;
+    }
+
+    $member = $conn->prepare('INSERT INTO evaluation_package_members (package_id, evaluation_id, member_status, joined_at_step) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE member_status = VALUES(member_status), joined_at_step = VALUES(joined_at_step)');
+    $member->bind_param('iisi', $package_id, $evaluation_id, $member_status, $joined_step);
+    $member->execute();
+    $member->close();
+
+    // Recalculate shared behavior score now that the new member is included.
+    recalculateOrganizationPackageBehaviorScore($conn, $package_id);
+
+    if (!$is_normal) {
+        // ── Re-open the package to step 1 so the supervisor reviews via the normal consolidation UI ──
+        // Reset all steps above step 1 back to 'Waiting' (they will be re-approved in sequence).
+        $conn->query("UPDATE evaluation_package_route_steps SET action_status = 'Waiting', acted_at = NULL WHERE package_id = $package_id AND step_order > 1");
+        // Reset step 1 to 'Pending' (it may be 'Approved' or 'Waiting').
+        $conn->query("UPDATE evaluation_package_route_steps SET action_status = 'Pending', acted_at = NULL WHERE package_id = $package_id AND step_order = 1");
+        // Revert package status and current_step_order to reflect that consolidation must restart.
+        $conn->query("UPDATE evaluation_packages SET status = 'Pending Consolidation', current_step_order = 1 WHERE package_id = $package_id");
+
+        $audit = $conn->prepare("INSERT INTO evaluation_package_audit (package_id, action, remarks) VALUES (?, 'LATE_MEMBER_REJOINED', ?)");
+        $remark = "Late member $emp_fullname submitted self-rating while package was $pkg_status. Package re-opened to consolidation (Step 1) for supervisor review.";
+        $audit->bind_param('is', $package_id, $remark); $audit->execute(); $audit->close();
+
+        // Notify the consolidator that the package was re-opened for a late member.
+        $notif_title = 'Package Re-Opened — Late Member Submitted Self-Rating';
+        $notif_body  = $emp_fullname . ($emp_job_title ? ' (' . $emp_job_title . ')' : '') .
+            ' submitted their self-evaluation for ' . $tmpl_name . ' after the package had already advanced. ' .
+            'The package has been returned to Step 1 (Consolidation) for your review. Please adjust scores as needed and re-endorse.';
+        if ($consolidator_id > 0) {
+            notifyUsersForEmployee($conn, $consolidator_id, $notif_title, $notif_body, BASE_URL . '/employee/team-evaluation-packages.php');
+        }
         notifyOrganizationPackageStepAssignees($conn, $package_id, 1,
-            'Team Package Consolidation Started',
-            "$emp_fullname ($dept_name) submitted their self-rating for $tmpl_name. Consolidation can begin — other team members can still submit and will be included automatically."
+            'Package Re-Opened for Late Member — Review Required',
+            "$emp_fullname ($dept_name) submitted their self-rating for $tmpl_name. The package has been re-opened to Step 1 for your review. Please include this member and re-endorse."
         );
     } else {
-        // Step 1 already Pending or active — notify consolidator of the new member.
-        notifyOrganizationPackageStepAssignees($conn, $package_id, 1,
-            'New Team Member Self-Rating Submitted',
-            "$emp_fullname ($dept_name) submitted their self-rating for $tmpl_name and has been added to the ongoing consolidation."
-        );
+        // Trigger notification bell to the package consolidator upon member self-rating completion.
+        $notif_title = 'Team Member Self-Rating Submitted';
+        $notif_body  = $emp_fullname . ($emp_job_title ? ' (' . $emp_job_title . ')' : '') . ' submitted their self-evaluation for ' . $tmpl_name . '.';
+        if ($consolidator_id > 0) {
+            notifyUsersForEmployee($conn, $consolidator_id, $notif_title, $notif_body, BASE_URL . '/employee/team-evaluation-packages.php');
+        }
+        if ($step1_status === 'Waiting') {
+            // First submission for this package — open consolidation immediately.
+            $open = $conn->prepare("UPDATE evaluation_package_route_steps SET action_status = 'Pending' WHERE package_id = ? AND step_order = 1 AND action_status = 'Waiting'");
+            $open->bind_param('i', $package_id); $open->execute(); $open->close();
+            $status_upd = $conn->prepare("UPDATE evaluation_packages SET status = 'Pending Consolidation', current_step_order = 1 WHERE package_id = ? AND status = 'Pending Self-Ratings'");
+            $status_upd->bind_param('i', $package_id); $status_upd->execute(); $status_upd->close();
+            notifyOrganizationPackageStepAssignees($conn, $package_id, 1,
+                'Team Package Consolidation Started',
+                "$emp_fullname ($dept_name) submitted their self-rating for $tmpl_name. Consolidation can begin — other team members can still submit and will be included automatically."
+            );
+        } else {
+            // Step 1 already Pending or active — notify consolidator of the new member.
+            notifyOrganizationPackageStepAssignees($conn, $package_id, 1,
+                'New Team Member Self-Rating Submitted',
+                "$emp_fullname ($dept_name) submitted their self-rating for $tmpl_name and has been added to the ongoing consolidation."
+            );
+        }
     }
     return $package_id;
 }
@@ -3459,10 +3677,12 @@ function getOrganizationPackageSubmissionSummary($conn, array $package)
 
 function recalculateOrganizationPackageBehaviorScore($conn, $package_id)
 {
+    // Include all active member statuses: Normal (on-time), Late Rejoined (re-opened for late submission),
+    // and legacy catch-up statuses for backward compatibility.
     $stmt = $conn->prepare("SELECT AVG(ev.behavior_average) AS shared_behavior_score
         FROM evaluation_package_members pm
         JOIN evaluations ev ON ev.evaluation_id = pm.evaluation_id
-        WHERE pm.package_id = ? AND pm.member_status IN ('Normal', 'Catchup Endorsed', 'Catchup Complete')");
+        WHERE pm.package_id = ? AND pm.member_status IN ('Normal', 'Late Rejoined', 'Catchup Endorsed', 'Catchup Complete')");
     $stmt->bind_param('i', $package_id); $stmt->execute();
     $score = (float) ($stmt->get_result()->fetch_assoc()['shared_behavior_score'] ?? 0); $stmt->close();
     $score = round($score, 2);

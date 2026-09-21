@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 $page_title = 'View Employee';
 require_once '../includes/session-check.php';
 checkRole(['HR Supervisor']);
@@ -870,13 +870,20 @@ $heroTenure = $heroHireDate ? (($diff = $heroHireDate->diff(new DateTime()))->y 
                                     tension: 0.35,
                                     pointBackgroundColor: '#294306',
                                     pointRadius: 5,
-                                    pointHoverRadius: 7
+                                    pointHoverRadius: 7,
+                                    clip: false
                                 }]
                             },
                             options: {
                                 responsive: true,
                                 maintainAspectRatio: false,
+                                layout: {
+                                    padding: { top: 14, right: 16, bottom: 6, left: 6 }
+                                },
                                 scales: {
+                                    x: {
+                                        offset: true
+                                    },
                                     y: {
                                         min: 1.0,
                                         max: 4.0,

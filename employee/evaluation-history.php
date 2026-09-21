@@ -235,7 +235,7 @@ require_once '../includes/header.php';
                             </div>
                             <div class="eh-card__badges">
                                 <?php if (!empty($ev['package_id'])): ?>
-                                    <?php echo renderOrganizationPipelineBadge($conn, (int)$ev['package_id']); ?>
+                                    <?php echo renderOrganizationPipelineBadge($conn, (int)$ev['package_id'], '', (int)($ev['evaluation_id'] ?? 0)); ?>
                                 <?php else: ?>
                                     <span class="badge <?php echo $ev['status'] === 'Approved' ? 'bg-success' : 'bg-secondary'; ?>"><?php echo e($ev['status']); ?></span>
                                 <?php endif; ?>

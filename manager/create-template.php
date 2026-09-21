@@ -583,9 +583,7 @@ require_once '../includes/header.php';
                         <h6 class="fw-bold text-dark mb-2"><i class="fas fa-calculator text-primary me-2"></i>Evaluation Score Formula</h6>
                         <p class="small text-muted mb-2">Each KRA item carries a weight % (summing to 100% in Section I). Shared core values ratings are averaged across all Section II items.</p>
                         <div class="p-3 bg-white rounded border font-monospace small text-dark">
-                            <strong>KRA Subtotal</strong> = &Sigma;(KRA Item Weight &times; Rating) &divide; 100<br>
-                            <strong>Shared Core Values Avg</strong> = &Sigma;(Shared Core Values Ratings) &divide; Total Shared Core Values Items<br>
-                            <strong>Final Score</strong> = (KRA Subtotal &times; KRA%) + (Shared Core Values Avg &times; Shared Core Values%)
+                            
                         </div>
                     </div>
                 </div>
@@ -1322,33 +1320,65 @@ function openTemplateStatusModal() {
     const desc = document.querySelector('[name="description"]')?.value || 'No description provided.';
 
     document.getElementById('modalTemplateInfo').innerHTML = `
-        <div class="col-md-6">
-            <div class="text-muted small text-uppercase">Template Name</div>
-            <div class="fw-bold text-dark fs-6">${escAttr(tplName)}</div>
+        <div class="col-12 col-md-6">
+            <div class="p-3 rounded-3 h-100" style="background:#f8fafc; border:1px solid #e2e8f0;">
+                <div class="text-muted small text-uppercase fw-semibold" style="font-size:0.72rem; letter-spacing:0.04em;">
+                    <i class="fas fa-file-lines me-1 text-primary"></i>Template Name
+                </div>
+                <div class="fw-bold text-dark fs-6 mt-1">${escAttr(tplName)}</div>
+            </div>
         </div>
-        <div class="col-md-3">
-            <div class="text-muted small text-uppercase">Evaluation Type</div>
-            <div class="fw-semibold text-dark"><span class="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-1">${escAttr(evalType)}</span></div>
+        <div class="col-6 col-md-3">
+            <div class="p-3 rounded-3 h-100 d-flex flex-column justify-content-between" style="background:#f8fafc; border:1px solid #e2e8f0;">
+                <div class="text-muted small text-uppercase fw-semibold" style="font-size:0.72rem; letter-spacing:0.04em;">
+                    <i class="fas fa-calendar-check me-1 text-primary"></i>Evaluation Type
+                </div>
+                <div class="mt-2">
+                    <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 px-3 py-1 rounded-pill fw-semibold">${escAttr(evalType)}</span>
+                </div>
+            </div>
         </div>
-        <div class="col-md-3">
-            <div class="text-muted small text-uppercase">Target Department</div>
-            <div class="fw-semibold text-dark"><span class="badge bg-info-subtle text-info border border-info-subtle px-3 py-1">${escAttr(targetDept)}</span></div>
+        <div class="col-6 col-md-3">
+            <div class="p-3 rounded-3 h-100 d-flex flex-column justify-content-between" style="background:#f8fafc; border:1px solid #e2e8f0;">
+                <div class="text-muted small text-uppercase fw-semibold" style="font-size:0.72rem; letter-spacing:0.04em;">
+                    <i class="fas fa-building me-1 text-info"></i>Target Department
+                </div>
+                <div class="mt-2">
+                    <span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25 px-3 py-1 rounded-pill fw-semibold">${escAttr(targetDept)}</span>
+                </div>
+            </div>
         </div>
-        <div class="col-md-4">
-            <div class="text-muted small text-uppercase">Form Control Code</div>
-            <div class="fw-semibold text-dark">${escAttr(formCode)}</div>
+        <div class="col-12 col-md-4">
+            <div class="p-3 rounded-3 h-100" style="background:#f8fafc; border:1px solid #e2e8f0;">
+                <div class="text-muted small text-uppercase fw-semibold" style="font-size:0.72rem; letter-spacing:0.04em;">
+                    <i class="fas fa-barcode me-1 text-secondary"></i>Form Control Code
+                </div>
+                <div class="fw-bold text-dark mt-1 font-monospace" style="font-size:0.95rem;">${escAttr(formCode)}</div>
+            </div>
         </div>
-        <div class="col-md-4">
-            <div class="text-muted small text-uppercase">Revision Date</div>
-            <div class="fw-semibold text-dark">${escAttr(revDate)}</div>
+        <div class="col-6 col-md-4">
+            <div class="p-3 rounded-3 h-100" style="background:#f8fafc; border:1px solid #e2e8f0;">
+                <div class="text-muted small text-uppercase fw-semibold" style="font-size:0.72rem; letter-spacing:0.04em;">
+                    <i class="fas fa-clock-rotate-left me-1 text-secondary"></i>Revision Date
+                </div>
+                <div class="fw-bold text-dark mt-1" style="font-size:0.95rem;">${escAttr(revDate)}</div>
+            </div>
         </div>
-        <div class="col-md-4">
-            <div class="text-muted small text-uppercase">Effective Date</div>
-            <div class="fw-semibold text-dark">${escAttr(effDate)}</div>
+        <div class="col-6 col-md-4">
+            <div class="p-3 rounded-3 h-100" style="background:#f8fafc; border:1px solid #e2e8f0;">
+                <div class="text-muted small text-uppercase fw-semibold" style="font-size:0.72rem; letter-spacing:0.04em;">
+                    <i class="fas fa-calendar-days me-1 text-secondary"></i>Effective Date
+                </div>
+                <div class="fw-bold text-dark mt-1" style="font-size:0.95rem;">${escAttr(effDate)}</div>
+            </div>
         </div>
-        <div class="col-12 border-top pt-2 mt-2">
-            <div class="text-muted small text-uppercase">Description</div>
-            <div class="text-secondary small">${escAttr(desc)}</div>
+        <div class="col-12">
+            <div class="p-3 rounded-3" style="background:#f8fafc; border:1px solid #e2e8f0;">
+                <div class="text-muted small text-uppercase fw-semibold mb-1" style="font-size:0.72rem; letter-spacing:0.04em;">
+                    <i class="fas fa-align-left me-1 text-secondary"></i>Description & Scope
+                </div>
+                <div class="text-secondary small" style="line-height:1.5;">${escAttr(desc)}</div>
+            </div>
         </div>
     `;
 

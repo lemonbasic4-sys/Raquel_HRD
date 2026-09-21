@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 $page_title = 'View Employee';
 require_once '../includes/session-check.php';
 checkRole(['HR Staff']);
@@ -544,7 +544,7 @@ $heroTenure = $heroHireDate ? (($diff = $heroHireDate->diff(new DateTime()))->y 
                             </div></div>
                         </div>
                         <script src="<?php echo BASE_URL; ?>/assets/vendor/chartjs/chart.umd.min.js"></script>
-                        <script>document.addEventListener('DOMContentLoaded', function () { const ctx = document.getElementById('empPerformanceTrendChartStaff').getContext('2d'); new Chart(ctx, { type: 'line', data: { labels: <?php echo json_encode($chart_labels); ?>, datasets: [{ label: 'Evaluation Score (1.00 - 4.00)', data: <?php echo json_encode($chart_scores); ?>, borderColor: '#BD9414', backgroundColor: 'rgba(189, 148, 20, 0.15)', borderWidth: 3, fill: true, tension: 0.35, pointBackgroundColor: '#294306', pointRadius: 5, pointHoverRadius: 7 }] }, options: { responsive: true, maintainAspectRatio: false, scales: { y: { min: 1.0, max: 4.0, ticks: { stepSize: 0.5 } } }, plugins: { legend: { display: false } } } }); });</script>
+                        <script>document.addEventListener('DOMContentLoaded', function () { const ctx = document.getElementById('empPerformanceTrendChartStaff').getContext('2d'); new Chart(ctx, { type: 'line', data: { labels: <?php echo json_encode($chart_labels); ?>, datasets: [{ label: 'Evaluation Score (1.00 - 4.00)', data: <?php echo json_encode($chart_scores); ?>, borderColor: '#BD9414', backgroundColor: 'rgba(189, 148, 20, 0.15)', borderWidth: 3, fill: true, tension: 0.35, pointBackgroundColor: '#294306', pointRadius: 5, pointHoverRadius: 7, clip: false }] }, options: { responsive: true, maintainAspectRatio: false, layout: { padding: { top: 14, right: 16, bottom: 6, left: 6 } }, scales: { x: { offset: true }, y: { min: 1.0, max: 4.0, ticks: { stepSize: 0.5 } } }, plugins: { legend: { display: false } } } }); });</script>
                     <?php endif; ?>
                 </div>
             </div>

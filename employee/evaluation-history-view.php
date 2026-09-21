@@ -117,7 +117,7 @@ require_once '../includes/header.php';
             </div>
             <div>
                 <?php if (!empty($evaluation['package_id'])): ?>
-                    <?php echo renderOrganizationPipelineBadge($conn, (int)$evaluation['package_id']); ?>
+                    <?php echo renderOrganizationPipelineBadge($conn, (int)$evaluation['package_id'], '', (int)($evaluation['evaluation_id'] ?? 0)); ?>
                 <?php else: ?>
                     <span class="badge <?php echo $evaluation['status'] === 'Approved' ? 'bg-success' : 'bg-secondary'; ?>">
                         <?php echo e($evaluation['status']); ?>

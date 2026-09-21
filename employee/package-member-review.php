@@ -64,7 +64,7 @@ if (!$is_catchup_review && (($review_step['status'] ?? '') === 'Approved and App
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verifyCsrfToken();
-    if (($eval_status_check['status'] ?? '') === 'Approved' || (!_is_catchup_review && isOrganizationPackageLocked($conn, $package_id))) {
+    if (($eval_status_check['status'] ?? '') === 'Approved' || (!$is_catchup_review && isOrganizationPackageLocked($conn, $package_id))) {
         redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'This evaluation is locked and can no longer be edited.');
     }
     $ratings = $_POST['rating'] ?? [];
