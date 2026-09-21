@@ -121,7 +121,7 @@ $sys_logo = getSetting($conn, 'system_logo', 'assets/img/logo/logo.png');
   <div class="root">
     <div class="track show-ess" id="track">
 
-      <!-- â•â• HRIS SCREEN â•â• -->
+      <!-- ══ HRIS SCREEN ══ -->
       <div class="screen">
         <div class="brand page-hero">
           <div class="cr tl"></div>
@@ -171,7 +171,7 @@ $sys_logo = getSetting($conn, 'system_logo', 'assets/img/logo/logo.png');
         </div>
 
         <div class="form-panel">
-          <!-- â”€â”€ HRIS Login Card â”€â”€ -->
+          <!-- ── HRIS Login Card ── -->
           <div class="form-inner hris" id="hrisCard">
             <p class="eyebrow ey-gold"><i class="ti ti-briefcase" aria-hidden="true"></i> HRIS Portal</p>
             <h2 class="form-title">Welcome Back!</h2>
@@ -222,10 +222,10 @@ $sys_logo = getSetting($conn, 'system_logo', 'assets/img/logo/logo.png');
               Employee Portal Login
             </button>
 
-            <p class="ffoot">Â© <?php echo date('Y'); ?> Raquel Pawnshop. All rights reserved.</p>
+            <p class="ffoot">&copy; <?php echo date('Y'); ?> Raquel Pawnshop. All rights reserved.</p>
           </div>
 
-          <!-- â”€â”€ ESS Login Card â”€â”€ -->
+          <!-- ── ESS Login Card ── -->
           <div class="form-inner essf">
             <p class="eyebrow ey-green"><i class="ti ti-user-circle" aria-hidden="true"></i> Employee Portal</p>
             <h2 class="form-title">Welcome Back!</h2>
@@ -275,7 +275,7 @@ $sys_logo = getSetting($conn, 'system_logo', 'assets/img/logo/logo.png');
               HR Management Login
             </button>
 
-            <p class="ffoot">Â© <?php echo date('Y'); ?> Raquel Pawnshop. All rights reserved.</p>
+            <p class="ffoot">&copy; <?php echo date('Y'); ?> Raquel Pawnshop. All rights reserved.</p>
           </div>
         </div>
       </div><!-- /HRIS screen -->

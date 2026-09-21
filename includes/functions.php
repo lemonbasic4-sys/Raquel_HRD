@@ -96,9 +96,13 @@ function verifyCsrfToken(): void
 
 function e($string)
 {
-
-    return htmlspecialchars($string ?? '', ENT_QUOTES, 'UTF-8');
-
+    if ($string === null || $string === '') {
+        return '';
+    }
+    if (!mb_check_encoding($string, 'UTF-8')) {
+        $string = mb_convert_encoding($string, 'UTF-8', 'UTF-8, ISO-8859-1, Windows-1252');
+    }
+    return htmlspecialchars($string, ENT_QUOTES, 'UTF-8');
 }
 
 

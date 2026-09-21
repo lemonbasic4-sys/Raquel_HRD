@@ -5,7 +5,7 @@ checkRole(['HR Manager']);
 require_once '../includes/functions.php';
 ensureOrganizationEvaluationPackageSchema($conn);
 
-// â”€â”€â”€ Handle Form Submissions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Handle Form Submissions ──────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verifyCsrfToken();
 
@@ -85,7 +85,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $null_dept = is_null($department_id) ? null : $department_id;
 
-    // â”€â”€ Prevent same employee from holding two different corporate governance roles â”€â”€
+    // ── Prevent same employee from holding two different corporate governance roles ──
     $corporate_roles = ['President', 'Audit Committee', 'Board of Directors'];
     if (in_array($type, $corporate_roles, true)) {
         $conflict_chk = $conn->prepare("
@@ -134,7 +134,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     redirectWith(BASE_URL . '/manager/evaluation-governance.php', 'success', 'Routing official assigned and active packages synced.');
 }
 
-// â”€â”€â”€ Handle GET Actions (Disable, Enable, Delete Single) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Handle GET Actions (Disable, Enable, Delete Single) ─────────────────────
 if (isset($_GET['disable']) && is_numeric($_GET['disable'])) {
     $id = (int)$_GET['disable'];
     $stmt = $conn->prepare('UPDATE evaluation_governance_approvers SET is_active = 0 WHERE governance_approver_id = ?');
@@ -162,7 +162,7 @@ if (isset($_GET['delete']) && is_numeric($_GET['delete'])) {
 
 require_once '../includes/header.php';
 
-// â”€â”€â”€ Data Queries â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Data Queries ─────────────────────────────────────────────────────────────
 
 // All active employees for selector with metadata (deduplicated by employee)
 $all_raw_employees = $conn->query("SELECT e.employee_id, e.employee_code,
@@ -230,7 +230,7 @@ foreach ($approvers as $a) {
     if ($a['governance_type'] === 'Division VP' && $a['department_id']) {
         $dept_id = (int)$a['department_id'];
         if (isset($dept_matrix[$dept_id]) && $a['is_active']) {
-            $dept_matrix[$dept_id]['division_vp'] = $a['full_name'] . ' â€” ' . ($a['job_title'] ?: ($a['role'] ?? 'Division VP'));
+            $dept_matrix[$dept_id]['division_vp'] = $a['full_name'] . ' — ' . ($a['job_title'] ?: ($a['role'] ?? 'Division VP'));
         }
     }
 }
@@ -469,7 +469,7 @@ foreach ($approvers as $a) {
             <div>
                 <p class="mb-1 small text-uppercase tracking-wider opacity-75"><i class="fas fa-shield-alt me-1"></i>Approval Flow & Governance Matrix</p>
                 <h1 class="h4 mb-1 fw-bold"><i class="fas fa-route me-2 text-warning"></i>Evaluation Routing & Governance</h1>
-                <p class="mb-0 text-white-50 small">Configure sign-off authorities for each step of evaluation packages: <strong>Consolidation â†’ Manager â†’ Division VP â†’ President & CEO â†’ Audit Committee â†’ Board of Directors (Final Lock).</strong></p>
+                <p class="mb-0 text-white-50 small">Configure sign-off authorities for each step of evaluation packages: <strong>Consolidation ←’ Manager ←’ Division VP ←’ President & CEO ←’ Audit Committee ←’ Board of Directors (Final Lock).</strong></p>
             </div>
             <div class="d-flex flex-wrap gap-2">
                 <button type="button" class="btn btn-secondary rounded-pill shadow-sm px-3 fw-bold opacity-50 text-white" disabled style="cursor: not-allowed;" title="Auto-Detect & Sync Governance is temporarily disabled">
@@ -485,7 +485,7 @@ foreach ($approvers as $a) {
             <li class="nav-item" role="presentation">
                 <button class="nav-link active py-2 px-3 text-start d-flex align-items-center justify-content-between gap-2" id="tab-corp-btn" data-bs-toggle="tab" data-bs-target="#tab-corp" type="button" role="tab" aria-controls="tab-corp" aria-selected="true">
                     <span><i class="fas fa-globe me-2 text-success"></i><strong>Corporate Officials</strong><span class="d-none d-xl-inline text-muted fw-normal small"> (Company-Wide)</span></span>
-                    <span class="badge bg-success-subtle text-success border border-success-subtle ms-1">Steps 5â€“7</span>
+                    <span class="badge bg-success-subtle text-success border border-success-subtle ms-1">Steps 5–7</span>
                 </button>
             </li>
             <li class="nav-item" role="presentation">
@@ -522,7 +522,7 @@ foreach ($approvers as $a) {
                         <h2 class="h5 mb-0 fw-bold"><i class="fas fa-globe me-2 text-success"></i>Corporate Governance Officials (Company-Wide)</h2>
                         <span class="small text-muted">Approval steps 4 to 6 that apply to all departments company-wide</span>
                     </div>
-                    <span class="badge bg-success-subtle text-success border border-success-subtle px-3 py-1">Steps 4â€“6</span>
+                    <span class="badge bg-success-subtle text-success border border-success-subtle px-3 py-1">Steps 4–6</span>
                 </header>
                 <div class="package-card__body p-4">
                     <div class="corp-strip mb-4">
@@ -700,10 +700,10 @@ foreach ($approvers as $a) {
                             </label>
                             <select class="form-select" id="governance-type" name="governance_type" required>
                                 <option value="">-- Select Role --</option>
-                                <optgroup label="â€” Department Level (Step 4) â€”">
+                                <optgroup label="— Department Level (Step 4) —">
                                     <option value="Division VP">Division VP / Executive Sign-off</option>
                                 </optgroup>
-                                <optgroup label="â€” Corporate Governance (Steps 5â€“7) â€”">
+                                <optgroup label="— Corporate Governance (Steps 5–7) —">
                                     <option value="President">Step 5: President &amp; CEO</option>
                                     <option value="Audit Committee">Step 6: Audit Committee</option>
                                     <option value="Board of Directors">Step 7: Board of Directors (Final Lock)</option>
@@ -738,7 +738,7 @@ foreach ($approvers as $a) {
                                     $assignedRole = $assigned_corporate[(int)$user['employee_id']] ?? '';
                                     if ($rankLabel !== $prevRank):
                                         if ($prevRank !== null) echo '</optgroup>';
-                                        echo '<optgroup label="â”€â”€ ' . e($rankLabel) . ' â”€â”€">';
+                                        echo '<optgroup label="── ' . e($rankLabel) . ' ──">';
                                         $prevRank = $rankLabel;
                                     endif;
                                 ?>
@@ -752,9 +752,9 @@ foreach ($approvers as $a) {
                                         data-assigned-role="<?php echo e($assignedRole); ?>"
                                         <?php if ($assignedRole) echo 'data-already="1"'; ?>>
                                         <?php
-                                            echo e($user['full_name'] . ' â€” ' . ($user['job_title'] ?: ($user['role'] ?? 'Official')));
+                                            echo e($user['full_name'] . ' — ' . ($user['job_title'] ?: ($user['role'] ?? 'Official')));
                                             if (!empty($user['department_name'])) echo ' (' . e($user['department_name']) . ')';
-                                            if ($assignedRole) echo ' âš  [' . e($assignedRole) . ']';
+                                            if ($assignedRole) echo ' ⚠ [' . e($assignedRole) . ']';
                                         ?>
                                     </option>
                                 <?php endforeach; if ($prevRank !== null) echo '</optgroup>'; ?>
@@ -908,7 +908,7 @@ foreach ($approvers as $a) {
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    // â”€â”€â”€ Batch Checkbox Toolbar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ─── Batch Checkbox Toolbar ───────────────────────────────────────────
     const selectAll  = document.getElementById('selectAllApprovers');
     const checkboxes = document.querySelectorAll('.approver-checkbox');
     const toolbar    = document.getElementById('batchActionToolbar');

@@ -149,13 +149,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['import_csv'])) {
             continue;
 
         $getV = function ($key, $idx = null) use ($row, $headerMap) {
+            $val = '';
             if (isset($headerMap[$key])) {
-                return trim($row[$headerMap[$key]] ?? '');
+                $val = trim($row[$headerMap[$key]] ?? '');
+            } elseif ($idx !== null) {
+                $val = trim($row[$idx] ?? '');
             }
-            if ($idx !== null) {
-                return trim($row[$idx] ?? '');
+            if ($val !== '') {
+                $val = mb_convert_encoding($val, 'UTF-8', 'UTF-8, ISO-8859-1, Windows-1252');
             }
-            return '';
+            return $val;
         };
 
         $first_name = $getV('First Name', 0);

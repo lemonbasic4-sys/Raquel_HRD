@@ -323,19 +323,19 @@ switch ($effective_role) {
             $_hdr_viewer_hr_role = getEmployeeHRRole($conn, $_hdr_emp_id);
         }
 
-        // â”€â”€ Section 1: My Profile â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ── Section 1: My Profile ───────────────────────────────────────────
         $menu_my_profile = [
             ['icon' => 'fas fa-briefcase', 'label' => 'My Employment', 'url' => BASE_URL . '/employee/my-employment.php', 'page' => 'my-employment.php'],
         ];
 
-        // â”€â”€ Section 2: Evaluations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ── Section 2: Evaluations ──────────────────────────────────────────
         $menu_evaluations = [
             ['icon' => 'fas fa-star',        'label' => 'Self Rating',        'url' => BASE_URL . '/employee/self-rating.php',      'page' => 'self-rating.php',      'badge' => $m_pending_template_count],
             ['icon' => 'fas fa-history',     'label' => 'Evaluation History', 'url' => BASE_URL . '/employee/evaluation-history.php', 'page' => 'evaluation-history.php'],
             ['icon' => 'fas fa-chart-line',  'label' => 'My Performance',     'url' => BASE_URL . '/employee/my-performance.php',   'page' => 'my-performance.php'],
         ];
 
-        // â”€â”€ Section 3: My Team (supervisors/managers & assigned package reviewers) â”€â”€
+        // ── Section 3: My Team (supervisors/managers & assigned package reviewers) ──
         $m_pending_pkg_count = countPendingOrganizationPackagesForUser($conn, (int)($_SESSION['user_id'] ?? 0));
         $menu_my_team = [];
         $is_hr_personnel = (strcasecmp($_hdr_emp_dept ?? '', 'Human Resources') === 0) 
@@ -347,11 +347,11 @@ switch ($effective_role) {
             $menu_my_team[] = ['icon' => 'fas fa-history',     'label' => 'Team Evaluation History',  'url' => BASE_URL . '/employee/team-evaluation-history.php', 'page' => 'team-evaluation-history.php'];
         }
 
-        // â”€â”€ Section 4: Career (rank-based) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ── Section 4: Career (rank-based) ─────────────────────────────────
         $menu_career = [];
         // Branch Manager (rank 3): can approve/reject Transfer requests from their branch
         if ($_hdr_emp_rank === 3) {
-            // Count pending BM approvals for badge â€” guarded in case schema migration hasn't run yet
+            // Count pending BM approvals for badge — guarded in case schema migration hasn't run yet
             $_hdr_bm_pending = 0;
             if ($_hdr_emp_branch_id > 0) {
                 try {
@@ -365,14 +365,14 @@ switch ($effective_role) {
                     $_hdr_bm_pending = (int)($_hdr_bm_stmt->get_result()->fetch_assoc()['cnt'] ?? 0);
                     $_hdr_bm_stmt->close();
                 } catch (mysqli_sql_exception $e) {
-                    // Column not yet migrated â€” badge shows 0
+                    // Column not yet migrated — badge shows 0
                     $_hdr_bm_pending = 0;
                 }
             }
             $menu_career[] = ['icon' => 'fas fa-clipboard-check', 'label' => 'Transfer Approvals', 'url' => BASE_URL . '/employee/branch-manager-approvals.php', 'page' => 'branch-manager-approvals.php', 'badge' => $_hdr_bm_pending];
         }
 
-        // â”€â”€ Build sidebar with grouped sections â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ── Build sidebar with grouped sections ─────────────────────────────
         $sidebar_menus = [
             'MAIN' => [
                 ['icon' => 'fas fa-tachometer-alt', 'label' => 'Dashboard', 'url' => BASE_URL . '/employee/dashboard.php', 'page' => 'dashboard.php'],
@@ -419,11 +419,11 @@ switch ($effective_role) {
     <link href="<?php echo BASE_URL; ?>/assets/vendor/fonts/fonts.css" rel="stylesheet">
     <link href="<?php echo BASE_URL; ?>/assets/css/style.css?v=<?php echo time(); ?>" rel="stylesheet">
     <?php if (in_array($effective_role, ['HR Manager', 'HR Supervisor', 'HR Staff', 'Admin'])): ?>
-    <!-- HR Department Mobile View â€” exclusive CSS for HR roles on mobile -->
+    <!-- HR Department Mobile View — exclusive CSS for HR roles on mobile -->
     <link href="<?php echo BASE_URL; ?>/assets/css/hr-department-mobile.css?v=<?php echo time(); ?>" rel="stylesheet">
     <?php endif; ?>
     <?php if ($effective_role === 'Employee'): ?>
-    <!-- Employee Portal UX Revamp CSS â€” loaded for Employee role only -->
+    <!-- Employee Portal UX Revamp CSS — loaded for Employee role only -->
     <!-- Critical CSS inlined for above-the-fold render speed (Task 24.4) -->
     <style>
     *,*::before,*::after{box-sizing:border-box;max-width:100%;}
@@ -444,7 +444,7 @@ switch ($effective_role) {
     <link href="<?php echo BASE_URL; ?>/assets/css/employee-portal-progress.css?v=<?php echo time(); ?>" rel="stylesheet">
     <link href="<?php echo BASE_URL; ?>/assets/css/employee-portal-notifications.css?v=<?php echo time(); ?>" rel="stylesheet">
     <?php endif; ?>
-    <!-- Feedback & Sound Effects System CSS â€” loaded for all roles -->
+    <!-- Feedback & Sound Effects System CSS — loaded for all roles -->
     <link href="<?php echo BASE_URL; ?>/assets/css/employee-portal-feedback.css?v=<?php echo time(); ?>" rel="stylesheet">
     <link href="<?php echo BASE_URL; ?>/assets/css/evaluation-packages.css?v=<?php echo time(); ?>" rel="stylesheet">
 
@@ -608,7 +608,7 @@ switch ($effective_role) {
             <?php if ($effective_role === 'Employee'): ?>
                 <small>Your HRIS Employee Portal</small>
             <?php else: ?>
-                <small>HRIS â€¢ <?php echo e($effective_role); ?></small>
+                <small>HRIS &bull; <?php echo e($effective_role); ?></small>
             <?php endif; ?>
         </div>
 
@@ -827,7 +827,7 @@ switch ($effective_role) {
                         ?>
                         <?php endif; ?>
                         <?php
-                        // Confirm Rating â€” for immediate heads outside HR department
+                        // Confirm Rating — for immediate heads outside HR department
                         $_g_is_sup = false;
                         $_g_dept_name = '';
                         if ($_g_emp_id > 0 && $conn) {
@@ -906,8 +906,8 @@ switch ($effective_role) {
         <?php
         // Always consume the flash session to prevent it leaking to the next page.
         // Suppress the visual banner on pages that have their own inline feedback:
-        //   - employee-accounts.php  â†’ Portal Accounts (uses credential slip modal)
-        //   - users.php              â†’ User Management (has its own inline alerts)
+        //   - employee-accounts.php  -> Portal Accounts (uses credential slip modal)
+        //   - users.php              -> User Management (has its own inline alerts)
         $suppress_flash_pages = ['employee-accounts.php', 'users.php'];
         if (isset($_SESSION['flash_message'])) {
             if (!in_array($current_page, $suppress_flash_pages, true)) {

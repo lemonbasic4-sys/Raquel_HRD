@@ -179,7 +179,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $row_map = [];
                             foreach ($headers as $col_index => $header) {
                                 $key = strtolower(trim((string) $header));
-                                $row_map[$key] = $row[$col_index] ?? '';
+                                $val = $row[$col_index] ?? '';
+                                $row_map[$key] = mb_convert_encoding((string)$val, 'UTF-8', 'UTF-8, ISO-8859-1, Windows-1252');
                             }
 
                             $entry = [

@@ -6,7 +6,7 @@ require_once '../includes/functions.php';
 
 $employee_id = (int)($_SESSION['employee_id'] ?? 0);
 
-// â”€â”€ Employee core info â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Employee core info ───────────────────────────────────────────────────────
 $emp_stmt = $conn->prepare("
     SELECT e.employee_id, e.first_name, e.last_name, e.job_title,
            e.profile_picture, e.hire_date, e.employment_status,
@@ -28,7 +28,7 @@ if (!empty($emp['hire_date'])) {
     $years_of_service = $diff->y;
 }
 
-// â”€â”€ Quick stats for PHP-rendered hero (latest approved) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Quick stats for PHP-rendered hero (latest approved) ─────────────────────
 $latest_stmt = $conn->prepare("
     SELECT total_score, performance_level, approved_date,
            YEAR(evaluation_period_end) AS eval_year
@@ -48,7 +48,7 @@ require_once '../includes/header.php';
 ?>
 
 <style>
-/* â”€â”€ My Performance â€” brand-matched styles â”€â”€ */
+/* ── My Performance — brand-matched styles ── */
 .score-ring           { width:110px; height:110px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-direction:column; font-weight:800; position:relative; }
 .score-ring-outstanding   { background: rgba(203,161,53,.18); border: 3px solid #CBA135; }
 .score-ring-exceeds       { background: rgba(22,163,74,.18);  border: 3px solid #16a34a; }
@@ -181,7 +181,7 @@ require_once '../includes/header.php';
 </style>
 
 <?php
-// â”€â”€ Hero score ring class â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Hero score ring class ────────────────────────────────────────────────────
 $score_val = $latest_eval ? (float)$latest_eval['total_score'] : 0;
 $ring_class = 'score-ring-needs';
 if ($score_val >= 3.60)      $ring_class = 'score-ring-outstanding';
@@ -190,7 +190,7 @@ elseif ($score_val >= 2.00)  $ring_class = 'score-ring-meets';
 $score_label = $latest_eval['performance_level'] ?? 'N/A';
 ?>
 
-<!-- â•â• PAGE HERO â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+<!-- ══ PAGE HERO ══════════════════════════════════════════════════════════════ -->
 <div class="page-hero fadeup mb-4">
     <div class="row align-items-center g-3">
         <div class="col-auto">
@@ -216,7 +216,7 @@ $score_label = $latest_eval['performance_level'] ?? 'N/A';
         </div>
 
         <div class="col">
-            <div style="font-size:.72rem;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,.55);">Employee Portal Â· My Performance</div>
+            <div style="font-size:.72rem;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,.55);">Employee Portal · My Performance</div>
             <h4 class="text-white fw-bold mb-0 mt-1"><?php echo e(($emp['first_name'] ?? '') . ' ' . ($emp['last_name'] ?? '')); ?></h4>
             <div class="text-white-50 small mt-1">
                 <?php echo e($emp['job_title'] ?? 'N/A'); ?> &bull;
@@ -254,7 +254,7 @@ $score_label = $latest_eval['performance_level'] ?? 'N/A';
         </div>
         <div class="col-6 col-md-3">
             <div class="stat-pill">
-                <div class="fw-bold text-white" style="font-size:1.2rem;" id="hero-avg-score">â€”</div>
+                <div class="fw-bold text-white" style="font-size:1.2rem;" id="hero-avg-score">—</div>
                 <div style="font-size:.7rem;color:rgba(255,255,255,.6);">Avg Score (All Time)</div>
             </div>
         </div>
@@ -277,7 +277,7 @@ $score_label = $latest_eval['performance_level'] ?? 'N/A';
 <div id="perfContent" style="display:none;">
     <div class="row g-4">
 
-        <!-- â”€â”€ LEFT COLUMN â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
+        <!-- ── LEFT COLUMN ──────────────────────────────────────────────── -->
         <div class="col-lg-8">
 
             <!-- Trend Chart -->
@@ -308,7 +308,7 @@ $score_label = $latest_eval['performance_level'] ?? 'N/A';
 
         </div>
 
-        <!-- â”€â”€ RIGHT COLUMN â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
+        <!-- ── RIGHT COLUMN ─────────────────────────────────────────────── -->
         <div class="col-lg-4">
 
             <!-- Career Readiness -->
@@ -318,7 +318,7 @@ $score_label = $latest_eval['performance_level'] ?? 'N/A';
                     <div class="text-muted mb-3" style="font-size:.75rem;">Based on evaluation scores, tenure & history</div>
                     <div class="d-flex align-items-center justify-content-between mb-2">
                         <span class="fw-bold" style="font-size:.85rem;" id="readinessLabel">Calculating...</span>
-                        <span class="fw-bold text-primary" id="readinessPct">â€”</span>
+                        <span class="fw-bold text-primary" id="readinessPct">—</span>
                     </div>
                     <div class="bg-light rounded-pill mb-3" style="height:14px;overflow:hidden;">
                         <div id="readinessBar" class="readiness-bar bg-success" style="width:0%;transition:width 1s ease;"></div>
@@ -368,7 +368,7 @@ $score_label = $latest_eval['performance_level'] ?? 'N/A';
 (function () {
     const BASE = '<?php echo BASE_URL; ?>';
 
-    // â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Helpers ────────────────────────────────────────────────────────────
     function scoreClass(s) {
         if (s >= 3.60) return 'outstanding';
         if (s >= 2.60) return 'exceeds';
@@ -386,24 +386,24 @@ $score_label = $latest_eval['performance_level'] ?? 'N/A';
         return `<span class="badge px-2 py-1 ${map[cls]}" style="font-size:.72rem;">${escHtml(label || s.toFixed(2))}</span>`;
     }
     function escHtml(s) {
-        if (!s) return 'â€”';
+        if (!s) return '—';
         return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
     function fmtDate(d) {
-        if (!d) return 'â€”';
+        if (!d) return '—';
         try { return new Date(d).toLocaleDateString('en-PH', {year:'numeric',month:'short',day:'numeric'}); } catch(e){return d;}
     }
     function fmtPeriod(start, end) {
-        if (!start && !end) return 'â€”';
+        if (!start && !end) return '—';
         if (!start) return fmtDate(end);
         try {
             const s = new Date(start).toLocaleDateString('en-PH', {month:'short', year:'numeric'});
             const e = new Date(end).toLocaleDateString('en-PH', {month:'short', year:'numeric'});
-            return `${s} â€“ ${e}`;
+            return `${s} – ${e}`;
         } catch(ex) { return end || start; }
     }
 
-    // â”€â”€ Fetch â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Fetch ──────────────────────────────────────────────────────────────
     fetch(`${BASE}/employee/ajax/get-my-performance.php`)
         .then(r => r.json())
         .then(data => {
@@ -416,22 +416,22 @@ $score_label = $latest_eval['performance_level'] ?? 'N/A';
 
             document.getElementById('perfContent').style.display = 'block';
 
-            // â”€â”€ Hero pills â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            // ── Hero pills ───────────────────────────────────────────────
             document.getElementById('hero-avg-score').textContent = data.avg_score
-                ? data.avg_score.toFixed(2) : 'â€”';
+                ? data.avg_score.toFixed(2) : '—';
 
             const trendMap = {
-                consistently_outstanding: { label: 'â­ Consistently Outstanding', bg: 'linear-gradient(90deg,#CBA135,#a07a1a)', color: '#fff' },
-                improving:               { label: 'â†‘ Improving',  bg: '#dcfce7', color: '#14532d' },
-                stable:                  { label: 'â†’ Stable',     bg: '#e2e3e5', color: '#41464b' },
-                declining:               { label: 'â†“ Declining',  bg: '#fee2e2', color: '#7f1d1d' },
+                consistently_outstanding: { label: '⭐ Consistently Outstanding', bg: 'linear-gradient(90deg,#CBA135,#a07a1a)', color: '#fff' },
+                improving:               { label: '←‘ Improving',  bg: '#dcfce7', color: '#14532d' },
+                stable:                  { label: '←’ Stable',     bg: '#e2e3e5', color: '#41464b' },
+                declining:               { label: '←“ Declining',  bg: '#fee2e2', color: '#7f1d1d' },
             };
             const tr = trendMap[data.trend] || trendMap['stable'];
             const trendPill = document.getElementById('hero-trend-badge');
             trendPill.textContent = tr.label;
             trendPill.style.cssText = `background:${tr.bg};color:${tr.color};padding:.3rem .75rem;border-radius:.5rem;`;
 
-            // â”€â”€ Trend chart â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            // ── Trend chart ──────────────────────────────────────────────
             renderChart(data.chart_labels, data.chart_scores);
 
             // Trend class badge
@@ -439,16 +439,16 @@ $score_label = $latest_eval['performance_level'] ?? 'N/A';
             tcb.textContent = tr.label;
             tcb.style.cssText = `background:${tr.bg};color:${tr.color};`;
 
-            // â”€â”€ Evaluation history table â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            // ── Evaluation history table ─────────────────────────────────
             renderHistory(data.evaluations);
 
-            // â”€â”€ Career readiness â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            // ── Career readiness ─────────────────────────────────────────
             renderReadiness(data.readiness);
 
-            // â”€â”€ Goal tracking â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            // ── Goal tracking ─────────────────────────────────────────────
             renderGoal(data.avg_score, data.next_level, data.points_needed);
 
-            // â”€â”€ Feedback â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            // ── Feedback ─────────────────────────────────────────────────
             renderFeedback(data.latest_eval);
         })
         .catch(() => {
@@ -456,7 +456,7 @@ $score_label = $latest_eval['performance_level'] ?? 'N/A';
             document.getElementById('perfEmptyState').style.display = 'block';
         });
 
-    // â”€â”€ Chart â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Chart ─────────────────────────────────────────────────────────────
     function renderChart(labels, scores) {
         if (!labels || labels.length === 0) return;
         const ctx = document.getElementById('perfTrendChart').getContext('2d');
@@ -515,7 +515,7 @@ $score_label = $latest_eval['performance_level'] ?? 'N/A';
         });
     }
 
-    // â”€â”€ History table â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── History table ─────────────────────────────────────────────────────
     function renderHistory(evals) {
         if (!evals || evals.length === 0) {
             document.getElementById('evalHistoryContainer').innerHTML =
@@ -528,7 +528,7 @@ $score_label = $latest_eval['performance_level'] ?? 'N/A';
             const badgeHtml = scoreBadgeHtml(s, ev.performance_level || s.toFixed(2));
             const shortComments = ev.supervisor_comments
                 ? escHtml(ev.supervisor_comments.substring(0, 60)) + (ev.supervisor_comments.length > 60 ? '...' : '')
-                : '<span class="opacity-50">â€”</span>';
+                : '<span class="opacity-50">—</span>';
             return `
                 <tr>
                     <td class="small">${escHtml(fmtPeriod(ev.evaluation_period_start, ev.evaluation_period_end))}</td>
@@ -583,7 +583,7 @@ $score_label = $latest_eval['performance_level'] ?? 'N/A';
             </div>`;
     }
 
-    // â”€â”€ Readiness â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Readiness ─────────────────────────────────────────────────────────
     function renderReadiness(pct) {
         const bar   = document.getElementById('readinessBar');
         const label = document.getElementById('readinessLabel');
@@ -602,12 +602,12 @@ $score_label = $latest_eval['performance_level'] ?? 'N/A';
         bar.style.background = barColor;
 
         bkEl.innerHTML = `
-            <div class="d-flex justify-content-between"><span>Evaluation Score (60%)</span><span id="r-eval">â€”</span></div>
-            <div class="d-flex justify-content-between"><span>Years of Service (25%)</span><span id="r-svc">â€”</span></div>
-            <div class="d-flex justify-content-between"><span>Evaluation History (15%)</span><span id="r-hist">â€”</span></div>`;
+            <div class="d-flex justify-content-between"><span>Evaluation Score (60%)</span><span id="r-eval">—</span></div>
+            <div class="d-flex justify-content-between"><span>Years of Service (25%)</span><span id="r-svc">—</span></div>
+            <div class="d-flex justify-content-between"><span>Evaluation History (15%)</span><span id="r-hist">—</span></div>`;
     }
 
-    // â”€â”€ Goal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Goal ──────────────────────────────────────────────────────────────
     function renderGoal(avgScore, nextLevel, pointsNeeded) {
         const el = document.getElementById('goalTrackingContent');
         if (!avgScore) { el.innerHTML = '<div class="text-muted small text-center py-3">No data yet.</div>'; return; }
@@ -619,7 +619,7 @@ $score_label = $latest_eval['performance_level'] ?? 'N/A';
             { label: 'Outstanding',        min: 3.60, max: 4.00, color: '#082E06' },
         ];
 
-        // Full 1â€“4 progress bar
+        // Full 1–4 progress bar
         const totalRange = 3.0;
         const pct = Math.min(((avgScore - 1.0) / totalRange) * 100, 100);
 
@@ -657,7 +657,7 @@ $score_label = $latest_eval['performance_level'] ?? 'N/A';
         }, 200);
     }
 
-    // â”€â”€ Feedback â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Feedback ──────────────────────────────────────────────────────────
     function renderFeedback(latestEval) {
         const el = document.getElementById('feedbackContent');
         if (!latestEval) {

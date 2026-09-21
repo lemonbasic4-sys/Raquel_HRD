@@ -308,7 +308,7 @@ if (in_array($_ft_role, ['HR Manager', 'HR Supervisor', 'HR Staff', 'Admin'])):
 
 <script src="<?php echo BASE_URL; ?>/assets/vendor/bootstrap/bootstrap.bundle.min.js"></script>
 <script>
-// â”€â”€ Sidebar tooltip activation (collapsed sidebar icon labels for elderly users) â”€â”€
+// ── Sidebar tooltip activation (collapsed sidebar icon labels for elderly users) ──
 (function initSidebarTooltips() {
     function activateTooltips() {
         // Activate all elements with title="" in the sidebar nav (works even on collapsed mode)
@@ -346,16 +346,16 @@ if (in_array($_ft_role, ['HR Manager', 'HR Supervisor', 'HR Staff', 'Admin'])):
 <script src="<?php echo BASE_URL; ?>/assets/js/zebra-stripe.js?v=<?php echo time(); ?>"></script>
 <script src="<?php echo BASE_URL; ?>/assets/js/main.js?v=<?php echo time(); ?>"></script>
 <?php if (isset($_SESSION['role'])): ?>
-<!-- Global Sound Effects & UX Feedback System â€” loaded for all HRIS & Admin roles -->
+<!-- Global Sound Effects & UX Feedback System — loaded for all HRIS & Admin roles -->
 <script src="<?php echo BASE_URL; ?>/assets/js/employee-portal-feedback.js?v=<?php echo time(); ?>" defer></script>
 <?php endif; ?>
 <?php if (isset($_SESSION['role']) && $_SESSION['role'] === 'Employee'): ?>
-<!-- Employee Portal UX JS utilities â€” deferred for performance -->
+<!-- Employee Portal UX JS utilities — deferred for performance -->
 <script src="<?php echo BASE_URL; ?>/assets/js/auto-save.js?v=<?php echo time(); ?>" defer></script>
 <script src="<?php echo BASE_URL; ?>/assets/js/form-validation.js?v=<?php echo time(); ?>" defer></script>
 <?php endif; ?>
 <?php if (in_array($_SESSION['role'] ?? '', ['HR Manager', 'HR Supervisor', 'HR Staff', 'Admin'])): ?>
-<!-- HR Department Mobile View JS â€” exclusive to HR roles -->
+<!-- HR Department Mobile View JS — exclusive to HR roles -->
 <script src="<?php echo BASE_URL; ?>/assets/js/hr-department-mobile.js?v=<?php echo time(); ?>" defer></script>
 <?php endif; ?>
 </body>
@@ -367,7 +367,7 @@ if (in_array($_ft_role, ['HR Manager', 'HR Supervisor', 'HR Staff', 'Admin'])):
     var csrfToken = csrfMeta.getAttribute('content');
     if (!csrfToken) return;
 
-    // Patch native fetch â€” auto-add header on non-GET requests
+    // Patch native fetch — auto-add header on non-GET requests
     var _origFetch = window.fetch;
     window.fetch = function (url, opts) {
         opts = opts || {};
