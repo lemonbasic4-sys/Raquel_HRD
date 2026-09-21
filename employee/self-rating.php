@@ -1803,7 +1803,7 @@ require_once '../includes/header.php';
                                     <i class="fas fa-bullseye me-2" aria-hidden="true"></i>KRA Self Rating
                                 </h2>
 
-                                <?php foreach ($criteria_kra as $criterion): ?>
+                                <?php foreach ($criteria_kra as $index => $criterion): ?>
                                     <?php
                                     $cid      = (int) $criterion['criterion_id'];
                                     $saved    = isset($edit_scores[$cid]) && $edit_scores[$cid] > 0
@@ -1814,6 +1814,7 @@ require_once '../includes/header.php';
                                     <div class="rating-item">
                                         <div class="rating-header">
                                             <h3 class="rating-title">
+                                                <?php echo ($index + 1) . '. '; ?>
                                                 <?php echo e($criterion['criterion_name']); ?>
                                                 <span class="badge bg-secondary ms-2" style="font-size:0.75rem;font-weight:600;">
                                                     Weight: <?php echo e($criterion['weight']); ?>%
@@ -1857,7 +1858,7 @@ require_once '../includes/header.php';
                                     <i class="fas fa-heart me-2" aria-hidden="true"></i>Behavior Self Rating
                                 </h2>
 
-                                <?php foreach ($criteria_behavior as $criterion): ?>
+                                <?php foreach ($criteria_behavior as $index => $criterion): ?>
                                     <?php
                                     $cid      = (int) $criterion['criterion_id'];
                                     $saved    = isset($edit_scores[$cid]) && $edit_scores[$cid] > 0
@@ -1867,7 +1868,10 @@ require_once '../includes/header.php';
                                     ?>
                                     <div class="rating-item">
                                         <div class="rating-header">
-                                            <h3 class="rating-title"><?php echo e($criterion['criterion_name']); ?></h3>
+                                            <h3 class="rating-title">
+                                                <?php echo ($index + 1) . '. '; ?>
+                                                <?php echo e($criterion['criterion_name']); ?>
+                                            </h3>
                                             <?php if (!empty($criterion['description'])): ?>
                                                 <p class="rating-description"><?php echo e($criterion['description']); ?></p>
                                             <?php endif; ?>
