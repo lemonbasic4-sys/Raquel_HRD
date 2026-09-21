@@ -59,6 +59,9 @@ $adminCheck->close();
 // Reconstruct flattened array for UI compatibility
 $emp['email'] = $emp['personal_email'];
 $emp['contact_number'] = $emp['mobile_number'];
+if (empty($emp['citizenship'])) {
+    $emp['citizenship'] = 'Filipino';
+}
 
 $res_addr = $conn->query("SELECT * FROM employee_addresses WHERE employee_id=$eid AND address_type='Residential'")->fetch_assoc();
 $perm_addr = $conn->query("SELECT * FROM employee_addresses WHERE employee_id=$eid AND address_type='Permanent'")->fetch_assoc();
@@ -714,10 +717,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'pagibig_number' => $pagibig_number,
             'tin_number' => $tin_number,
             'telephone_number' => $telephone_number,
-            'mobile_number' => $mobile_number,
-            'personal_email' => $personal_email,
-            'email' => $personal_email,
-            'contact_number' => $mobile_number,
+            'mobile_number' => $contact_number,
+            'personal_email' => $email,
             'hire_date' => $hire_date,
             'job_title' => $job_title,
             'department_id' => $department_id,

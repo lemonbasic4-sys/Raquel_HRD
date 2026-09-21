@@ -5733,8 +5733,6 @@ function logEmployeeProfileEdit($conn, int $employee_id, int $editor_user_id, ?i
         'telephone_number'     => 'Telephone No.',
         'mobile_number'        => 'Mobile No.',
         'personal_email'       => 'Personal Email',
-        'email'                => 'Email Address',
-        'contact_number'       => 'Contact Number',
         'hire_date'            => 'Engagement / Hire Date',
         'job_title'            => 'Job Title',
         'department_id'        => 'Department',
@@ -5744,6 +5742,8 @@ function logEmployeeProfileEdit($conn, int $employee_id, int $editor_user_id, ?i
         'employment_type'      => 'Employment Type',
         'contract_start_date'  => 'Contract Start Date',
         'contract_end_date'    => 'Contract End Date',
+        'separation_date'      => 'Separation Date',
+        'separation_remarks'   => 'Separation Remarks',
         'profile_picture'      => 'Profile Picture',
         'res_street'           => 'Residential Street',
         'res_barangay'         => 'Residential Barangay',
@@ -5807,6 +5807,23 @@ function logEmployeeProfileEdit($conn, int $employee_id, int $editor_user_id, ?i
         $old_val = isset($old_data[$f_key]) ? trim((string)$old_data[$f_key]) : '';
         $new_val = isset($new_data[$f_key]) ? trim((string)$new_data[$f_key]) : '';
 
+        // Normalize numeric comparisons
+        if (in_array($f_key, ['height_m', 'weight_kg'], true)) {
+            if ($old_val !== '' && $new_val !== '' && abs((float)$old_val - (float)$new_val) < 0.0001) {
+                continue;
+            }
+        } elseif (in_array($f_key, ['department_id', 'branch_id', 'rank_category_id'], true)) {
+            if ((int)$old_val === (int)$new_val) {
+                continue;
+            }
+        } elseif ($f_key === 'citizenship') {
+            $norm_old = $old_val === '' ? 'Filipino' : $old_val;
+            $norm_new = $new_val === '' ? 'Filipino' : $new_val;
+            if (strcasecmp($norm_old, $norm_new) === 0) {
+                continue;
+            }
+        }
+
         // Normalize nulls and booleans
         if ($old_val !== $new_val) {
             $display_old = $old_val;
@@ -5862,10 +5879,27 @@ function logEmployeeProfileEdit($conn, int $employee_id, int $editor_user_id, ?i
         $stmt->close();
     }
 
-    // Also link with master logAudit
+    // Also link with master logAudit with detailed previous/new values and branch/dept
     $emp_first = $new_data['first_name'] ?? ($old_data['first_name'] ?? '');
     $emp_last  = $new_data['last_name'] ?? ($old_data['last_name'] ?? '');
-    logAudit($conn, $editor_user_id, 'UPDATE', 'Employee', $employee_id, "Profile edited by {$editor_role} ({$editor_name}) for employee {$emp_first} {$emp_last}. {$summary}");
+    
+    $prev_lines = [];
+    $new_lines = [];
+    foreach ($changes as $ch) {
+        $prev_lines[] = $ch['label'] . ': ' . ($ch['old'] !== '' ? $ch['old'] : '(none)');
+        $new_lines[]  = $ch['label'] . ': ' . ($ch['new'] !== '' ? $ch['new'] : '(none)');
+    }
+
+    $audit_context = [
+        'module'             => 'Employee Management',
+        'target_employee_id' => $employee_id,
+        'previous_value'     => !empty($prev_lines) ? implode(", ", $prev_lines) : null,
+        'new_value'          => !empty($new_lines) ? implode(", ", $new_lines) : null,
+        'branch_id'          => !empty($new_data['branch_id']) ? (int)$new_data['branch_id'] : (!empty($old_data['branch_id']) ? (int)$old_data['branch_id'] : null),
+        'department_id'      => !empty($new_data['department_id']) ? (int)$new_data['department_id'] : (!empty($old_data['department_id']) ? (int)$old_data['department_id'] : null),
+    ];
+
+    logAudit($conn, $editor_user_id, 'UPDATE', 'Employee', $employee_id, "Profile edited by {$editor_role} ({$editor_name}) for employee {$emp_first} {$emp_last}. {$summary}", $audit_context);
 
     return true;
 }

@@ -49,7 +49,7 @@ REPLACE INTO employees (
 (91002, 'OP-T02', 'Gabriel', 'Mendoza', 'Santos', '2010-01-04', '1975-03-12', 'Lucena City', 'Male', 'Married', 1100, 'President and CEO', 10, 1, 102, 'Regular', 'Full-time', NULL, 1);
 
 -- ----------------------------------------------------------------------------
--- 3. Employee Contacts
+-- 3. Employee Contacts & Details
 -- ----------------------------------------------------------------------------
 REPLACE INTO employee_contacts (employee_id, personal_email, mobile_number, telephone_number) VALUES
 (90101, 'ap.t01@test.local', '09170000001', '888-1001'),
@@ -59,6 +59,15 @@ REPLACE INTO employee_contacts (employee_id, personal_email, mobile_number, tele
 (90202, 'isabel.mendoza@test.local', '09170000012', '888-2002'),
 (90203, 'manuel.ramos@test.local', '09170000013', '888-2003'),
 (91002, 'op.t02@test.local',  '09170000092', '888-0002');
+
+REPLACE INTO employee_details (employee_id, height_m, weight_kg, blood_type, citizenship) VALUES
+(90101, 1.60, 52.0, 'O+', 'Filipino'),
+(90102, 1.70, 68.0, 'A+', 'Filipino'),
+(90103, 1.68, 65.0, 'B+', 'Filipino'),
+(90104, 1.75, 75.0, 'O+', 'Filipino'),
+(90202, 1.62, 54.0, 'AB+', 'Filipino'),
+(90203, 1.70, 72.0, 'A+', 'Filipino'),
+(91002, 1.72, 70.0, 'O+', 'Filipino');
 
 -- ----------------------------------------------------------------------------
 -- 4. Create Employee portal accounts (password: password)
