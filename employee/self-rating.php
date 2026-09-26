@@ -2195,6 +2195,7 @@ require_once '../includes/header.php';
                                                             <?php echo $saved === $val ? 'checked' : ''; ?>
                                                             required
                                                             aria-label="<?php echo e($scale['label']); ?>"
+                                                            aria-keyshortcuts="<?php echo $val; ?>"
                                                         >
                                                         <label class="rating-label" for="<?php echo $field_id . '_' . $val; ?>">
                                                             <span class="rating-number" aria-hidden="true"><?php echo $val; ?></span>
@@ -2247,6 +2248,7 @@ require_once '../includes/header.php';
                                                             <?php echo $saved === $val ? 'checked' : ''; ?>
                                                             required
                                                             aria-label="<?php echo e($scale['label']); ?>"
+                                                            aria-keyshortcuts="<?php echo $val; ?>"
                                                         >
                                                         <label class="rating-label" for="<?php echo $field_id . '_' . $val; ?>">
                                                             <span class="rating-number" aria-hidden="true"><?php echo $val; ?></span>
@@ -2594,6 +2596,26 @@ function validateAllRatings() {
     return false;
 }
 
+// Number keys choose a rating for the currently focused criterion.
+document.addEventListener('keydown', function (e) {
+    if (!['1', '2', '3', '4'].includes(e.key) || e.altKey || e.ctrlKey || e.metaKey) return;
+    const active = document.activeElement;
+    if (!active || active.matches('input:not(.rating-input), textarea, select, [contenteditable="true"]')) return;
+
+    const item = active.closest('.rating-item');
+    if (!item) return;
+    const choice = item.querySelector('input.rating-input[value="' + e.key + '"]');
+    if (!choice) return;
+
+    e.preventDefault();
+    if (!choice.checked) {
+        choice.checked = true;
+        choice.focus();
+        choice.dispatchEvent(new Event('input', { bubbles: true }));
+        choice.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+});
+
 // Auto-clear error highlight when user picks a rating on a previously missing item
 document.addEventListener('change', function (e) {
     if (e.target && (e.target.name?.startsWith('kra_scores[') || e.target.name?.startsWith('beh_scores['))) {
@@ -2769,6 +2791,8 @@ document.addEventListener('change', function (e) {
         const nextItem = allItems[currentIndex + 1];
         setTimeout(() => {
             nextItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            const nextRating = nextItem.querySelector('.rating-input:checked') || nextItem.querySelector('.rating-input');
+            if (nextRating) nextRating.focus({ preventScroll: true });
             // Add a brief subtle pulse outline highlight to signal active focus
             nextItem.style.transition = 'box-shadow 0.3s ease';
             nextItem.style.boxShadow = '0 0 0 3px rgba(4, 61, 7, 0.2)';

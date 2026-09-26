@@ -473,6 +473,10 @@ if (in_array($session_role, ['HR Manager', 'HR Supervisor', 'Admin'], true)) {
         $is_board_step = ($package['step_type'] === 'Governance') && (stripos($package['step_label'], 'Board') !== false);
         $members_stmt = $conn->prepare("SELECT e.evaluation_id, emp.first_name, emp.last_name, emp.job_title,
                 e.kra_subtotal, e.behavior_average, e.total_score, e.status, pm.member_status,
+                (SELECT AVG(COALESCE(es.manager_override_score, es.supervisor_override_score,
+                                     es.dept_manager_override_score, es.score_value))
+                 FROM evaluation_scores es JOIN evaluation_criteria ec ON ec.criterion_id = es.criterion_id
+                 WHERE es.evaluation_id = e.evaluation_id AND ec.section = 'Behavior') AS individual_behavior,
                 EXISTS(SELECT 1 FROM evaluation_scores es WHERE es.evaluation_id = e.evaluation_id AND (es.supervisor_override_score IS NOT NULL OR es.dept_manager_override_score IS NOT NULL OR es.manager_override_score IS NOT NULL)) AS has_adjustments
             FROM evaluation_package_members pm
             JOIN evaluations e ON e.evaluation_id = pm.evaluation_id
@@ -511,6 +515,12 @@ if (in_array($session_role, ['HR Manager', 'HR Supervisor', 'Admin'], true)) {
         $next_rev_stmt->close();
         $next_reviewer_name = $next_rev_info ? getOrganizationPackageReviewerDisplayName($conn, (int)($next_rev_info['reviewer_user_id'] ?? 0), (int)($next_rev_info['reviewer_employee_id'] ?? 0)) : 'Board of Directors';
         $package_next_check = checkNextPackageStepIsAssigned($conn, (int)$package['package_id'], (int)$package['current_step_order']);
+        $team_size_stmt = $conn->prepare("SELECT COUNT(*) AS team_size FROM employees
+            WHERE department_id = ? AND is_active = 1 AND deleted_at IS NULL");
+        $team_size_stmt->bind_param('i', $package['department_id']);
+        $team_size_stmt->execute();
+        $department_team_size = (int)($team_size_stmt->get_result()->fetch_assoc()['team_size'] ?? 0);
+        $team_size_stmt->close();
         ?>
         <article class="package-card" role="region" aria-label="<?php echo e($package['department_name']); ?> Evaluation Action Package">
             <header class="package-card__header">
@@ -533,7 +543,7 @@ if (in_array($session_role, ['HR Manager', 'HR Supervisor', 'Admin'], true)) {
                             <i class="fas fa-users"></i>
                         </div>
                         <div class="package-stat-content">
-                            <strong><?php echo count($members); ?> Members</strong>
+                            <strong><?php echo $department_team_size; ?> Employees</strong>
                             <span>Department Team Size</span>
                         </div>
                     </div>
@@ -579,8 +589,8 @@ if (in_array($session_role, ['HR Manager', 'HR Supervisor', 'Admin'], true)) {
                                         <th class="col-employee">Employee</th>
                                         <th class="col-position">Position</th>
                                         <th class="text-end col-score"><span class="d-none d-lg-inline">Individual </span>KRA</th>
-                                        <th class="text-end col-score"><span class="d-none d-lg-inline">Self </span>Behavior</th>
-                                        <th class="text-end col-score">Total<span class="d-none d-xl-inline"> Score</span></th>
+                                        <th class="text-end col-score">Individual Behavior</th>
+                                        <th class="text-end col-score">Individual<span class="d-none d-xl-inline"> Score</span></th>
                                         <th class="text-end col-final-score">Final<span class="d-none d-xl-inline"> Score</span></th>
                                         <th class="col-status">Status</th>
                                         <th class="text-end col-action">Action</th>
@@ -591,7 +601,7 @@ if (in_array($session_role, ['HR Manager', 'HR Supervisor', 'Admin'], true)) {
                                         <?php
                                         $kra_w = isset($package['kra_weight']) && (float)$package['kra_weight'] > 0 ? (float)$package['kra_weight'] : 80;
                                         $beh_w = isset($package['behavior_weight']) && (float)$package['behavior_weight'] > 0 ? (float)$package['behavior_weight'] : 20;
-                                        $beh_val = (float)$member['behavior_average'];
+                                        $beh_val = (float)($member['individual_behavior'] ?? $member['behavior_average']);
                                         $total_score_val = calculateEvalTotal((float)$member['kra_subtotal'], $beh_val, $kra_w, $beh_w);
                                         $shared_beh_val = $package['shared_behavior_score'] !== null ? (float)$package['shared_behavior_score'] : $beh_val;
                                         $final_score_val = calculateEvalTotal((float)$member['kra_subtotal'], $shared_beh_val, $kra_w, $beh_w);
@@ -620,7 +630,7 @@ if (in_array($session_role, ['HR Manager', 'HR Supervisor', 'Admin'], true)) {
                                             </td>
                                             <td class="col-position"><?php echo e($member['job_title']); ?></td>
                                             <td class="col-score text-end tabular-nums fw-semibold"><?php echo number_format((float)$member['kra_subtotal'], 2); ?></td>
-                                            <td class="col-score text-end tabular-nums fw-semibold"><?php echo number_format((float)$member['behavior_average'], 2); ?></td>
+                                            <td class="col-score text-end tabular-nums fw-semibold"><?php echo number_format($beh_val, 2); ?></td>
                                             <td class="col-score text-end tabular-nums fw-semibold text-muted"><?php echo number_format($total_score_val, 2); ?></td>
                                             <td class="col-final-score text-end tabular-nums fw-bold text-success" style="font-size: 1.05rem;"><?php echo number_format($final_score_val, 2); ?></td>
                                             <td class="col-status">

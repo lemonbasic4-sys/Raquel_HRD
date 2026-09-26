@@ -78,6 +78,10 @@ require_once '../includes/header.php';
         $package_id = (int)$package['package_id'];
         $members_stmt = $conn->prepare("SELECT e.evaluation_id, emp.first_name, emp.last_name, emp.job_title,
                 e.kra_subtotal, e.behavior_average, e.total_score, e.status,
+                (SELECT AVG(COALESCE(es.manager_override_score, es.supervisor_override_score,
+                                     es.dept_manager_override_score, es.score_value))
+                 FROM evaluation_scores es JOIN evaluation_criteria ec ON ec.criterion_id = es.criterion_id
+                 WHERE es.evaluation_id = e.evaluation_id AND ec.section = 'Behavior') AS individual_behavior,
                 EXISTS(SELECT 1 FROM evaluation_scores es WHERE es.evaluation_id = e.evaluation_id AND (es.supervisor_override_score IS NOT NULL OR es.dept_manager_override_score IS NOT NULL OR es.manager_override_score IS NOT NULL)) AS has_adjustments
             FROM evaluation_package_members pm
             JOIN evaluations e ON e.evaluation_id = pm.evaluation_id
@@ -126,8 +130,8 @@ require_once '../includes/header.php';
                                     <th>Employee</th>
                                     <th>Position</th>
                                     <th class="text-end">Individual KRA</th>
-                                    <th class="text-end">Self Behavior</th>
-                                    <th class="text-end">Total Score</th>
+                                    <th class="text-end">Individual Behavior</th>
+                                    <th class="text-end">Individual Score</th>
                                     <th class="text-end">Final Score</th>
                                     <th>Status</th>
                                     <th class="text-end">Action</th>
@@ -138,7 +142,7 @@ require_once '../includes/header.php';
                                     <?php
                                     $kra_w = isset($package['kra_weight']) && (float)$package['kra_weight'] > 0 ? (float)$package['kra_weight'] : 80;
                                     $beh_w = isset($package['behavior_weight']) && (float)$package['behavior_weight'] > 0 ? (float)$package['behavior_weight'] : 20;
-                                    $beh_val = (float)$member['behavior_average'];
+                                    $beh_val = (float)($member['individual_behavior'] ?? $member['behavior_average']);
                                     $total_score_val = calculateEvalTotal((float)$member['kra_subtotal'], $beh_val, $kra_w, $beh_w);
                                     $shared_beh_val = $package['shared_behavior_score'] !== null ? (float)$package['shared_behavior_score'] : $beh_val;
                                     $final_score_val = calculateEvalTotal((float)$member['kra_subtotal'], $shared_beh_val, $kra_w, $beh_w);
@@ -157,7 +161,7 @@ require_once '../includes/header.php';
                                             <?php echo $member['kra_subtotal'] !== null ? number_format((float) $member['kra_subtotal'], 2) : '&mdash;'; ?>
                                         </td>
                                         <td class="text-end fw-semibold tabular-nums">
-                                            <?php echo $member['behavior_average'] !== null ? number_format((float) $member['behavior_average'], 2) : '&mdash;'; ?>
+                                            <?php echo $member['individual_behavior'] !== null ? number_format((float) $member['individual_behavior'], 2) : '&mdash;'; ?>
                                         </td>
                                         <td class="text-end fw-semibold text-muted tabular-nums">
                                             <?php echo number_format($total_score_val, 2); ?>

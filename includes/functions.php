@@ -3683,14 +3683,50 @@ function getOrganizationPackageSubmissionSummary($conn, array $package)
 
 function recalculateOrganizationPackageBehaviorScore($conn, $package_id)
 {
-    // Include all active member statuses: Normal (on-time), Late Rejoined (re-opened for late submission),
-    // and legacy catch-up statuses for backward compatibility.
-    $stmt = $conn->prepare("SELECT AVG(ev.behavior_average) AS shared_behavior_score
-        FROM evaluation_package_members pm
-        JOIN evaluations ev ON ev.evaluation_id = pm.evaluation_id
-        WHERE pm.package_id = ? AND pm.member_status IN ('Normal', 'Late Rejoined', 'Catchup Endorsed', 'Catchup Complete')");
-    $stmt->bind_param('i', $package_id); $stmt->execute();
-    $score = (float) ($stmt->get_result()->fetch_assoc()['shared_behavior_score'] ?? 0); $stmt->close();
+    $package_id = (int) $package_id;
+    $package = $conn->query("SELECT department_id, template_id, period_start, period_end
+        FROM evaluation_packages WHERE package_id = $package_id LIMIT 1")->fetch_assoc();
+    if (!$package) return 0.0;
+
+    $department_id = (int) $package['department_id'];
+    $template_id = (int) $package['template_id'];
+    $period_start = $conn->real_escape_string($package['period_start']);
+    $period_end = $conn->real_escape_string($package['period_end']);
+
+    // Progressive rule: each previously finalized employee contributes their
+    // stored shared score; each employee in this still-open package contributes
+    // their own effective Behavior criterion average. Never seed a new package
+    // from only its own member scores when this cohort already has finalized results.
+    $result = $conn->query("SELECT AVG(cohort_scores.behavior_score) AS shared_behavior_score
+        FROM (
+            SELECT ev.behavior_average AS behavior_score
+            FROM evaluations ev
+            JOIN (
+                SELECT DISTINCT pm.evaluation_id
+                FROM evaluation_package_members pm
+                JOIN evaluation_packages prior_pkg ON prior_pkg.package_id = pm.package_id
+                WHERE prior_pkg.department_id = $department_id
+                  AND prior_pkg.template_id = $template_id
+                  AND prior_pkg.period_start = '$period_start'
+                  AND prior_pkg.period_end = '$period_end'
+                  AND prior_pkg.status = 'Approved and Applied'
+                  AND prior_pkg.package_id <> $package_id
+            ) prior_members ON prior_members.evaluation_id = ev.evaluation_id
+            UNION ALL
+            SELECT (
+                SELECT AVG(COALESCE(es.manager_override_score, es.supervisor_override_score,
+                                    es.dept_manager_override_score, es.score_value))
+                FROM evaluation_scores es
+                JOIN evaluation_criteria ec ON ec.criterion_id = es.criterion_id
+                WHERE es.evaluation_id = ev.evaluation_id AND ec.section = 'Behavior'
+            ) AS behavior_score
+            FROM evaluation_package_members pm
+            JOIN evaluations ev ON ev.evaluation_id = pm.evaluation_id
+            WHERE pm.package_id = $package_id
+              AND pm.member_status IN ('Normal', 'Late Rejoined', 'Catchup Endorsed', 'Catchup Complete')
+        ) cohort_scores
+        WHERE cohort_scores.behavior_score IS NOT NULL");
+    $score = round((float) ($result ? ($result->fetch_assoc()['shared_behavior_score'] ?? 0) : 0), 2);
     $score = round($score, 2);
     $update = $conn->prepare('UPDATE evaluation_packages SET shared_behavior_score = ? WHERE package_id = ?');
     $update->bind_param('di', $score, $package_id); $update->execute(); $update->close();
@@ -3934,18 +3970,15 @@ function finalizeLatePackageMember($conn, $package_id, $evaluation_id)
     if (!$pkg) return false;
 
     // A late member belongs to the same department/template/period cohort even
-    // when the original package has already been finalized. Rebuild the cohort
-    // score from criterion ratings, since behavior_average on finalized records
-    // already contains the previously shared score.
+    // when the original package has already been finalized. Carry forward each
+    // prior finalized shared score, then add each newly endorsed member's own
+    // effective behavior average.
     $department_id = (int) $pkg['department_id'];
     $template_id = (int) $pkg['template_id'];
     $period_start = $conn->real_escape_string($pkg['period_start']);
     $period_end = $conn->real_escape_string($pkg['period_end']);
     $cohort = $conn->query("SELECT DISTINCT ev.evaluation_id, ev.kra_subtotal,
-            (SELECT AVG(es.score_value)
-             FROM evaluation_scores es
-             JOIN evaluation_criteria ec ON ec.criterion_id = es.criterion_id
-             WHERE es.evaluation_id = ev.evaluation_id AND ec.section = 'Behavior') AS raw_behavior_average
+            ev.behavior_average AS behavior_score, 'prior' AS score_source
         FROM evaluation_package_members pm
         JOIN evaluation_packages cohort_pkg ON cohort_pkg.package_id = pm.package_id
         JOIN evaluations ev ON ev.evaluation_id = pm.evaluation_id
@@ -3953,21 +3986,35 @@ function finalizeLatePackageMember($conn, $package_id, $evaluation_id)
           AND cohort_pkg.template_id = $template_id
           AND cohort_pkg.period_start = '$period_start'
           AND cohort_pkg.period_end = '$period_end'
-          AND (cohort_pkg.status = 'Approved and Applied' OR cohort_pkg.package_id = $package_id)
-          AND pm.member_status IN ('Normal', 'Late Rejoined', 'Catchup Endorsed', 'Catchup Complete')");
+          AND cohort_pkg.status = 'Approved and Applied'
+          AND cohort_pkg.package_id <> $package_id
+          AND pm.member_status IN ('Normal', 'Late Rejoined', 'Catchup Endorsed', 'Catchup Complete')
+        UNION ALL
+        SELECT ev.evaluation_id, ev.kra_subtotal,
+            (SELECT AVG(COALESCE(es.manager_override_score, es.supervisor_override_score,
+                                 es.dept_manager_override_score, es.score_value))
+             FROM evaluation_scores es
+             JOIN evaluation_criteria ec ON ec.criterion_id = es.criterion_id
+             WHERE es.evaluation_id = ev.evaluation_id AND ec.section = 'Behavior') AS behavior_score,
+            'new' AS score_source
+        FROM evaluation_package_members pm
+        JOIN evaluations ev ON ev.evaluation_id = pm.evaluation_id
+        WHERE pm.package_id = $package_id AND pm.member_status = 'Catchup Endorsed'");
     if (!$cohort || $cohort->num_rows === 0) return false;
 
     $cohort_members = $cohort->fetch_all(MYSQLI_ASSOC);
-    $raw_total = 0.0;
-    $raw_count = 0;
+    $score_total = 0.0;
+    $score_count = 0;
+    $new_member_count = 0;
     foreach ($cohort_members as $member) {
-        if ($member['raw_behavior_average'] !== null) {
-            $raw_total += (float) $member['raw_behavior_average'];
-            $raw_count++;
+        if ($member['behavior_score'] !== null) {
+            $score_total += (float) $member['behavior_score'];
+            $score_count++;
+            if ($member['score_source'] === 'new') $new_member_count++;
         }
     }
-    if ($raw_count === 0) return false;
-    $new_score = round($raw_total / $raw_count, 2);
+    if ($score_count === 0 || $new_member_count === 0) return false;
+    $new_score = round($score_total / $score_count, 2);
 
     $kra_weight      = (float) $pkg['kra_weight'];
     $behavior_weight = (float) $pkg['behavior_weight'];
@@ -3991,7 +4038,7 @@ function finalizeLatePackageMember($conn, $package_id, $evaluation_id)
     $conn->query("UPDATE evaluation_package_members SET member_status = 'Catchup Complete' WHERE package_id = $package_id AND evaluation_id = $evaluation_id");
 
     $audit = $conn->prepare("INSERT INTO evaluation_package_audit (package_id, action, remarks) VALUES (?, 'LATE_MEMBER_FINALIZED', ?)");
-    $remark = "Late member evaluation ID $evaluation_id finalized. Shared behavior score $new_score was recalculated and applied across $raw_count finalized cohort evaluations.";
+    $remark = "Late member evaluation ID $evaluation_id finalized. Progressive shared behavior score $new_score was applied across $score_count completed cohort members.";
     $audit->bind_param('is', $package_id, $remark); $audit->execute(); $audit->close();
 
     // Notify the late member
