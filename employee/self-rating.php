@@ -1015,88 +1015,422 @@ require_once '../includes/header.php';
     letter-spacing: 0.03em;
 }
 
-/* Compact, viewport-safe declaration dialog */
-#consentModal .consent-modal-dialog {
-    max-width: 540px;
-}
-
-#consentModal .modal-content {
+/* ── Consent Modal – Clean Professional Redesign ── */
+#consentModal .modal-dialog {
+    max-width: 620px;
     max-height: calc(100dvh - 2rem);
 }
 
-#consentModal .consent-modal-header {
-    padding: 0.9rem 1.1rem;
+#consentModal .modal-content {
+    border: 0;
+    border-radius: 16px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.14);
+    overflow: hidden;
+    max-height: calc(100dvh - 2rem);
+    display: flex;
+    flex-direction: column;
 }
 
-#consentModal .consent-modal-body {
+/* Header */
+#consentModal .cm-header {
+    background: #f8f9fa;
+    border-bottom: 1px solid #e9ecef;
+    padding: 1.25rem 1.5rem 1rem;
+    position: relative;
+    flex-shrink: 0;
+}
+
+#consentModal .cm-header::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 4px;
+    background: #2d7a2d;
+    border-radius: 0;
+}
+
+#consentModal .cm-header-eyebrow {
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #2d7a2d;
+    margin-bottom: 0.3rem;
+}
+
+#consentModal .cm-header-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #1a2a1a;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+#consentModal .cm-header-icon {
+    width: 34px; height: 34px;
+    background: #e8f5e8;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    color: #2d7a2d;
+    font-size: 0.95rem;
+    flex-shrink: 0;
+}
+
+#consentModal .cm-header-badge {
+    margin-left: auto;
+    background: #f0faf0;
+    border: 1px solid #c3e6c3;
+    border-radius: 20px;
+    padding: 3px 10px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #2d7a2d;
+    display: flex; align-items: center; gap: 4px;
+    flex-shrink: 0;
+}
+
+/* Body */
+#consentModal .cm-body {
     overflow-y: auto;
+    padding: 1.5rem;
+    background: #ffffff;
+    flex: 1 1 auto;
+}
+
+/* Declaration card */
+#consentModal .cm-declaration-card {
+    background: #f6faf6;
+    border: 1px solid #d4ecd4;
+    border-left: 4px solid #2d7a2d;
+    border-radius: 10px;
     padding: 1rem 1.1rem;
+    margin-bottom: 1rem;
 }
 
-#consentModal .consent-declaration {
-    line-height: 1.5 !important;
-    margin-bottom: 0.85rem !important;
-    padding: 0.8rem !important;
+#consentModal .cm-declaration-label {
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #2d7a2d;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
 }
 
-#consentModal .consent-checkbox {
-    margin-bottom: 1rem !important;
+#consentModal .cm-declaration-text {
+    font-size: 0.875rem;
+    line-height: 1.65;
+    color: #3d4d3d;
+    margin: 0;
 }
 
-#consentModal .consent-checkbox .form-check-input {
-    border-radius: 0.25em;
-    height: 1.25rem !important;
-    min-height: 1.25rem !important;
-    min-width: 1.25rem;
-    width: 1.25rem;
+/* Agree checkbox */
+#consentModal .cm-agree-row {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    background: #fff;
+    border: 1.5px solid #d9e2db;
+    border-radius: 10px;
+    padding: 0.85rem 1.1rem;
+    margin-bottom: 1.25rem;
+    cursor: pointer;
+    transition: border-color 0.2s, box-shadow 0.2s, background-color 0.2s;
+    user-select: none;
 }
 
-#consentModal .consent-checkbox .form-check-label {
-    line-height: 1.35;
-    padding-top: 0.1rem;
+#consentModal .cm-agree-row:hover {
+    border-color: #2d7a2d;
+    background-color: #fbfcfa;
+}
+
+#consentModal .cm-agree-row:has(.form-check-input:checked) {
+    border-color: #2d7a2d;
+    background-color: #f6faf6;
+    box-shadow: 0 0 0 3px rgba(45,122,45,0.08);
+}
+
+#consentModal .cm-agree-row .form-check-input,
+#consentModal .cm-agree-row .form-check-input.is-valid,
+#consentModal .cm-agree-row .form-check-input.is-invalid,
+#consentModal .cm-agree-row .form-check-input:valid,
+#consentModal .cm-agree-row .form-check-input:invalid,
+#consentModal .cm-agree-row input[type="checkbox"] {
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 20px !important;
+    height: 20px !important;
+    min-width: 20px !important;
+    max-width: 20px !important;
+    min-height: 20px !important;
+    max-height: 20px !important;
+    box-sizing: border-box !important;
+    border-radius: 4px !important;
+    border: 2px solid #6b7280 !important;
+    background-color: #ffffff !important;
+    background-image: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    cursor: pointer;
+    flex-shrink: 0 !important;
+    outline: none !important;
+    box-shadow: none !important;
+    transition: all 0.15s ease-in-out;
+}
+
+#consentModal .cm-agree-row .form-check-input:hover {
+    border-color: #2d7a2d !important;
+}
+
+#consentModal .cm-agree-row .form-check-input:checked,
+#consentModal .cm-agree-row .form-check-input.is-valid:checked,
+#consentModal .cm-agree-row .form-check-input:valid:checked,
+#consentModal .cm-agree-row input[type="checkbox"]:checked {
+    background-color: #2d7a2d !important;
+    border-color: #2d7a2d !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23ffffff' stroke-width='2.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='4 10.5 8 14.5 16 6'/%3E%3C/svg%3E") !important;
+    background-position: center !important;
+    background-repeat: no-repeat !important;
+    background-size: 14px 14px !important;
+}
+
+#consentModal .cm-agree-row .form-check-input:focus {
+    border-color: #2d7a2d !important;
+    box-shadow: 0 0 0 3px rgba(45, 122, 45, 0.22) !important;
+}
+
+#consentModal .cm-agree-row .form-check-input.is-invalid {
+    border-color: #dc3545 !important;
+    box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.2) !important;
+}
+
+#consentModal .cm-agree-row:has(.form-check-input.is-invalid) {
+    border-color: #dc3545 !important;
+    box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.08) !important;
+}
+
+#consentModal .cm-agree-label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #1a2a1a;
+    line-height: 1.4;
+    margin: 0;
+    cursor: pointer;
+    flex: 1;
+}
+
+/* Signature section divider */
+#consentModal .cm-sig-divider {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    color: #9eaaa0;
+}
+
+#consentModal .cm-sig-divider::before,
+#consentModal .cm-sig-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: #e9ecef;
+}
+
+#consentModal .cm-sig-divider-label {
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    color: #9eaaa0;
+}
+
+/* Sig tab bar */
+#consentModal .cm-sig-tabs {
+    display: flex;
+    gap: 4px;
+    background: #f3f4f3;
+    border-radius: 8px;
+    padding: 3px;
+    margin-bottom: 1rem;
+}
+
+#consentModal .cm-sig-tab {
+    flex: 1;
+    border: 0;
+    background: transparent;
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #6c757d;
+    cursor: pointer;
+    transition: background 0.18s, color 0.18s, box-shadow 0.18s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+}
+
+#consentModal .cm-sig-tab.active {
+    background: #fff;
+    color: #2d7a2d;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+}
+
+/* Canvas wrapper */
+#consentModal .cm-canvas-wrapper {
+    border: 1.5px solid #dde6dd;
+    border-radius: 10px;
+    background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 24px,
+        #f0f4f0 24px,
+        #f0f4f0 25px
+    );
+    position: relative;
+    overflow: hidden;
 }
 
 #consentModal #signatureCanvas {
-    height: 110px !important;
+    height: 120px !important;
+    width: 100%;
+    display: block;
+    cursor: crosshair;
 }
 
-#consentModal .consent-modal-footer {
-    gap: 0.5rem;
-    padding: 0.75rem 1.1rem;
+#consentModal .cm-canvas-placeholder {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    color: #c8d8c8;
+    font-size: 0.85rem;
+    font-weight: 500;
+    gap: 6px;
 }
 
+/* Drop zone */
+#consentModal .cm-drop-zone {
+    border: 2px dashed #c8d8c8;
+    border-radius: 10px;
+    min-height: 110px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    background: #fafcfa;
+    gap: 4px;
+}
+
+#consentModal .cm-drop-zone:hover {
+    border-color: #2d7a2d;
+    background: #f2faf2;
+}
+
+/* Footer */
+#consentModal .cm-footer {
+    background: #f8f9fa;
+    border-top: 1px solid #e9ecef;
+    padding: 1rem 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-shrink: 0;
+}
+
+#consentModal .cm-footer-note {
+    font-size: 0.75rem;
+    color: #8a9a8a;
+    margin-right: auto;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+#consentModal .cm-btn-back {
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 0.45rem 1.1rem;
+    border-radius: 50px;
+    border: 1.5px solid #c8d4c8;
+    background: #fff;
+    color: #5a6a5a;
+    cursor: pointer;
+    transition: border-color 0.18s, color 0.18s;
+    white-space: nowrap;
+}
+
+#consentModal .cm-btn-back:hover {
+    border-color: #2d7a2d;
+    color: #2d7a2d;
+}
+
+#consentModal .cm-btn-continue {
+    font-size: 0.85rem;
+    font-weight: 700;
+    padding: 0.5rem 1.4rem;
+    border-radius: 50px;
+    border: 0;
+    background: #2d7a2d;
+    color: #fff;
+    cursor: pointer;
+    transition: background 0.18s, box-shadow 0.18s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+
+#consentModal .cm-btn-continue:hover {
+    background: #236023;
+    box-shadow: 0 4px 14px rgba(45,122,45,0.3);
+}
+
+/* Mobile */
 @media (max-width: 575.98px) {
-    #consentModal .consent-modal-dialog {
-        height: calc(100dvh - 1rem);
-        margin: 0.5rem;
+    #consentModal .modal-dialog {
+        margin: 0.4rem;
         max-width: none;
+        max-height: none;
+        height: calc(100dvh - 0.8rem);
     }
-
     #consentModal .modal-content {
         height: 100%;
         max-height: none;
+        border-radius: 12px;
     }
-
-    #consentModal .consent-modal-header {
-        padding: 0.75rem 0.9rem;
+    #consentModal .cm-header {
+        padding: 1rem 1.1rem 0.8rem;
     }
-
-    #consentModal .consent-modal-body {
-        padding: 0.85rem 0.9rem;
+    #consentModal .cm-body {
+        padding: 1rem 1.1rem;
     }
-
-    #consentModal #signatureCanvas {
-        height: 96px !important;
+    #consentModal .cm-footer {
+        flex-wrap: wrap;
+        padding: 0.75rem 1.1rem;
     }
-
-    #consentModal .consent-modal-footer {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        padding: 0.7rem 0.9rem;
+    #consentModal .cm-footer-note {
+        width: 100%;
+        margin-right: 0;
     }
-
-    #consentModal .consent-modal-footer .consent-footer-note {
-        grid-column: 1 / -1;
+    #consentModal .cm-btn-back,
+    #consentModal .cm-btn-continue {
+        flex: 1;
+        justify-content: center;
     }
 }
 </style>
@@ -1894,56 +2228,106 @@ require_once '../includes/header.php';
                                     placeholder="Share any notes about your self-rating..."><?php echo e($edit_eval['staff_comments'] ?? ''); ?></textarea>
                             </div>
 
-                            <!-- Declaration Consent & Digital Signature: required before starting a new self-rating -->
+                            <!-- Declaration Consent & Digital Signature -->
                             <div class="modal fade" id="consentModal" tabindex="-1" aria-labelledby="consentModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
-                                <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable consent-modal-dialog">
-                                    <div class="modal-content border-0 shadow-lg">
-                                        <div class="modal-header bg-primary text-white border-0 consent-modal-header">
-                                            <div>
-                                                <div class="small text-uppercase opacity-75 fw-semibold" style="letter-spacing:.06em;">Before you begin</div>
-                                                <h5 class="modal-title fw-bold mb-0" id="consentModalLabel"><i class="fas fa-file-contract me-2"></i>Declaration Consent &amp; Digital Signature</h5>
+                                <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+                                    <div class="modal-content">
+
+                                        <!-- Header -->
+                                        <div class="cm-header">
+                                            <div class="cm-header-eyebrow"><i class="fas fa-shield-alt me-1"></i>Before You Begin</div>
+                                            <div class="cm-header-title">
+                                                <div class="cm-header-icon"><i class="fas fa-file-signature"></i></div>
+                                                <h5 class="mb-0" id="consentModalLabel">Declaration Consent &amp; Digital Signature</h5>
+                                                <span class="cm-header-badge"><i class="fas fa-lock"></i> Secured</span>
                                             </div>
                                         </div>
-                                        <div class="modal-body consent-modal-body" style="background: #f8faf6;">
-                                    <!-- Consent Disclaimer Text -->
-                                    <div class="consent-declaration p-3 bg-white rounded border mb-3 small text-secondary shadow-sm" style="line-height: 1.6;">
-                                        <i class="fas fa-quote-left text-primary opacity-50 me-2"></i>
-                                        I hereby declare and certify that the scores, self-assessment ratings, and comments provided in this form are accurate, complete, and submitted voluntarily. I understand that this submission forms an official component of my employee performance appraisal record.
-                                    </div>
-                                    
-                                    <!-- Mandatory Consent Checkbox -->
-                                    <div class="consent-checkbox form-check mb-4">
-                                        <input class="form-check-input" type="checkbox" id="employee_consent_agreed" value="1" <?php echo !empty($edit_eval['employee_consent_agreed']) ? 'checked' : ''; ?>>
-                                        <label class="form-check-label fw-bold text-dark small" for="employee_consent_agreed">
-                                            I have read, understood, and agree to the declaration statement above.
-                                        </label>
-                                    </div>
 
-                                    <!-- Digital Signature Canvas Pad -->
-                                    <div class="mb-2">
-                                        <div class="d-flex justify-content-between align-items-center mb-1">
-                                            <label class="form-label fw-semibold small text-dark mb-0">
-                                                <i class="fas fa-pen-nib me-1 text-primary"></i>Employee Digital Signature
+                                        <!-- Body -->
+                                        <div class="cm-body">
+
+                                            <!-- Declaration card -->
+                                            <div class="cm-declaration-card">
+                                                <div class="cm-declaration-label"><i class="fas fa-scroll"></i>Official Declaration</div>
+                                                <p class="cm-declaration-text">
+                                                    I hereby declare and certify that the scores, self-assessment ratings, and comments provided in this form are accurate, complete, and submitted voluntarily. I understand that this submission forms an official component of my employee performance appraisal record.
+                                                </p>
+                                            </div>
+
+                                            <!-- Agree checkbox -->
+                                            <label class="cm-agree-row" for="employee_consent_agreed">
+                                                <input class="form-check-input" type="checkbox" id="employee_consent_agreed" value="1" <?php echo !empty($edit_eval['employee_consent_agreed']) ? 'checked' : ''; ?>>
+                                                <span class="cm-agree-label">I have read, understood, and agree to the declaration statement above.</span>
                                             </label>
-                                            <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" style="font-size:0.75rem;" onclick="clearSignatureCanvas()">
-                                                <i class="fas fa-eraser me-1"></i>Clear Signature
+
+                                            <!-- Signature divider -->
+                                            <div class="cm-sig-divider">
+                                                <span class="cm-sig-divider-label"><i class="fas fa-pen-nib me-1"></i>Your Signature</span>
+                                            </div>
+
+                                            <!-- Sig tab bar -->
+                                            <div class="cm-sig-tabs" id="sigTabBar" role="tablist">
+                                                <button type="button" id="sigTabDraw" role="tab" aria-selected="true"
+                                                    class="cm-sig-tab active" onclick="switchSigTab('draw')">
+                                                    <i class="fas fa-pen"></i> Draw Signature
+                                                </button>
+                                                <button type="button" id="sigTabUpload" role="tab" aria-selected="false"
+                                                    class="cm-sig-tab" onclick="switchSigTab('upload')">
+                                                    <i class="fas fa-upload"></i> Upload Image
+                                                </button>
+                                            </div>
+
+                                            <!-- Draw panel -->
+                                            <div id="sigPanelDraw">
+                                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                                    <span class="small text-muted" style="font-size:0.78rem;"><i class="fas fa-info-circle me-1"></i>Use your mouse or finger to sign</span>
+                                                    <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" style="font-size:0.75rem;border-radius:20px;" onclick="clearSignatureCanvas()">
+                                                        <i class="fas fa-eraser me-1"></i>Clear
+                                                    </button>
+                                                </div>
+                                                <div class="cm-canvas-wrapper" style="touch-action:none;">
+                                                    <div class="cm-canvas-placeholder" id="sigCanvasPlaceholder">
+                                                        <i class="fas fa-signature"></i> Sign here...
+                                                    </div>
+                                                    <canvas id="signatureCanvas" width="560" height="160"></canvas>
+                                                    <input type="hidden" id="employee_signature_data" value="<?php echo e($edit_eval['employee_signature_data'] ?? ''); ?>">
+                                                </div>
+                                            </div>
+
+                                            <!-- Upload panel -->
+                                            <div id="sigPanelUpload" style="display:none;">
+                                                <div class="cm-drop-zone" id="sigDropZone"
+                                                    onclick="document.getElementById('sigFileInput').click()"
+                                                    ondragover="sigDragOver(event)" ondragleave="sigDragLeave(event)" ondrop="sigDrop(event)">
+                                                    <i class="fas fa-cloud-upload-alt fa-2x mb-2" style="color:#adc8ad;"></i>
+                                                    <span class="small fw-semibold" style="color:#5a7a5a;">Click or drag &amp; drop your signature image</span>
+                                                    <span class="small" style="color:#9eaaa0;">JPG, PNG, WebP &mdash; max 2 MB</span>
+                                                </div>
+                                                <input type="file" id="sigFileInput" accept="image/*" class="d-none">
+                                                <div id="sigUploadPreview" class="text-center mt-3" style="display:none;">
+                                                    <img id="sigUploadPreviewImg" src="" alt="Signature Preview"
+                                                        style="max-height:90px;max-width:100%;object-fit:contain;border:1.5px solid #d4ecd4;border-radius:8px;padding:6px;background:#f6faf6;">
+                                                    <div class="mt-2">
+                                                        <button type="button" onclick="clearUploadedSignature()"
+                                                            style="font-size:0.75rem;border-radius:20px;" class="btn btn-sm btn-outline-danger py-0 px-3">
+                                                            <i class="fas fa-times me-1"></i>Remove
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                <p class="small text-muted mt-2 mb-0" style="font-size:0.78rem;"><i class="fas fa-info-circle me-1"></i>Upload a photo or scan of your handwritten signature from your device.</p>
+                                            </div>
+
+                                        </div>
+
+                                        <!-- Footer -->
+                                        <div class="cm-footer">
+                                            <span class="cm-footer-note"><i class="fas fa-lock"></i> Consent &amp; signature required</span>
+                                            <a href="<?php echo BASE_URL; ?>/employee/self-rating.php" class="cm-btn-back">Choose Another Template</a>
+                                            <button type="button" class="cm-btn-continue" onclick="confirmConsentAndContinue()">
+                                                Continue <i class="fas fa-arrow-right"></i>
                                             </button>
                                         </div>
-                                        
-                                        <div class="signature-canvas-wrapper border rounded bg-white shadow-sm position-relative text-center" style="touch-action: none;">
-                                            <canvas id="signatureCanvas" width="500" height="150" style="width: 100%; height: 110px; cursor: crosshair; display: block;"></canvas>
-                                            <input type="hidden" id="employee_signature_data" value="<?php echo e($edit_eval['employee_signature_data'] ?? ''); ?>">
-                                        </div>
-                                        <div class="form-text small text-muted"><i class="fas fa-info-circle me-1"></i>Use your mouse or finger (on touchscreens) to draw your signature inside the box above.</div>
-                                    </div>
-                                        </div>
-                                        <div class="modal-footer bg-white border-0 consent-modal-footer">
-                                            <div class="consent-footer-note small text-muted me-auto"><i class="fas fa-lock me-1"></i>Consent and signature are required.</div>
-                                            <a href="<?php echo BASE_URL; ?>/employee/self-rating.php" class="btn btn-outline-secondary rounded-pill">Choose Another Template</a>
-                                            <button type="button" class="btn btn-primary rounded-pill px-4" onclick="confirmConsentAndContinue()">
-                                                Continue to Self-Rating <i class="fas fa-arrow-right ms-2"></i>
-                                            </button>
-                                        </div>
+
                                     </div>
                                 </div>
                             </div>
@@ -2222,6 +2606,13 @@ function confirmConsentAndContinue() {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
+    const consentInput = document.getElementById('employee_consent_agreed');
+    if (consentInput) {
+        consentInput.addEventListener('change', function() {
+            if (this.checked) this.classList.remove('is-invalid');
+        });
+    }
+
     const shouldOpenConsentModal = <?php echo (!$view_mode && $selected_template_id > 0 && (!$edit_eval || empty($edit_eval['employee_consent_agreed']) || empty($edit_eval['employee_signature_data']))) ? 'true' : 'false'; ?>;
     const modalElement = document.getElementById('consentModal');
     if (shouldOpenConsentModal && modalElement) {
@@ -2397,6 +2788,9 @@ document.addEventListener('DOMContentLoaded', function() {
         img.onload = function() {
             ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
             hasSignature = true;
+            // Hide the placeholder since a signature already exists
+            const ph = document.getElementById('sigCanvasPlaceholder');
+            if (ph) ph.style.display = 'none';
         };
         img.src = hiddenInput.value;
     }
@@ -2422,6 +2816,9 @@ document.addEventListener('DOMContentLoaded', function() {
         ctx.lineWidth = 2.5;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
+        // Hide the "Sign here..." placeholder once drawing starts
+        const ph = document.getElementById('sigCanvasPlaceholder');
+        if (ph) ph.style.display = 'none';
         if (e.type === 'touchstart') e.preventDefault();
     }
 
@@ -2456,6 +2853,117 @@ document.addEventListener('DOMContentLoaded', function() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         hasSignature = false;
         if (hiddenInput) hiddenInput.value = '';
+        // Restore the "Sign here..." placeholder
+        const ph = document.getElementById('sigCanvasPlaceholder');
+        if (ph) ph.style.display = '';
     };
 });
+
+// ── Signature Tab Switcher ────────────────────────────────────────────────────
+(function() {
+    let currentSigTab = 'draw';
+
+    window.switchSigTab = function(tab) {
+        currentSigTab = tab;
+        const drawPanel   = document.getElementById('sigPanelDraw');
+        const uploadPanel = document.getElementById('sigPanelUpload');
+        const tabDraw     = document.getElementById('sigTabDraw');
+        const tabUpload   = document.getElementById('sigTabUpload');
+
+        if (tab === 'draw') {
+            drawPanel.style.display   = '';
+            uploadPanel.style.display = 'none';
+            tabDraw.classList.add('active');
+            tabUpload.classList.remove('active');
+            // Clear the upload-sourced value so the canvas is the source of truth
+            clearUploadedSignature(true);
+        } else {
+            drawPanel.style.display   = 'none';
+            uploadPanel.style.display = '';
+            tabDraw.classList.remove('active');
+            tabUpload.classList.add('active');
+            // Clear the drawn signature so the uploaded image is the source of truth
+            if (typeof window.clearSignatureCanvas === 'function') window.clearSignatureCanvas();
+        }
+    };
+
+    // ── Upload / Drop logic ───────────────────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', function() {
+        const fileInput   = document.getElementById('sigFileInput');
+        const hiddenInput = document.getElementById('employee_signature_data');
+        if (!fileInput) return;
+
+        fileInput.addEventListener('change', function() {
+            if (this.files && this.files[0]) loadSigFile(this.files[0]);
+        });
+
+        // Check if the existing value looks like an upload (not from canvas)
+        // so we can restore the correct tab on page reload/edit
+        if (hiddenInput && hiddenInput.value) {
+            // Both draw and upload are base64; we just keep the draw tab as default
+        }
+    });
+
+    function loadSigFile(file) {
+        const MAX_BYTES = 2 * 1024 * 1024; // 2 MB
+        if (file.size > MAX_BYTES) {
+            if (typeof showToast === 'function') showToast('Image is too large. Please use a file under 2 MB.', 'error');
+            else alert('Image is too large. Please use a file under 2 MB.');
+            return;
+        }
+        if (!file.type.startsWith('image/')) {
+            if (typeof showToast === 'function') showToast('Please select a valid image file.', 'error');
+            else alert('Please select a valid image file.');
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const base64 = e.target.result;
+            const hiddenInput = document.getElementById('employee_signature_data');
+            if (hiddenInput) hiddenInput.value = base64;
+
+            // Show preview
+            const previewImg  = document.getElementById('sigUploadPreviewImg');
+            const previewDiv  = document.getElementById('sigUploadPreview');
+            const dropZone    = document.getElementById('sigDropZone');
+            if (previewImg) previewImg.src = base64;
+            if (previewDiv) previewDiv.style.display = '';
+            if (dropZone)   dropZone.style.display   = 'none';
+        };
+        reader.readAsDataURL(file);
+    }
+
+    window.clearUploadedSignature = function(silent) {
+        const previewDiv  = document.getElementById('sigUploadPreview');
+        const previewImg  = document.getElementById('sigUploadPreviewImg');
+        const dropZone    = document.getElementById('sigDropZone');
+        const fileInput   = document.getElementById('sigFileInput');
+        if (previewDiv) previewDiv.style.display = 'none';
+        if (previewImg) previewImg.src = '';
+        if (dropZone)   dropZone.style.display   = '';
+        if (fileInput)  fileInput.value = '';
+        if (!silent) {
+            const hiddenInput = document.getElementById('employee_signature_data');
+            if (hiddenInput) hiddenInput.value = '';
+        }
+    };
+
+    // ── Drag & Drop helpers ───────────────────────────────────────────────────
+    window.sigDragOver = function(e) {
+        e.preventDefault();
+        const dz = document.getElementById('sigDropZone');
+        if (dz) { dz.style.borderColor = 'var(--bs-primary)'; dz.style.background = '#f0f7f0'; }
+    };
+    window.sigDragLeave = function(e) {
+        const dz = document.getElementById('sigDropZone');
+        if (dz) { dz.style.borderColor = '#ced4da'; dz.style.background = ''; }
+    };
+    window.sigDrop = function(e) {
+        e.preventDefault();
+        sigDragLeave(e);
+        const file = e.dataTransfer.files && e.dataTransfer.files[0];
+        if (file) loadSigFile(file);
+    };
+}());
 </script>
