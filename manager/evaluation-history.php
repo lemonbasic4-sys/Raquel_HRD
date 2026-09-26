@@ -18,6 +18,8 @@ $history = $conn->query("SELECT ev.*, CONCAT(e.first_name, ' ', e.last_name) as 
     LEFT JOIN users u3 ON ev.approved_by = u3.user_id
     LEFT JOIN evaluation_templates et ON ev.template_id = et.template_id
     LEFT JOIN evaluation_package_members pm ON pm.evaluation_id = ev.evaluation_id
+        AND EXISTS (SELECT 1 FROM evaluation_packages active_ep
+                    WHERE active_ep.package_id = pm.package_id AND active_ep.status <> 'Cancelled')
     LEFT JOIN evaluation_packages ep ON ep.package_id = pm.package_id
     WHERE ev.status IN ('Approved', 'Rejected', 'Returned')
     AND ev.employee_id NOT IN (SELECT employee_id FROM users WHERE role = 'Admin' AND employee_id IS NOT NULL)

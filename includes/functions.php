@@ -3017,7 +3017,7 @@ function renderOrganizationPipelineBadge($conn, $package_id, $extra_classes = ''
     
     $status = $row['status'] ?? '';
     if ($status === 'Approved and Applied') {
-        return '<span class="pipeline-badge pipeline-badge--approved ' . e($extra_classes) . '"><i class="fas fa-lock me-1"></i>Approved &amp; Locked</span>';
+        return '<span class="pipeline-badge pipeline-badge--approved ' . e($extra_classes) . '"><i class="fas fa-check-circle me-1"></i>Approved</span>';
     }
     if ($status === 'Pending Self-Ratings' || empty($row['current_step_order'])) {
         $s1_stmt = $conn->prepare("SELECT reviewer_user_id, reviewer_employee_id, step_label FROM evaluation_package_route_steps WHERE package_id = ? AND step_order = 1 LIMIT 1");
@@ -3926,34 +3926,72 @@ function finalizeLatePackageMember($conn, $package_id, $evaluation_id)
     $package_id    = (int) $package_id;
     $evaluation_id = (int) $evaluation_id;
 
-    // Fetch template weights
-    $pkg = $conn->query("SELECT ep.shared_behavior_score, et.kra_weight, et.behavior_weight
+    // Fetch the finalized package's cohort identity and scoring weights.
+    $pkg = $conn->query("SELECT ep.department_id, ep.template_id, ep.period_start, ep.period_end,
+            et.kra_weight, et.behavior_weight
         FROM evaluation_packages ep JOIN evaluation_templates et ON et.template_id = ep.template_id
         WHERE ep.package_id = $package_id LIMIT 1")->fetch_assoc();
     if (!$pkg) return false;
 
-    // Recalculate shared score including the late member
-    $new_score = recalculateOrganizationPackageBehaviorScore($conn, $package_id);
+    // A late member belongs to the same department/template/period cohort even
+    // when the original package has already been finalized. Rebuild the cohort
+    // score from criterion ratings, since behavior_average on finalized records
+    // already contains the previously shared score.
+    $department_id = (int) $pkg['department_id'];
+    $template_id = (int) $pkg['template_id'];
+    $period_start = $conn->real_escape_string($pkg['period_start']);
+    $period_end = $conn->real_escape_string($pkg['period_end']);
+    $cohort = $conn->query("SELECT DISTINCT ev.evaluation_id, ev.kra_subtotal,
+            (SELECT AVG(es.score_value)
+             FROM evaluation_scores es
+             JOIN evaluation_criteria ec ON ec.criterion_id = es.criterion_id
+             WHERE es.evaluation_id = ev.evaluation_id AND ec.section = 'Behavior') AS raw_behavior_average
+        FROM evaluation_package_members pm
+        JOIN evaluation_packages cohort_pkg ON cohort_pkg.package_id = pm.package_id
+        JOIN evaluations ev ON ev.evaluation_id = pm.evaluation_id
+        WHERE cohort_pkg.department_id = $department_id
+          AND cohort_pkg.template_id = $template_id
+          AND cohort_pkg.period_start = '$period_start'
+          AND cohort_pkg.period_end = '$period_end'
+          AND (cohort_pkg.status = 'Approved and Applied' OR cohort_pkg.package_id = $package_id)
+          AND pm.member_status IN ('Normal', 'Late Rejoined', 'Catchup Endorsed', 'Catchup Complete')");
+    if (!$cohort || $cohort->num_rows === 0) return false;
+
+    $cohort_members = $cohort->fetch_all(MYSQLI_ASSOC);
+    $raw_total = 0.0;
+    $raw_count = 0;
+    foreach ($cohort_members as $member) {
+        if ($member['raw_behavior_average'] !== null) {
+            $raw_total += (float) $member['raw_behavior_average'];
+            $raw_count++;
+        }
+    }
+    if ($raw_count === 0) return false;
+    $new_score = round($raw_total / $raw_count, 2);
 
     $kra_weight      = (float) $pkg['kra_weight'];
     $behavior_weight = (float) $pkg['behavior_weight'];
-
-    // Apply to this late member's evaluation
-    $ev = $conn->query("SELECT kra_subtotal FROM evaluations WHERE evaluation_id = $evaluation_id LIMIT 1")->fetch_assoc();
-    if (!$ev) return false;
-
-    $total = calculateEvalTotal((float) $ev['kra_subtotal'], $new_score, $kra_weight, $behavior_weight);
-    $level = getPerformanceLevel($total);
-
     $update = $conn->prepare("UPDATE evaluations SET behavior_average = ?, total_score = ?, performance_level = ?, status = 'Approved', approved_date = NOW() WHERE evaluation_id = ?");
-    $update->bind_param('ddsi', $new_score, $total, $level, $evaluation_id);
-    $update->execute();
+    foreach ($cohort_members as $member) {
+        $member_id = (int) $member['evaluation_id'];
+        $total = calculateEvalTotal((float) $member['kra_subtotal'], $new_score, $kra_weight, $behavior_weight);
+        $level = getPerformanceLevel($total);
+        $update->bind_param('ddsi', $new_score, $total, $level, $member_id);
+        $update->execute();
+    }
     $update->close();
+
+    $cohort_score = $conn->prepare("UPDATE evaluation_packages SET shared_behavior_score = ?
+        WHERE department_id = ? AND template_id = ? AND period_start = ? AND period_end = ?
+          AND status = 'Approved and Applied'");
+    $cohort_score->bind_param('diiss', $new_score, $department_id, $template_id, $pkg['period_start'], $pkg['period_end']);
+    $cohort_score->execute();
+    $cohort_score->close();
 
     $conn->query("UPDATE evaluation_package_members SET member_status = 'Catchup Complete' WHERE package_id = $package_id AND evaluation_id = $evaluation_id");
 
     $audit = $conn->prepare("INSERT INTO evaluation_package_audit (package_id, action, remarks) VALUES (?, 'LATE_MEMBER_FINALIZED', ?)");
-    $remark = "Late member evaluation ID $evaluation_id finalized independently. Score: $total, Level: $level.";
+    $remark = "Late member evaluation ID $evaluation_id finalized. Shared behavior score $new_score was recalculated and applied across $raw_count finalized cohort evaluations.";
     $audit->bind_param('is', $package_id, $remark); $audit->execute(); $audit->close();
 
     // Notify the late member
