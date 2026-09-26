@@ -163,25 +163,69 @@
     box-sizing: border-box;
 }
 
-/* ── Senior Accessibility Stats Box ────────────────────────────────────────── */
+/* ── Adaptive Stats Grid & Boxes ────────────────────────────────────────── */
+.evaluation-packages .package-stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 0.85rem;
+    margin-bottom: 1.15rem;
+    width: 100%;
+    box-sizing: border-box;
+}
+
 .evaluation-packages .package-stat {
     background: #F8FAF6;
     border: 1px solid #E2E8F0;
     border-radius: 12px;
     color: var(--rp-text-muted);
-    font-size: 0.95rem;
+    font-size: 0.86rem;
     font-weight: 600;
-    padding: 1rem 1.25rem;
-    text-align: left;
+    padding: 0.85rem 1.15rem;
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.evaluation-packages .package-stat:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(8, 46, 6, 0.08);
+    border-color: #CBD5E1;
+}
+
+.evaluation-packages .package-stat-content {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.evaluation-packages .package-stat-content span {
+    display: block;
+    font-size: 0.78rem;
+    color: var(--rp-text-muted, #64748B);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    font-weight: 700;
 }
 
 .evaluation-packages .package-stat strong {
     color: var(--rp-forest-green);
     display: block;
-    font-size: 1.6rem;
+    font-size: clamp(1.3rem, 1.8vw, 1.65rem);
     font-weight: 800;
-    line-height: 1.2;
-    margin-bottom: 0.25rem;
+    line-height: 1.15;
+    margin-bottom: 0.15rem;
+}
+
+.evaluation-packages .package-stat-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    flex-shrink: 0;
 }
 
 /* ── Shared Behavior Highlight Box ─────────────────────────────────────────── */
@@ -337,13 +381,16 @@
 }
 
 /* ── Tables & Accessible Data Grids ────────────────────────────────────────── */
+/* ── Tables & Accessible Responsive Data Grids ─────────────────────────────── */
 .evaluation-packages .table-responsive {
     border: 1px solid #E2E8F0;
-    border-radius: 10px;
+    border-radius: 12px;
     background: #FFFFFF;
     margin-bottom: 1.25rem;
     overflow-x: auto;
     width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
     -webkit-overflow-scrolling: touch;
 }
 
@@ -351,27 +398,29 @@
     border-collapse: separate;
     border-spacing: 0;
     margin-bottom: 0;
-    min-width: 100%;
     width: 100%;
+    min-width: 100%;
+    table-layout: auto;
 }
 
 .evaluation-packages .package-table th {
     background: #F1F5F9;
     border-bottom: 2px solid var(--rp-border-color);
     color: var(--rp-text-main);
-    font-size: 0.82rem;
+    font-size: clamp(0.72rem, 0.78vw, 0.82rem);
     font-weight: 800;
     letter-spacing: 0.02em;
-    padding: 0.65rem 0.85rem;
+    padding: 0.65rem 0.6rem;
     text-transform: uppercase;
-    white-space: nowrap;
+    line-height: 1.25;
+    vertical-align: middle;
 }
 
 .evaluation-packages .package-table td {
     border-bottom: 1px solid #E2E8F0;
     color: var(--rp-text-main);
-    font-size: 0.88rem;
-    padding: 0.65rem 0.85rem;
+    font-size: clamp(0.8rem, 0.84vw, 0.88rem);
+    padding: 0.65rem 0.6rem;
     vertical-align: middle;
 }
 
@@ -386,6 +435,56 @@
 .evaluation-packages .package-table .tabular-nums {
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
+}
+
+/* ── Proportional Auto-Fit Columns ────────────────────────────────────────── */
+.evaluation-packages .package-table .col-employee {
+    min-width: 130px;
+}
+
+.evaluation-packages .package-table .col-position {
+    min-width: 105px;
+    color: #475569;
+    font-size: 0.82rem;
+}
+
+.evaluation-packages .package-table .col-score {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    min-width: 65px;
+}
+
+.evaluation-packages .package-table .col-final-score {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    font-weight: 800;
+    color: #15803D !important;
+    font-size: clamp(0.95rem, 1vw, 1.08rem) !important;
+    min-width: 70px;
+}
+
+.evaluation-packages .package-table .col-status {
+    min-width: 125px;
+    text-align: left;
+}
+
+.evaluation-packages .package-table .col-action {
+    text-align: right;
+    white-space: nowrap;
+    min-width: 85px;
+}
+
+.evaluation-packages .package-table .col-status .badge {
+    font-size: 0.72rem;
+    padding: 0.28rem 0.5rem;
+    border-radius: 6px;
+    font-weight: 600;
+    white-space: normal;
+    line-height: 1.25;
+    display: inline-block;
+    max-width: 100%;
 }
 
 /* ── Side-by-Side Audit Comparison (Req 4) ─────────────────────────────────── */
@@ -648,33 +747,33 @@
 /* ── 1. ULTRA-WIDE & 2K/4K MONITORS (1600px+) ────────────────────────────── */
 @media (min-width: 1600px) {
     .evaluation-packages {
-        font-size: 1.05rem;
+        font-size: 1.02rem;
     }
     .evaluation-packages .package-hero {
-        padding: 2.25rem 2.5rem;
-        border-radius: 0 18px 18px 0;
+        padding: 2rem 2.25rem;
+        border-radius: 0 16px 16px 0;
     }
     .evaluation-packages .package-hero h1 {
-        font-size: 2.1rem;
+        font-size: 2rem;
     }
     .evaluation-packages .package-card__header {
-        padding: 1.35rem 2rem;
+        padding: 1.25rem 1.75rem;
     }
     .evaluation-packages .package-card__body {
-        padding: 2rem;
+        padding: 1.75rem;
     }
     .evaluation-packages .package-table th {
-        font-size: 0.92rem;
-        padding: 1rem 1.25rem;
+        font-size: 0.88rem;
+        padding: 0.85rem 1rem;
     }
     .evaluation-packages .package-table td {
-        font-size: 1.02rem;
-        padding: 1rem 1.25rem;
+        font-size: 0.95rem;
+        padding: 0.85rem 1rem;
     }
 }
 
-/* ── 2. STANDARD DESKTOP & FULL HD (1200px – 1599px) ─────────────────────── */
-@media (min-width: 1200px) and (max-width: 1599px) {
+/* ── 2. STANDARD DESKTOP & FULL HD (1440px – 1599px) ─────────────────────── */
+@media (min-width: 1440px) and (max-width: 1599.98px) {
     .evaluation-packages {
         width: 100% !important;
     }
@@ -683,25 +782,27 @@
     }
     .evaluation-packages .package-table th,
     .evaluation-packages .package-table td {
-        padding: 0.6rem 0.75rem;
-        font-size: 0.85rem;
+        padding: 0.65rem 0.75rem;
     }
 }
 
-/* ── 3. LAPTOPS & SMALL MONITORS (993px – 1366px) ────────────────────────── */
-@media (max-width: 1366px) {
+/* ── 3. LAPTOPS & COMMON WORKSTATIONS (992px – 1439px) ────────────────────── */
+/* Specially optimized for 1366x768 and 1280x800 business screens with sidebar */
+@media (min-width: 992px) and (max-width: 1439.98px) {
     .evaluation-packages {
         font-size: 0.88rem;
     }
     .evaluation-packages .package-hero {
-        padding: 1.25rem 1.5rem;
-        margin-bottom: 1.25rem;
+        padding: 1.15rem 1.4rem;
+        margin-bottom: 1.15rem;
     }
     .evaluation-packages .package-hero h1 {
-        font-size: 1.45rem;
+        font-size: 1.4rem;
+        margin-bottom: 0.25rem;
     }
     .evaluation-packages .package-hero p {
-        font-size: 0.88rem;
+        font-size: 0.86rem;
+        margin-bottom: 0.4rem;
     }
     .evaluation-packages .package-card__header {
         padding: 0.85rem 1.15rem;
@@ -713,44 +814,61 @@
         padding: 1rem 1.15rem;
     }
     .evaluation-packages .package-stat {
-        padding: 0.75rem 0.9rem;
-        font-size: 0.82rem;
+        padding: 0.75rem 0.95rem;
     }
     .evaluation-packages .package-stat strong {
         font-size: 1.3rem;
     }
+    .evaluation-packages .package-table {
+        width: 100%;
+        table-layout: auto;
+    }
     .evaluation-packages .package-table th {
-        font-size: 0.78rem;
-        padding: 0.5rem 0.65rem;
+        font-size: 0.74rem;
+        padding: 0.5rem 0.45rem;
         letter-spacing: 0.01em;
     }
     .evaluation-packages .package-table td {
         font-size: 0.82rem;
-        padding: 0.5rem 0.65rem;
+        padding: 0.5rem 0.45rem;
     }
-    .evaluation-packages .package-table .btn {
-        padding: 0.25rem 0.55rem;
+    .evaluation-packages .package-table .col-score {
+        min-width: 58px;
+        font-size: 0.8rem;
+    }
+    .evaluation-packages .package-table .col-final-score {
+        min-width: 62px;
+        font-size: 0.95rem !important;
+    }
+    .evaluation-packages .package-table .col-employee {
+        min-width: 110px;
+    }
+    .evaluation-packages .package-table .col-position {
+        min-width: 90px;
         font-size: 0.78rem;
     }
+    .evaluation-packages .package-table .col-status {
+        min-width: 110px;
+    }
+    .evaluation-packages .package-table .col-action {
+        min-width: 78px;
+    }
+    .evaluation-packages .package-table .btn {
+        padding: 0.22rem 0.5rem;
+        font-size: 0.75rem;
+    }
     .evaluation-packages .pipeline-badge {
-        font-size: 0.8rem;
-        padding: 0.3rem 0.75rem;
+        font-size: 0.78rem;
+        padding: 0.25rem 0.65rem;
     }
     .evaluation-packages .package-nav-tabs .nav-link {
         font-size: 0.82rem;
-        padding: 0.55rem 0.85rem;
-    }
-    .score-circle {
-        height: 46px;
-        min-height: 46px;
-        min-width: 46px;
-        width: 46px;
-        font-size: 0.85rem;
+        padding: 0.5rem 0.8rem;
     }
 }
 
-/* ── 4. TABLETS & MEDIUM SCREENS (769px – 992px) ─────────────────────────── */
-@media (max-width: 992px) {
+/* ── 4. TABLETS & MEDIUM SCREENS (769px – 991.98px) ───────────────────────── */
+@media (max-width: 991.98px) {
     .evaluation-packages .package-card__header {
         align-items: flex-start;
         flex-direction: column;
@@ -763,22 +881,30 @@
     .evaluation-packages .package-stat strong {
         font-size: 1.2rem;
     }
+    .evaluation-packages .package-table th {
+        font-size: 0.75rem;
+        padding: 0.5rem 0.45rem;
+    }
+    .evaluation-packages .package-table td {
+        font-size: 0.8rem;
+        padding: 0.5rem 0.45rem;
+    }
 }
 
 /* ── 5. MOBILE & SMALL TOUCH SCREENS (<= 768px) ──────────────────────────── */
 @media (max-width: 768px) {
     .evaluation-packages .package-hero {
-        padding: 1.15rem 1rem;
-        border-radius: 0 12px 12px 0;
+        padding: 1rem 0.85rem;
+        border-radius: 0 10px 10px 0;
     }
     .evaluation-packages .package-hero h1 {
-        font-size: 1.25rem;
+        font-size: 1.2rem;
     }
     .evaluation-packages .package-card__body {
-        padding: 0.9rem;
+        padding: 0.85rem;
     }
     .roster-card {
-        padding: 1rem 0.85rem;
+        padding: 0.85rem 0.75rem;
     }
     .evaluation-packages .package-nav-tabs {
         flex-direction: column;

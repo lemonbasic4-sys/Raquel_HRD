@@ -167,6 +167,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $editing_id = (int) ($_POST['edit_id'] ?? 0);
     $employee_consent_agreed = isset($_POST['employee_consent_agreed']) ? 1 : 0;
     $employee_signature_data = trim($_POST['employee_signature_data'] ?? '');
+    // Safety: ensure oversized uploaded signature data is compressed to fit safely in MySQL
+    if (!empty($employee_signature_data) && strlen($employee_signature_data) > 80000) {
+        if (preg_match('/^data:image\/(\w+);base64,/', $employee_signature_data)) {
+            $comma_pos = strpos($employee_signature_data, ',');
+            $raw_bytes = base64_decode(substr($employee_signature_data, $comma_pos + 1));
+            if ($raw_bytes !== false && function_exists('imagecreatefromstring')) {
+                $src = @imagecreatefromstring($raw_bytes);
+                if ($src !== false) {
+                    $orig_w = imagesx($src);
+                    $orig_h = imagesy($src);
+                    $max_w = 600;
+                    $max_h = 200;
+                    $scale = min($max_w / max(1, $orig_w), $max_h / max(1, $orig_h), 1.0);
+                    $new_w = max(1, (int) round($orig_w * $scale));
+                    $new_h = max(1, (int) round($orig_h * $scale));
+
+                    $dst = imagecreatetruecolor($new_w, $new_h);
+                    imagealphablending($dst, false);
+                    imagesavealpha($dst, true);
+                    $transparent = imagecolorallocatealpha($dst, 255, 255, 255, 127);
+                    imagefilledrectangle($dst, 0, 0, $new_w, $new_h, $transparent);
+
+                    imagecopyresampled($dst, $src, 0, 0, 0, 0, $new_w, $new_h, $orig_w, $orig_h);
+
+                    ob_start();
+                    imagepng($dst, null, 6);
+                    $compressed = ob_get_clean();
+
+                    imagedestroy($src);
+                    imagedestroy($dst);
+
+                    if (!empty($compressed)) {
+                        $employee_signature_data = 'data:image/png;base64,' . base64_encode($compressed);
+                    }
+                }
+            }
+        }
+    }
     $editable_eval = null;
     $is_assigned_submission = false;
 
@@ -2905,10 +2943,10 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     function loadSigFile(file) {
-        const MAX_BYTES = 2 * 1024 * 1024; // 2 MB
+        const MAX_BYTES = 5 * 1024 * 1024; // Up to 5 MB accepted from camera/device
         if (file.size > MAX_BYTES) {
-            if (typeof showToast === 'function') showToast('Image is too large. Please use a file under 2 MB.', 'error');
-            else alert('Image is too large. Please use a file under 2 MB.');
+            if (typeof showToast === 'function') showToast('Image is too large. Please use a file under 5 MB.', 'error');
+            else alert('Image is too large. Please use a file under 5 MB.');
             return;
         }
         if (!file.type.startsWith('image/')) {
@@ -2919,17 +2957,46 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const reader = new FileReader();
         reader.onload = function(e) {
-            const base64 = e.target.result;
-            const hiddenInput = document.getElementById('employee_signature_data');
-            if (hiddenInput) hiddenInput.value = base64;
+            const rawBase64 = e.target.result;
+            const img = new Image();
+            img.onload = function() {
+                // Downscale signature to fit cleanly inside 600x200 bounding box
+                const maxW = 600;
+                const maxH = 200;
+                let w = img.width;
+                let h = img.height;
 
-            // Show preview
-            const previewImg  = document.getElementById('sigUploadPreviewImg');
-            const previewDiv  = document.getElementById('sigUploadPreview');
-            const dropZone    = document.getElementById('sigDropZone');
-            if (previewImg) previewImg.src = base64;
-            if (previewDiv) previewDiv.style.display = '';
-            if (dropZone)   dropZone.style.display   = 'none';
+                if (w > maxW || h > maxH) {
+                    const ratio = Math.min(maxW / w, maxH / h);
+                    w = Math.round(w * ratio);
+                    h = Math.round(h * ratio);
+                }
+
+                const canvas = document.createElement('canvas');
+                canvas.width = w;
+                canvas.height = h;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, w, h);
+
+                // Use PNG to preserve transparency; compressed to ~20-50 KB
+                const compressedBase64 = canvas.toDataURL('image/png');
+
+                const hiddenInput = document.getElementById('employee_signature_data');
+                if (hiddenInput) hiddenInput.value = compressedBase64;
+
+                // Show preview
+                const previewImg  = document.getElementById('sigUploadPreviewImg');
+                const previewDiv  = document.getElementById('sigUploadPreview');
+                const dropZone    = document.getElementById('sigDropZone');
+                if (previewImg) previewImg.src = compressedBase64;
+                if (previewDiv) previewDiv.style.display = '';
+                if (dropZone)   dropZone.style.display   = 'none';
+            };
+            img.onerror = function() {
+                if (typeof showToast === 'function') showToast('Failed to process image file.', 'error');
+                else alert('Failed to process image file.');
+            };
+            img.src = rawBase64;
         };
         reader.readAsDataURL(file);
     }

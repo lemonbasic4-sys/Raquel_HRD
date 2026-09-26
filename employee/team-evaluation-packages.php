@@ -527,17 +527,23 @@ if (in_array($session_role, ['HR Manager', 'HR Supervisor', 'Admin'], true)) {
             </header>
             <div class="collapse show" id="pkgBody-act-<?php echo (int)$package['package_id']; ?>">
                 <div class="package-card__body">
-                <div class="row g-3 mb-4">
-                    <div class="col-sm-6">
-                        <div class="package-stat">
+                <div class="package-stat-grid mb-3">
+                    <div class="package-stat">
+                        <div class="package-stat-icon" style="background: rgba(8, 46, 6, 0.08); color: var(--rp-forest-green, #082E06);">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <div class="package-stat-content">
                             <strong><?php echo count($members); ?> Members</strong>
-                            Department Team Size
+                            <span>Department Team Size</span>
                         </div>
                     </div>
-                    <div class="col-sm-6">
-                        <div class="package-stat">
+                    <div class="package-stat">
+                        <div class="package-stat-icon" style="background: rgba(189, 148, 20, 0.12); color: var(--rp-primary-gold-dark, #8C6D0D);">
+                            <i class="fas fa-handshake"></i>
+                        </div>
+                        <div class="package-stat-content">
                             <strong><?php echo $package['shared_behavior_score'] !== null ? number_format((float)$package['shared_behavior_score'], 2) : 'Calculating…'; ?></strong>
-                            Shared Behavior Score
+                            <span>Shared Behavior Score</span>
                         </div>
                     </div>
                 </div>
@@ -570,14 +576,14 @@ if (in_array($session_role, ['HR Manager', 'HR Supervisor', 'Admin'], true)) {
                             <table class="package-table table align-middle mb-0">
                                 <thead>
                                     <tr>
-                                        <th>Employee</th>
-                                        <th>Position</th>
-                                        <th class="text-end">Individual KRA</th>
-                                        <th class="text-end">Self Behavior</th>
-                                        <th class="text-end">Total Score</th>
-                                        <th class="text-end">Final Score</th>
-                                        <th>Status</th>
-                                        <th class="text-end">Action</th>
+                                        <th class="col-employee">Employee</th>
+                                        <th class="col-position">Position</th>
+                                        <th class="text-end col-score"><span class="d-none d-lg-inline">Individual </span>KRA</th>
+                                        <th class="text-end col-score"><span class="d-none d-lg-inline">Self </span>Behavior</th>
+                                        <th class="text-end col-score">Total<span class="d-none d-xl-inline"> Score</span></th>
+                                        <th class="text-end col-final-score">Final<span class="d-none d-xl-inline"> Score</span></th>
+                                        <th class="col-status">Status</th>
+                                        <th class="text-end col-action">Action</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -591,7 +597,7 @@ if (in_array($session_role, ['HR Manager', 'HR Supervisor', 'Admin'], true)) {
                                         $final_score_val = calculateEvalTotal((float)$member['kra_subtotal'], $shared_beh_val, $kra_w, $beh_w);
                                         ?>
                                         <tr>
-                                            <td>
+                                            <td class="col-employee">
                                                 <div class="fw-bold"><?php echo e($member['first_name'] . ' ' . $member['last_name']); ?></div>
                                                 <?php if (($member['member_status'] ?? 'Normal') === 'Late Rejoined'): ?>
                                                     <span class="badge py-1 px-2" style="background:rgba(234,179,8,0.2); border:1px solid rgba(234,179,8,0.5); color:#fde047; font-size:0.72rem;" title="This member submitted their self-rating after the package had already advanced. The package was re-opened for consolidation to include them.">
@@ -612,15 +618,15 @@ if (in_array($session_role, ['HR Manager', 'HR Supervisor', 'Admin'], true)) {
                                                     </span>
                                                 <?php endif; ?>
                                             </td>
-                                            <td><?php echo e($member['job_title']); ?></td>
-                                            <td class="text-end tabular-nums fw-semibold"><?php echo number_format((float)$member['kra_subtotal'], 2); ?></td>
-                                            <td class="text-end tabular-nums fw-semibold"><?php echo number_format((float)$member['behavior_average'], 2); ?></td>
-                                            <td class="text-end tabular-nums fw-semibold text-muted"><?php echo number_format($total_score_val, 2); ?></td>
-                                            <td class="text-end tabular-nums fw-bold text-success" style="font-size: 1.05rem;"><?php echo number_format($final_score_val, 2); ?></td>
-                                            <td>
+                                            <td class="col-position"><?php echo e($member['job_title']); ?></td>
+                                            <td class="col-score text-end tabular-nums fw-semibold"><?php echo number_format((float)$member['kra_subtotal'], 2); ?></td>
+                                            <td class="col-score text-end tabular-nums fw-semibold"><?php echo number_format((float)$member['behavior_average'], 2); ?></td>
+                                            <td class="col-score text-end tabular-nums fw-semibold text-muted"><?php echo number_format($total_score_val, 2); ?></td>
+                                            <td class="col-final-score text-end tabular-nums fw-bold text-success" style="font-size: 1.05rem;"><?php echo number_format($final_score_val, 2); ?></td>
+                                            <td class="col-status">
                                                 <span class="badge bg-secondary"><?php echo e($member['status']); ?></span>
                                             </td>
-                                            <td class="text-end">
+                                            <td class="col-action text-end">
                                                 <?php if ($can_adjust): ?>
                                                     <a class="btn-action-adjust btn btn-sm" href="<?php echo BASE_URL; ?>/employee/package-member-review.php?package_id=<?php echo (int)$package['package_id']; ?>&evaluation_id=<?php echo (int)$member['evaluation_id']; ?>" title="View ratings and make supervisor adjustments">
                                                         <i class="fas fa-sliders-h me-1"></i>Adjust
@@ -801,7 +807,7 @@ if (in_array($session_role, ['HR Manager', 'HR Supervisor', 'Admin'], true)) {
 
                     <!-- F3: Pre-Submission Summary & Confirmation Modal -->
                     <div class="modal fade" id="confirmApproveModal-<?php echo (int)$package['package_id']; ?>" tabindex="-1" aria-labelledby="confirmModalLabel-<?php echo (int)$package['package_id']; ?>" aria-hidden="true">
-                        <div class="modal-dialog modal-lg modal-dialog-centered">
+                        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
                             <div class="modal-content border-0 shadow">
                                 <div class="modal-header bg-dark text-white">
                                     <h5 class="modal-title fw-bold" id="confirmModalLabel-<?php echo (int)$package['package_id']; ?>">

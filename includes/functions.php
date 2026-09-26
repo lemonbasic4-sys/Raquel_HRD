@@ -2384,6 +2384,12 @@ function ensureOrganizationEvaluationPackageSchema($conn)
         } catch (mysqli_sql_exception $e) {
             // Column already exists or table unavailable — ignore silently.
         }
+        try {
+            $conn->query("ALTER TABLE evaluation_package_members
+                MODIFY member_status ENUM('Normal','Late Rejoined','Pending Supervisor Catchup','Pending HR Catchup','Catchup Endorsed','Catchup Complete') NOT NULL DEFAULT 'Normal'");
+        } catch (mysqli_sql_exception $e) {
+            // Safe to ignore if already altered
+        }
         // Ensure index on department_id exists before dropping uq_evaluation_package (as foreign key requires it)
         try {
             $conn->query("ALTER TABLE evaluation_packages ADD INDEX idx_package_dept (department_id)");
@@ -3975,7 +3981,7 @@ function applyOrganizationPackageResults($conn, $package_id)
     }
     $score = (float) $package['shared_behavior_score'];
     $kra_weight = (float) $package['kra_weight']; $behavior_weight = (float) $package['behavior_weight'];
-    $members = $conn->prepare("SELECT e.evaluation_id, e.kra_subtotal FROM evaluation_package_members pm JOIN evaluations e ON e.evaluation_id = pm.evaluation_id WHERE pm.package_id = ? AND pm.member_status IN ('Normal', 'Catchup Endorsed')");
+    $members = $conn->prepare("SELECT e.evaluation_id, e.kra_subtotal FROM evaluation_package_members pm JOIN evaluations e ON e.evaluation_id = pm.evaluation_id WHERE pm.package_id = ? AND pm.member_status IN ('Normal', 'Late Rejoined', 'Catchup Endorsed')");
     $members->bind_param('i', $package_id); $members->execute(); $result = $members->get_result();
     while ($evaluation = $result->fetch_assoc()) {
         $total = calculateEvalTotal((float) $evaluation['kra_subtotal'], $score, $kra_weight, $behavior_weight);
