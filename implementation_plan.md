@@ -301,3 +301,152 @@ The feature is ready when:
 - Should historical forms display original signatures, names only, or approval text?
 - Which HR role may import and roll back batches?
 - Should the system allow historical records with no matching template, using a generic historical template?
+
+---
+
+# Progressive Department Shared Behavior Implementation Plan
+
+> Planning only. No application code or database records have been changed. This section documents the proposed fix for progressive Shared Behavior across submitted employee evaluations in the same department cohort.
+
+## 1. Purpose
+
+Calculate Shared Behavior from the Individual Behavior scores of every participating employee in the same department, evaluation template, and evaluation period. Participation begins when an employee's self-rating is submitted and an Individual Behavior score is available. Package workflow status and package ownership must not remove an otherwise eligible employee from this population.
+
+The calculation must work when employees are in separate packages because a prior package has already advanced through consolidation. For the inspected HR 2026 scenario, the expected score is:
+
+```text
+(2.63 + 2.75 + 3.13) / 3 = 2.836666... = 2.84
+```
+
+## 2. Inspected Current State
+
+The live database contains these HR evaluations in department 7, template 1, period 2026-01-01 through 2026-12-31:
+
+| Employee | Evaluation | Package | Workflow state | Individual Behavior |
+| --- | ---: | ---: | --- | ---: |
+| Elena Delgado, HR Manager | 2 | 1 | Package review pending | 2.63 |
+| Patricia Gomez, HR Supervisor | 1 | 1 | Consolidation approved; manager review pending | 2.75 |
+| Miguel Torres, HR Staff | 3 | 2 | Team consolidation pending | 3.13 |
+
+All three submitted evaluations have eight Behavior score rows. Package 1 currently stores Shared Behavior 2.69; package 2 stores 3.13. Department team size is 3.
+
+The existing `recalculateOrganizationPackageBehaviorScore()` in `includes/functions.php` averages eligible members from the package being recalculated plus members of matching prior packages whose status is `Approved and Applied`. Since package 1 is `Pending Review`, recalculating package 2 excludes Elena and Patricia. Package 2 then averages only Miguel's eight Behavior items: 3.125, rounded to 3.13.
+
+The current calculation is scoped using package department, template, period, and membership. The consolidator is not an aggregation filter, though a package that has passed consolidation can cause a later submission to be placed in a separate package. Department membership is not currently the direct participant query for Shared Behavior.
+
+## 3. Proposed Participation Rules
+
+An employee participates when all of the following are true:
+
+1. Their employee record belongs to the cohort department.
+2. Their evaluation matches the cohort template and period.
+3. Their self-rating has been submitted (not Draft, Pending Self-Rating, Returned, or Rejected).
+4. Their Individual Behavior score can be computed from the Behavior items.
+
+Do not require team consolidation, manager review, governance approval, or final application. Do not infer department membership from a package owner or consolidator. Do not require that the employee's evaluation share a package with the other participants.
+
+Use the existing score override precedence when selecting an item's effective rating:
+
+```text
+manager override, otherwise supervisor override, otherwise department-manager override, otherwise submitted score
+```
+
+Compute each participating employee's Individual Behavior independently. Count each employee at most once for the cohort. If duplicate evaluations exist for the same employee and cohort, define a deterministic eligible evaluation selection and surface duplicates for review rather than counting both.
+
+## 4. Proposed Calculation and Rounding
+
+To match the provided workbook, use each participant's Individual Behavior score at two decimal places, average those employee values, then round the resulting department score to two decimal places:
+
+```text
+individual_behavior(employee) = round(average(effective Behavior item scores), 2)
+shared_behavior = round(average(individual_behavior for unique participants), 2)
+```
+
+For the current HR cohort:
+
+```text
+round(average(2.63, 2.75, 3.13), 2)
+= round(2.836666..., 2)
+= 2.84
+```
+
+Do not use a prior Shared Behavior value as an employee input. Recompute from the Individual Behavior values of the participating employees. This avoids incorrectly treating the prior 2-person value of 2.69 as one person's score and avoids dependence on package arrival order.
+
+## 5. Score Boundaries to Preserve
+
+- **Individual KRA:** unchanged.
+- **Individual Behavior:** remains each employee's own average across their Behavior items.
+- **Individual Score:** remains `(Individual KRA × 80%) + (Individual Behavior × 20%)` for the configured weights.
+- **Final Score:** remains `(Individual KRA × 80%) + (department Shared Behavior × 20%)` for the configured weights.
+- **Department Team Size:** remains the active department employee count; it is not the participating employee count or package member count.
+- **Workflow and approvals:** unchanged. Participating in Shared Behavior does not finalize an evaluation or add it to final analytics.
+
+## 6. Proposed Update Flow
+
+1. On a submitted self-rating or an adjustment that changes an Individual Behavior item, identify the cohort from department, template, and period.
+2. Query all eligible submitted evaluations for that cohort across packages, independent of package workflow status.
+3. Compute per-employee Individual Behavior and the unique participant count.
+4. Compute the department Shared Behavior using the rounding policy above.
+5. Persist the provisional Shared Behavior consistently for relevant open packages in that cohort so separate package cards do not show separate department populations.
+6. Keep final score application and analytics governed by their existing finalization flow. Do not broaden analytics changes as part of this fix.
+
+The existing finalization path that applies package results and propagates progressive values should be reviewed for compatibility with the cohort calculation. Change it only if required to ensure final scores use the same department Shared Behavior; do not change unrelated approval or analytics behavior.
+
+## 7. Likely Code Locations
+
+### Primary calculation
+
+- `includes/functions.php`
+- `recalculateOrganizationPackageBehaviorScore()` (currently around line 3684): replace package-local plus approved-package aggregation with cohort-wide eligible Individual Behavior aggregation and consistent persistence to the relevant open cohort packages.
+
+### Recalculation triggers to verify
+
+- `syncEvaluationToOrganizationPackage()` in `includes/functions.php`: called as evaluations are added to packages, including standalone package creation for late submissions.
+- `syncWaitingOrganizationPackages()` in `includes/functions.php`: recalculates when a waiting package is unlocked.
+- Package member score adjustment and return paths in `employee/package-member-review.php` and `employee/team-evaluation-packages.php`: ensure a changed or removed participant triggers cohort recalculation.
+- Consolidation-time recalculation in `employee/team-evaluation-packages.php`: keep if needed for score adjustments, but it must call the same cohort calculation.
+
+### Display and score consumers to verify
+
+- `employee/team-evaluation-packages.php`: displays the package Shared Behavior and calculates estimated final scores from it.
+- `employee/package-member-review.php`: reads package Shared Behavior for the estimated final score.
+- `employee/team-evaluation-history.php` and `employee/evaluation-history.php`: inspect only to confirm they display consistent package values; avoid unrelated history or analytics changes.
+
+The implementation should centralize calculation logic rather than implement different formulas in each caller or view. Views should continue to consume the persisted cohort score.
+
+## 8. Validation Scenarios
+
+Before release, verify at minimum:
+
+1. **Current split-package case:** scores 2.63, 2.75, and 3.13 across two in-progress packages produce 2.84 in both relevant package views; participation count is 3; department team size is 3.
+2. **Before staff submission:** manager and supervisor scores 2.63 and 2.75 produce 2.69; participant count is 2; team size remains 3.
+3. **Workflow independence:** a submitted employee in pending consolidation or review participates; a draft, returned, or rejected evaluation does not.
+4. **Package independence:** different consolidators or package IDs in the same department/template/period do not split the population.
+5. **Cohort boundaries:** another department, template, or period is excluded.
+6. **No duplicate counting:** an employee appearing through duplicate membership/query joins contributes once.
+7. **Missing Behavior scores:** an employee without an available Individual Behavior score is not counted until the score becomes available.
+8. **Score separation:** Individual Score still uses personal Individual Behavior; Final Score uses department Shared Behavior.
+9. **Precision:** participant Individual Behavior values are rounded to two decimals, then the cohort average is rounded to two decimals, matching the supplied workbook.
+
+## 9. Acceptance Criteria
+
+- HR Manager, HR Supervisor, and HR Staff participate in the same HR department cohort once their self-ratings and Individual Behavior scores are available.
+- The current three-person example produces Shared Behavior **2.84**, not **3.13**.
+- A package's workflow status and consolidator do not determine department participation.
+- Team size remains 3 independently of the 2- or 3-person participation count.
+- Individual Behavior, Individual Score, KRA, finalization, approval workflow, and analytics retain their defined responsibilities.
+- The calculation is cohort-wide and consistent across open packages in the same department/template/period.
+
+## 10. Not in Scope
+
+- KRA formula or criteria changes.
+- Behavior item formula or score override precedence changes.
+- Individual Score formula changes.
+- Consolidation, review, governance, or approval workflow redesign.
+- Changing department assignments or package ownership.
+- General analytics, reports, or historical evaluation changes.
+- Backfilling or rewriting existing finalized records unless separately reviewed and approved.
+
+## 11. Approval Boundary
+
+This document is a proposal only. No PHP, SQL schema, seed data, live evaluation data, or workflow settings have been modified. Implementation should begin only after this plan and the rounding rule are approved.
