@@ -3733,6 +3733,33 @@ function recalculateOrganizationPackageBehaviorScore($conn, $package_id)
     return $score;
 }
 
+/** True when a still-open package shares a cycle with already-approved results. */
+function hasOpenProgressiveEvaluationCohort($conn)
+{
+    $result = $conn->query("SELECT EXISTS(
+        SELECT 1
+        FROM evaluation_packages completed_pkg
+        JOIN evaluation_package_members completed_member ON completed_member.package_id = completed_pkg.package_id
+        JOIN evaluations completed_eval ON completed_eval.evaluation_id = completed_member.evaluation_id
+        WHERE completed_pkg.status = 'Approved and Applied'
+          AND completed_eval.status = 'Approved'
+          AND EXISTS (
+              SELECT 1
+              FROM evaluation_packages open_pkg
+              JOIN evaluation_package_members open_member ON open_member.package_id = open_pkg.package_id
+              WHERE open_pkg.department_id = completed_pkg.department_id
+                AND open_pkg.template_id = completed_pkg.template_id
+                AND open_pkg.period_start = completed_pkg.period_start
+                AND open_pkg.period_end = completed_pkg.period_end
+                AND open_pkg.package_id <> completed_pkg.package_id
+                AND open_pkg.status NOT IN ('Approved and Applied', 'Cancelled')
+                AND open_member.evaluation_id <> completed_eval.evaluation_id
+          )
+    ) AS has_open_cohort");
+    if (!$result) return false;
+    return (bool) ($result->fetch_assoc()['has_open_cohort'] ?? false);
+}
+
 /**
  * Scan all packages in 'Pending Self-Ratings' or with Step 1 'Waiting'
  * and automatically unlock them to 'Pending Consolidation' (Step 1 'Pending')
@@ -4055,7 +4082,8 @@ function finalizeLatePackageMember($conn, $package_id, $evaluation_id)
 function applyOrganizationPackageResults($conn, $package_id)
 {
     $package_id = (int) $package_id;
-    $stmt = $conn->prepare("SELECT ep.status, ep.shared_behavior_score, et.kra_weight, et.behavior_weight
+    $stmt = $conn->prepare("SELECT ep.status, ep.shared_behavior_score, ep.department_id, ep.template_id,
+            ep.period_start, ep.period_end, et.kra_weight, et.behavior_weight
         FROM evaluation_packages ep JOIN evaluation_templates et ON et.template_id = ep.template_id
         WHERE ep.package_id = ? LIMIT 1");
     $stmt->bind_param('i', $package_id); $stmt->execute(); $package = $stmt->get_result()->fetch_assoc(); $stmt->close();
@@ -4075,6 +4103,60 @@ function applyOrganizationPackageResults($conn, $package_id)
         $update->bind_param('ddsi', $score, $total, $level, $evaluation_id); $update->execute(); $update->close();
     }
     $members->close();
+
+    // The shared score is progressive for the entire department/template/period
+    // cohort. Once this package is finalized, carry the latest shared value and
+    // final score into earlier finalized evaluations in that same cohort.
+    $department_id = (int) $package['department_id'];
+    $template_id = (int) $package['template_id'];
+    $period_start = $conn->real_escape_string($package['period_start']);
+    $period_end = $conn->real_escape_string($package['period_end']);
+    $prior_members = $conn->query("SELECT DISTINCT ev.evaluation_id, ev.kra_subtotal
+        FROM evaluation_package_members pm
+        JOIN evaluation_packages prior_pkg ON prior_pkg.package_id = pm.package_id
+        JOIN evaluations ev ON ev.evaluation_id = pm.evaluation_id
+        WHERE prior_pkg.department_id = $department_id
+          AND prior_pkg.template_id = $template_id
+          AND prior_pkg.period_start = '$period_start'
+          AND prior_pkg.period_end = '$period_end'
+          AND prior_pkg.status = 'Approved and Applied'
+          AND prior_pkg.package_id <> $package_id
+          AND pm.member_status IN ('Normal', 'Late Rejoined', 'Catchup Endorsed', 'Catchup Complete')");
+    if ($prior_members) {
+        $update_prior = $conn->prepare("UPDATE evaluations
+            SET behavior_average = ?, total_score = ?, performance_level = ?, status = 'Approved', approved_date = NOW()
+            WHERE evaluation_id = ?");
+        while ($prior = $prior_members->fetch_assoc()) {
+            $prior_eval_id = (int) $prior['evaluation_id'];
+            $prior_total = calculateEvalTotal((float) $prior['kra_subtotal'], $score, $kra_weight, $behavior_weight);
+            $prior_level = getPerformanceLevel($prior_total);
+            $update_prior->bind_param('ddsi', $score, $prior_total, $prior_level, $prior_eval_id);
+            $update_prior->execute();
+        }
+        $update_prior->close();
+
+        $update_prior_packages = $conn->prepare("UPDATE evaluation_packages SET shared_behavior_score = ?
+            WHERE department_id = ? AND template_id = ? AND period_start = ? AND period_end = ?
+              AND status = 'Approved and Applied'");
+        $update_prior_packages->bind_param('diiss', $score, $department_id, $template_id, $package['period_start'], $package['period_end']);
+        $update_prior_packages->execute();
+        $update_prior_packages->close();
+
+        $prior_packages = $conn->query("SELECT DISTINCT package_id FROM evaluation_packages
+            WHERE department_id = $department_id AND template_id = $template_id
+              AND period_start = '$period_start' AND period_end = '$period_end'
+              AND status = 'Approved and Applied' AND package_id <> $package_id");
+        $audit_prior = $conn->prepare("INSERT INTO evaluation_package_audit (package_id, action, remarks)
+            VALUES (?, 'PROGRESSIVE_SHARED_SCORE_UPDATED', ?)");
+        $audit_remark = "A later cohort package finalized. Progressive shared behavior score updated to $score and applied to this package's finalized evaluations.";
+        while ($prior_package = $prior_packages->fetch_assoc()) {
+            $prior_package_id = (int) $prior_package['package_id'];
+            $audit_prior->bind_param('is', $prior_package_id, $audit_remark);
+            $audit_prior->execute();
+        }
+        $audit_prior->close();
+    }
+
     $conn->query("UPDATE evaluation_package_members SET member_status = 'Catchup Complete' WHERE package_id = $package_id AND member_status = 'Catchup Endorsed'");
     return true;
 }

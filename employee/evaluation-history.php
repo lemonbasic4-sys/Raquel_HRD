@@ -6,6 +6,7 @@ require_once '../includes/functions.php';
 ensureEvaluationWorkflowSchema($conn);
 ensureHistoricalImportSchema($conn);
 ensureOrganizationEvaluationPackageSchema($conn);
+$show_progressive_notice = hasOpenProgressiveEvaluationCohort($conn);
 $user_id = (int) ($_SESSION['user_id'] ?? 0);
 $employee_stmt = $conn->prepare('SELECT employee_id FROM users WHERE user_id = ? LIMIT 1');
 $employee_stmt->bind_param('i', $user_id);
@@ -179,6 +180,13 @@ require_once '../includes/header.php';
             <i class="fas fa-info-circle me-1"></i>Review your submitted evaluations, scores, and audit details.
         </p>
     </section>
+
+    <?php if ($show_progressive_notice): ?>
+    <div class="alert alert-warning d-flex align-items-start gap-2 mt-3" role="status">
+        <i class="fas fa-hourglass-half mt-1"></i>
+        <div><strong>Scores are provisional for active evaluation cycles.</strong> At least one employee is still in evaluation for a department, template, and period with approved results. When the remaining evaluation is finalized, the progressive Shared Behavior Score and final scores for that completed cohort may be updated. Individual Behavior remains each employee’s own rating.</div>
+    </div>
+    <?php endif; ?>
 
     <div class="d-md-none d-flex justify-content-between align-items-center mt-3 mb-4 flex-wrap gap-3">
         <a href="<?php echo BASE_URL; ?>/employee/dashboard.php" class="btn btn-primary btn-sm rounded-pill px-3 shadow-sm">

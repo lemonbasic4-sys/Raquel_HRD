@@ -8,6 +8,7 @@ require_once '../includes/session-check.php';
 checkRole(['HR Staff']);
 require_once '../includes/functions.php';
 ensureHistoricalImportSchema($conn);
+$show_progressive_notice = hasOpenProgressiveEvaluationCohort($conn);
 require_once '../includes/header.php';
 
 // Fetch evaluation history
@@ -118,6 +119,13 @@ ksort($existing_templates);
         </div>
     </div>
 </div>
+
+<?php if ($show_progressive_notice): ?>
+<div class="alert alert-warning d-flex align-items-start gap-2 mt-3" role="status">
+    <i class="fas fa-hourglass-half mt-1"></i>
+    <div><strong>Scores are provisional for active evaluation cycles.</strong> At least one employee is still in evaluation for a department, template, and period with approved results. When the remaining evaluation is finalized, the progressive Shared Behavior Score and final scores for that completed cohort may be updated. Individual Behavior remains each employee’s own rating.</div>
+</div>
+<?php endif; ?>
 
 <style>
     .badge-audit {
