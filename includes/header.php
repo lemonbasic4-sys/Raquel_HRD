@@ -201,7 +201,6 @@ switch ($effective_role) {
         $is_dept_manager_menu = false;
         $is_supervisor_menu  = false;
         $hdr_sup_dept_name   = '';
-        $_hdr_viewer_hr_role = null;
         if (isset($_SESSION['employee_id']) && $conn) {
             $_hdr_emp_id = (int) $_SESSION['employee_id'];
             $_hdr_dept_stmt = $conn->prepare("
@@ -319,8 +318,6 @@ switch ($effective_role) {
                 }
             }
 
-            // Resolve HR role for use elsewhere in this block
-            $_hdr_viewer_hr_role = getEmployeeHRRole($conn, $_hdr_emp_id);
         }
 
         // ── Section 1: My Profile ───────────────────────────────────────────
@@ -338,9 +335,9 @@ switch ($effective_role) {
         // ── Section 3: My Team (supervisors/managers & assigned package reviewers) ──
         $m_pending_pkg_count = countPendingOrganizationPackagesForUser($conn, (int)($_SESSION['user_id'] ?? 0));
         $menu_my_team = [];
-        $is_hr_personnel = (strcasecmp($_hdr_emp_dept ?? '', 'Human Resources') === 0) 
-                            || !empty($_hdr_viewer_hr_role) 
-                            || in_array($_SESSION['role'] ?? '', ['HR Manager', 'HR Supervisor', 'HR Staff'], true);
+        // The current department controls this Employee Portal menu. A held
+        // former HRIS role may remain linked for audit/history after transfer.
+        $is_hr_personnel = strcasecmp($_hdr_emp_dept ?? '', 'Human Resources') === 0;
         if (!$is_hr_personnel && ($is_supervisor_menu || $m_pending_pkg_count > 0)) {
             $menu_my_team[] = ['icon' => 'fas fa-users',       'label' => 'My Team',                  'url' => BASE_URL . '/employee/team-list.php',              'page' => 'team-list.php'];
             $menu_my_team[] = ['icon' => 'fas fa-layer-group', 'label' => 'Team Evaluation Packages', 'url' => BASE_URL . '/employee/team-evaluation-packages.php', 'page' => 'team-evaluation-packages.php', 'badge' => $m_pending_pkg_count ?: null, 'badge_class' => 'bg-warning text-dark'];
@@ -370,6 +367,11 @@ switch ($effective_role) {
                 }
             }
             $menu_career[] = ['icon' => 'fas fa-clipboard-check', 'label' => 'Transfer Approvals', 'url' => BASE_URL . '/employee/branch-manager-approvals.php', 'page' => 'branch-manager-approvals.php', 'badge' => $_hdr_bm_pending];
+        }
+        // Branch Supervisor (rank 4): can file career movement requests for
+        // employees in their branch through the Employee Portal workflow.
+        if ($_hdr_emp_rank === 4) {
+            $menu_career[] = ['icon' => 'fas fa-route', 'label' => 'Career Movements', 'url' => BASE_URL . '/employee/career-movement-request.php', 'page' => 'career-movement-request.php'];
         }
 
         // ── Build sidebar with grouped sections ─────────────────────────────

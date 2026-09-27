@@ -17,9 +17,11 @@ $emp_dept_stmt->bind_param("i", $employee_id);
 $emp_dept_stmt->execute();
 $emp_dept_name = $emp_dept_stmt->get_result()->fetch_assoc()['department_name'] ?? '';
 $emp_dept_stmt->close();
-$hr_role = getEmployeeHRRole($conn, $employee_id);
 
-if (strcasecmp($emp_dept_name, 'Human Resources') === 0 || !empty($hr_role) || in_array($_SESSION['role'] ?? '', ['HR Manager', 'HR Supervisor', 'HR Staff'], true)) {
+// Use the employee's current department. A former HRIS role may remain on a
+// held account for audit/history after a Career Movement and must not block
+// the employee's active Employee Portal access.
+if (strcasecmp($emp_dept_name, 'Human Resources') === 0) {
     redirectWith(BASE_URL . '/employee/dashboard.php', 'info', 'Human Resource personnel manage team evaluation features directly on the HRIS portal.');
 }
 

@@ -12,17 +12,6 @@ if ($movement_ready) {
 $current_user_id = (int) ($_SESSION['user_id'] ?? 0);
 $sup_branch_id   = (int) ($_SESSION['branch_id'] ?? 0);
 
-// Resolve this supervisor's own employee_id so we can block self-movements
-$sup_emp_id = 0;
-$sup_emp_stmt = $conn->prepare("SELECT employee_id FROM users WHERE user_id = ? LIMIT 1");
-$sup_emp_stmt->bind_param("i", $current_user_id);
-$sup_emp_stmt->execute();
-$sup_emp_row = $sup_emp_stmt->get_result()->fetch_assoc();
-$sup_emp_stmt->close();
-if ($sup_emp_row) {
-    $sup_emp_id = (int)$sup_emp_row['employee_id'];
-}
-
 // ── Helper: apply movement immediately + RBAC ───────────────────────────────
 function applyMovementNow($conn, array $movement, int $movement_id): void
 {
@@ -62,11 +51,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_movement'])) {
         if ($new_position === '') {
             redirectWith(BASE_URL . '/supervisor/career-movements.php', 'danger', 'New Position is required for ' . $movement_type . '.');
         }
-    }
-
-    // Safeguard: cannot file for themselves
-    if ($sup_emp_id > 0 && $employee_id === $sup_emp_id) {
-        redirectWith(BASE_URL . '/supervisor/career-movements.php', 'danger', 'You cannot file a career movement for yourself.');
     }
 
     // Validate employee exists and is active (and within authorized branch if supervisor is branch-scoped)

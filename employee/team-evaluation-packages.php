@@ -22,12 +22,83 @@ syncPendingOrganizationPackageGovernanceApprovers($conn);
 syncWaitingOrganizationPackages($conn);
 $user_id = (int) $_SESSION['user_id'];
 $reviewer_match = organizationPackageReviewerMatchSql('rs');
+$package_claim_role = in_array($_SESSION['role'] ?? '', ['HR Supervisor', 'HR Manager'], true)
+    ? (string) $_SESSION['role']
+    : '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verifyCsrfToken();
     $package_id = (int) ($_POST['package_id'] ?? 0);
     $action = $_POST['package_action'] ?? '';
     $comments = trim($_POST['comments'] ?? '');
+
+    if ($action === 'claim') {
+        $claim_role = (string) ($_SESSION['role'] ?? '');
+        $claim_employee_id = (int) ($_SESSION['employee_id'] ?? 0);
+        if (!in_array($claim_role, ['HR Supervisor', 'HR Manager'], true) || $claim_employee_id <= 0 || $package_id <= 0) {
+            redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'Only an active HR Supervisor or HR Manager can accept this package.');
+        }
+
+        $eligible_user = $conn->prepare("SELECT u.user_id FROM users u
+            JOIN employees e ON e.employee_id = u.employee_id
+            WHERE u.user_id = ? AND u.employee_id = ? AND u.role = ? AND u.is_active = 1
+              AND e.is_active = 1 AND e.deleted_at IS NULL
+              AND COALESCE(u.account_hold, 0) = 0 LIMIT 1");
+        $eligible_user->bind_param('iis', $user_id, $claim_employee_id, $claim_role);
+        $eligible_user->execute();
+        $is_eligible = (bool) $eligible_user->get_result()->fetch_assoc();
+        $eligible_user->close();
+        if (!$is_eligible) {
+            redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'Your account is not eligible to accept this HR review stage.');
+        }
+
+        try {
+            $conn->begin_transaction();
+            $claim_stmt = $conn->prepare("UPDATE evaluation_package_route_steps rs
+                JOIN evaluation_packages ep ON ep.package_id = rs.package_id
+                SET rs.reviewer_employee_id = ?, rs.reviewer_user_id = ?, rs.claimed_at = NOW()
+                WHERE rs.package_id = ? AND rs.eligible_role = ?
+                  AND rs.action_status = 'Pending' AND rs.claimed_at IS NULL
+                  AND rs.reviewer_employee_id IS NULL AND rs.reviewer_user_id IS NULL
+                  AND ep.current_step_order = rs.step_order
+                  AND ep.status NOT IN ('Approved and Applied', 'Cancelled')");
+            $claim_stmt->bind_param('iiis', $claim_employee_id, $user_id, $package_id, $claim_role);
+            $claim_stmt->execute();
+            $claimed = $claim_stmt->affected_rows === 1;
+            $claim_stmt->close();
+
+            if (!$claimed) {
+                $conn->rollback();
+                redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'warning', 'Another eligible reviewer has already accepted this package, or it is no longer awaiting acceptance.');
+            }
+
+            $step_info = $conn->prepare('SELECT step_type FROM evaluation_package_route_steps WHERE package_id = ? AND reviewer_user_id = ? AND claimed_at IS NOT NULL LIMIT 1');
+            $step_info->bind_param('ii', $package_id, $user_id);
+            $step_info->execute();
+            $claimed_step = $step_info->get_result()->fetch_assoc();
+            $step_info->close();
+            if (($claimed_step['step_type'] ?? '') === 'Consolidation') {
+                $owner_update = $conn->prepare('UPDATE evaluation_packages SET consolidator_employee_id = ? WHERE package_id = ?');
+                $owner_update->bind_param('ii', $claim_employee_id, $package_id);
+                $owner_update->execute();
+                $owner_update->close();
+            }
+
+            $audit = $conn->prepare("INSERT INTO evaluation_package_audit (package_id, user_id, action, remarks)
+                VALUES (?, ?, 'PACKAGE_ACCEPTED', ?)");
+            $audit_remarks = $claim_role . ' accepted responsibility for this package stage.';
+            $audit->bind_param('iis', $package_id, $user_id, $audit_remarks);
+            $audit->execute();
+            $audit->close();
+            $conn->commit();
+        } catch (Throwable $e) {
+            $conn->rollback();
+            error_log('Unable to claim HR evaluation package: ' . $e->getMessage());
+            redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'The package could not be accepted. Refresh the page and try again.');
+        }
+
+        redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'success', 'Package accepted. It is now assigned to you for review.');
+    }
 
     // Late Member Catch-Up Endorsement (Supervisor -> HR Manager -> Active Pipeline)
     if ($action === 'endorse_catchup') {
@@ -211,7 +282,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $approve->close();
 
     $next_order = (int) $step['step_order'] + 1;
-    $next_stmt = $conn->prepare('SELECT package_route_step_id, reviewer_user_id, reviewer_employee_id, step_label, step_type FROM evaluation_package_route_steps WHERE package_id = ? AND step_order = ? LIMIT 1');
+    $next_stmt = $conn->prepare('SELECT package_route_step_id, reviewer_user_id, reviewer_employee_id, step_label, step_type, eligible_role, claimed_at FROM evaluation_package_route_steps WHERE package_id = ? AND step_order = ? LIMIT 1');
     $next_stmt->bind_param('ii', $package_id, $next_order);
     $next_stmt->execute();
     $next = $next_stmt->get_result()->fetch_assoc();
@@ -239,7 +310,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $was_merged  = ($merged_into !== $package_id);
 
         $audit_pkg_id = $was_merged ? $merged_into : $package_id;
-        $next_name = getOrganizationPackageReviewerDisplayName($conn, (int)($next['reviewer_user_id'] ?? 0), (int)($next['reviewer_employee_id'] ?? 0));
+        $next_name = !empty($next['eligible_role']) && empty($next['claimed_at'])
+            ? $next['eligible_role']
+            : getOrganizationPackageReviewerDisplayName($conn, (int)($next['reviewer_user_id'] ?? 0), (int)($next['reviewer_employee_id'] ?? 0));
         if (!$was_merged) {
             notifyOrganizationPackageStepAssignees($conn, $package_id, $next_order, 'Team evaluation package awaiting your review', 'The ' . $step['department_name'] . ' evaluation package was approved by ' . $step['step_label'] . ' and forwarded for your review: ' . $next['step_label'] . '.');
         }
@@ -314,15 +387,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 require_once '../includes/header.php';
 
 // Pending packages awaiting this reviewer's action right now (must have at least 1 submitted member)
-$packages_stmt = $conn->prepare("SELECT ep.*, d.department_name, et.template_name, et.kra_weight, et.behavior_weight, rs.package_route_step_id, rs.step_label, rs.step_type, rs.action_status
+$packages_stmt = $conn->prepare("SELECT ep.*, d.department_name, et.template_name, et.kra_weight, et.behavior_weight,
+        rs.package_route_step_id, rs.step_label, rs.step_type, rs.action_status, rs.eligible_role, rs.claimed_at
     FROM evaluation_packages ep
     JOIN evaluation_package_route_steps rs ON rs.package_id = ep.package_id
     JOIN departments d ON d.department_id = ep.department_id
     JOIN evaluation_templates et ON et.template_id = ep.template_id
-    WHERE $reviewer_match AND rs.action_status = 'Pending'
+    WHERE ($reviewer_match OR (rs.eligible_role = ? AND rs.claimed_at IS NULL))
+    AND rs.action_status = 'Pending' AND ep.current_step_order = rs.step_order
+    AND ep.status NOT IN ('Cancelled', 'Approved and Applied')
     AND (SELECT COUNT(*) FROM evaluation_package_members pm WHERE pm.package_id = ep.package_id) > 0
     ORDER BY ep.updated_at DESC");
-$packages_stmt->bind_param('ii', $user_id, $user_id);
+$packages_stmt->bind_param('iis', $user_id, $user_id, $package_claim_role);
 $packages_stmt->execute();
 $packages = $packages_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $packages_stmt->close();
@@ -470,7 +546,8 @@ if (in_array($session_role, ['HR Manager', 'HR Supervisor', 'Admin'], true)) {
     <!-- Active Packages Awaiting Action -->
     <?php foreach ($packages as $package): ?>
         <?php
-        $can_adjust = !isOrganizationPackageLocked($conn, (int)$package['package_id']);
+        $is_unclaimed_role_step = !empty($package['eligible_role']) && empty($package['claimed_at']);
+        $can_adjust = !$is_unclaimed_role_step && !isOrganizationPackageLocked($conn, (int)$package['package_id']);
         $is_board_step = ($package['step_type'] === 'Governance') && (stripos($package['step_label'], 'Board') !== false);
         $members_stmt = $conn->prepare("SELECT e.evaluation_id, emp.first_name, emp.last_name, emp.job_title,
                 e.kra_subtotal, e.behavior_average, e.total_score, e.status, pm.member_status,
@@ -509,12 +586,16 @@ if (in_array($session_role, ['HR Manager', 'HR Supervisor', 'Admin'], true)) {
 
         // Next reviewer for modal summary
         $next_step_order = (int)$package['current_step_order'] + 1;
-        $next_rev_stmt = $conn->prepare('SELECT step_label, reviewer_user_id, reviewer_employee_id FROM evaluation_package_route_steps WHERE package_id = ? AND step_order = ? LIMIT 1');
+        $next_rev_stmt = $conn->prepare('SELECT step_label, reviewer_user_id, reviewer_employee_id, eligible_role, claimed_at FROM evaluation_package_route_steps WHERE package_id = ? AND step_order = ? LIMIT 1');
         $next_rev_stmt->bind_param('ii', $package['package_id'], $next_step_order);
         $next_rev_stmt->execute();
         $next_rev_info = $next_rev_stmt->get_result()->fetch_assoc();
         $next_rev_stmt->close();
-        $next_reviewer_name = $next_rev_info ? getOrganizationPackageReviewerDisplayName($conn, (int)($next_rev_info['reviewer_user_id'] ?? 0), (int)($next_rev_info['reviewer_employee_id'] ?? 0)) : 'Board of Directors';
+        $next_reviewer_name = $next_rev_info
+            ? (!empty($next_rev_info['eligible_role']) && empty($next_rev_info['claimed_at'])
+                ? $next_rev_info['eligible_role']
+                : getOrganizationPackageReviewerDisplayName($conn, (int)($next_rev_info['reviewer_user_id'] ?? 0), (int)($next_rev_info['reviewer_employee_id'] ?? 0)))
+            : 'Board of Directors';
         $package_next_check = checkNextPackageStepIsAssigned($conn, (int)$package['package_id'], (int)$package['current_step_order']);
         $team_size_stmt = $conn->prepare("SELECT COUNT(*) AS team_size FROM employees
             WHERE department_id = ? AND is_active = 1 AND deleted_at IS NULL");
@@ -763,9 +844,17 @@ if (in_array($session_role, ['HR Manager', 'HR Supervisor', 'Admin'], true)) {
                 <!-- Action Panel with descriptive hand-off copy & F3 Pre-Submission Modal -->
                 <form method="post" class="package-action-panel" id="pkgForm-<?php echo (int)$package['package_id']; ?>">
                     <input type="hidden" name="package_id" value="<?php echo (int)$package['package_id']; ?>">
-                    <input type="hidden" name="package_action" id="actionInput-<?php echo (int)$package['package_id']; ?>" value="approve">
+                    <input type="hidden" name="package_action" id="actionInput-<?php echo (int)$package['package_id']; ?>" value="<?php echo $is_unclaimed_role_step ? 'claim' : 'approve'; ?>">
                     <?php echo csrfField(); ?>
-                    
+
+                    <?php if ($is_unclaimed_role_step): ?>
+                        <div class="alert alert-info py-2 px-3 small mb-3">
+                            <i class="fas fa-user-check me-1"></i>This package is available to any active <strong><?php echo e($package['eligible_role']); ?></strong>. Accepting assigns the package to you; other reviewers can no longer claim this stage.
+                        </div>
+                        <button class="btn btn-success px-4 py-2 fw-bold" type="submit" style="min-height:46px; border-radius:8px;">
+                            <i class="fas fa-hand-paper me-1"></i>Accept Package
+                        </button>
+                    <?php else: ?>
                     <?php if (!$package_next_check['ok']): ?>
                         <div class="alert alert-danger py-2 px-3 small mb-3 border-danger shadow-sm">
                             <i class="fas fa-exclamation-triangle me-1"></i><?php echo $package_next_check['message']; ?>
@@ -898,6 +987,7 @@ if (in_array($session_role, ['HR Manager', 'HR Supervisor', 'Admin'], true)) {
                             </div>
                         </div>
                     </div>
+                    <?php endif; ?>
                 </form>
             </div>
         </div>
