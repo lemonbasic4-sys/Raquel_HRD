@@ -80,6 +80,7 @@ if (isset($_GET['activate']) && is_numeric($_GET['activate'])) {
 
 if (isset($_GET['delete']) && is_numeric($_GET['delete'])) {
     $eid = (int) $_GET['delete'];
+    $affected_shared_behavior_cohorts = getEmployeeSharedBehaviorPackageCohorts($conn, $eid);
     // Delete the user account associated with this employee (if any) BEFORE deleting employee
     // This prevents orphaned user accounts from appearing in User Management
     $conn->query("DELETE FROM users WHERE employee_id = $eid");
@@ -112,6 +113,7 @@ if (isset($_GET['delete']) && is_numeric($_GET['delete'])) {
     }
 
     $conn->query("DELETE FROM employees WHERE employee_id = $eid");
+    refreshSharedBehaviorAfterEmployeeDeletion($conn, $affected_shared_behavior_cohorts, (int)($_SESSION['user_id'] ?? 0));
     logAudit($conn, $_SESSION['user_id'], 'DELETE', 'Employee', $eid, 'Permanently deleted employee');
     redirectWith($buildRedirectWithFilters('delete'), 'success', 'Employee deleted permanently.');
 }

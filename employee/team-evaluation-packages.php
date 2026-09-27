@@ -334,7 +334,8 @@ $waiting_stmt = $conn->prepare("SELECT ep.*, d.department_name, et.template_name
     JOIN departments d ON d.department_id = ep.department_id
     JOIN evaluation_templates et ON et.template_id = ep.template_id
     WHERE $reviewer_match 
-    AND (rs.action_status = 'Waiting' OR (SELECT COUNT(*) FROM evaluation_package_members pm WHERE pm.package_id = ep.package_id) = 0)
+    AND rs.action_status = 'Waiting'
+    AND EXISTS (SELECT 1 FROM evaluation_package_members pm WHERE pm.package_id = ep.package_id)
     AND ep.status NOT IN ('Cancelled', 'Approved and Applied')
     ORDER BY ep.updated_at DESC");
 $waiting_stmt->bind_param('ii', $user_id, $user_id);
@@ -554,6 +555,9 @@ if (in_array($session_role, ['HR Manager', 'HR Supervisor', 'Admin'], true)) {
                         <div class="package-stat-content">
                             <strong><?php echo $package['shared_behavior_score'] !== null ? number_format((float)$package['shared_behavior_score'], 2) : 'Calculating…'; ?></strong>
                             <span>Shared Behavior Score</span>
+                            <small class="d-block text-muted mt-1" style="font-size: 0.72rem; line-height: 1.25;">
+                                Starts with the first submitted Individual Behavior score and updates as more department employees submit, including employees in other packages.
+                            </small>
                         </div>
                     </div>
                 </div>
@@ -770,7 +774,7 @@ if (in_array($session_role, ['HR Manager', 'HR Supervisor', 'Admin'], true)) {
 
                     <?php if ($package['step_type'] === 'Consolidation'): ?>
                         <div class="alert alert-info py-2 px-3 small mb-3">
-                            <i class="fas fa-info-circle me-1"></i><strong>Consolidation step:</strong> Shared Core Behaviors &amp; Values is calculated automatically from all team members. Use <strong>Adjust</strong> to adjust any member's score before submitting.
+                            <i class="fas fa-info-circle me-1"></i><strong>Consolidation step:</strong> Shared Behavior averages submitted Individual Behavior scores across the department, including employees in other packages. It updates as more eligible employees submit. Use <strong>Adjust</strong> to adjust a member's score before submitting.
                         </div>
                     <?php elseif ($is_board_step): ?>
                         <div class="alert alert-warning py-2 px-3 small mb-3">

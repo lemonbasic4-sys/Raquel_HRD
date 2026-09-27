@@ -3458,9 +3458,22 @@ function syncEvaluationToOrganizationPackage($conn, $evaluation_id)
     $department_id = (int) $evaluation['department_id'];
     $template_id = (int) $evaluation['template_id'];
     $type = $evaluation['evaluation_type']; $start = $evaluation['evaluation_period_start']; $end = $evaluation['evaluation_period_end'];
-    // Look for an existing active (non-cancelled, non-applied) package for this department & template first
-    $find = $conn->prepare("SELECT package_id, consolidator_employee_id FROM evaluation_packages WHERE department_id = ? AND template_id = ? AND status NOT IN ('Cancelled', 'Approved and Applied') LIMIT 1");
-    $find->bind_param('ii', $department_id, $template_id); $find->execute();
+    // Prefer a same-cycle package that is still at step 1. This lets a
+    // resubmission reuse its reset, empty package instead of creating another
+    // active package beside it. Packages already past consolidation remain
+    // untouched; late submissions still follow the standalone-package path.
+    $find = $conn->prepare("SELECT ep.package_id, ep.consolidator_employee_id
+        FROM evaluation_packages ep
+        JOIN evaluation_package_route_steps rs ON rs.package_id = ep.package_id AND rs.step_order = 1
+        WHERE ep.department_id = ? AND ep.template_id = ?
+          AND ep.period_start = ? AND ep.period_end = ?
+          AND ep.status NOT IN ('Cancelled', 'Approved and Applied')
+          AND rs.action_status IN ('Waiting', 'Pending')
+        ORDER BY CASE WHEN NOT EXISTS (
+            SELECT 1 FROM evaluation_package_members empty_pm WHERE empty_pm.package_id = ep.package_id
+        ) THEN 0 ELSE 1 END, ep.updated_at DESC
+        LIMIT 1");
+    $find->bind_param('iiss', $department_id, $template_id, $start, $end); $find->execute();
     $package = $find->get_result()->fetch_assoc(); $find->close();
     if (!$package) {
         // Fallback: look for exact period match if not found
@@ -3684,53 +3697,181 @@ function getOrganizationPackageSubmissionSummary($conn, array $package)
 function recalculateOrganizationPackageBehaviorScore($conn, $package_id)
 {
     $package_id = (int) $package_id;
-    $package = $conn->query("SELECT department_id, template_id, period_start, period_end
-        FROM evaluation_packages WHERE package_id = $package_id LIMIT 1")->fetch_assoc();
+    $package_stmt = $conn->prepare('SELECT department_id, template_id, period_start, period_end
+        FROM evaluation_packages WHERE package_id = ? LIMIT 1');
+    $package_stmt->bind_param('i', $package_id);
+    $package_stmt->execute();
+    $package = $package_stmt->get_result()->fetch_assoc();
+    $package_stmt->close();
     if (!$package) return 0.0;
 
     $department_id = (int) $package['department_id'];
     $template_id = (int) $package['template_id'];
-    $period_start = $conn->real_escape_string($package['period_start']);
-    $period_end = $conn->real_escape_string($package['period_end']);
 
-    // Progressive rule: each previously finalized employee contributes their
-    // stored shared score; each employee in this still-open package contributes
-    // their own effective Behavior criterion average. Never seed a new package
-    // from only its own member scores when this cohort already has finalized results.
-    $result = $conn->query("SELECT AVG(cohort_scores.behavior_score) AS shared_behavior_score
+    // Shared Behavior belongs to the department/template/period cohort, not
+    // to one package or its consolidator. Include submitted evaluations with
+    // complete Behavior scores regardless of their current approval stage.
+    // If duplicate evaluations exist for one employee in this cohort, use that
+    // employee's latest submitted evaluation so they contribute only once.
+    $result_stmt = $conn->prepare("SELECT
+            AVG(participant_scores.individual_behavior) AS shared_behavior_score,
+            COUNT(*) AS participant_count
         FROM (
-            SELECT ev.behavior_average AS behavior_score
+            SELECT ev.employee_id, ev.evaluation_id,
+                   ROUND(AVG(COALESCE(es.manager_override_score, es.supervisor_override_score,
+                                      es.dept_manager_override_score, es.score_value)), 2) AS individual_behavior,
+                   COUNT(DISTINCT ec.criterion_id) AS rated_behavior_count,
+                   (SELECT COUNT(*)
+                    FROM evaluation_criteria expected_ec
+                    WHERE expected_ec.template_id = ev.template_id
+                      AND expected_ec.section = 'Behavior') AS expected_behavior_count
             FROM evaluations ev
-            JOIN (
-                SELECT DISTINCT pm.evaluation_id
-                FROM evaluation_package_members pm
-                JOIN evaluation_packages prior_pkg ON prior_pkg.package_id = pm.package_id
-                WHERE prior_pkg.department_id = $department_id
-                  AND prior_pkg.template_id = $template_id
-                  AND prior_pkg.period_start = '$period_start'
-                  AND prior_pkg.period_end = '$period_end'
-                  AND prior_pkg.status = 'Approved and Applied'
-                  AND prior_pkg.package_id <> $package_id
-            ) prior_members ON prior_members.evaluation_id = ev.evaluation_id
-            UNION ALL
-            SELECT (
-                SELECT AVG(COALESCE(es.manager_override_score, es.supervisor_override_score,
-                                    es.dept_manager_override_score, es.score_value))
-                FROM evaluation_scores es
-                JOIN evaluation_criteria ec ON ec.criterion_id = es.criterion_id
-                WHERE es.evaluation_id = ev.evaluation_id AND ec.section = 'Behavior'
-            ) AS behavior_score
-            FROM evaluation_package_members pm
-            JOIN evaluations ev ON ev.evaluation_id = pm.evaluation_id
-            WHERE pm.package_id = $package_id
-              AND pm.member_status IN ('Normal', 'Late Rejoined', 'Catchup Endorsed', 'Catchup Complete')
-        ) cohort_scores
-        WHERE cohort_scores.behavior_score IS NOT NULL");
-    $score = round((float) ($result ? ($result->fetch_assoc()['shared_behavior_score'] ?? 0) : 0), 2);
-    $score = round($score, 2);
-    $update = $conn->prepare('UPDATE evaluation_packages SET shared_behavior_score = ? WHERE package_id = ?');
-    $update->bind_param('di', $score, $package_id); $update->execute(); $update->close();
-    return $score;
+            JOIN employees emp ON emp.employee_id = ev.employee_id
+            JOIN evaluation_scores es ON es.evaluation_id = ev.evaluation_id
+            JOIN evaluation_criteria ec ON ec.criterion_id = es.criterion_id
+                                       AND ec.template_id = ev.template_id
+                                       AND ec.section = 'Behavior'
+            WHERE emp.department_id = ?
+              AND ev.template_id = ?
+              AND ev.evaluation_period_start = ?
+              AND ev.evaluation_period_end = ?
+              AND ev.deleted_at IS NULL
+              AND ev.submitted_date IS NOT NULL
+              AND ev.status NOT IN ('Draft', 'Pending Self-Rating', 'Returned', 'Rejected')
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM evaluations newer_ev
+                  WHERE newer_ev.employee_id = ev.employee_id
+                    AND newer_ev.template_id = ev.template_id
+                    AND newer_ev.evaluation_period_start = ev.evaluation_period_start
+                    AND newer_ev.evaluation_period_end = ev.evaluation_period_end
+                    AND newer_ev.deleted_at IS NULL
+                    AND newer_ev.submitted_date IS NOT NULL
+                    AND newer_ev.status NOT IN ('Draft', 'Pending Self-Rating', 'Returned', 'Rejected')
+                    AND (newer_ev.submitted_date > ev.submitted_date
+                         OR (newer_ev.submitted_date = ev.submitted_date
+                             AND newer_ev.evaluation_id > ev.evaluation_id))
+              )
+            GROUP BY ev.employee_id, ev.evaluation_id, ev.template_id
+            HAVING expected_behavior_count > 0
+               AND rated_behavior_count = expected_behavior_count
+        ) participant_scores");
+    $result_stmt->bind_param('iiss', $department_id, $template_id, $package['period_start'], $package['period_end']);
+    $result_stmt->execute();
+    $result = $result_stmt->get_result()->fetch_assoc();
+    $result_stmt->close();
+
+    $participant_count = (int) ($result['participant_count'] ?? 0);
+    $score = $participant_count > 0
+        ? round((float) $result['shared_behavior_score'], 2)
+        : null;
+
+    // Keep every open package in this cohort on the same provisional score.
+    // Finalized package results remain governed by the existing application flow.
+    $score_assignment = $score === null ? 'shared_behavior_score = NULL' : 'shared_behavior_score = ?';
+    $update = $conn->prepare("UPDATE evaluation_packages
+        SET $score_assignment
+        WHERE department_id = ? AND template_id = ? AND period_start = ? AND period_end = ?
+          AND status NOT IN ('Approved and Applied', 'Cancelled')");
+    if ($score === null) {
+        $update->bind_param('iiss', $department_id, $template_id, $package['period_start'], $package['period_end']);
+    } else {
+        $update->bind_param('diiss', $score, $department_id, $template_id, $package['period_start'], $package['period_end']);
+    }
+    $update->execute();
+    $update->close();
+
+    return $score === null ? 0.0 : $score;
+}
+
+/** Capture open evaluation cohorts that must be refreshed before an employee is permanently deleted. */
+function getEmployeeSharedBehaviorPackageCohorts($conn, $employee_id)
+{
+    $employee_id = (int) $employee_id;
+    $stmt = $conn->prepare("SELECT DISTINCT ep.package_id, ep.department_id, ep.template_id, ep.period_start, ep.period_end
+        FROM evaluations ev
+        JOIN employees emp ON emp.employee_id = ev.employee_id
+        JOIN evaluation_packages ep ON ep.department_id = emp.department_id
+            AND ep.template_id = ev.template_id
+            AND ep.period_start = ev.evaluation_period_start
+            AND ep.period_end = ev.evaluation_period_end
+        WHERE ev.employee_id = ? AND ev.deleted_at IS NULL
+          AND ep.status NOT IN ('Approved and Applied', 'Cancelled')");
+    $stmt->bind_param('i', $employee_id);
+    $stmt->execute();
+    $cohorts = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+    return $cohorts;
+}
+
+/** Recalculate open department cohorts after employee deletion and close packages left empty by the deletion. */
+function refreshSharedBehaviorAfterEmployeeDeletion($conn, array $cohorts, $actor_user_id = null)
+{
+    $seen_cohorts = [];
+    foreach ($cohorts as $cohort) {
+        $package_id = (int) ($cohort['package_id'] ?? 0);
+        if ($package_id <= 0) continue;
+
+        $cohort_key = implode('|', [
+            (int) $cohort['department_id'],
+            (int) $cohort['template_id'],
+            (string) $cohort['period_start'],
+            (string) $cohort['period_end'],
+        ]);
+        if (isset($seen_cohorts[$cohort_key])) continue;
+        $seen_cohorts[$cohort_key] = true;
+
+        // The employee's evaluation rows have already been removed by the
+        // employee foreign-key cascade, so this recalculates from survivors.
+        recalculateOrganizationPackageBehaviorScore($conn, $package_id);
+
+        // Do not leave a pending/reviewable package behind when the deleted
+        // employee was its final member.
+        $empty_stmt = $conn->prepare("SELECT ep.package_id
+            FROM evaluation_packages ep
+            WHERE ep.department_id = ? AND ep.template_id = ?
+              AND ep.period_start = ? AND ep.period_end = ?
+              AND ep.status NOT IN ('Approved and Applied', 'Cancelled')
+              AND NOT EXISTS (
+                  SELECT 1 FROM evaluation_package_members pm WHERE pm.package_id = ep.package_id
+              )");
+        $empty_stmt->bind_param('iiss', $cohort['department_id'], $cohort['template_id'], $cohort['period_start'], $cohort['period_end']);
+        $empty_stmt->execute();
+        $empty_packages = $empty_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $empty_stmt->close();
+
+        foreach ($empty_packages as $empty_package) {
+            $empty_package_id = (int) $empty_package['package_id'];
+            $skip_steps = $conn->prepare("UPDATE evaluation_package_route_steps
+                SET action_status = 'Skipped', acted_at = NULL
+                WHERE package_id = ? AND action_status IN ('Waiting', 'Pending')");
+            $skip_steps->bind_param('i', $empty_package_id);
+            $skip_steps->execute();
+            $skip_steps->close();
+
+            $cancel = $conn->prepare("UPDATE evaluation_packages
+                SET status = 'Cancelled', current_step_order = NULL
+                WHERE package_id = ? AND status NOT IN ('Approved and Applied', 'Cancelled')");
+            $cancel->bind_param('i', $empty_package_id);
+            $cancel->execute();
+            $cancelled = $cancel->affected_rows > 0;
+            $cancel->close();
+
+            if ($cancelled) {
+                if ((int) $actor_user_id > 0) {
+                    $audit = $conn->prepare("INSERT INTO evaluation_package_audit (package_id, user_id, action, remarks)
+                        VALUES (?, ?, 'EMPTY_PACKAGE_CANCELLED', 'Package cancelled because permanent employee deletion removed its final evaluation member.')");
+                    $audit->bind_param('ii', $empty_package_id, $actor_user_id);
+                } else {
+                    $audit = $conn->prepare("INSERT INTO evaluation_package_audit (package_id, user_id, action, remarks)
+                        VALUES (?, NULL, 'EMPTY_PACKAGE_CANCELLED', 'Package cancelled because permanent employee deletion removed its final evaluation member.')");
+                    $audit->bind_param('i', $empty_package_id);
+                }
+                $audit->execute();
+                $audit->close();
+            }
+        }
+    }
 }
 
 /** True when a still-open package shares a cycle with already-approved results. */
@@ -3779,6 +3920,10 @@ function syncWaitingOrganizationPackages($conn)
     $pkgs = $stmt->fetch_all(MYSQLI_ASSOC);
     foreach ($pkgs as $pkg) {
         $pkg_id = (int)$pkg['package_id'];
+        $member_count = (int) ($conn->query("SELECT COUNT(*) AS c FROM evaluation_package_members WHERE package_id = $pkg_id")->fetch_assoc()['c'] ?? 0);
+        if ($member_count === 0) {
+            continue;
+        }
         $summary = getOrganizationPackageSubmissionSummary($conn, $pkg);
         // Unlock as soon as at least 1 member has submitted — no need to wait for the whole team.
         if ($summary['submitted'] >= 1) {
