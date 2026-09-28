@@ -2385,6 +2385,7 @@ function ensureOrganizationEvaluationPackageSchema($conn)
             step_label VARCHAR(160) NOT NULL,
             step_type ENUM('Consolidation','Review','Governance') NOT NULL DEFAULT 'Review',
             eligible_role VARCHAR(50) NULL,
+            eligible_rank_category_id INT NULL,
             action_status ENUM('Waiting','Pending','Approved','Returned','Skipped') NOT NULL DEFAULT 'Waiting',
             claimed_at DATETIME NULL,
             acted_at DATETIME NULL,
@@ -2398,6 +2399,7 @@ function ensureOrganizationEvaluationPackageSchema($conn)
         try {
             $conn->query("ALTER TABLE evaluation_package_route_steps
                 ADD COLUMN IF NOT EXISTS eligible_role VARCHAR(50) NULL AFTER step_type,
+                ADD COLUMN IF NOT EXISTS eligible_rank_category_id INT NULL AFTER eligible_role,
                 ADD COLUMN IF NOT EXISTS claimed_at DATETIME NULL AFTER action_status");
         } catch (mysqli_sql_exception $e) { /* Already migrated or unsupported — safe to ignore. */ }
         $conn->query("CREATE TABLE IF NOT EXISTS evaluation_package_audit (
@@ -2446,6 +2448,62 @@ function ensureOrganizationEvaluationPackageSchema($conn)
                 AND rs.step_order = 1 AND rs.eligible_role = 'HR Supervisor'
             SET ep.consolidator_employee_id = NULL
             WHERE d.department_name = 'Human Resources'
+              AND ep.status NOT IN ('Approved and Applied', 'Cancelled')
+              AND rs.action_status IN ('Pending', 'Waiting')
+              AND rs.claimed_at IS NULL");
+        // Convert open non-HR department steps to Employee Portal rank groups.
+        // The employee account role is generic ('Employee'), so supervisor and
+        // manager eligibility is determined by rank category within the package department.
+        $conn->query("UPDATE evaluation_package_route_steps rs
+            JOIN evaluation_packages ep ON ep.package_id = rs.package_id
+            JOIN departments d ON d.department_id = ep.department_id
+            SET rs.eligible_rank_category_id = CASE
+                    WHEN rs.step_order = 1 AND EXISTS (
+                        SELECT 1 FROM employees reviewer
+                        JOIN users reviewer_user ON reviewer_user.employee_id = reviewer.employee_id
+                            AND reviewer_user.role = 'Employee' AND reviewer_user.is_active = 1
+                            AND COALESCE(reviewer_user.account_hold, 0) = 0
+                        WHERE reviewer.department_id = ep.department_id
+                          AND reviewer.rank_category_id = 4
+                          AND reviewer.is_active = 1 AND reviewer.deleted_at IS NULL
+                    ) THEN 4
+                    WHEN rs.step_order = 1 THEN 3
+                    ELSE 3
+                END,
+                rs.reviewer_employee_id = NULL,
+                rs.reviewer_user_id = NULL,
+                rs.claimed_at = NULL
+            WHERE d.department_name <> 'Human Resources'
+              AND ep.status NOT IN ('Approved and Applied', 'Cancelled')
+              AND rs.step_order IN (1, 2)
+              AND rs.step_type <> 'Governance'
+              AND rs.action_status IN ('Pending', 'Waiting')
+              AND rs.eligible_role IS NULL
+              AND rs.eligible_rank_category_id IS NULL
+              AND EXISTS (
+                  SELECT 1 FROM employees available_reviewer
+                  JOIN users available_user ON available_user.employee_id = available_reviewer.employee_id
+                      AND available_user.role = 'Employee' AND available_user.is_active = 1
+                      AND COALESCE(available_user.account_hold, 0) = 0
+                  WHERE available_reviewer.department_id = ep.department_id
+                    AND available_reviewer.rank_category_id IN (3, 4)
+                    AND available_reviewer.is_active = 1 AND available_reviewer.deleted_at IS NULL
+              )
+              AND (rs.step_order = 1 OR EXISTS (
+                  SELECT 1 FROM employees available_manager
+                  JOIN users available_manager_user ON available_manager_user.employee_id = available_manager.employee_id
+                      AND available_manager_user.role = 'Employee' AND available_manager_user.is_active = 1
+                      AND COALESCE(available_manager_user.account_hold, 0) = 0
+                  WHERE available_manager.department_id = ep.department_id
+                    AND available_manager.rank_category_id = 3
+                    AND available_manager.is_active = 1 AND available_manager.deleted_at IS NULL
+              ))");
+        $conn->query("UPDATE evaluation_packages ep
+            JOIN departments d ON d.department_id = ep.department_id
+            JOIN evaluation_package_route_steps rs ON rs.package_id = ep.package_id
+                AND rs.step_order = 1 AND rs.eligible_rank_category_id IN (3, 4)
+            SET ep.consolidator_employee_id = NULL
+            WHERE d.department_name <> 'Human Resources'
               AND ep.status NOT IN ('Approved and Applied', 'Cancelled')
               AND rs.action_status IN ('Pending', 'Waiting')
               AND rs.claimed_at IS NULL");
@@ -2519,6 +2577,33 @@ function getOrganizationPackageConsolidator($conn, $department_id)
     $row = $stmt->get_result()->fetch_assoc();
     $stmt->close();
     return $row ?: null;
+}
+
+/** Return whether a non-HR department has an active Employee Portal reviewer for a rank category. */
+function hasOrganizationPackageRankReviewer($conn, $department_id, $rank_category_id)
+{
+    $department_id = (int) $department_id;
+    $rank_category_id = (int) $rank_category_id;
+    if ($department_id <= 0 || !in_array($rank_category_id, [3, 4], true)) return false;
+    $stmt = $conn->prepare("SELECT 1
+        FROM employees e
+        JOIN users u ON u.employee_id = e.employee_id AND u.role = 'Employee'
+            AND u.is_active = 1 AND COALESCE(u.account_hold, 0) = 0 AND u.deleted_at IS NULL
+        WHERE e.department_id = ? AND e.rank_category_id = ?
+          AND e.is_active = 1 AND e.deleted_at IS NULL
+        LIMIT 1");
+    $stmt->bind_param('ii', $department_id, $rank_category_id);
+    $stmt->execute();
+    $has_reviewer = (bool) $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    return $has_reviewer;
+}
+
+function isOrganizationPackageGroupRoutedDepartment($conn, $department_id)
+{
+    if (isHumanResourcesPackageDepartment($conn, $department_id)) return true;
+    return hasOrganizationPackageRankReviewer($conn, $department_id, 4)
+        || hasOrganizationPackageRankReviewer($conn, $department_id, 3);
 }
 
 /**
@@ -2805,7 +2890,7 @@ function checkNextPackageStepIsAssigned($conn, $package_id, $current_step_order)
 
     // 4. Look for the next step row in evaluation_package_route_steps
     $next_order = $current_step_order + 1;
-    $next_stmt = $conn->prepare("SELECT package_route_step_id, step_order, reviewer_user_id, reviewer_employee_id, step_label, step_type, eligible_role
+    $next_stmt = $conn->prepare("SELECT package_route_step_id, step_order, reviewer_user_id, reviewer_employee_id, step_label, step_type, eligible_role, eligible_rank_category_id
         FROM evaluation_package_route_steps 
         WHERE package_id = ? AND step_order = ? LIMIT 1");
     $next_stmt->bind_param('ii', $package_id, $next_order);
@@ -2826,6 +2911,18 @@ function checkNextPackageStepIsAssigned($conn, $package_id, $current_step_order)
             $role_stmt->execute();
             $has_reviewer = (bool) $role_stmt->get_result()->fetch_assoc();
             $role_stmt->close();
+        }
+        if (!$has_reviewer && !empty($next_step['eligible_rank_category_id'])) {
+            $rank_stmt = $conn->prepare("SELECT 1 FROM evaluation_packages ep
+                JOIN employees e ON e.department_id = ep.department_id
+                    AND e.rank_category_id = ? AND e.is_active = 1 AND e.deleted_at IS NULL
+                JOIN users u ON u.employee_id = e.employee_id AND u.role = 'Employee'
+                    AND u.is_active = 1 AND COALESCE(u.account_hold, 0) = 0 AND u.deleted_at IS NULL
+                WHERE ep.package_id = ? LIMIT 1");
+            $rank_stmt->bind_param('ii', $next_step['eligible_rank_category_id'], $package_id);
+            $rank_stmt->execute();
+            $has_reviewer = (bool) $rank_stmt->get_result()->fetch_assoc();
+            $rank_stmt->close();
         }
         if (!empty($next_step['reviewer_user_id'])) {
             $u_stmt = $conn->prepare("SELECT u.user_id FROM users u 
@@ -3004,7 +3101,9 @@ function notifyOrganizationPackageStepAssignees($conn, $package_id, $step_order,
 {
     $package_id = (int) $package_id;
     $step_order = (int) $step_order;
-    $stmt = $conn->prepare('SELECT reviewer_user_id, reviewer_employee_id, eligible_role, claimed_at FROM evaluation_package_route_steps WHERE package_id = ? AND step_order = ? LIMIT 1');
+    $stmt = $conn->prepare('SELECT rs.reviewer_user_id, rs.reviewer_employee_id, rs.eligible_role, rs.eligible_rank_category_id, rs.claimed_at, ep.department_id
+        FROM evaluation_package_route_steps rs JOIN evaluation_packages ep ON ep.package_id = rs.package_id
+        WHERE rs.package_id = ? AND rs.step_order = ? LIMIT 1');
     $stmt->bind_param('ii', $package_id, $step_order);
     $stmt->execute();
     $step = $stmt->get_result()->fetch_assoc();
@@ -3021,6 +3120,23 @@ function notifyOrganizationPackageStepAssignees($conn, $package_id, $step_order,
             WHERE u.role = ? AND u.is_active = 1 AND COALESCE(u.account_hold, 0) = 0
               AND e.is_active = 1 AND e.deleted_at IS NULL");
         $eligible_stmt->bind_param('s', $step['eligible_role']);
+        $eligible_stmt->execute();
+        $eligible_users = $eligible_stmt->get_result();
+        while ($eligible_user = $eligible_users->fetch_assoc()) {
+            $eligible_user_id = (int) $eligible_user['user_id'];
+            createNotification($conn, $eligible_user_id, $title, $message, $link);
+            $notified_users[$eligible_user_id] = true;
+        }
+        $eligible_stmt->close();
+        return count($notified_users);
+    }
+    if (!empty($step['eligible_rank_category_id']) && empty($step['claimed_at'])) {
+        $eligible_stmt = $conn->prepare("SELECT DISTINCT u.user_id
+            FROM users u JOIN employees e ON e.employee_id = u.employee_id
+            WHERE u.role = 'Employee' AND u.is_active = 1 AND COALESCE(u.account_hold, 0) = 0
+              AND u.deleted_at IS NULL AND e.department_id = ? AND e.rank_category_id = ?
+              AND e.is_active = 1 AND e.deleted_at IS NULL");
+        $eligible_stmt->bind_param('ii', $step['department_id'], $step['eligible_rank_category_id']);
         $eligible_stmt->execute();
         $eligible_users = $eligible_stmt->get_result();
         while ($eligible_user = $eligible_users->fetch_assoc()) {
@@ -3053,7 +3169,7 @@ function notifyOrganizationPackageStepAssignees($conn, $package_id, $step_order,
 function getOrganizationPackagePipelineLabel($conn, $package_id)
 {
     $package_id = (int) $package_id;
-    $stmt = $conn->prepare("SELECT ep.status, ep.current_step_order, rs.step_label, rs.step_type, rs.action_status, rs.reviewer_user_id, rs.reviewer_employee_id
+    $stmt = $conn->prepare("SELECT ep.status, ep.current_step_order, rs.step_label, rs.step_type, rs.action_status, rs.reviewer_user_id, rs.reviewer_employee_id, rs.eligible_role, rs.eligible_rank_category_id, rs.claimed_at
         FROM evaluation_packages ep
         LEFT JOIN evaluation_package_route_steps rs ON rs.package_id = ep.package_id
             AND rs.step_order = ep.current_step_order
@@ -3070,17 +3186,33 @@ function getOrganizationPackagePipelineLabel($conn, $package_id)
         return 'Approved & Locked';
     }
     if (($row['status'] ?? '') === 'Pending Self-Ratings' || empty($row['current_step_order'])) {
-        $s1_stmt = $conn->prepare("SELECT reviewer_user_id, reviewer_employee_id, step_label FROM evaluation_package_route_steps WHERE package_id = ? AND step_order = 1 LIMIT 1");
+        $s1_stmt = $conn->prepare("SELECT reviewer_user_id, reviewer_employee_id, step_label, eligible_role, eligible_rank_category_id, claimed_at FROM evaluation_package_route_steps WHERE package_id = ? AND step_order = 1 LIMIT 1");
         $s1_stmt->bind_param('i', $package_id);
         $s1_stmt->execute();
         $s1 = $s1_stmt->get_result()->fetch_assoc();
         $s1_stmt->close();
-        $s1_name = $s1 ? getOrganizationPackageReviewerDisplayName($conn, (int)($s1['reviewer_user_id'] ?? 0), (int)($s1['reviewer_employee_id'] ?? 0)) : '';
+        $s1_name = '';
+        if ($s1) {
+            if (empty($s1['claimed_at']) && !empty($s1['eligible_role'])) {
+                $s1_name = $s1['eligible_role'];
+            } elseif (empty($s1['claimed_at']) && !empty($s1['eligible_rank_category_id'])) {
+                $s1_name = (int)$s1['eligible_rank_category_id'] === 4 ? 'Department Supervisor' : 'Department Manager';
+            } else {
+                $s1_name = getOrganizationPackageReviewerDisplayName($conn, (int)($s1['reviewer_user_id'] ?? 0), (int)($s1['reviewer_employee_id'] ?? 0));
+            }
+        }
         return 'Waiting for team self-ratings' . ($s1_name ? ' (Consolidator: ' . $s1_name . ')' : '');
     }
     if (($row['status'] ?? '') === 'Returned') {
         $name = getOrganizationPackageReviewerDisplayName($conn, (int) ($row['reviewer_user_id'] ?? 0), (int) ($row['reviewer_employee_id'] ?? 0));
         return 'Returned for revision — ' . $name;
+    }
+    if (empty($row['claimed_at']) && !empty($row['eligible_role'])) {
+        return 'Pending ' . $row['step_label'] . ' — Available to ' . $row['eligible_role'];
+    }
+    if (empty($row['claimed_at']) && !empty($row['eligible_rank_category_id'])) {
+        $group_name = (int)$row['eligible_rank_category_id'] === 4 ? 'Department Supervisors' : 'Department Managers';
+        return 'Pending ' . $row['step_label'] . ' — Available to ' . $group_name;
     }
     $name = getOrganizationPackageReviewerDisplayName($conn, (int) ($row['reviewer_user_id'] ?? 0), (int) ($row['reviewer_employee_id'] ?? 0));
     $label = trim((string) ($row['step_label'] ?? 'Review'));
@@ -3297,13 +3429,19 @@ function countPendingOrganizationPackagesForUser($conn, $user_id)
         FROM evaluation_packages ep
         JOIN evaluation_package_route_steps rs ON rs.package_id = ep.package_id
         WHERE ($match OR (rs.eligible_role = (SELECT role FROM users WHERE user_id = ? LIMIT 1)
-                           AND rs.claimed_at IS NULL AND rs.action_status = 'Pending'))
+                           AND rs.claimed_at IS NULL AND rs.action_status = 'Pending')
+               OR (rs.eligible_rank_category_id = (SELECT e.rank_category_id FROM users u
+                       JOIN employees e ON e.employee_id = u.employee_id WHERE u.user_id = ? LIMIT 1)
+                   AND ep.department_id = (SELECT e.department_id FROM users u
+                       JOIN employees e ON e.employee_id = u.employee_id WHERE u.user_id = ? LIMIT 1)
+                   AND (SELECT role FROM users WHERE user_id = ? LIMIT 1) = 'Employee'
+                   AND rs.claimed_at IS NULL AND rs.action_status = 'Pending'))
           AND (
               (rs.step_order = 1 AND rs.action_status IN ('Pending', 'Waiting'))
               OR (rs.step_order > 1 AND rs.action_status = 'Pending')
           )
           AND ep.status NOT IN ('Approved and Applied', 'Cancelled')");
-    $stmt->bind_param('iii', $user_id, $user_id, $user_id);
+    $stmt->bind_param('iiiiii', $user_id, $user_id, $user_id, $user_id, $user_id, $user_id);
     $stmt->execute();
     $total = (int) ($stmt->get_result()->fetch_assoc()['total'] ?? 0);
     $stmt->close();
@@ -3368,6 +3506,49 @@ function createOrganizationPackageRoute($conn, $package_id, $consolidator_employ
         $order = appendOrganizationGovernanceRouteStep($conn, $package_id, $order, 'Audit Committee', 'Audit Committee approval');
         appendOrganizationGovernanceRouteStep($conn, $package_id, $order, 'Board of Directors', 'Board of Directors approval');
         return;
+    }
+
+    // Non-HR departments use Employee Portal accounts. Those accounts share
+    // the generic "Employee" user role, so their reviewer group is based on
+    // the department rank category (Supervisor = 4, Manager = 3), not title suffix.
+    if ($package_department_id) {
+        $has_supervisors = hasOrganizationPackageRankReviewer($conn, $package_department_id, 4);
+        $has_managers = hasOrganizationPackageRankReviewer($conn, $package_department_id, 3);
+        if ($has_supervisors || $has_managers) {
+            $first_rank = $has_supervisors ? 4 : 3;
+            $group_step = $conn->prepare("INSERT INTO evaluation_package_route_steps
+                (package_id, step_order, step_label, step_type, eligible_rank_category_id, action_status)
+                VALUES (?, ?, ?, ?, ?, 'Waiting')");
+            $step_label = $first_rank === 4 ? 'Team consolidation — Department Supervisor' : 'Team consolidation — Department Manager';
+            $step_type = 'Consolidation';
+            $step_order = 1;
+            $group_step->bind_param('iissi', $package_id, $step_order, $step_label, $step_type, $first_rank);
+            $group_step->execute();
+            $group_step->close();
+
+            $order = 2;
+            if ($has_supervisors && $has_managers) {
+                $group_step = $conn->prepare("INSERT INTO evaluation_package_route_steps
+                    (package_id, step_order, step_label, step_type, eligible_rank_category_id, action_status)
+                    VALUES (?, ?, ?, ?, 3, 'Waiting')");
+                $step_label = 'Final department review — Department Manager';
+                $step_type = 'Review';
+                $step_order = 2;
+                $group_step->bind_param('iiss', $package_id, $step_order, $step_label, $step_type);
+                $group_step->execute();
+                $group_step->close();
+                $order = 3;
+            }
+
+            $div_vp = getDepartmentDesignatedOfficial($conn, 'Division VP', $package_department_id);
+            if ($div_vp) {
+                $order = appendOrganizationGovernanceRouteStep($conn, $package_id, $order, 'Division VP', 'Division VP Review — ' . $div_vp['job_title'], $package_department_id);
+            }
+            $order = appendOrganizationGovernanceRouteStep($conn, $package_id, $order, 'President', 'Executive Approval — President & CEO');
+            $order = appendOrganizationGovernanceRouteStep($conn, $package_id, $order, 'Audit Committee', 'Audit Committee approval');
+            appendOrganizationGovernanceRouteStep($conn, $package_id, $order, 'Board of Directors', 'Board of Directors approval');
+            return;
+        }
     }
 
     // Track which employee_ids already appear in the internal chain so we don't
@@ -3593,6 +3774,7 @@ function syncEvaluationToOrganizationPackage($conn, $evaluation_id)
     if (!$evaluation || empty($evaluation['department_id']) || empty($evaluation['evaluation_period_start']) || empty($evaluation['evaluation_period_end'])) return null;
     $department_id = (int) $evaluation['department_id'];
     $is_hr_package = isHumanResourcesPackageDepartment($conn, $department_id);
+    $is_group_routed_package = isOrganizationPackageGroupRoutedDepartment($conn, $department_id);
     $template_id = (int) $evaluation['template_id'];
     $type = $evaluation['evaluation_type']; $start = $evaluation['evaluation_period_start']; $end = $evaluation['evaluation_period_end'];
     // Prefer a same-cycle package that is still at step 1. This lets a
@@ -3627,7 +3809,7 @@ function syncEvaluationToOrganizationPackage($conn, $evaluation_id)
         if ($cancelled_pkg) {
             // Reactivate the cancelled package
             $package_id = (int) $cancelled_pkg['package_id'];
-            $consolidator_id = $is_hr_package ? 0 : (!empty($cancelled_pkg['consolidator_employee_id']) ? (int)$cancelled_pkg['consolidator_employee_id'] : 0);
+            $consolidator_id = $is_group_routed_package ? 0 : (!empty($cancelled_pkg['consolidator_employee_id']) ? (int)$cancelled_pkg['consolidator_employee_id'] : 0);
             $conn->query("UPDATE evaluation_packages SET status = 'Pending Self-Ratings', current_step_order = NULL WHERE package_id = $package_id");
             // Reset route steps — handle blank/empty action_status as well as 'Cancelled'
             $conn->query("UPDATE evaluation_package_route_steps SET action_status = 'Waiting', acted_at = NULL, comments = NULL WHERE package_id = $package_id");
@@ -3637,10 +3819,19 @@ function syncEvaluationToOrganizationPackage($conn, $evaluation_id)
                         reviewer_employee_id = NULL, reviewer_user_id = NULL, claimed_at = NULL
                     WHERE package_id = $package_id AND step_order IN (1, 2) AND step_type <> 'Governance'");
                 $conn->query("UPDATE evaluation_packages SET consolidator_employee_id = NULL WHERE package_id = $package_id");
+            } elseif ($is_group_routed_package) {
+                $supervisor_rank = hasOrganizationPackageRankReviewer($conn, $department_id, 4) ? 4 : 3;
+                $step_two_filter = hasOrganizationPackageRankReviewer($conn, $department_id, 3) ? 'step_order IN (1, 2)' : 'step_order = 1';
+                $conn->query("UPDATE evaluation_package_route_steps
+                    SET eligible_role = NULL,
+                        eligible_rank_category_id = CASE WHEN step_order = 1 THEN $supervisor_rank ELSE 3 END,
+                        reviewer_employee_id = NULL, reviewer_user_id = NULL, claimed_at = NULL
+                    WHERE package_id = $package_id AND $step_two_filter AND step_type <> 'Governance'");
+                $conn->query("UPDATE evaluation_packages SET consolidator_employee_id = NULL WHERE package_id = $package_id");
             }
             // If no route steps exist at all, rebuild them from consolidator
             $step_count = (int)($conn->query("SELECT COUNT(*) AS c FROM evaluation_package_route_steps WHERE package_id = $package_id")->fetch_assoc()['c'] ?? 0);
-            if ($step_count === 0 && ($consolidator_id > 0 || $is_hr_package)) {
+            if ($step_count === 0 && ($consolidator_id > 0 || $is_group_routed_package)) {
                 createOrganizationPackageRoute($conn, $package_id, $consolidator_id);
             }
             $audit = $conn->prepare("INSERT INTO evaluation_package_audit (package_id, action, remarks) VALUES (?, 'REACTIVATED', 'Package reactivated after cancellation — new self-rating submission received.')");
@@ -3648,11 +3839,11 @@ function syncEvaluationToOrganizationPackage($conn, $evaluation_id)
         } else {
             // No package at all — create a fresh one
             $consolidator = getOrganizationPackageConsolidator($conn, $department_id);
-            $consolidator_id = !$is_hr_package && $consolidator ? (int) $consolidator['employee_id'] : 0;
+            $consolidator_id = !$is_group_routed_package && $consolidator ? (int) $consolidator['employee_id'] : 0;
             $insert = $conn->prepare('INSERT INTO evaluation_packages (department_id, template_id, evaluation_type, period_start, period_end, consolidator_employee_id) VALUES (?, ?, ?, ?, ?, NULLIF(?, 0))');
             $insert->bind_param('iisssi', $department_id, $template_id, $type, $start, $end, $consolidator_id); $insert->execute();
             $package_id = (int) $insert->insert_id; $insert->close();
-            if ($consolidator_id || $is_hr_package) createOrganizationPackageRoute($conn, $package_id, $consolidator_id);
+            if ($consolidator_id || $is_group_routed_package) createOrganizationPackageRoute($conn, $package_id, $consolidator_id);
             $audit = $conn->prepare("INSERT INTO evaluation_package_audit (package_id, action, remarks) VALUES (?, 'CREATED', 'Created from first submitted self-rating.')");
             $audit->bind_param('i', $package_id); $audit->execute(); $audit->close();
         }
@@ -3691,13 +3882,13 @@ function syncEvaluationToOrganizationPackage($conn, $evaluation_id)
     if ($is_approved_and_applied) {
         // ── Package is fully finalized OR has already passed Step 1: create a brand-new standalone package ──
         $new_consolidator = getOrganizationPackageConsolidator($conn, $department_id);
-        $new_consolidator_id = $is_hr_package ? 0 : ($new_consolidator ? (int)$new_consolidator['employee_id'] : $consolidator_id);
+        $new_consolidator_id = $is_group_routed_package ? 0 : ($new_consolidator ? (int)$new_consolidator['employee_id'] : $consolidator_id);
         $insert_new = $conn->prepare('INSERT INTO evaluation_packages (department_id, template_id, evaluation_type, period_start, period_end, consolidator_employee_id) VALUES (?, ?, ?, ?, ?, NULLIF(?, 0))');
         $insert_new->bind_param('iisssi', $department_id, $template_id, $type, $start, $end, $new_consolidator_id);
         $insert_new->execute();
         $new_package_id = (int)$insert_new->insert_id;
         $insert_new->close();
-        if ($new_consolidator_id > 0 || $is_hr_package) createOrganizationPackageRoute($conn, $new_package_id, $new_consolidator_id);
+        if ($new_consolidator_id > 0 || $is_group_routed_package) createOrganizationPackageRoute($conn, $new_package_id, $new_consolidator_id);
         // Add the late member to the new package
         $member = $conn->prepare('INSERT INTO evaluation_package_members (package_id, evaluation_id, member_status, joined_at_step) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE member_status = VALUES(member_status), joined_at_step = VALUES(joined_at_step)');
         $late_status = 'Normal'; $late_step = 1;
@@ -3716,10 +3907,10 @@ function syncEvaluationToOrganizationPackage($conn, $evaluation_id)
                 'Late Member Self-Rating — New Package Created',
                 "$emp_fullname submitted their self-rating for $tmpl_name ($dept_name). A new consolidation package has been created for your review (the original package is still progressing through approvals).",
                 BASE_URL . '/employee/team-evaluation-packages.php');
-        } elseif ($is_hr_package) {
+        } elseif ($is_group_routed_package) {
             notifyOrganizationPackageStepAssignees($conn, $new_package_id, 1,
                 'Late Member Self-Rating — New Package Created',
-                "$emp_fullname submitted their self-rating for $tmpl_name ($dept_name). An HR Supervisor can accept the package and begin consolidation.");
+                "$emp_fullname submitted their self-rating for $tmpl_name ($dept_name). An eligible department reviewer can accept the package and begin consolidation.");
         }
         return $new_package_id;
     }
@@ -3764,6 +3955,9 @@ function syncEvaluationToOrganizationPackage($conn, $evaluation_id)
         if ($consolidator_id > 0) {
             notifyUsersForEmployee($conn, $consolidator_id, $notif_title, $notif_body, BASE_URL . '/employee/team-evaluation-packages.php');
         }
+        if ($is_group_routed_package) {
+            notifyOrganizationPackageStepAssignees($conn, $package_id, 1, $notif_title, $notif_body);
+        }
         notifyOrganizationPackageStepAssignees($conn, $package_id, 1,
             'Package Re-Opened for Late Member — Review Required',
             "$emp_fullname ($dept_name) submitted their self-rating for $tmpl_name. The package has been re-opened to Step 1 for your review. Please include this member and re-endorse."
@@ -3774,6 +3968,9 @@ function syncEvaluationToOrganizationPackage($conn, $evaluation_id)
         $notif_body  = $emp_fullname . ($emp_job_title ? ' (' . $emp_job_title . ')' : '') . ' submitted their self-evaluation for ' . $tmpl_name . '.';
         if ($consolidator_id > 0) {
             notifyUsersForEmployee($conn, $consolidator_id, $notif_title, $notif_body, BASE_URL . '/employee/team-evaluation-packages.php');
+        }
+        if ($is_group_routed_package) {
+            notifyOrganizationPackageStepAssignees($conn, $package_id, 1, $notif_title, $notif_body);
         }
         if ($step1_status === 'Waiting') {
             // First submission for this package — open consolidation immediately.
