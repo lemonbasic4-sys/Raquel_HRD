@@ -62,10 +62,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $lockout_seconds = checkLoginBruteForce($conn, $username, $ip);
     if ($lockout_seconds > 0) {
         $error = "Too many failed login attempts. Please try again in $lockout_seconds seconds.";
+        logLoginAudit($conn, $username, 'HRIS Portal', 'Failed', 'Blocked by login rate limit.');
     } elseif (empty($username)) {
         $error = 'Please enter your username.';
+        logLoginAudit($conn, $username, 'HRIS Portal', 'Failed', 'Username was not provided.');
     } elseif (empty($password)) {
         $error = 'Please enter your password.';
+        logLoginAudit($conn, $username, 'HRIS Portal', 'Failed', 'Password was not provided.');
     } else {
         // Query user by username
         $stmt = $conn->prepare("SELECT user_id, employee_id, username, email, password_hash, full_name, role, branch_id, is_active, account_hold, first_login_completed FROM users WHERE BINARY username = ?");
@@ -80,11 +83,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Check if account is active
             if (!$user['is_active']) {
                 $error = 'Your account has been deactivated. Please contact the administrator.';
+                logLoginAudit($conn, $username, 'HRIS Portal', 'Failed', 'Account is deactivated.', (int)$user['user_id']);
             } elseif (!empty($user['account_hold'])) {
                 $error = 'Your account is on hold after an employee movement. Please contact an administrator for new credentials.';
+                logLoginAudit($conn, $username, 'HRIS Portal', 'Failed', 'Account is on hold.', (int)$user['user_id']);
             } elseif (password_verify($password, $user['password_hash'])) {
                 if (($user['role'] ?? '') === 'Employee') {
                     $error = 'Employee accounts must sign in through the Employee Self-Service Portal.';
+                    logLoginAudit($conn, $username, 'HRIS Portal', 'Failed', 'Employee accounts must use the Employee Portal.', (int)$user['user_id']);
                     $stmt->close();
                     goto render_login;
                 }
@@ -115,6 +121,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_SESSION['role'] = $user['role'];
                 $_SESSION['branch_id'] = $user['branch_id'];
                 $_SESSION['first_login_completed'] = (bool) ($user['first_login_completed'] ?? false);
+
+                logLoginAudit($conn, $username, 'HRIS Portal', 'Successful', '', (int)$user['user_id']);
 
                 // Clear brute force attempts on successful login
                 clearLoginAttempts($conn, $username, $ip);
@@ -152,6 +160,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 // Register failed attempt
                 registerLoginAttempt($conn, $username, $ip);
+                logLoginAudit($conn, $username, 'HRIS Portal', 'Failed', 'Password did not match the account.', (int)$user['user_id']);
 
                 // Notify Admins of failed login (wrong password)
                 $ip = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
@@ -168,6 +177,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             // Register failed attempt
             registerLoginAttempt($conn, $username, $ip);
+            logLoginAudit($conn, $username, 'HRIS Portal', 'Failed', 'Account was not found.');
 
             // Notify Admins of failed login (invalid account)
             $ip = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';

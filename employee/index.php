@@ -22,8 +22,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $lockout_seconds = checkLoginBruteForce($conn, $username, $ip);
     if ($lockout_seconds > 0) {
         $error = "Too many failed login attempts. Please try again in $lockout_seconds seconds.";
+        logLoginAudit($conn, $username, 'Employee Portal', 'Failed', 'Blocked by login rate limit.');
     } elseif (empty($username) || empty($password)) {
         $error = 'Please enter both username and password.';
+        logLoginAudit($conn, $username, 'Employee Portal', 'Failed', 'Username or password was not provided.');
     } else {
         $stmt = $conn->prepare("
             SELECT u.user_id, u.employee_id, u.username, u.email, u.password_hash, u.full_name, u.role, u.branch_id, u.is_active, u.account_hold, u.first_login_completed, e.is_active as emp_is_active, e.employment_status
@@ -43,9 +45,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $is_emp_inactive = ($user['emp_is_active'] !== null && (int)$user['emp_is_active'] === 0) || (strcasecmp($user['employment_status'] ?? '', 'Inactive') === 0);
             if (!$user['is_active'] || $is_emp_inactive) {
                 $error = 'Your account has been deactivated.';
+                logLoginAudit($conn, $username, 'Employee Portal', 'Failed', 'Account is deactivated.', (int)$user['user_id']);
             } elseif (!empty($user['account_hold'])) {
                 $error = 'Your account is on hold after an employee movement. Please contact an administrator for new credentials.';
                 registerLoginAttempt($conn, $username, $ip);
+                logLoginAudit($conn, $username, 'Employee Portal', 'Failed', 'Account is on hold.', (int)$user['user_id']);
             } elseif (password_verify($password, $user['password_hash'])) {
                 // Clear attempts on successful login
                 clearLoginAttempts($conn, $username, $ip);
@@ -75,15 +79,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_SESSION['role'] = $user['role'];
                 $_SESSION['first_login_completed'] = (bool) ($user['first_login_completed'] ?? false);
 
+                logLoginAudit($conn, $username, 'Employee Portal', 'Successful', '', (int)$user['user_id']);
+
                 header("Location: dashboard.php");
                 exit();
             } else {
                 $error = 'Invalid credentials.';
                 registerLoginAttempt($conn, $username, $ip);
+                logLoginAudit($conn, $username, 'Employee Portal', 'Failed', 'Password did not match the account.', (int)$user['user_id']);
             }
         } else {
             $error = 'Only Employee accounts can access the Employee Portal.';
             registerLoginAttempt($conn, $username, $ip);
+            logLoginAudit($conn, $username, 'Employee Portal', 'Failed', 'No eligible employee account was found.');
         }
     }
 }

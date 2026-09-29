@@ -457,8 +457,10 @@ function logAudit($conn, $user_id, $action_type, $entity_type, $entity_id = null
 
 
 
-    $ip = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
-    $user_agent = substr($_SERVER['HTTP_USER_AGENT'] ?? 'Unknown device', 0, 500);
+    // REMOTE_ADDR is the address observed by the server. Forwarded headers are
+    // intentionally not trusted here because clients can spoof them.
+    $ip = $context['ip_address'] ?? ($_SERVER['REMOTE_ADDR'] ?? null);
+    $user_agent = substr($context['user_agent'] ?? ($_SERVER['HTTP_USER_AGENT'] ?? 'Unknown device'), 0, 500);
     $module = $context['module'] ?? auditModuleForEntity($entity_type);
     $target_employee_id = $context['target_employee_id'] ?? (strcasecmp($entity_type, 'Employee') === 0 ? $entity_id : null);
     $previous_value = $context['previous_value'] ?? null;
@@ -477,6 +479,47 @@ function logAudit($conn, $user_id, $action_type, $entity_type, $entity_id = null
 
     $stmt->close();
 
+}
+
+/** Record a login outcome for the admin audit trail without ever storing credentials. */
+function logLoginAudit($conn, $identifier, $portal, $status, $reason = '', $user_id = null): void
+{
+    $identifier = trim((string)$identifier);
+    $user = null;
+    if ($user_id) {
+        $stmt = $conn->prepare("SELECT u.user_id, u.employee_id, u.username, u.full_name, u.role, u.branch_id, e.department_id
+            FROM users u LEFT JOIN employees e ON e.employee_id = u.employee_id WHERE u.user_id = ? LIMIT 1");
+        $stmt->bind_param('i', $user_id);
+    } elseif ($identifier !== '') {
+        $stmt = $conn->prepare("SELECT u.user_id, u.employee_id, u.username, u.full_name, u.role, u.branch_id, e.department_id
+            FROM users u LEFT JOIN employees e ON e.employee_id = u.employee_id WHERE BINARY u.username = ? LIMIT 1");
+        $stmt->bind_param('s', $identifier);
+    } else {
+        $stmt = null;
+    }
+    if ($stmt) {
+        $stmt->execute();
+        $user = $stmt->get_result()->fetch_assoc() ?: null;
+        $stmt->close();
+    }
+
+    $actor_id = $user ? (int)$user['user_id'] : null;
+    $display_identifier = $identifier !== '' ? $identifier : '[not provided]';
+    $details = "Portal: {$portal}; account: {$display_identifier}; result: {$status}.";
+    if ($reason !== '') $details .= ' Reason: ' . preg_replace('/[\r\n]+/', ' ', trim($reason)) . '.';
+    $forwarded = trim((string)($_SERVER['HTTP_X_FORWARDED_FOR'] ?? ''));
+    if ($forwarded !== '') {
+        $details .= ' Forwarded-for header (unverified): ' . substr(preg_replace('/[\r\n]+/', ' ', $forwarded), 0, 200) . '.';
+    }
+
+    $context = [
+        'module' => 'Authentication & Access',
+        'status' => $status,
+        'target_employee_id' => $user['employee_id'] ?? null,
+        'branch_id' => $user['branch_id'] ?? null,
+        'department_id' => $user['department_id'] ?? null,
+    ];
+    logAudit($conn, $actor_id, 'LOGIN', 'Authentication', $actor_id, $details, $context);
 }
 
 function auditModuleForEntity($entity_type): string
