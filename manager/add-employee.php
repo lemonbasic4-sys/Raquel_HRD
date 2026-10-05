@@ -1651,9 +1651,6 @@ $stepLabels = [
     };
 
     window.csvGoBack = function () {
-        const header = document.getElementById('csvModalHeader');
-        header.classList.remove('bg-primary');
-        header.classList.add('bg-success');
         document.getElementById('csvModalIcon').className = 'fas fa-file-csv me-2';
         document.getElementById('csvModalTitleText').textContent = 'Import Employees from CSV';
 
@@ -1668,9 +1665,6 @@ $stepLabels = [
     };
 
     function switchToStep2() {
-        const header = document.getElementById('csvModalHeader');
-        header.classList.remove('bg-success');
-        header.classList.add('bg-primary');
         document.getElementById('csvModalIcon').className = 'fas fa-table-list me-2';
         document.getElementById('csvModalTitleText').textContent = 'Review & Verify CSV Data';
 
@@ -1723,9 +1717,9 @@ $stepLabels = [
                         </div>
                     </div>
                     <div class="col-6 col-md-3">
-                        <div class="p-2 bg-white rounded border border-primary-subtle">
-                            <div class="text-primary small fw-semibold text-uppercase" style="font-size:0.72rem;">Updates</div>
-                            <div class="fs-5 fw-bold text-primary">${s.update}</div>
+                        <div class="p-2 bg-white rounded border border-warning-subtle">
+                            <div class="small fw-semibold text-uppercase" style="font-size:0.72rem; color:#996c00;">Updates</div>
+                            <div class="fs-5 fw-bold" style="color:#996c00;">${s.update}</div>
                         </div>
                     </div>
                     <div class="col-6 col-md-3">
@@ -1763,10 +1757,10 @@ $stepLabels = [
             const actionBadge = r.action === 'new'
                 ? '<span class="badge bg-success">New</span>'
                 : r.action === 'update'
-                    ? '<span class="badge bg-primary">Update</span>'
+                    ? '<span class="badge bg-warning text-dark">Update</span>'
                     : '<span class="badge bg-danger">Skip</span>';
 
-            const rowClass = r.action === 'skip' ? 'table-danger' : (r.action === 'update' ? 'table-info' : '');
+            const rowClass = r.action === 'skip' ? 'table-danger' : (r.action === 'update' ? 'table-warning' : '');
 
             const deptCell = r.dept_warning
                 ? `<span class="badge bg-warning text-dark" title="Warning"><i class="fas fa-exclamation-triangle me-1"></i>${esc(r.department)}</span>`
