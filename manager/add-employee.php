@@ -167,6 +167,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['import_csv'])) {
         $name_extension = $getV('Extension', 3);
         $employee_code = $getV('Company ID', 39);
 
+        // Skip instruction / legend row if present in uploaded CSV
+        if (str_starts_with($first_name, '[') || str_starts_with($last_name, '[') || stripos($first_name, '[Required]') !== false) {
+            continue;
+        }
+
         $dobRaw = $getV('Birthday', 4);
         $dob = $parseCsvDate($dobRaw);
 
@@ -1378,9 +1383,8 @@ $stepLabels = [
             <p class="text-white-50 small mb-0 mt-2">Create an employee record manually or import validated employee details from a CSV file.</p>
         </div>
         <div class="d-flex flex-wrap gap-2">
-            <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#importModal"
-                style="background: linear-gradient(135deg, #28a745 0%, #218838 100%); border: none; padding: .5rem 1.25rem; border-radius: 8px; font-weight: 500; color: #fff;">
-                <i class="fas fa-file-csv me-2"></i>Import Custom CSV
+            <button type="button" class="btn btn-light btn-sm fw-semibold rounded-pill px-3 shadow-sm d-flex align-items-center" data-bs-toggle="modal" data-bs-target="#importModal">
+                <i class="fas fa-file-csv me-2 text-success"></i>Import via CSV
             </button>
         </div>
     </div>
@@ -1482,42 +1486,341 @@ $stepLabels = [
 
 <?php require_once '../includes/footer.php'; ?>
 
-<!-- Import CSV Modal -->
+<!-- ══════════════════════════════════════════════════════════
+     Import CSV Modal  —  2-step: Preview → Confirm & Import
+     ══════════════════════════════════════════════════════════ -->
 <div class="modal fade" id="importModal" tabindex="-1" aria-labelledby="importModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable" id="importModalDialog">
         <div class="modal-content">
-            <form method="POST" action="" enctype="multipart/form-data">
-                <?php echo csrfField(); ?>
-                <div class="modal-header bg-success text-white">
-                    <h5 class="modal-title" id="importModalLabel"><i class="fas fa-file-csv me-2"></i>Import Employees
-                        from CSV</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
-                        aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <p class="small text-muted mb-3">Upload a CSV UTF-8 file to bulk import complete employee records. Excel workbooks (.xlsx) are not supported; save them as CSV first. Ensure your file matches the system's exact column format.</p>
 
+            <!-- Modal Header -->
+            <div class="modal-header bg-success text-white" id="csvModalHeader">
+                <h5 class="modal-title" id="csvModalTitle">
+                    <i class="fas fa-file-csv me-2" id="csvModalIcon"></i><span id="csvModalTitleText">Import Employees from CSV</span>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <!-- Modal Body (Bootstrap manages scrollable area) -->
+            <div class="modal-body p-0">
+                <!-- ── Step 1: Upload ── -->
+                <div id="csvStep1" class="p-4">
+                    <p class="text-muted small mb-3">
+                        Upload your standardized CSV file to bulk import or update employee records. The system will first validate and display a complete preview so you can review every record before anything is saved.
+                    </p>
                     <div class="mb-3">
-                        <label for="employee_csv" class="form-label fw-bold">Select CSV File</label>
-                        <input class="form-control" type="file" id="employee_csv" name="employee_csv" accept=".csv"
-                            required>
+                        <label for="employee_csv_preview" class="form-label fw-bold small text-dark">
+                            <i class="fas fa-file-upload me-1 text-success"></i>Select CSV File
+                        </label>
+                        <input class="form-control" type="file" id="employee_csv_preview" accept=".csv" required>
+                        <div class="form-text text-muted small mt-1">Supported format: <strong>.csv</strong> (UTF-8). Excel workbooks (.xlsx) must be saved as CSV before uploading.</div>
                     </div>
+                    <div class="alert alert-info d-flex align-items-center py-2 px-3 small mb-0 rounded-3">
+                        <i class="fas fa-info-circle me-2 fs-5 flex-shrink-0"></i>
+                        <div>
+                            Need the official template?
+                            <a href="<?php echo BASE_URL; ?>/manager/download-sample.php" class="alert-link fw-semibold">Download CSV Template</a> with sample records and column guidelines.
+                        </div>
+                    </div>
+                    <!-- Inline error -->
+                    <div id="csvPreviewError" class="alert alert-danger mt-3 py-2 small d-none rounded-3"></div>
+                </div>
 
-                    <div class="alert alert-info py-2 small mb-0">
-                        <i class="fas fa-info-circle me-1"></i>
-                        Need the format? <a href="<?php echo BASE_URL; ?>/manager/download-sample.php"
-                            class="alert-link">Download the sample template</a>.
+                <!-- ── Step 2: Preview + Confirm ── -->
+                <div id="csvStep2" style="display:none;">
+                    <!-- Summary bar -->
+                    <div id="csvSummaryBar"></div>
+
+                    <!-- Global warnings -->
+                    <div id="csvGlobalWarnings" class="px-4 pt-3 pb-1"></div>
+
+                    <!-- Preview table -->
+                    <div class="px-3 pb-3 pt-2">
+                        <div class="table-responsive border rounded">
+                            <table class="table table-hover table-striped align-middle mb-0" style="font-size:.84rem;">
+                                <thead class="table-light sticky-top text-muted text-uppercase" style="font-size:0.75rem; letter-spacing:0.5px;">
+                                    <tr>
+                                        <th style="width:40px;">#</th>
+                                        <th style="width:85px;">Action</th>
+                                        <th>Company ID</th>
+                                        <th>Name</th>
+                                        <th>Job Title</th>
+                                        <th>Department</th>
+                                        <th>Branch</th>
+                                        <th>Hire Date</th>
+                                        <th>Status</th>
+                                        <th>Issues / Notes</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="csvPreviewBody"></tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" name="import_csv" class="btn btn-success"><i
-                            class="fas fa-upload me-2"></i>Upload File</button>
+            </div>
+
+            <!-- Modal Footer for Step 1 -->
+            <div class="modal-footer bg-light px-4 py-3" id="csvStep1Footer">
+                <button type="button" class="btn btn-secondary rounded-pill px-3" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" id="csvPreviewBtn" class="btn btn-success rounded-pill px-4" onclick="loadCsvPreview()">
+                    <i class="fas fa-search me-1"></i>Preview Import
+                </button>
+            </div>
+
+            <!-- Modal Footer for Step 2 -->
+            <div class="modal-footer bg-light d-flex justify-content-between align-items-center px-4 py-3" id="csvStep2Footer" style="display:none !important;">
+                <button type="button" class="btn btn-outline-secondary rounded-pill px-3" onclick="csvGoBack()">
+                    <i class="fas fa-arrow-left me-1"></i>Back
+                </button>
+                <div class="d-flex gap-2 align-items-center">
+                    <span id="csvConfirmNote" class="small fw-semibold"></span>
+                    <!-- Hidden real import form -->
+                    <form method="POST" action="" enctype="multipart/form-data" id="csvConfirmForm" class="m-0">
+                        <?php echo csrfField(); ?>
+                        <input type="hidden" name="import_csv" value="1">
+                        <input type="file" name="employee_csv" id="csvConfirmFileInput" style="display:none;" accept=".csv">
+                        <button type="submit" id="csvConfirmBtn" class="btn btn-success rounded-pill px-4" disabled>
+                            <i class="fas fa-check-circle me-1"></i>Confirm &amp; Import
+                        </button>
+                    </form>
                 </div>
-            </form>
-        </div>
-    </div>
-</div>
-</div>
-</div>
-</div>
+            </div>
+
+        </div><!-- /.modal-content -->
+    </div><!-- /.modal-dialog -->
+</div><!-- /.modal -->
+
+
+<script>
+// ── CSV Import Preview Logic ──────────────────────────────────────────────────
+(function () {
+    'use strict';
+
+    const CSRF_TOKEN = document.querySelector('#csvConfirmForm input[name="csrf_token"]')?.value ?? '';
+    const PREVIEW_URL = '<?php echo BASE_URL; ?>/manager/ajax/preview-csv.php';
+
+    // Reset modal to Step 1 when it is hidden
+    document.getElementById('importModal')?.addEventListener('hidden.bs.modal', resetCsvModal);
+
+    window.loadCsvPreview = function () {
+        const fileInput = document.getElementById('employee_csv_preview');
+        const errDiv    = document.getElementById('csvPreviewError');
+        const btn       = document.getElementById('csvPreviewBtn');
+
+        errDiv.classList.add('d-none');
+        errDiv.textContent = '';
+
+        if (!fileInput.files.length) {
+            showCsvError('Please select a CSV file first.');
+            return;
+        }
+
+        const file = fileInput.files[0];
+        if (!file.name.toLowerCase().endsWith('.csv')) {
+            showCsvError('Only .csv files are supported. Please save your Excel file as CSV UTF-8 first.');
+            return;
+        }
+
+        // Show loading state
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Validating CSV…';
+
+        const fd = new FormData();
+        fd.append('employee_csv', file);
+        fd.append('csrf_token', CSRF_TOKEN);
+
+        fetch(PREVIEW_URL, { method: 'POST', body: fd })
+            .then(r => r.json())
+            .then(data => {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-search me-1"></i>Preview Import';
+
+                if (!data.success) {
+                    showCsvError(data.message ?? 'Preview failed. Please try again.');
+                    return;
+                }
+
+                renderPreview(data, file);
+                switchToStep2();
+            })
+            .catch(() => {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-search me-1"></i>Preview Import';
+                showCsvError('Network error. Please try again.');
+            });
+    };
+
+    window.csvGoBack = function () {
+        const header = document.getElementById('csvModalHeader');
+        header.classList.remove('bg-primary');
+        header.classList.add('bg-success');
+        document.getElementById('csvModalIcon').className = 'fas fa-file-csv me-2';
+        document.getElementById('csvModalTitleText').textContent = 'Import Employees from CSV';
+
+        document.getElementById('csvStep2').style.display = 'none';
+        document.getElementById('csvStep1').style.display = '';
+
+        document.getElementById('csvStep2Footer').style.setProperty('display', 'none', 'important');
+        document.getElementById('csvStep1Footer').style.display = '';
+
+        document.getElementById('importModalDialog').classList.remove('modal-xl');
+        document.getElementById('importModalDialog').classList.add('modal-lg');
+    };
+
+    function switchToStep2() {
+        const header = document.getElementById('csvModalHeader');
+        header.classList.remove('bg-success');
+        header.classList.add('bg-primary');
+        document.getElementById('csvModalIcon').className = 'fas fa-table-list me-2';
+        document.getElementById('csvModalTitleText').textContent = 'Review & Verify CSV Data';
+
+        document.getElementById('csvStep1').style.display = 'none';
+        document.getElementById('csvStep2').style.display = '';
+
+        document.getElementById('csvStep1Footer').style.display = 'none';
+        document.getElementById('csvStep2Footer').style.setProperty('display', 'flex', 'important');
+
+        document.getElementById('importModalDialog').classList.remove('modal-lg');
+        document.getElementById('importModalDialog').classList.add('modal-xl');
+    }
+
+    function showCsvError(msg) {
+        const errDiv = document.getElementById('csvPreviewError');
+        errDiv.textContent = '⚠ ' + msg;
+        errDiv.classList.remove('d-none');
+    }
+
+    function resetCsvModal() {
+        csvGoBack();
+        document.getElementById('csvPreviewError').classList.add('d-none');
+        document.getElementById('employee_csv_preview').value = '';
+        document.getElementById('csvPreviewBtn').disabled = false;
+        document.getElementById('csvPreviewBtn').innerHTML = '<i class="fas fa-search me-1"></i>Preview Import';
+        document.getElementById('csvSummaryBar').innerHTML = '';
+        document.getElementById('csvGlobalWarnings').innerHTML = '';
+        document.getElementById('csvPreviewBody').innerHTML = '';
+        document.getElementById('csvConfirmBtn').disabled = true;
+    }
+
+    function renderPreview(data, originalFile) {
+        const s = data.summary;
+
+        // ── Summary bar ───────────────────────────────────────────────────────
+        const summaryBar = document.getElementById('csvSummaryBar');
+        summaryBar.innerHTML = `
+            <div class="p-3 bg-light border-bottom">
+                <div class="row g-2 text-center">
+                    <div class="col-6 col-md-3">
+                        <div class="p-2 bg-white rounded border">
+                            <div class="text-muted small fw-semibold text-uppercase" style="font-size:0.72rem;">Total Rows</div>
+                            <div class="fs-5 fw-bold text-dark">${s.total}</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="p-2 bg-white rounded border border-success-subtle">
+                            <div class="text-success small fw-semibold text-uppercase" style="font-size:0.72rem;">New Records</div>
+                            <div class="fs-5 fw-bold text-success">${s.new}</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="p-2 bg-white rounded border border-primary-subtle">
+                            <div class="text-primary small fw-semibold text-uppercase" style="font-size:0.72rem;">Updates</div>
+                            <div class="fs-5 fw-bold text-primary">${s.update}</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="p-2 bg-white rounded border ${s.skipped > 0 ? 'border-danger-subtle' : ''}">
+                            <div class="${s.skipped > 0 ? 'text-danger' : 'text-muted'} small fw-semibold text-uppercase" style="font-size:0.72rem;">Skipped</div>
+                            <div class="fs-5 fw-bold ${s.skipped > 0 ? 'text-danger' : 'text-muted'}">${s.skipped}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mt-2 pt-2 border-top small text-muted">
+                    <div><i class="fas fa-file-csv text-success me-1"></i><strong class="text-dark">${esc(data.filename)}</strong></div>
+                    <div>Showing <strong>${data.rows.length}</strong> preview row(s)</div>
+                </div>
+            </div>
+        `;
+
+        // ── Global warnings ───────────────────────────────────────────────────
+        const warnDiv = document.getElementById('csvGlobalWarnings');
+        warnDiv.innerHTML = '';
+        if (s.warnings && s.warnings.length) {
+            s.warnings.forEach(w => {
+                warnDiv.innerHTML += `<div class="alert alert-warning py-2 small mb-2 mx-0 rounded-3"><i class="fas fa-exclamation-triangle me-1"></i>${esc(w)}</div>`;
+            });
+        }
+
+        // ── Table body ────────────────────────────────────────────────────────
+        const tbody = document.getElementById('csvPreviewBody');
+        tbody.innerHTML = '';
+
+        if (!data.rows.length) {
+            tbody.innerHTML = '<tr><td colspan="10" class="text-center text-muted py-4">No data rows found.</td></tr>';
+        }
+
+        data.rows.forEach(r => {
+            const actionBadge = r.action === 'new'
+                ? '<span class="badge bg-success">New</span>'
+                : r.action === 'update'
+                    ? '<span class="badge bg-primary">Update</span>'
+                    : '<span class="badge bg-danger">Skip</span>';
+
+            const rowClass = r.action === 'skip' ? 'table-danger' : (r.action === 'update' ? 'table-info' : '');
+
+            const deptCell = r.dept_warning
+                ? `<span class="badge bg-warning text-dark" title="Warning"><i class="fas fa-exclamation-triangle me-1"></i>${esc(r.department)}</span>`
+                : esc(r.department);
+            const branchCell = r.branch_warning
+                ? `<span class="text-muted" title="Fallback used">${esc(r.branch)}</span>`
+                : esc(r.branch);
+
+            const issuesList = r.issues.length
+                ? '<ul class="mb-0 ps-3">' + r.issues.map(i => `<li class="text-danger small">${esc(i)}</li>`).join('') + '</ul>'
+                : '<span class="text-muted">—</span>';
+
+            tbody.innerHTML += `
+                <tr class="${rowClass}">
+                    <td class="text-muted small">${r.row_num}</td>
+                    <td>${actionBadge}</td>
+                    <td><code>${esc(r.employee_code)}</code></td>
+                    <td class="fw-semibold text-dark">${esc(r.name)}</td>
+                    <td>${esc(r.job_title)}</td>
+                    <td>${deptCell}</td>
+                    <td>${branchCell}</td>
+                    <td>${esc(r.hire_date)}</td>
+                    <td><span class="badge bg-secondary">${esc(r.emp_status)}</span></td>
+                    <td>${issuesList}</td>
+                </tr>`;
+        });
+
+        // ── Wire the confirm button ───────────────────────────────────────────
+        const confirmBtn  = document.getElementById('csvConfirmBtn');
+        const confirmNote = document.getElementById('csvConfirmNote');
+        const importable  = s.new + s.update;
+
+        if (importable > 0) {
+            confirmBtn.disabled = false;
+            confirmNote.innerHTML = `<span class="text-success"><i class="fas fa-check-circle me-1"></i>${importable} record(s) ready to import</span>`;
+
+            // Attach the original file to the hidden form's file input using DataTransfer
+            const dt = new DataTransfer();
+            dt.items.add(originalFile);
+            document.getElementById('csvConfirmFileInput').files = dt.files;
+        } else {
+            confirmBtn.disabled = true;
+            confirmNote.innerHTML = `<span class="text-danger"><i class="fas fa-times-circle me-1"></i>No importable records found</span>`;
+        }
+    }
+
+    function esc(str) {
+        if (!str) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+})();
+</script>
+
