@@ -1013,23 +1013,26 @@ select option.position-group-label {
 
 /* ── Close button ── */
 .flash-message-banner .btn-close,
+.flash-message-banner .flash-message-close,
 .hrd-toast__close {
     position: static !important;
     flex-shrink: 0;
-    width: 24px; height: 24px;
+    width: 22px; height: 22px;
     display: flex; align-items: center; justify-content: center;
     border: none;
     background: rgba(255,255,255,.08) !important;
     border-radius: 6px;
     cursor: pointer;
-    color: #94a3b8;
-    font-size: .85rem;
+    color: #e2e8f0;
+    font-size: .9rem;
+    font-weight: 700;
+    line-height: 1;
     padding: 0;
-    filter: invert(1) !important;
-    opacity: .65 !important;
-    transition: background .2s, opacity .2s;
+    opacity: .7 !important;
+    transition: background .2s, opacity .2s, transform .2s;
 }
 .flash-message-banner .btn-close:hover,
+.flash-message-banner .flash-message-close:hover,
 .hrd-toast__close:hover {
     background: rgba(255,255,255,.18) !important;
     opacity: 1 !important;

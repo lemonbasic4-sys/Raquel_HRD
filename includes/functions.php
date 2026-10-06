@@ -1634,7 +1634,7 @@ function renderFlashPopup($type, $message)
     echo '<strong class="flash-message-title">' . e($title) . '</strong>';
     echo '<span class="flash-message-text">' . $message . '</span>';
     echo '</div>';
-    echo '<button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>';
+    echo '<button type="button" class="flash-message-close" aria-label="Close notification" title="Close">×</button>';
     echo '</div>';
 
 }

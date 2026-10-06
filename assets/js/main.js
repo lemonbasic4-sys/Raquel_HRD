@@ -112,6 +112,17 @@ function initDynamicComponents() {
         if (toast.parentElement !== stack) {
             stack.appendChild(toast);
         }
+
+        const closeBtn = toast.querySelector('.flash-message-close');
+        if (closeBtn && !closeBtn.dataset.bound) {
+            closeBtn.dataset.bound = 'true';
+            closeBtn.addEventListener('click', function (event) {
+                event.preventDefault();
+                event.stopPropagation();
+                _hrdDismissToast(toast);
+            });
+        }
+
         if (!toast.dataset.animated) {
             toast.dataset.animated = 'true';
             toast.classList.remove('show');
