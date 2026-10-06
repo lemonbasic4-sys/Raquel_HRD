@@ -2697,6 +2697,87 @@ function appendOrganizationGovernanceRouteStep($conn, $package_id, $order, $gove
     return $order + 1;
 }
 
+function normalizeOrganizationPackageRouteOrders($conn, $package_id)
+{
+    $package_id = (int)$package_id;
+    $steps_result = $conn->query("SELECT package_route_step_id, step_order
+        FROM evaluation_package_route_steps
+        WHERE package_id = $package_id
+        ORDER BY step_order, package_route_step_id");
+    if (!$steps_result) {
+        return false;
+    }
+
+    $steps = $steps_result->fetch_all(MYSQLI_ASSOC);
+    $steps_result->free();
+    if (!$steps) {
+        return true;
+    }
+
+    $has_gap = false;
+    foreach ($steps as $index => $step) {
+        if ((int)$step['step_order'] !== $index + 1) {
+            $has_gap = true;
+            break;
+        }
+    }
+    if (!$has_gap) {
+        return true;
+    }
+
+    $current_result = $conn->query("SELECT current_step_order
+        FROM evaluation_packages WHERE package_id = $package_id LIMIT 1");
+    $current_order = $current_result ? (int)($current_result->fetch_assoc()['current_step_order'] ?? 0) : 0;
+    if ($current_result) {
+        $current_result->free();
+    }
+
+    $current_step_id = null;
+    $max_order = max(array_map(static fn($step) => (int)$step['step_order'], $steps));
+    foreach ($steps as $step) {
+        if ((int)$step['step_order'] === $current_order) {
+            $current_step_id = (int)$step['package_route_step_id'];
+            break;
+        }
+    }
+
+    $move_stmt = $conn->prepare('UPDATE evaluation_package_route_steps SET step_order = ? WHERE package_route_step_id = ?');
+    if (!$move_stmt) {
+        throw new RuntimeException('Unable to prepare package route order normalization.');
+    }
+
+    foreach ($steps as $index => $step) {
+        $temporary_order = $max_order + $index + 1;
+        $step_id = (int)$step['package_route_step_id'];
+        $move_stmt->bind_param('ii', $temporary_order, $step_id);
+        $move_stmt->execute();
+    }
+
+    $normalized_current_order = null;
+    foreach ($steps as $index => $step) {
+        $normalized_order = $index + 1;
+        $step_id = (int)$step['package_route_step_id'];
+        $move_stmt->bind_param('ii', $normalized_order, $step_id);
+        $move_stmt->execute();
+        if ($current_step_id === $step_id) {
+            $normalized_current_order = $normalized_order;
+        }
+    }
+    $move_stmt->close();
+
+    if ($normalized_current_order !== null) {
+        $package_stmt = $conn->prepare('UPDATE evaluation_packages SET current_step_order = ? WHERE package_id = ?');
+        if (!$package_stmt) {
+            throw new RuntimeException('Unable to prepare package current-step normalization.');
+        }
+        $package_stmt->bind_param('ii', $normalized_current_order, $package_id);
+        $package_stmt->execute();
+        $package_stmt->close();
+    }
+
+    return true;
+}
+
 /**
  * Fetch the designated official for a given governance role and department.
  * Returns ['user_id' => int|null, 'employee_id' => int|null, 'job_title' => string, 'full_name' => string] or null.
@@ -4932,8 +5013,22 @@ function ensureOrganizationPackageGovernanceSteps($conn, $package_id)
                   AND (($vp_user_id > 0 AND reviewer_user_id = $vp_user_id) OR ($vp_emp_id > 0 AND reviewer_employee_id = $vp_emp_id))")->fetch_assoc()['c'] ?? 0);
 
             if ($internal_vp_count > 0) {
-                // Already in reporting chain — purge any extraneous duplicate Governance Division VP step
-                $conn->query("DELETE FROM evaluation_package_route_steps WHERE package_id = $package_id AND step_label LIKE 'Division VP Review%'");
+                // Remove only a future, unacted duplicate and close its route-order gap.
+                $duplicate_steps = $conn->query("SELECT step_order
+                    FROM evaluation_package_route_steps
+                    WHERE package_id = $package_id
+                      AND step_label LIKE 'Division VP Review%'
+                      AND action_status = 'Waiting'
+                      AND step_order > " . (int)($pkg['current_step_order'] ?? 0) . "
+                    ORDER BY step_order DESC");
+                if ($duplicate_steps) {
+                    while ($duplicate = $duplicate_steps->fetch_assoc()) {
+                        $duplicate_order = (int)$duplicate['step_order'];
+                        $conn->query("DELETE FROM evaluation_package_route_steps
+                            WHERE package_id = $package_id AND step_order = $duplicate_order");
+                    }
+                    $duplicate_steps->free();
+                }
             }
         }
     }
@@ -4983,6 +5078,13 @@ function ensureOrganizationPackageGovernanceSteps($conn, $package_id)
     if (!$has_board) {
         $max_order++;
         appendOrganizationGovernanceRouteStep($conn, $package_id, $max_order, 'Board of Directors', 'Board of Directors approval');
+    }
+
+    normalizeOrganizationPackageRouteOrders($conn, $package_id);
+    $current_order_result = $conn->query("SELECT current_step_order FROM evaluation_packages WHERE package_id = $package_id");
+    if ($current_order_result && $pkg) {
+        $pkg['current_step_order'] = $current_order_result->fetch_assoc()['current_step_order'] ?? $pkg['current_step_order'];
+        $current_order_result->free();
     }
 
     // 6. Advance step if previous step was approved but next step was stuck in Waiting.
