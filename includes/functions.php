@@ -2787,6 +2787,12 @@ function autoDetectAndLinkGovernanceApprover($conn, $employee_id)
     $gov_type = autoDetectGovernanceRoleFromJobTitle($emp['job_title'] ?? '');
     if (!$gov_type) return false;
 
+    // Corporate governance officials are intentionally manual-only.
+    // They must not be auto-assigned from employee titles.
+    if (in_array($gov_type, ['President', 'Audit Committee', 'Board of Directors'], true)) {
+        return false;
+    }
+
     // Check if an active user account was already provisioned by the Administrator (DO NOT auto-create)
     $u_stmt = $conn->prepare("SELECT user_id FROM users WHERE employee_id = ? AND is_active = 1 AND deleted_at IS NULL ORDER BY (role != 'Employee') DESC LIMIT 1");
     $u_stmt->bind_param('i', $employee_id);
@@ -2847,6 +2853,10 @@ function autoDetectAndSyncAllGovernanceApprovers($conn)
             $linked_count++;
         }
     }
+
+    // Corporate governance officials remain manual-only.
+    // The company-wide slots (President, Audit Committee, Board of Directors)
+    // are deliberately excluded from automated sync.
 
     syncPendingOrganizationPackageGovernanceApprovers($conn);
     return $linked_count;

@@ -9,11 +9,9 @@ ensureOrganizationEvaluationPackageSchema($conn);
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verifyCsrfToken();
 
-    // Auto-Detect & Sync All Governance Roles (DO NOT auto-generate user accounts)
+    // Auto-detect is intentionally unavailable for governance assignment.
     if (isset($_POST['action']) && $_POST['action'] === 'auto_detect_all') {
-        $linked = autoDetectAndSyncAllGovernanceApprovers($conn);
-        logAudit($conn, (int)$_SESSION['user_id'], 'UPDATE', 'Evaluation Governance', 0, "Auto-detected and synced $linked governance approver(s)");
-        redirectWith(BASE_URL . '/manager/evaluation-governance.php', 'success', "Smart Detection complete: $linked governance official(s) auto-assigned from employee job titles.");
+        redirectWith(BASE_URL . '/manager/evaluation-governance.php', 'warning', 'Auto-detect and sync has been removed. Governance assignments must be set manually.');
     }
 
     // Batch Actions (Enable, Disable, Delete)
@@ -472,9 +470,9 @@ foreach ($approvers as $a) {
                 <p class="mb-0 text-white-50 small">Configure sign-off authorities for each step of evaluation packages: <strong>Consolidation ←’ Manager ←’ Division VP ←’ President & CEO ←’ Audit Committee ←’ Board of Directors (Final Lock).</strong></p>
             </div>
             <div class="d-flex flex-wrap gap-2">
-                <button type="button" class="btn btn-secondary rounded-pill shadow-sm px-3 fw-bold opacity-50 text-white" disabled style="cursor: not-allowed;" title="Auto-Detect & Sync Governance is temporarily disabled">
-                    <i class="fas fa-bolt me-1 text-warning"></i>Auto-Detect & Sync Governance
-                </button>
+                <span class="badge bg-light text-dark border border-light-subtle px-3 py-2 fw-semibold">
+                    <i class="fas fa-lock me-1 text-success"></i>Manual Governance Assignment
+                </span>
             </div>
         </div>
     </section>
