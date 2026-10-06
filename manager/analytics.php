@@ -270,6 +270,188 @@ $gender_q->execute();
 $gender_data = $gender_q->get_result()->fetch_all(MYSQLI_ASSOC);
 $gender_q->close();
 
+/* ════════════════════════════════════════════════════════════════════════
+   DEMOGRAPHICS INSIGHTS QUERIES
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* ── Active Employee KPI Summary (by employment status) ─────────────────── */
+$demo_active_total = 0;
+$demo_status_kpi   = ['Regular' => 0, 'Probationary' => 0, 'Trainee' => 0, 'Project-Based' => 0, 'OJT' => 0];
+
+$demo_kpi_q = $conn->query("
+    SELECT employment_status, COUNT(*) AS cnt
+    FROM employees
+    WHERE is_active = 1 AND deleted_at IS NULL
+      AND employment_status IN ('Regular','Probationary','Trainee','Project Based','OJT')
+    GROUP BY employment_status
+");
+if ($demo_kpi_q) {
+    while ($r = $demo_kpi_q->fetch_assoc()) {
+        $key = $r['employment_status'] === 'Project Based' ? 'Project-Based' : $r['employment_status'];
+        $demo_status_kpi[$key] = (int)$r['cnt'];
+        $demo_active_total    += (int)$r['cnt'];
+    }
+}
+// Also count ALL active (not just the 5 types)
+$total_active_q = $conn->query("SELECT COUNT(*) AS cnt FROM employees WHERE is_active=1 AND deleted_at IS NULL");
+if ($total_active_q) $demo_active_total = (int)$total_active_q->fetch_assoc()['cnt'];
+
+/* ── Gender Distribution (all active employees) ─────────────────────────── */
+$demo_gender = [];
+$demo_gender_q = $conn->query("
+    SELECT gender, COUNT(*) AS cnt
+    FROM employees
+    WHERE is_active = 1 AND deleted_at IS NULL AND gender IS NOT NULL
+    GROUP BY gender
+    ORDER BY cnt DESC
+");
+if ($demo_gender_q) {
+    while ($r = $demo_gender_q->fetch_assoc()) $demo_gender[] = $r;
+}
+
+/* ── Civil Status Distribution ───────────────────────────────────────────── */
+$demo_civil = [];
+$demo_civil_order = ['Single','Married','Widowed','Separated','Other'];
+$demo_civil_raw   = [];
+$demo_civil_q = $conn->query("
+    SELECT civil_status, COUNT(*) AS cnt
+    FROM employees
+    WHERE is_active = 1 AND deleted_at IS NULL AND civil_status IS NOT NULL
+    GROUP BY civil_status
+");
+if ($demo_civil_q) {
+    while ($r = $demo_civil_q->fetch_assoc()) $demo_civil_raw[$r['civil_status']] = (int)$r['cnt'];
+}
+foreach ($demo_civil_order as $cs) {
+    $demo_civil[] = ['label' => $cs, 'cnt' => $demo_civil_raw[$cs] ?? 0];
+}
+
+/* ── Age Distribution ───────────────────────────────────────────────────── */
+$demo_age_brackets = ['20-25','26-30','31-40','41-50','51-60','61+'];
+$demo_age_raw      = [];
+$demo_age_q = $conn->query("
+    SELECT
+        CASE
+            WHEN TIMESTAMPDIFF(YEAR, date_of_birth, CURDATE()) BETWEEN 20 AND 25 THEN '20-25'
+            WHEN TIMESTAMPDIFF(YEAR, date_of_birth, CURDATE()) BETWEEN 26 AND 30 THEN '26-30'
+            WHEN TIMESTAMPDIFF(YEAR, date_of_birth, CURDATE()) BETWEEN 31 AND 40 THEN '31-40'
+            WHEN TIMESTAMPDIFF(YEAR, date_of_birth, CURDATE()) BETWEEN 41 AND 50 THEN '41-50'
+            WHEN TIMESTAMPDIFF(YEAR, date_of_birth, CURDATE()) BETWEEN 51 AND 60 THEN '51-60'
+            ELSE '61+'
+        END AS age_bracket,
+        COUNT(*) AS cnt
+    FROM employees
+    WHERE is_active = 1 AND deleted_at IS NULL AND date_of_birth IS NOT NULL
+    GROUP BY age_bracket
+");
+if ($demo_age_q) {
+    while ($r = $demo_age_q->fetch_assoc()) $demo_age_raw[$r['age_bracket']] = (int)$r['cnt'];
+}
+$demo_age_counts = array_map(fn($b) => $demo_age_raw[$b] ?? 0, $demo_age_brackets);
+
+/* ── Employment Status Distribution (for donut) ─────────────────────────── */
+$demo_emp_status   = [];
+$demo_emp_status_q = $conn->query("
+    SELECT employment_status, COUNT(*) AS cnt
+    FROM employees
+    WHERE is_active = 1 AND deleted_at IS NULL
+    GROUP BY employment_status
+    ORDER BY cnt DESC
+");
+if ($demo_emp_status_q) {
+    while ($r = $demo_emp_status_q->fetch_assoc()) $demo_emp_status[] = $r;
+}
+
+/* ── Tenure Distribution (all active employees) ─────────────────────────── */
+$demo_tenure_order  = ['Less than 1 year','1-3 years','3-5 years','5-10 years','More than 10 years'];
+$demo_tenure_raw    = [];
+$demo_tenure_q = $conn->query("
+    SELECT
+        CASE
+            WHEN DATEDIFF(CURDATE(), hire_date)/365.25 < 1          THEN 'Less than 1 year'
+            WHEN DATEDIFF(CURDATE(), hire_date)/365.25 BETWEEN 1 AND 3 THEN '1-3 years'
+            WHEN DATEDIFF(CURDATE(), hire_date)/365.25 BETWEEN 3 AND 5 THEN '3-5 years'
+            WHEN DATEDIFF(CURDATE(), hire_date)/365.25 BETWEEN 5 AND 10 THEN '5-10 years'
+            ELSE 'More than 10 years'
+        END AS tenure_range,
+        COUNT(*) AS cnt
+    FROM employees
+    WHERE is_active = 1 AND deleted_at IS NULL
+    GROUP BY tenure_range
+");
+if ($demo_tenure_q) {
+    while ($r = $demo_tenure_q->fetch_assoc()) $demo_tenure_raw[$r['tenure_range']] = (int)$r['cnt'];
+}
+$demo_tenure_counts = array_map(fn($t) => $demo_tenure_raw[$t] ?? 0, $demo_tenure_order);
+
+/* ── Educational Attainment (highest level per employee) ────────────────── */
+$demo_edu_levels = ['Elementary','Secondary','Senior High School','Vocational','College','Graduate Studies'];
+$demo_edu_labels = ['High School','Secondary','Senior High','Vocational','College Level','Graduate Studies'];
+$demo_edu_raw    = [];
+$demo_edu_q = $conn->query("
+    SELECT ee.education_level, COUNT(DISTINCT ee.employee_id) AS cnt
+    FROM employee_education ee
+    INNER JOIN employees e ON ee.employee_id = e.employee_id
+    WHERE e.is_active = 1 AND e.deleted_at IS NULL
+    GROUP BY ee.education_level
+");
+if ($demo_edu_q) {
+    while ($r = $demo_edu_q->fetch_assoc()) $demo_edu_raw[$r['education_level']] = (int)$r['cnt'];
+}
+$demo_edu_counts = array_map(fn($l) => $demo_edu_raw[$l] ?? 0, $demo_edu_levels);
+
+/* ── Workforce by Organizational Group ─────────────────────────────────── */
+// Support = Head Office employees (no branch or branch_id IS NULL or department-based)
+// Operations = Branch employees (has a branch)
+// We'll split by whether employee has a branch or not
+$demo_support_count = 0;
+$demo_ops_count     = 0;
+
+$demo_org_q = $conn->query("
+    SELECT
+        SUM(CASE WHEN branch_id IS NULL OR branch_id = 0 THEN 1 ELSE 0 END) AS support_cnt,
+        SUM(CASE WHEN branch_id IS NOT NULL AND branch_id > 0 THEN 1 ELSE 0 END) AS ops_cnt
+    FROM employees
+    WHERE is_active = 1 AND deleted_at IS NULL
+");
+if ($demo_org_q) {
+    $org_row = $demo_org_q->fetch_assoc();
+    $demo_support_count = (int)($org_row['support_cnt'] ?? 0);
+    $demo_ops_count     = (int)($org_row['ops_cnt']     ?? 0);
+}
+
+/* ── Support Department Distribution ────────────────────────────────────── */
+$demo_support_depts = [];
+$demo_support_dept_q = $conn->query("
+    SELECT d.department_name, COUNT(e.employee_id) AS cnt
+    FROM employees e
+    INNER JOIN departments d ON e.department_id = d.department_id
+    WHERE e.is_active = 1 AND e.deleted_at IS NULL
+      AND (e.branch_id IS NULL OR e.branch_id = 0)
+    GROUP BY d.department_id, d.department_name
+    ORDER BY cnt DESC
+    LIMIT 8
+");
+if ($demo_support_dept_q) {
+    while ($r = $demo_support_dept_q->fetch_assoc()) $demo_support_depts[] = $r;
+}
+
+/* ── Operations Branch Distribution ─────────────────────────────────────── */
+$demo_ops_branches = [];
+$demo_ops_branch_q = $conn->query("
+    SELECT b.branch_name, COUNT(e.employee_id) AS cnt
+    FROM employees e
+    INNER JOIN branches b ON e.branch_id = b.branch_id
+    WHERE e.is_active = 1 AND e.deleted_at IS NULL
+      AND e.branch_id IS NOT NULL AND e.branch_id > 0
+    GROUP BY b.branch_id, b.branch_name
+    ORDER BY cnt DESC
+    LIMIT 8
+");
+if ($demo_ops_branch_q) {
+    while ($r = $demo_ops_branch_q->fetch_assoc()) $demo_ops_branches[] = $r;
+}
+
 /* ── Branch color palette (26 brand-harmonious colors) ─────────────────── */
 $palette = ['#294306','#BD9414','#D71920','#2E86AB','#3BB273',
             '#7B2D8B','#F18F01','#44BBA4','#E94F37','#386FA4',
@@ -427,6 +609,8 @@ $yoy_emp    = formatYoYData($yoy_emp_raw, $yoy_years);
 
 
 
+<div class="analytics-page">
+
 <!-- ═══════════════════════  HERO  ═══════════════════════ -->
 <div class="page-hero fadeup">
     <div class="d-flex flex-wrap align-items-center justify-content-between mb-4 gap-3">
@@ -563,6 +747,140 @@ $yoy_emp    = formatYoYData($yoy_emp_raw, $yoy_years);
 }
 .tab-pane {
     animation: fadeSlideUp 0.4s ease forwards;
+}
+
+/* ═══════════════════════ DEMOGRAPHICS STYLES ═══════════════════════ */
+/* Section divider */
+.demo-section-divider {
+    display: flex;
+    align-items: center;
+    font-size: .85rem;
+    font-weight: 700;
+    color: #294306;
+    border-bottom: 2px solid #eef2e8;
+    padding-bottom: 10px;
+    margin-bottom: 18px;
+    margin-top: 8px;
+}
+
+/* KPI cards */
+.demo-kpi-card {
+    background: #fff;
+    border: 1px solid #eee;
+    border-radius: 12px;
+    padding: 14px 12px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.04);
+    transition: box-shadow .2s;
+    height: 100%;
+}
+.demo-kpi-card:hover { box-shadow: 0 4px 16px rgba(41,67,6,.1); }
+.demo-kpi-icon {
+    width: 38px; height: 38px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1rem; flex-shrink: 0;
+}
+.demo-kpi-val  { font-size: 1.5rem; font-weight: 800; line-height: 1; color: #1a2e06; }
+.demo-kpi-label{ font-size: .72rem; font-weight: 700; color: #555; margin-top: 3px; text-transform: uppercase; letter-spacing: .4px; }
+.demo-kpi-sub  { font-size: .65rem; color: #aaa; margin-top: 2px; }
+.demo-kpi-active     .demo-kpi-icon { background: rgba(41,67,6,.1);   color:#294306; }
+.demo-kpi-regular    .demo-kpi-icon { background: rgba(41,67,6,.1);   color:#294306; }
+.demo-kpi-probationary.demo-kpi-icon{ background: rgba(189,148,20,.1);color:#BD9414; }
+.demo-kpi-trainee    .demo-kpi-icon { background: rgba(46,134,171,.1);color:#2E86AB; }
+.demo-kpi-project    .demo-kpi-icon { background: rgba(215,25,32,.1); color:#D71920; }
+.demo-kpi-ojt        .demo-kpi-icon { background: rgba(233,79,55,.1); color:#E94F37; }
+
+/* Horizontal bars */
+.demo-hbar-row {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 11px;
+}
+.demo-hbar-label {
+    min-width: 100px; font-size: .75rem; font-weight: 600; color: #444;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.demo-hbar-track {
+    flex: 1; height: 8px; background: #f0f4ee; border-radius: 20px; overflow: hidden;
+}
+.demo-hbar-fill {
+    height: 100%; border-radius: 20px;
+    transition: width .6s cubic-bezier(.4,0,.2,1);
+}
+.demo-hbar-stat  { display: flex; gap: 4px; align-items: center; flex-shrink: 0; }
+.demo-hbar-cnt   { font-size: .75rem; font-weight: 700; color: #294306; min-width: 26px; text-align: right; }
+.demo-hbar-pct   { font-size: .68rem; color: #aaa; min-width: 34px; text-align: right; }
+
+/* Gender donut helpers */
+.demo-gender-wrap   { text-align: center; }
+.demo-donut-center  {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+    text-align: center; pointer-events: none;
+}
+.demo-donut-val     { font-size: 1.35rem; font-weight: 800; color: #1a2e06; line-height: 1; }
+.demo-donut-lbl     { font-size: .65rem;  color: #aaa; font-weight: 600; margin-top: 2px; }
+.demo-gender-legend { text-align: left; max-width: 220px; margin: 0 auto; }
+.demo-gender-row {
+    display: flex; align-items: center; gap: 7px;
+    font-size: .75rem; padding: 4px 0; border-bottom: 1px solid #f5f5f5;
+}
+.demo-gender-row:last-child { border-bottom: none; }
+.demo-gender-dot   { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.demo-gender-name  { flex: 1; font-weight: 600; color: #444; }
+.demo-gender-count { font-weight: 800; color: #294306; min-width: 24px; text-align: right; }
+.demo-gender-pct   { color: #aaa; min-width: 36px; text-align: right; }
+
+/* Employment status donut + legend */
+.demo-emp-wrap { text-align: center; }
+.demo-empst-row {
+    display: flex; align-items: center; gap: 6px;
+    font-size: .72rem; padding: 3px 0; border-bottom: 1px solid #f5f5f5;
+}
+.demo-empst-row:last-child { border-bottom: none; }
+.demo-empst-dot  { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.demo-empst-name { flex: 1; font-weight: 600; color: #555; text-align: left; }
+.demo-empst-cnt  { font-weight: 700; color: #294306; min-width: 24px; text-align: right; }
+.demo-empst-pct  { color: #aaa; min-width: 34px; text-align: right; }
+
+/* Org group KPI blocks */
+.demo-org-kpi {
+    display: flex; align-items: center; gap: 14px;
+    border-radius: 12px; padding: 18px 16px;
+    margin-bottom: 4px;
+}
+.demo-org-support { background: linear-gradient(135deg,#eef5e6,#d8ebc4); border: 1px solid #c6e0a0; }
+.demo-org-ops     { background: linear-gradient(135deg,#fdf6e0,#fae8a4); border: 1px solid #f0d060; }
+.demo-org-icon {
+    width: 48px; height: 48px; border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.2rem; flex-shrink: 0;
+}
+.demo-org-support .demo-org-icon { background: rgba(41,67,6,.15);   color: #294306; }
+.demo-org-ops     .demo-org-icon { background: rgba(189,148,20,.2); color: #BD9414; }
+.demo-org-title { font-size: .75rem; font-weight: 700; color: #555; }
+.demo-org-count { font-size: 2rem; font-weight: 900; line-height: 1.1; color: #1a2e06; }
+.demo-org-pct   { font-size: .7rem; color: #888; margin-top: 1px; }
+
+/* Mini horizontal bars (org group section) */
+.demo-mini-hbar-row {
+    display: flex; align-items: center; gap: 6px;
+    margin-bottom: 8px;
+}
+.demo-mini-hbar-label {
+    font-size: .7rem; font-weight: 600; color: #555;
+    min-width: 90px; max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.demo-mini-hbar-track {
+    flex: 1; height: 6px; background: #eee; border-radius: 10px; overflow: hidden;
+}
+.demo-mini-hbar-fill {
+    height: 100%; border-radius: 10px;
+    transition: width .6s cubic-bezier(.4,0,.2,1);
+}
+.demo-mini-hbar-cnt {
+    font-size: .7rem; font-weight: 700; color: #294306;
+    min-width: 20px; text-align: right; flex-shrink: 0;
 }
 </style>
 
@@ -968,7 +1286,6 @@ $yoy_emp    = formatYoYData($yoy_emp_raw, $yoy_years);
                     </div>
                 </div>
             </div>
-
             <!-- Gender Performance Insights -->
             <div class="col-lg-6">
                 <div class="chart-card">
@@ -988,7 +1305,350 @@ $yoy_emp    = formatYoYData($yoy_emp_raw, $yoy_years);
                 </div>
             </div>
         </div>
+
+        <!-- ══════ DEMOGRAPHICS INSIGHTS SECTION ══════ -->
+        <div class="demo-section-divider">
+            <i class="fas fa-users me-2" style="color:#294306;"></i>Demographics Insights
+            <span style="font-size:.72rem;color:#aaa;font-weight:400;margin-left:8px;">Understanding our workforce composition and characteristics</span>
+            <span class="ms-auto badge border" style="background:#f8f9fa;color:#555;font-size:.74rem;font-weight:500;padding:5px 12px;">
+                <i class="fas fa-calendar-alt me-1" style="color:#294306;"></i>As of <?php echo date('Y'); ?>
+            </span>
+        </div>
+
+        <!-- ── KPI Cards ── -->
+        <div class="row g-2 mb-4">
+            <div class="col-6 col-md-4 col-xl-2">
+                <div class="demo-kpi-card demo-kpi-active">
+                    <div class="demo-kpi-icon"><i class="fas fa-users"></i></div>
+                    <div class="demo-kpi-body">
+                        <div class="demo-kpi-val"><?php echo number_format($demo_active_total); ?></div>
+                        <div class="demo-kpi-label">Active Employees</div>
+                        <div class="demo-kpi-sub">100% of workforce</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-4 col-xl-2">
+                <div class="demo-kpi-card demo-kpi-regular">
+                    <div class="demo-kpi-icon"><i class="fas fa-user-tie"></i></div>
+                    <div class="demo-kpi-body">
+                        <div class="demo-kpi-val"><?php echo number_format($demo_status_kpi['Regular']); ?></div>
+                        <div class="demo-kpi-label">Regular</div>
+                        <div class="demo-kpi-sub"><?php echo $demo_active_total > 0 ? number_format($demo_status_kpi['Regular']/$demo_active_total*100,1) : 0; ?>% of active employees</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-4 col-xl-2">
+                <div class="demo-kpi-card demo-kpi-probationary">
+                    <div class="demo-kpi-icon"><i class="fas fa-user-clock"></i></div>
+                    <div class="demo-kpi-body">
+                        <div class="demo-kpi-val"><?php echo number_format($demo_status_kpi['Probationary']); ?></div>
+                        <div class="demo-kpi-label">Probationary</div>
+                        <div class="demo-kpi-sub"><?php echo $demo_active_total > 0 ? number_format($demo_status_kpi['Probationary']/$demo_active_total*100,1) : 0; ?>% of active employees</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-4 col-xl-2">
+                <div class="demo-kpi-card demo-kpi-trainee">
+                    <div class="demo-kpi-icon"><i class="fas fa-graduation-cap"></i></div>
+                    <div class="demo-kpi-body">
+                        <div class="demo-kpi-val"><?php echo number_format($demo_status_kpi['Trainee']); ?></div>
+                        <div class="demo-kpi-label">Trainee</div>
+                        <div class="demo-kpi-sub"><?php echo $demo_active_total > 0 ? number_format($demo_status_kpi['Trainee']/$demo_active_total*100,1) : 0; ?>% of active employees</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-4 col-xl-2">
+                <div class="demo-kpi-card demo-kpi-project">
+                    <div class="demo-kpi-icon"><i class="fas fa-file-contract"></i></div>
+                    <div class="demo-kpi-body">
+                        <div class="demo-kpi-val"><?php echo number_format($demo_status_kpi['Project-Based']); ?></div>
+                        <div class="demo-kpi-label">Project-Based</div>
+                        <div class="demo-kpi-sub"><?php echo $demo_active_total > 0 ? number_format($demo_status_kpi['Project-Based']/$demo_active_total*100,1) : 0; ?>% of active employees</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-4 col-xl-2">
+                <div class="demo-kpi-card demo-kpi-ojt">
+                    <div class="demo-kpi-icon"><i class="fas fa-user-graduate"></i></div>
+                    <div class="demo-kpi-body">
+                        <div class="demo-kpi-val"><?php echo number_format($demo_status_kpi['OJT']); ?></div>
+                        <div class="demo-kpi-label">OJT</div>
+                        <div class="demo-kpi-sub"><?php echo $demo_active_total > 0 ? number_format($demo_status_kpi['OJT']/$demo_active_total*100,1) : 0; ?>% of active employees</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Row 1: Gender | Civil Status | Age Distribution ── -->
+        <div class="row g-3 mb-3">
+            <!-- Gender Distribution -->
+            <div class="col-lg-4">
+                <div class="chart-card h-100">
+                    <div class="cc-header">
+                        <h6><i class="fas fa-venus-mars me-2" style="color:#294306;"></i>Gender Distribution</h6>
+                        <span class="badge bg-light text-muted" style="font-size:.7rem;"><?php echo number_format($demo_active_total); ?> employees</span>
+                    </div>
+                    <div class="cc-body">
+                        <div class="demo-gender-wrap">
+                            <div style="position:relative;width:180px;height:180px;margin:0 auto;">
+                                <canvas id="demoGenderChart"></canvas>
+                                <div class="demo-donut-center">
+                                    <div class="demo-donut-val"><?php echo number_format($demo_active_total); ?></div>
+                                    <div class="demo-donut-lbl">Total</div>
+                                </div>
+                            </div>
+                            <div class="demo-gender-legend mt-3">
+                                <?php
+                                $genderColors = ['Male'=>'#386FA4','Female'=>'#E94F37','Other'=>'#44BBA4','Preferred not to say'=>'#9B2226'];
+                                foreach ($demo_gender as $g):
+                                    $gc   = $genderColors[$g['gender']] ?? '#888';
+                                    $gpct = $demo_active_total > 0 ? number_format($g['cnt']/$demo_active_total*100,1) : 0;
+                                ?>
+                                <div class="demo-gender-row">
+                                    <span class="demo-gender-dot" style="background:<?php echo $gc; ?>;"></span>
+                                    <span class="demo-gender-name"><?php echo e($g['gender']); ?></span>
+                                    <span class="demo-gender-count"><?php echo number_format($g['cnt']); ?></span>
+                                    <span class="demo-gender-pct"><?php echo $gpct; ?>%</span>
+                                </div>
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Civil Status -->
+            <div class="col-lg-4">
+                <div class="chart-card h-100">
+                    <div class="cc-header">
+                        <h6><i class="fas fa-heart me-2" style="color:#E94F37;"></i>Civil Status</h6>
+                        <span class="badge bg-light text-muted" style="font-size:.7rem;"><?php echo number_format($demo_active_total); ?> employees</span>
+                    </div>
+                    <div class="cc-body">
+                        <?php
+                        $civil_total = array_sum(array_column($demo_civil,'cnt'));
+                        $civil_max   = $civil_total > 0 ? max(array_column($demo_civil,'cnt')) : 1;
+                        $civilColors = ['Single'=>'#3BB273','Married'=>'#294306','Widowed'=>'#BD9414','Separated'=>'#E94F37','Other'=>'#9B2226'];
+                        foreach ($demo_civil as $cv):
+                            if ($cv['cnt'] === 0) continue;
+                            $cpct   = $civil_max  > 0 ? round($cv['cnt']/$civil_max*100)  : 0;
+                            $clabel = $civil_total > 0 ? number_format($cv['cnt']/$civil_total*100,1) : 0;
+                            $col    = $civilColors[$cv['label']] ?? '#888';
+                        ?>
+                        <div class="demo-hbar-row">
+                            <div class="demo-hbar-label"><?php echo e($cv['label']); ?></div>
+                            <div class="demo-hbar-track">
+                                <div class="demo-hbar-fill" style="width:<?php echo $cpct; ?>%;background:<?php echo $col; ?>;"></div>
+                            </div>
+                            <div class="demo-hbar-stat">
+                                <span class="demo-hbar-cnt"><?php echo number_format($cv['cnt']); ?></span>
+                                <span class="demo-hbar-pct"><?php echo $clabel; ?>%</span>
+                            </div>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Age Distribution -->
+            <div class="col-lg-4">
+                <div class="chart-card h-100">
+                    <div class="cc-header">
+                        <h6><i class="fas fa-birthday-cake me-2" style="color:#BD9414;"></i>Age Distribution</h6>
+                        <span class="badge bg-light text-muted" style="font-size:.7rem;"><?php echo number_format($demo_active_total); ?> employees</span>
+                    </div>
+                    <div class="cc-body" style="padding-bottom:0;">
+                        <div class="chart-wrap" style="height:220px;">
+                            <canvas id="demoAgeChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Row 2: Employment Status | Tenure | Education ── -->
+        <div class="row g-3 mb-3">
+            <!-- Employment Status Distribution -->
+            <div class="col-lg-4">
+                <div class="chart-card h-100">
+                    <div class="cc-header">
+                        <h6><i class="fas fa-id-badge me-2" style="color:#294306;"></i>Employment Status Distribution</h6>
+                        <span class="badge bg-light text-muted" style="font-size:.7rem;"><?php echo number_format($demo_active_total); ?> employees</span>
+                    </div>
+                    <div class="cc-body">
+                        <div class="demo-emp-wrap">
+                            <div style="position:relative;width:170px;height:170px;margin:0 auto 12px;">
+                                <canvas id="demoEmpStatusChart"></canvas>
+                                <div class="demo-donut-center">
+                                    <div class="demo-donut-val"><?php echo number_format($demo_active_total); ?></div>
+                                    <div class="demo-donut-lbl">Total</div>
+                                </div>
+                            </div>
+                            <?php
+                            $empStatusColors = ['Regular'=>'#294306','Probationary'=>'#BD9414','Trainee'=>'#2E86AB','Project Based'=>'#F18F01','OJT'=>'#E94F37'];
+                            foreach ($demo_emp_status as $es):
+                                $esColor = $empStatusColors[$es['employment_status']] ?? '#888';
+                                $esPct   = $demo_active_total > 0 ? number_format($es['cnt']/$demo_active_total*100,1) : 0;
+                            ?>
+                            <div class="demo-empst-row">
+                                <span class="demo-empst-dot" style="background:<?php echo $esColor; ?>;"></span>
+                                <span class="demo-empst-name"><?php echo e($es['employment_status']); ?></span>
+                                <span class="demo-empst-cnt"><?php echo number_format($es['cnt']); ?></span>
+                                <span class="demo-empst-pct"><?php echo $esPct; ?>%</span>
+                            </div>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Employee Tenure -->
+            <div class="col-lg-4">
+                <div class="chart-card h-100">
+                    <div class="cc-header">
+                        <h6><i class="fas fa-clock me-2" style="color:#294306;"></i>Employee Tenure</h6>
+                        <span class="badge bg-light text-muted" style="font-size:.7rem;"><?php echo number_format($demo_active_total); ?> employees</span>
+                    </div>
+                    <div class="cc-body">
+                        <?php
+                        $tenure_total  = array_sum($demo_tenure_counts);
+                        $nonzero_t     = array_filter($demo_tenure_counts, fn($v) => $v > 0);
+                        $tenure_max    = $nonzero_t ? max($nonzero_t) : 1;
+                        $tenureColors  = ['#294306','#3BB273','#BD9414','#2E86AB','#E94F37'];
+                        foreach ($demo_tenure_order as $ti => $tl):
+                            $tcnt = $demo_tenure_counts[$ti];
+                            if ($tcnt === 0) continue;
+                            $tpct   = $tenure_max  > 0 ? round($tcnt/$tenure_max*100)  : 0;
+                            $tlabel = $tenure_total > 0 ? number_format($tcnt/$tenure_total*100,1) : 0;
+                        ?>
+                        <div class="demo-hbar-row">
+                            <div class="demo-hbar-label"><?php echo e($tl); ?></div>
+                            <div class="demo-hbar-track">
+                                <div class="demo-hbar-fill" style="width:<?php echo $tpct; ?>%;background:<?php echo $tenureColors[$ti%count($tenureColors)]; ?>;"></div>
+                            </div>
+                            <div class="demo-hbar-stat">
+                                <span class="demo-hbar-cnt"><?php echo number_format($tcnt); ?></span>
+                                <span class="demo-hbar-pct"><?php echo $tlabel; ?>%</span>
+                            </div>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Educational Attainment -->
+            <div class="col-lg-4">
+                <div class="chart-card h-100">
+                    <div class="cc-header">
+                        <h6><i class="fas fa-graduation-cap me-2" style="color:#294306;"></i>Educational Attainment</h6>
+                        <span class="badge bg-light text-muted" style="font-size:.7rem;"><?php echo number_format($demo_active_total); ?> employees</span>
+                    </div>
+                    <div class="cc-body">
+                        <?php
+                        $edu_total  = array_sum($demo_edu_counts);
+                        $nonzero_e  = array_filter($demo_edu_counts, fn($v) => $v > 0);
+                        $edu_max    = $nonzero_e ? max($nonzero_e) : 1;
+                        $eduColors  = ['#BD9414','#9B2226','#294306','#2E86AB','#E94F37','#7B2D8B'];
+                        foreach ($demo_edu_levels as $ei => $el):
+                            $ecnt = $demo_edu_counts[$ei];
+                            if ($ecnt === 0) continue;
+                            $epct   = $edu_max  > 0 ? round($ecnt/$edu_max*100)  : 0;
+                            $elabel = $edu_total > 0 ? number_format($ecnt/$edu_total*100,1) : 0;
+                            $elbl   = $demo_edu_labels[$ei];
+                        ?>
+                        <div class="demo-hbar-row">
+                            <div class="demo-hbar-label"><?php echo e($elbl); ?></div>
+                            <div class="demo-hbar-track">
+                                <div class="demo-hbar-fill" style="width:<?php echo $epct; ?>%;background:<?php echo $eduColors[$ei%count($eduColors)]; ?>;"></div>
+                            </div>
+                            <div class="demo-hbar-stat">
+                                <span class="demo-hbar-cnt"><?php echo number_format($ecnt); ?></span>
+                                <span class="demo-hbar-pct"><?php echo $elabel; ?>%</span>
+                            </div>
+                        </div>
+                        <?php endforeach; ?>
+                        <?php if ($edu_total === 0): ?>
+                        <div class="empty-state" style="padding:30px 0;"><i class="fas fa-graduation-cap" style="color:#ddd;font-size:1.5rem;"></i><div style="margin-top:8px;color:#aaa;font-size:.8rem;">No education records found.</div></div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Row 3: Workforce by Organizational Group ── -->
+        <div class="chart-card mb-2">
+            <div class="cc-header d-flex flex-wrap gap-2 align-items-center">
+                <h6 class="mb-0"><i class="fas fa-building me-2" style="color:#294306;"></i>Workforce by Organizational Group</h6>
+                <span style="font-size:.7rem;color:#aaa;">Distribution of employees across Support (Head Office) and Operations (Branch)</span>
+                <span class="badge bg-light text-muted ms-auto" style="font-size:.7rem;"><?php echo number_format($demo_active_total); ?> employees</span>
+            </div>
+            <div class="cc-body">
+                <div class="row g-3">
+                    <!-- Support KPI block -->
+                    <div class="col-md-3">
+                        <div class="demo-org-kpi demo-org-support">
+                            <div class="demo-org-icon"><i class="fas fa-building"></i></div>
+                            <div>
+                                <div class="demo-org-title">Support <small style="font-weight:400;">(Head Office)</small></div>
+                                <div class="demo-org-count"><?php echo number_format($demo_support_count); ?></div>
+                                <div class="demo-org-pct"><?php echo $demo_active_total > 0 ? number_format($demo_support_count/$demo_active_total*100,1) : 0; ?>% of total</div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Operations KPI block -->
+                    <div class="col-md-3">
+                        <div class="demo-org-kpi demo-org-ops">
+                            <div class="demo-org-icon"><i class="fas fa-store"></i></div>
+                            <div>
+                                <div class="demo-org-title">Operations <small style="font-weight:400;">(Branches and Sales)</small></div>
+                                <div class="demo-org-count"><?php echo number_format($demo_ops_count); ?></div>
+                                <div class="demo-org-pct"><?php echo $demo_active_total > 0 ? number_format($demo_ops_count/$demo_active_total*100,1) : 0; ?>% of total</div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Support dept bars -->
+                    <div class="col-md-3">
+                        <div style="font-size:.72rem;font-weight:700;color:#294306;margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px;">
+                            Support Department Distribution
+                            <?php if (!empty($demo_support_depts)): ?><span class="text-muted fw-normal">&nbsp;<?php echo number_format($demo_support_count); ?></span><?php endif; ?>
+                        </div>
+                        <?php if (empty($demo_support_depts)): ?>
+                        <div style="color:#aaa;font-size:.78rem;">No head office employees found.</div>
+                        <?php else: $sd_max = max(array_column($demo_support_depts,'cnt'));
+                        foreach ($demo_support_depts as $sd):
+                            $sd_pct = $sd_max > 0 ? round($sd['cnt']/$sd_max*100) : 0; ?>
+                        <div class="demo-mini-hbar-row">
+                            <div class="demo-mini-hbar-label"><?php echo e($sd['department_name']); ?></div>
+                            <div class="demo-mini-hbar-track"><div class="demo-mini-hbar-fill" style="width:<?php echo $sd_pct; ?>%;background:#294306;"></div></div>
+                            <div class="demo-mini-hbar-cnt"><?php echo number_format($sd['cnt']); ?></div>
+                        </div>
+                        <?php endforeach; endif; ?>
+                    </div>
+                    <!-- Operations branch bars -->
+                    <div class="col-md-3">
+                        <div style="font-size:.72rem;font-weight:700;color:#294306;margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px;">
+                            Operations Distribution
+                            <?php if (!empty($demo_ops_branches)): ?><span class="text-muted fw-normal">&nbsp;<?php echo number_format($demo_ops_count); ?></span><?php endif; ?>
+                        </div>
+                        <?php if (empty($demo_ops_branches)): ?>
+                        <div style="color:#aaa;font-size:.78rem;">No branch employees found.</div>
+                        <?php else: $ob_max = max(array_column($demo_ops_branches,'cnt'));
+                        foreach ($demo_ops_branches as $ob):
+                            $ob_pct = $ob_max > 0 ? round($ob['cnt']/$ob_max*100) : 0; ?>
+                        <div class="demo-mini-hbar-row">
+                            <div class="demo-mini-hbar-label"><?php echo e($ob['branch_name']); ?></div>
+                            <div class="demo-mini-hbar-track"><div class="demo-mini-hbar-fill" style="width:<?php echo $ob_pct; ?>%;background:#BD9414;"></div></div>
+                            <div class="demo-mini-hbar-cnt"><?php echo number_format($ob['cnt']); ?></div>
+                        </div>
+                        <?php endforeach; endif; ?>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div>
+</div>
+
 </div>
 
 <script>
@@ -1591,6 +2251,164 @@ document.addEventListener('DOMContentLoaded', function () {
             } else {
                 yoyChart.resize();
             }
+        });
+    }
+
+    /* ── [NEW] 9. Demographics Insights Charts ── */
+    // 9.1 Gender Distribution Donut
+    const demoGenderCtx = document.getElementById('demoGenderChart');
+    let demoGenderChart = null;
+    if (demoGenderCtx) {
+        const demoGenderLabels = <?php echo json_encode(array_column($demo_gender, 'gender')); ?>;
+        const demoGenderData   = <?php echo json_encode(array_map('intval', array_column($demo_gender, 'cnt'))); ?>;
+        const genderColorMap = {
+            'Male': '#386FA4',
+            'Female': '#E94F37',
+            'Other': '#44BBA4',
+            'Preferred not to say': '#9B2226'
+        };
+        const demoGenderColors = demoGenderLabels.map(l => genderColorMap[l] || '#888');
+
+        demoGenderChart = new Chart(demoGenderCtx, {
+            type: 'doughnut',
+            data: {
+                labels: demoGenderLabels,
+                datasets: [{
+                    data: demoGenderData.length > 0 ? demoGenderData : [1],
+                    backgroundColor: demoGenderData.length > 0 ? demoGenderColors : ['#e9ecef'],
+                    borderWidth: 3,
+                    borderColor: '#ffffff',
+                    hoverOffset: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '72%',
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: ctx => ` ${ctx.label}: ${ctx.parsed} employees`
+                        }
+                    }
+                },
+                animation: {
+                    animateRotate: true,
+                    animateScale: true,
+                    duration: 1200
+                }
+            }
+        });
+    }
+
+    // 9.2 Age Distribution Bar Chart
+    const demoAgeCtx = document.getElementById('demoAgeChart');
+    let demoAgeChart = null;
+    if (demoAgeCtx) {
+        demoAgeChart = new Chart(demoAgeCtx, {
+            type: 'bar',
+            data: {
+                labels: <?php echo json_encode($demo_age_brackets); ?>,
+                datasets: [{
+                    label: 'Employees',
+                    data: <?php echo json_encode($demo_age_counts); ?>,
+                    backgroundColor: '#3BB273',
+                    borderColor: '#294306',
+                    borderWidth: 1,
+                    borderRadius: 6,
+                    maxBarThickness: 34
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        grid: { display: false },
+                        ticks: { color: '#666', font: { size: 10, weight: 600 } }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        ticks: { stepSize: 1, color: '#888' },
+                        grid: { color: gridColor }
+                    }
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: ctx => ` ${ctx.parsed.y} employee(s)`
+                        }
+                    }
+                },
+                animation: {
+                    duration: 1200,
+                    easing: 'easeOutQuart'
+                }
+            }
+        });
+    }
+
+    // 9.3 Employment Status Donut
+    const demoEmpCtx = document.getElementById('demoEmpStatusChart');
+    let demoEmpChart = null;
+    if (demoEmpCtx) {
+        const demoEmpLabels = <?php echo json_encode(array_column($demo_emp_status, 'employment_status')); ?>;
+        const demoEmpData   = <?php echo json_encode(array_map('intval', array_column($demo_emp_status, 'cnt'))); ?>;
+        const empStatusColorMap = {
+            'Regular': '#294306',
+            'Probationary': '#BD9414',
+            'Trainee': '#2E86AB',
+            'Project Based': '#F18F01',
+            'OJT': '#E94F37'
+        };
+        const demoEmpColors = demoEmpLabels.map(l => empStatusColorMap[l] || '#888');
+
+        demoEmpChart = new Chart(demoEmpCtx, {
+            type: 'doughnut',
+            data: {
+                labels: demoEmpLabels,
+                datasets: [{
+                    data: demoEmpData.length > 0 ? demoEmpData : [1],
+                    backgroundColor: demoEmpData.length > 0 ? demoEmpColors : ['#e9ecef'],
+                    borderWidth: 3,
+                    borderColor: '#ffffff',
+                    hoverOffset: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '72%',
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: ctx => ` ${ctx.label}: ${ctx.parsed} employees`
+                        }
+                    }
+                },
+                animation: {
+                    animateRotate: true,
+                    animateScale: true,
+                    duration: 1200
+                }
+            }
+        });
+    }
+
+    // Tab resize trigger for Demographics tab
+    const demoTabBtn = document.getElementById('demographics-tab');
+    if (demoTabBtn) {
+        demoTabBtn.addEventListener('shown.bs.tab', function () {
+            if (demoGenderChart) demoGenderChart.resize();
+            if (demoAgeChart) demoAgeChart.resize();
+            if (demoEmpChart) demoEmpChart.resize();
+            const tChart = Chart.getChart('tenureChart');
+            if (tChart) tChart.resize();
+            const gChart = Chart.getChart('genderPerfChart');
+            if (gChart) gChart.resize();
         });
     }
 });

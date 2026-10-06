@@ -3909,6 +3909,104 @@ body.mobile-sidebar-active .sidebar {
     position: relative;
 }
 
+/* Analytics dashboard: keep every grid and chart constrained to its viewport column. */
+.analytics-page,
+.analytics-page .tab-content,
+.analytics-page .tab-pane,
+.analytics-page .chart-card,
+.analytics-page .filter-card {
+    max-width: 100%;
+    min-width: 0;
+}
+
+.analytics-page #analyticsTabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.analytics-page #analyticsTabs .nav-item {
+    flex: 1 1 190px;
+    min-width: 0;
+}
+
+.analytics-page #analyticsTabs .nav-link {
+    height: 100%;
+    white-space: normal;
+}
+
+.analytics-page .chart-card .cc-header {
+    flex-wrap: wrap;
+    gap: 8px;
+    min-width: 0;
+}
+
+.analytics-page .chart-card .cc-header h6 {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.analytics-page .chart-wrap {
+    max-width: 100%;
+    min-width: 0;
+    width: 100%;
+}
+
+.analytics-page .chart-wrap canvas {
+    max-width: 100%;
+}
+
+.analytics-page .table-responsive {
+    max-width: 100%;
+}
+
+@media (max-width: 767.98px) {
+    .analytics-page .page-hero > .d-flex {
+        align-items: flex-start !important;
+    }
+
+    .analytics-page .page-hero .row > [class*="col-"] {
+        min-width: 0;
+    }
+
+    .analytics-page #analyticsTabs .nav-item {
+        flex-basis: calc(50% - 4px);
+    }
+
+    .analytics-page #analyticsTabs .nav-link {
+        font-size: .78rem;
+        padding: 10px 8px;
+    }
+
+    .analytics-page #analyticsTabs .nav-link i {
+        margin-right: 5px !important;
+    }
+
+    .analytics-page .chart-card .cc-header {
+        align-items: flex-start;
+        padding: 13px 14px 10px;
+    }
+
+    .analytics-page .chart-card .cc-body {
+        min-width: 0;
+        padding: 12px;
+    }
+}
+
+@media (max-width: 479.98px) {
+    .analytics-page #analyticsTabs .nav-item {
+        flex-basis: 100%;
+    }
+
+    .analytics-page #analyticsTabs .nav-link {
+        text-align: left;
+    }
+
+    .analytics-page .chart-wrap {
+        height: clamp(200px, 60vw, 260px) !important;
+    }
+}
+
 /* Premium List rows (Branches) */
 .branch-row {
     display: flex;
