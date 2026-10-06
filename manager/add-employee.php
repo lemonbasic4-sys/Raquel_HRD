@@ -1373,42 +1373,45 @@ $stepLabels = [
 ];
 ?>
 
-<div class="page-hero fadeup mb-4">
-    <div class="d-flex flex-wrap align-items-center justify-content-between mb-4 gap-3">
-        <div>
-            <div style="font-size:.72rem;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,.55);">HR
-                Manager · Employees</div>
-            <h4 class="text-white fw-bold mb-0 mt-1"><i class="fas fa-user-plus me-2" style="color:#BD9414;"></i>Add New
-                Employee</h4>
-            <p class="text-white-50 small mb-0 mt-2">Create an employee record manually or import validated employee details from a CSV file.</p>
-        </div>
-        <div class="d-flex flex-wrap gap-2">
-            <button type="button" class="btn btn-light btn-sm fw-semibold rounded-pill px-3 shadow-sm d-flex align-items-center" data-bs-toggle="modal" data-bs-target="#importModal">
-                <i class="fas fa-file-csv me-2 text-success"></i>Import via CSV
-            </button>
+<div class="employee-create-page">
+    <div class="page-hero employee-create-hero fadeup mb-4">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div class="employee-create-hero-copy">
+                <div class="employee-create-eyebrow"><i class="fas fa-users-gear me-2"></i>Employee Management</div>
+                <h1 class="text-white fw-bold mb-2"><i class="fas fa-user-plus me-2"></i>Add New Employee</h1>
+                <p class="text-white-50 mb-0">Build a complete employee record with the guided Personal Data Sheet wizard.</p>
+            </div>
+            <div class="employee-create-hero-actions">
+                <button type="button" class="btn btn-light fw-semibold rounded-pill px-4 shadow-sm d-flex align-items-center" data-bs-toggle="modal" data-bs-target="#importModal">
+                    <i class="fas fa-file-csv me-2 text-success"></i>Import via CSV
+                </button>
+                <span class="employee-create-hero-note"><i class="fas fa-shield-halved me-1"></i>Your information is saved securely</span>
+            </div>
         </div>
     </div>
-</div>
 
-
-
-
-
-
-
-
-
-
-
-<div class="content-card">
-    <div class="card-header">
-        <h5><i class="fas fa-user-plus me-2"></i>Add New Employee (Personal Data Sheet)</h5>
-    </div>
-    <div class="card-body">
+    <div class="content-card employee-create-card">
+        <div class="card-header employee-create-card-header">
+            <div class="employee-create-card-title">
+                <span class="employee-create-card-icon"><i class="fas fa-id-card"></i></span>
+                <div>
+                    <h2>Personal Data Sheet</h2>
+                    <p>Complete each section to create the employee's HR profile.</p>
+                </div>
+            </div>
+            <span class="employee-create-step-count"><i class="fas fa-list-ol me-2"></i>12 guided steps</span>
+        </div>
+        <div class="card-body employee-create-card-body">
         <form method="POST" action="" id="addEmployeeForm" enctype="multipart/form-data" data-is-edit="false">
             <?php echo csrfField(); ?>
-            <!-- Wizard Header / Progress (matches Employee PDS wizard UX) -->
-            <div class="pds-progress-container mb-3">
+            <div class="employee-create-progress-heading">
+                <div>
+                    <span class="employee-create-overline">FORM PROGRESS</span>
+                    <strong id="wizardProgressLabel">Core Identity · Step 1 of 3</strong>
+                </div>
+                <span class="employee-create-progress-caption">Your progress updates as you move through the form</span>
+            </div>
+            <div class="pds-progress-container employee-create-progress mb-3">
                 <div class="pds-progress-wrapper">
                     <div id="pdsProgressBar" class="pds-progress-bar" style="width: 8.33%;"></div>
                 </div>
@@ -1463,9 +1466,7 @@ $stepLabels = [
                     style="display:none;">
                     <i class="fas fa-arrow-left me-2"></i>Back
                 </button>
-                <div class="text-muted small d-none d-md-block" id="wizardProgressLabel">
-                    Portal 1 of 4 · Step 1 of 12
-                </div>
+                <span class="wizard-footer-hint d-none d-md-inline"><i class="fas fa-circle-info me-1"></i>Required fields are marked with <b>*</b></span>
                 <div class="d-flex gap-2">
                     <button type="button" id="nextBtn" onclick="nextStep()" class="btn btn-primary px-4 shadow-sm">
                         Next <i class="fas fa-arrow-right ms-2"></i>
@@ -1478,6 +1479,7 @@ $stepLabels = [
 
         </form>
     </div>
+</div>
 </div>
 
 <script src="<?php echo BASE_URL; ?>/assets/js/employee-form.js?v=<?php echo time(); ?>"></script>
@@ -1817,4 +1819,3 @@ $stepLabels = [
     }
 })();
 </script>
-

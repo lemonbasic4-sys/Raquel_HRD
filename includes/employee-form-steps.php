@@ -483,7 +483,7 @@ $rankCategories = $rankCategories ?? [
                         <div class="pds-card-actions">
                             <button type="button" class="pds-card-btn btn-move-up" onclick="moveCard(this,'up')" title="Move Up"><i class="fas fa-chevron-up"></i></button>
                             <button type="button" class="pds-card-btn btn-move-down" onclick="moveCard(this,'down')" title="Move Down"><i class="fas fa-chevron-down"></i></button>
-                            <button type="button" class="pds-card-btn btn-delete" onclick="this.closest('.pds-card').remove(); document.querySelectorAll('#educationContainer select[name=\'edu_level[]\']').forEach(s=>{const c=s.closest('.pds-card');if(c)updateEduCardBadge(c)})" title="Remove"><i class="fas fa-trash"></i></button>
+                            <button type="button" class="pds-card-btn btn-delete" onclick="removeEducationCard(this)" title="Remove"><i class="fas fa-trash"></i></button>
                         </div>
                     </div>
                     <div class="pds-form-grid">
