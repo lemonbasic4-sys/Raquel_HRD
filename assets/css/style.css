@@ -3525,6 +3525,190 @@ body.mobile-sidebar-active .sidebar {
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
 }
 
+.history-detail-modal .modal-dialog {
+    max-width: min(1120px, calc(100vw - 32px));
+}
+
+.history-detail-modal .modal-content {
+    max-height: calc(100dvh - 32px);
+    border-radius: 20px !important;
+    overflow: hidden;
+    box-shadow: 0 24px 80px rgba(15, 23, 42, .28);
+}
+
+.history-detail-modal .history-modal-header {
+    align-items: center;
+    background: linear-gradient(120deg, #0b2d0a, #164e24);
+    border: 0;
+    color: #fff;
+    display: flex;
+    justify-content: space-between;
+    padding: 20px 26px;
+}
+
+.history-modal-heading {
+    align-items: center;
+    display: flex;
+    gap: 14px;
+    min-width: 0;
+}
+
+.history-modal-icon {
+    align-items: center;
+    background: rgba(255, 255, 255, .12);
+    border: 1px solid rgba(255, 255, 255, .16);
+    border-radius: 13px;
+    color: #f5d36e;
+    display: inline-flex;
+    flex: 0 0 44px;
+    height: 44px;
+    justify-content: center;
+}
+
+.history-modal-heading .modal-title { color: #fff; font-size: 1.08rem; }
+.history-modal-subtitle { color: rgba(255, 255, 255, .68); font-size: .78rem; margin: 3px 0 0; }
+
+.history-modal-status {
+    border: 1px solid rgba(255, 255, 255, .24);
+    border-radius: 999px;
+    display: inline-flex;
+    flex: 0 0 auto;
+    font-size: .74rem;
+    font-weight: 700;
+    gap: 7px;
+    margin-left: auto;
+    margin-right: 16px;
+    padding: 7px 12px;
+}
+
+.history-modal-status.approved { background: rgba(34, 197, 94, .17); color: #bbf7d0; }
+.history-modal-status.rejected { background: rgba(239, 68, 68, .17); color: #fecaca; }
+.history-modal-status.returned { background: rgba(245, 158, 11, .17); color: #fde68a; }
+.history-detail-modal .btn-close { opacity: .8; }
+.history-detail-modal .modal-body { background: #f6f8f5; overflow-y: auto; padding: 22px 26px !important; }
+
+.history-detail-modal .status-stepper {
+    align-items: flex-start;
+    border: 0 !important;
+    gap: 0;
+    margin: 0 0 18px !important;
+    overflow: visible !important;
+    padding: 0 !important;
+}
+
+.history-detail-modal .status-stepper .step-item {
+    color: #94a3b8 !important;
+    flex: 1;
+    font-size: .66rem;
+    letter-spacing: .06em;
+    position: relative;
+    text-transform: uppercase;
+}
+
+.history-detail-modal .status-stepper .step-item:not(:last-child)::after {
+    background: #dbe4d8;
+    content: '';
+    height: 2px;
+    left: calc(50% + 20px);
+    position: absolute;
+    right: calc(-50% + 20px);
+    top: 17px;
+}
+
+.history-detail-modal .status-stepper .step-item.is-complete { color: #166534 !important; }
+.history-detail-modal .status-stepper .step-item.is-terminal { color: #a16207 !important; }
+.history-detail-modal .status-stepper .step-item.is-rejected { color: #b91c1c !important; }
+
+.history-detail-modal .history-step-icon {
+    align-items: center;
+    background: #fff;
+    border: 1px solid #dbe4d8;
+    border-radius: 50%;
+    color: #94a3b8;
+    display: flex;
+    height: 36px;
+    justify-content: center;
+    margin: 0 auto 7px;
+    position: relative;
+    width: 36px;
+    z-index: 1;
+}
+
+.history-detail-modal .step-item.is-complete .history-step-icon { background: #e8f5e9; border-color: #a7d7ac; color: #15803d; }
+.history-detail-modal .step-item.is-terminal .history-step-icon { background: #fff7df; border-color: #f5d36e; color: #a16207; }
+.history-detail-modal .step-item.is-rejected .history-step-icon { background: #fff1f2; border-color: #fecdd3; color: #be123c; }
+
+.history-detail-modal .eval-summary-header {
+    align-items: center;
+    background: #fff;
+    border: 1px solid #e5ebe2;
+    border-radius: 16px;
+    box-shadow: 0 4px 14px rgba(15, 23, 42, .04);
+    flex-wrap: wrap;
+    margin-bottom: 24px;
+    padding: 16px 18px;
+}
+
+.history-detail-modal .history-employee-avatar {
+    align-items: center;
+    background: linear-gradient(145deg, #155e2c, #0b2d0a);
+    border-radius: 14px;
+    color: #fff;
+    display: inline-flex;
+    flex: 0 0 52px;
+    font-size: 1rem;
+    height: 52px;
+    justify-content: center;
+}
+
+.history-detail-modal .history-employee-copy { min-width: 0; }
+.history-detail-modal .history-employee-copy h4 { font-size: 1.02rem !important; }
+.history-detail-modal .history-employee-meta { color: #64748b; font-size: .76rem; }
+.history-detail-modal .history-summary-actions { align-items: center; display: flex; flex-wrap: wrap; gap: 14px; margin-left: auto; }
+.history-detail-modal .history-summary-actions .score-circle { height: 68px; min-width: 68px; width: 68px; }
+.history-detail-modal .history-summary-actions .score-circle .val { font-size: 1.08rem; }
+
+.history-detail-modal .section-premium-label {
+    align-items: center;
+    color: #164e24;
+    display: flex;
+    font-size: .79rem;
+    gap: 9px;
+    letter-spacing: .07em;
+    margin: 22px 0 12px !important;
+}
+
+.history-detail-modal .table-responsive { background: #fff; border: 1px solid #e4e9e1; border-radius: 12px; }
+.history-detail-modal .table { margin: 0; }
+.history-detail-modal .table thead th {
+    background: #eff4ed;
+    border-bottom: 1px solid #e0e8dc;
+    color: #475569;
+    font-size: .68rem;
+    letter-spacing: .05em;
+    padding-bottom: 11px;
+    padding-top: 11px;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+.history-detail-modal .table tbody td { padding-bottom: 11px; padding-top: 11px; }
+.history-detail-modal .table tbody tr:last-child td { border-bottom: 0; }
+
+@media (max-width: 767px) {
+    .history-detail-modal .modal-dialog { margin: 8px; max-width: calc(100vw - 16px); }
+    .history-detail-modal .modal-content { max-height: calc(100dvh - 16px); border-radius: 16px !important; }
+    .history-detail-modal .history-modal-header { flex-wrap: wrap; gap: 12px; padding: 16px; }
+    .history-modal-heading { gap: 10px; }
+    .history-modal-icon { flex-basis: 38px; height: 38px; }
+    .history-detail-modal .history-modal-status { margin-left: 48px; margin-right: 0; order: 3; }
+    .history-detail-modal .modal-body { padding: 16px !important; }
+    .history-detail-modal .eval-summary-header { align-items: flex-start; }
+    .history-detail-modal .history-summary-actions { margin-left: 0; width: 100%; }
+    .history-detail-modal .history-summary-actions .score-circle { height: 60px; min-width: 60px; width: 60px; }
+    .history-detail-modal .history-step-icon { height: 32px; width: 32px; }
+    .history-detail-modal .status-stepper .step-item:not(:last-child)::after { left: calc(50% + 17px); right: calc(-50% + 17px); top: 15px; }
+}
+
 .score-circle {
     width: 82px;
     height: 82px;

@@ -283,54 +283,69 @@ ksort($existing_templates);
 <?php 
 // Modals for evaluation details (strictly read-only)
 foreach ($all_history as $row): 
+    $status = $row['status'];
     $initials = strtoupper(substr($row['employee_name'], 0, 1) . substr(explode(' ', $row['employee_name'])[1] ?? '', 0, 1));
 ?>
-    <div class="modal fade modal-premium" id="reviewModal<?php echo $row['evaluation_id']; ?>" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-lg modal-dialog-scrollable">
-            <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; overflow: hidden;">
-                <div class="modal-header">
-                    <div>
-                        <h5 class="modal-title mb-1">Performance Details (Read Only)</h5>
-                        <p class="mb-0 opacity-75 small">Comprehensive archive record for <?php echo e($row['employee_name']); ?></p>
+    <div class="modal fade modal-premium history-detail-modal" id="reviewModal<?php echo $row['evaluation_id']; ?>" tabindex="-1" aria-labelledby="reviewModalTitle<?php echo $row['evaluation_id']; ?>" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header history-modal-header">
+                    <div class="history-modal-heading">
+                        <span class="history-modal-icon"><i class="fas fa-file-circle-check"></i></span>
+                        <div>
+                            <h5 class="modal-title mb-1" id="reviewModalTitle<?php echo $row['evaluation_id']; ?>">Evaluation Details</h5>
+                            <p class="history-modal-subtitle"><?php echo e($row['employee_name']); ?> <span aria-hidden="true">·</span> <?php echo e($row['template_name']); ?></p>
+                        </div>
                     </div>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    <span class="history-modal-status <?php echo e(strtolower($status)); ?>">
+                        <i class="fas <?php echo $status === 'Approved' ? 'fa-circle-check' : ($status === 'Rejected' ? 'fa-circle-xmark' : 'fa-rotate-left'); ?>"></i>
+                        <?php echo e($status); ?>
+                    </span>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close evaluation details"></button>
                 </div>
-                <div class="modal-body p-4 pt-0">
+                <div class="modal-body">
                     <div class="status-stepper d-flex justify-content-between mb-4 py-3 border-bottom overflow-hidden">
                         <?php
                         $steps = [
                             ['l' => 'Drafted', 'a' => true, 'i' => 'fa-pencil-alt'],
                             ['l' => 'Supervisor', 'a' => true, 'i' => 'fa-user-tie'],
-                            ['l' => 'Approved', 'a' => ($row['status'] === 'Approved'), 'i' => 'fa-check-double']
+                            ['l' => 'Review', 'a' => true, 'i' => 'fa-user-shield'],
+                            ['l' => 'Final', 'a' => ($status === 'Approved'), 'i' => 'fa-check-double', 'c' => ($status === 'Approved')]
                         ];
+                        if ($status === 'Rejected') {
+                            $steps[3] = ['l' => 'Rejected', 'a' => true, 'i' => 'fa-times-circle', 'c' => true];
+                        } elseif ($status === 'Returned') {
+                            $steps[3] = ['l' => 'Returned', 'a' => true, 'i' => 'fa-rotate-left', 'c' => true];
+                        }
                         foreach ($steps as $st): ?>
-                            <div class="step-item text-center <?php echo $st['a'] ? 'text-primary' : 'text-muted'; ?>" style="flex: 1;">
-                                <div class="mb-1">
-                                    <i class="fas <?php echo $st['i']; ?>"></i>
-                                </div>
-                                <div style="font-size: 0.65rem; font-weight: 800; text-transform: uppercase;"><?php echo $st['l']; ?></div>
+                            <?php
+                            $step_state = empty($st['a'])
+                                ? 'is-upcoming'
+                                : (!empty($st['c']) ? ($status === 'Rejected' ? 'is-rejected' : 'is-terminal') : 'is-complete');
+                            ?>
+                            <div class="step-item text-center <?php echo $step_state; ?>">
+                                <div class="history-step-icon"><i class="fas <?php echo e($st['i']); ?>"></i></div>
+                                <div class="fw-bold"><?php echo e($st['l']); ?></div>
                             </div>
                         <?php endforeach; ?>
                     </div>
 
                     <div class="eval-summary-header">
                         <div class="d-flex align-items-center gap-3">
-                            <div class="emp-avatar bg-primary text-white d-flex align-items-center justify-content-center fw-bold rounded-3 shadow-sm" style="width: 54px; height: 54px; font-size: 1.2rem;"><?php echo $initials; ?></div>
-                            <div>
-                                <h4 class="mb-1 fw-bold text-dark" style="font-size: 1.2rem;"><?php echo e($row['employee_name']); ?></h4>
-                                <div class="text-muted small d-flex align-items-center gap-2 flex-wrap">
+                            <div class="history-employee-avatar"><?php echo e($initials); ?></div>
+                            <div class="history-employee-copy">
+                                <h4 class="mb-1 fw-bold text-dark"><?php echo e($row['employee_name']); ?></h4>
+                                <div class="history-employee-meta d-flex align-items-center gap-2 flex-wrap">
                                     <span class="badge bg-white text-secondary border fw-semibold"><?php echo e($row['job_title'] ?? 'Staff'); ?></span>
-                                    <span>&bull;</span>
-                                    <span><?php echo e($row['template_name']); ?></span>
+                                    <span><?php echo e($row['department_name'] ?? 'Department not set'); ?></span>
                                 </div>
                             </div>
                         </div>
-                        <div class="d-flex align-items-center gap-3 d-print-none">
+                        <div class="history-summary-actions d-print-none">
                             <a href="../manager/print-evaluation.php?id=<?php echo $row['evaluation_id']; ?>" target="_blank" class="btn btn-sm btn-primary rounded-pill px-3 py-2 fw-bold d-inline-flex align-items-center gap-2 shadow-sm">
-                                <i class="fas fa-print"></i>
-                                <span>Print Form</span>
+                                <i class="fas fa-print"></i><span>Print Form</span>
                             </a>
-                            <?php echo getEvaluationScoreCirclesHtml($conn, $row['evaluation_id'], $row['total_score']); ?>
+                            <div class="d-flex align-items-center gap-2"><?php echo getEvaluationScoreCirclesHtml($conn, $row['evaluation_id'], $row['total_score']); ?></div>
                         </div>
                     </div>
 
@@ -506,22 +521,6 @@ foreach ($all_history as $row):
                             </div>
                         </div>
                     <?php endif; ?>
-                </div>
-                <div class="modal-footer border-0 pt-0 px-4 pb-4">
-                    <div class="d-flex justify-content-between align-items-center w-100">
-                        <div class="text-muted small">
-                            <i class="fas fa-clock me-1"></i>
-                            Last updated: <?php echo $row['updated_at'] ? formatDate($row['updated_at']) : 'N/A'; ?>
-                        </div>
-                        <div class="d-flex gap-2">
-                            <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">
-                                <i class="fas fa-times me-1"></i>Close
-                            </button>
-                            <a href="../manager/print-evaluation.php?id=<?php echo $row['evaluation_id']; ?>" target="_blank" class="btn btn-primary btn-sm px-3">
-                                <i class="fas fa-print me-1"></i>Print Form
-                            </a>
-                        </div>
-                    </div>
                 </div>
             </div>
         </div>

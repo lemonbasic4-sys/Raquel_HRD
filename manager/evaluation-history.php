@@ -225,6 +225,151 @@ ksort($existing_templates);
 .hist-card-action { justify-self: end; }
 .hist-card-action .btn { white-space: nowrap; }
 
+/* Evaluation details modal */
+.history-detail-modal .modal-dialog { max-width: min(1120px, calc(100vw - 32px)); }
+.history-detail-modal .modal-content {
+    max-height: calc(100dvh - 32px);
+    border-radius: 20px !important;
+    overflow: hidden;
+    box-shadow: 0 24px 80px rgba(15, 23, 42, .28);
+}
+.history-detail-modal .history-modal-header {
+    align-items: center;
+    background: linear-gradient(120deg, #0b2d0a, #164e24);
+    border: 0;
+    color: #fff;
+    display: flex;
+    justify-content: space-between;
+    padding: 20px 26px;
+}
+.history-modal-heading { align-items: center; display: flex; gap: 14px; min-width: 0; }
+.history-modal-icon {
+    align-items: center;
+    background: rgba(255,255,255,.12);
+    border: 1px solid rgba(255,255,255,.16);
+    border-radius: 13px;
+    color: #f5d36e;
+    display: inline-flex;
+    flex: 0 0 44px;
+    height: 44px;
+    justify-content: center;
+}
+.history-modal-heading .modal-title { color: #fff; font-size: 1.08rem; }
+.history-modal-subtitle { color: rgba(255,255,255,.68); font-size: .78rem; margin: 3px 0 0; }
+.history-modal-status {
+    border: 1px solid rgba(255,255,255,.24);
+    border-radius: 999px;
+    display: inline-flex;
+    flex: 0 0 auto;
+    font-size: .74rem;
+    font-weight: 700;
+    gap: 7px;
+    margin-left: auto;
+    margin-right: 16px;
+    padding: 7px 12px;
+}
+.history-modal-status.approved { background: rgba(34,197,94,.17); color: #bbf7d0; }
+.history-modal-status.rejected { background: rgba(239,68,68,.17); color: #fecaca; }
+.history-modal-status.returned { background: rgba(245,158,11,.17); color: #fde68a; }
+.history-detail-modal .btn-close { opacity: .8; }
+.history-detail-modal .modal-body { background: #f6f8f5; overflow-y: auto; padding: 22px 26px !important; }
+.history-detail-modal .status-stepper {
+    align-items: flex-start;
+    border: 0 !important;
+    gap: 0;
+    margin: 0 0 18px !important;
+    overflow: visible !important;
+    padding: 0 !important;
+}
+.history-detail-modal .status-stepper .step-item {
+    color: #94a3b8 !important;
+    flex: 1;
+    font-size: .66rem;
+    letter-spacing: .06em;
+    position: relative;
+    text-transform: uppercase;
+}
+.history-detail-modal .status-stepper .step-item:not(:last-child)::after {
+    background: #dbe4d8;
+    content: '';
+    height: 2px;
+    left: calc(50% + 20px);
+    position: absolute;
+    right: calc(-50% + 20px);
+    top: 17px;
+}
+.history-detail-modal .status-stepper .step-item.is-complete { color: #166534 !important; }
+.history-detail-modal .status-stepper .step-item.is-terminal { color: #a16207 !important; }
+.history-detail-modal .status-stepper .step-item.is-rejected { color: #b91c1c !important; }
+.history-detail-modal .history-step-icon {
+    align-items: center;
+    background: #fff;
+    border: 1px solid #dbe4d8;
+    border-radius: 50%;
+    color: #94a3b8;
+    display: flex;
+    height: 36px;
+    justify-content: center;
+    margin: 0 auto 7px;
+    position: relative;
+    width: 36px;
+    z-index: 1;
+}
+.history-detail-modal .step-item.is-complete .history-step-icon { background: #e8f5e9; border-color: #a7d7ac; color: #15803d; }
+.history-detail-modal .step-item.is-terminal .history-step-icon { background: #fff7df; border-color: #f5d36e; color: #a16207; }
+.history-detail-modal .step-item.is-rejected .history-step-icon { background: #fff1f2; border-color: #fecdd3; color: #be123c; }
+.history-detail-modal .eval-summary-header {
+    align-items: center;
+    background: #fff;
+    border: 1px solid #e5ebe2;
+    border-radius: 16px;
+    box-shadow: 0 4px 14px rgba(15,23,42,.04);
+    flex-wrap: wrap;
+    margin-bottom: 24px;
+    padding: 16px 18px;
+}
+.history-detail-modal .history-employee-avatar {
+    align-items: center;
+    background: linear-gradient(145deg, #155e2c, #0b2d0a);
+    border-radius: 14px;
+    color: #fff;
+    display: inline-flex;
+    flex: 0 0 52px;
+    font-size: 1rem;
+    height: 52px;
+    justify-content: center;
+}
+.history-detail-modal .history-employee-copy { min-width: 0; }
+.history-detail-modal .history-employee-copy h4 { font-size: 1.02rem !important; }
+.history-detail-modal .history-employee-meta { color: #64748b; font-size: .76rem; }
+.history-detail-modal .history-summary-actions { align-items: center; display: flex; flex-wrap: wrap; gap: 14px; margin-left: auto; }
+.history-detail-modal .history-summary-actions .score-circle { height: 68px; min-width: 68px; width: 68px; }
+.history-detail-modal .history-summary-actions .score-circle .val { font-size: 1.08rem; }
+.history-detail-modal .section-premium-label {
+    align-items: center;
+    color: #164e24;
+    display: flex;
+    font-size: .79rem;
+    gap: 9px;
+    letter-spacing: .07em;
+    margin: 22px 0 12px !important;
+}
+.history-detail-modal .table-responsive { background: #fff; border: 1px solid #e4e9e1; border-radius: 12px; }
+.history-detail-modal .table { margin: 0; }
+.history-detail-modal .table thead th {
+    background: #eff4ed;
+    border-bottom: 1px solid #e0e8dc;
+    color: #475569;
+    font-size: .68rem;
+    letter-spacing: .05em;
+    padding-bottom: 11px;
+    padding-top: 11px;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+.history-detail-modal .table tbody td { padding-bottom: 11px; padding-top: 11px; }
+.history-detail-modal .table tbody tr:last-child td { border-bottom: 0; }
+
 .hist-status-badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 12px; border-radius: 999px; font-size: .72rem; font-weight: 700; white-space: nowrap; }
 .hist-status-badge.approved { background: #d1fae5; color: #065f46; }
 .hist-status-badge.rejected { background: #fee2e2; color: #991b1b; }
@@ -251,6 +396,18 @@ ksort($existing_templates);
 }
 
 @media (max-width: 767px) {
+    .history-detail-modal .modal-dialog { margin: 8px; max-width: calc(100vw - 16px); }
+    .history-detail-modal .modal-content { max-height: calc(100dvh - 16px); border-radius: 16px !important; }
+    .history-detail-modal .history-modal-header { flex-wrap: wrap; gap: 12px; padding: 16px; }
+    .history-modal-heading { gap: 10px; }
+    .history-modal-icon { flex-basis: 38px; height: 38px; }
+    .history-detail-modal .history-modal-status { margin-left: 48px; margin-right: 0; order: 3; }
+    .history-detail-modal .modal-body { padding: 16px !important; }
+    .history-detail-modal .eval-summary-header { align-items: flex-start; }
+    .history-detail-modal .history-summary-actions { margin-left: 0; width: 100%; }
+    .history-detail-modal .history-summary-actions .score-circle { height: 60px; min-width: 60px; width: 60px; }
+    .history-detail-modal .history-step-icon { height: 32px; width: 32px; }
+    .history-detail-modal .status-stepper .step-item:not(:last-child)::after { left: calc(50% + 17px); right: calc(-50% + 17px); top: 15px; }
     .hist-card {
         grid-template-columns: 36px 1fr;
         grid-template-rows: auto auto auto;
@@ -471,17 +628,24 @@ foreach ($all_history as $row):
     $initials = strtoupper(substr($row['employee_name'], 0, 1) . substr(explode(' ', $row['employee_name'])[1] ?? '', 0, 1));
 ?>
     <!-- History Modal for <?php echo $row['evaluation_id']; ?> -->
-    <div class="modal fade modal-premium" id="reviewModal<?php echo $row['evaluation_id']; ?>" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-lg modal-dialog-scrollable">
-            <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; overflow: hidden;">
-                <div class="modal-header">
-                    <div>
-                        <h5 class="modal-title mb-1">Evaluation Details</h5>
-                        <p class="mb-0 opacity-75 small"><?php echo e($row['employee_name']); ?> - <?php echo e($row['template_name']); ?></p>
+    <div class="modal fade modal-premium history-detail-modal" id="reviewModal<?php echo $row['evaluation_id']; ?>" tabindex="-1" aria-labelledby="reviewModalTitle<?php echo $row['evaluation_id']; ?>" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header history-modal-header">
+                    <div class="history-modal-heading">
+                        <span class="history-modal-icon"><i class="fas fa-file-circle-check"></i></span>
+                        <div>
+                            <h5 class="modal-title mb-1" id="reviewModalTitle<?php echo $row['evaluation_id']; ?>">Evaluation Details</h5>
+                            <p class="history-modal-subtitle"><?php echo e($row['employee_name']); ?> <span aria-hidden="true">·</span> <?php echo e($row['template_name']); ?></p>
+                        </div>
                     </div>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    <span class="history-modal-status <?php echo e(strtolower($status)); ?>">
+                        <i class="fas <?php echo $status === 'Approved' ? 'fa-circle-check' : ($status === 'Rejected' ? 'fa-circle-xmark' : 'fa-rotate-left'); ?>"></i>
+                        <?php echo e($status); ?>
+                    </span>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close evaluation details"></button>
                 </div>
-                <div class="modal-body p-4 pt-0">
+                <div class="modal-body">
                     <!-- Status Stepper -->
                     <div class="status-stepper d-flex justify-content-between mb-4 py-3 border-bottom overflow-hidden">
                         <?php
@@ -498,34 +662,33 @@ foreach ($all_history as $row):
                         }
                         
                         foreach ($steps as $st): ?>
-                            <div class="step-item text-center <?php echo $st['a'] ? ($st['cls'] ?? 'text-primary') : 'text-muted'; ?>" style="flex: 1;">
-                                <div class="mb-1">
-                                    <i class="fas <?php echo $st['i']; ?> <?php echo $st['c'] ? 'fa-pulse' : ''; ?>"></i>
+                            <?php
+                            $step_state = !$st['a']
+                                ? 'is-upcoming'
+                                : ($st['c'] ? ($status === 'Rejected' ? 'is-rejected' : 'is-terminal') : 'is-complete');
+                            ?>
+                            <div class="step-item text-center <?php echo $step_state; ?>">
+                                <div class="history-step-icon">
+                                    <i class="fas <?php echo e($st['i']); ?>"></i>
                                 </div>
-                                <div style="font-size: 0.65rem; font-weight: 800; text-transform: uppercase;"><?php echo $st['l']; ?></div>
+                                <div class="fw-bold"><?php echo e($st['l']); ?></div>
                             </div>
                         <?php endforeach; ?>
                     </div>
 
-                    <div class="alert <?php echo $status === 'Approved' ? 'alert-success' : ($status === 'Rejected' ? 'alert-danger' : 'alert-warning'); ?> py-2 small d-flex align-items-center mb-4">
-                        <i class="fas <?php echo $status === 'Approved' ? 'fa-check-circle' : ($status === 'Rejected' ? 'fa-times-circle' : 'fa-exclamation-circle'); ?> me-2"></i>
-                        <span>Historical Status: <strong><?php echo $status; ?></strong></span>
-                    </div>
-
                     <div class="eval-summary-header">
                         <div class="d-flex align-items-center gap-3">
-                            <div class="emp-avatar bg-primary text-white d-flex align-items-center justify-content-center fw-bold rounded-3 shadow-sm" style="width: 54px; height: 54px; font-size: 1.2rem;"><?php echo $initials; ?></div>
-                            <div>
-                                <h4 class="mb-1 fw-bold text-dark" style="font-size: 1.2rem;"><?php echo e($row['employee_name']); ?></h4>
-                                <div class="text-muted small d-flex align-items-center gap-2 flex-wrap">
+                            <div class="history-employee-avatar"><?php echo e($initials); ?></div>
+                            <div class="history-employee-copy">
+                                <h4 class="mb-1 fw-bold text-dark"><?php echo e($row['employee_name']); ?></h4>
+                                <div class="history-employee-meta d-flex align-items-center gap-2 flex-wrap">
                                     <span class="badge bg-white text-secondary border fw-semibold"><?php echo e($row['job_title'] ?? 'Staff'); ?></span>
-                                    <span>&bull;</span>
-                                    <span><?php echo e($row['template_name']); ?></span>
+                                    <span><?php echo e($row['department_name'] ?? 'Department not set'); ?></span>
                                 </div>
                             </div>
                         </div>
-                        <div class="d-flex align-items-center gap-3 d-print-none">
-                            <div class="d-flex align-items-center gap-2">
+                        <div class="history-summary-actions d-print-none">
+                            <div class="d-flex align-items-center gap-2 flex-wrap">
                                 <button type="button" class="btn btn-sm btn-success rounded-pill px-3 fw-bold btn-save-ratings d-none" onclick="saveRatings(<?php echo $row['evaluation_id']; ?>)">
                                     <i class="fas fa-save me-1"></i>Save Changes
                                 </button>
@@ -537,7 +700,7 @@ foreach ($all_history as $row):
                                     <span>Print Form</span>
                                 </a>
                             </div>
-                            <?php echo getEvaluationScoreCirclesHtml($conn, $row['evaluation_id'], $row['total_score']); ?>
+                            <div class="d-flex align-items-center gap-2"><?php echo getEvaluationScoreCirclesHtml($conn, $row['evaluation_id'], $row['total_score']); ?></div>
                         </div>
                     </div>
 
