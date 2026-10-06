@@ -418,7 +418,7 @@ switch ($effective_role) {
     <link href="<?php echo BASE_URL; ?>/assets/vendor/fontawesome/css/all.min.css" rel="stylesheet">
     
     
-    <link href="<?php echo BASE_URL; ?>/assets/vendor/fonts/fonts.css" rel="stylesheet">
+    <link href="<?php echo BASE_URL; ?>/assets/vendor/fonts/fonts.css?v=2" rel="stylesheet">
     <link href="<?php echo BASE_URL; ?>/assets/css/style.css?v=<?php echo time(); ?>" rel="stylesheet">
     <?php if (in_array($effective_role, ['HR Manager', 'HR Supervisor', 'HR Staff', 'Admin'])): ?>
     <!-- HR Department Mobile View — exclusive CSS for HR roles on mobile -->
@@ -932,5 +932,4 @@ switch ($effective_role) {
                . "</div>";
         }
         ?>
-
 
