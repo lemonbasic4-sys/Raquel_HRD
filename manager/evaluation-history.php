@@ -172,7 +172,7 @@ ksort($existing_templates);
     border-radius: 14px;
     padding: 16px 20px;
     display: grid;
-    grid-template-columns: 40px minmax(0,2fr) minmax(0,1.5fr) 130px 110px auto;
+    grid-template-columns: 40px minmax(0,2fr) minmax(0,1.5fr) 130px minmax(125px,max-content) max-content;
     align-items: center;
     gap: 16px;
     transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
@@ -181,6 +181,7 @@ ksort($existing_templates);
     position: relative;
     overflow: hidden;
 }
+.hist-card > * { min-width: 0; }
 .hist-card::before {
     content: '';
     position: absolute;
@@ -213,10 +214,16 @@ ksort($existing_templates);
 .hist-card-dept .dept     { font-weight: 600; font-size: .82rem; color: #374151; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hist-card-dept .tpl      { font-size: .7rem; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-.hist-score-col { display: flex; flex-direction: column; gap: 4px; }
+.hist-score-col { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.hist-score-col > .d-flex { flex-wrap: wrap; column-gap: 6px !important; row-gap: 2px; }
 .hist-score-val { font-weight: 800; font-size: 1rem; }
+.hist-score-col .badge { max-width: 100%; white-space: normal; line-height: 1.2; text-align: center; }
 .hist-score-bar { height: 5px; background: #e2e8f0; border-radius: 99px; overflow: hidden; }
 .hist-score-bar .fill { height: 100%; border-radius: 99px; transition: width .4s ease; }
+.hist-status-col { min-width: 0; overflow-wrap: normal; }
+.hist-status-col .pipeline-badge { max-width: 100%; }
+.hist-card-action { justify-self: end; }
+.hist-card-action .btn { white-space: nowrap; }
 
 .hist-status-badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 12px; border-radius: 999px; font-size: .72rem; font-weight: 700; white-space: nowrap; }
 .hist-status-badge.approved { background: #d1fae5; color: #065f46; }
@@ -230,13 +237,30 @@ ksort($existing_templates);
 /* Results meta */
 .hist-meta { font-size: .78rem; color: #94a3b8; padding: 6px 4px; }
 
+@media (min-width: 768px) and (max-width: 1199px) {
+    .hist-card {
+        grid-template-columns: 40px minmax(0, 1.3fr) minmax(0, 1fr) minmax(110px, .8fr);
+        gap: 12px;
+        padding: 14px 16px;
+    }
+    .hist-card-employee { grid-column: 2; }
+    .hist-card-dept { grid-column: 3; }
+    .hist-score-col { grid-column: 4; }
+    .hist-status-col { grid-column: 2 / 4; }
+    .hist-card-action { grid-column: 4; grid-row: 2; }
+}
+
 @media (max-width: 767px) {
     .hist-card {
         grid-template-columns: 36px 1fr;
         grid-template-rows: auto auto auto;
+        gap: 10px 12px;
+        padding: 14px 16px;
     }
+    .hist-card-employee { grid-column: 2; }
     .hist-card-dept, .hist-score-col, .hist-status-col { grid-column: 2; }
-    .hist-card-action { grid-column: 1 / -1; }
+    .hist-card-action { grid-column: 1 / -1; justify-self: stretch; }
+    .hist-card-action .btn { width: 100%; }
 }
 </style>
 
