@@ -678,7 +678,13 @@ foreach ($all_history as $row):
 
                     <div class="eval-summary-header">
                         <div class="d-flex align-items-center gap-3">
-                            <div class="history-employee-avatar"><?php echo e($initials); ?></div>
+                            <div class="history-employee-avatar">
+                                <?php if (!empty($row['profile_picture'])): ?>
+                                    <img src="<?php echo e(getEmployeeAvatar($row['profile_picture'])); ?>" alt="<?php echo e($row['employee_name']); ?> profile picture">
+                                <?php else: ?>
+                                    <?php echo e($initials); ?>
+                                <?php endif; ?>
+                            </div>
                             <div class="history-employee-copy">
                                 <h4 class="mb-1 fw-bold text-dark"><?php echo e($row['employee_name']); ?></h4>
                                 <div class="history-employee-meta d-flex align-items-center gap-2 flex-wrap">

@@ -8,7 +8,7 @@ $show_progressive_notice = hasOpenProgressiveEvaluationCohort($conn);
 require_once '../includes/header.php';
 
 // Fetch evaluation history 
-$history = $conn->query("SELECT ev.*, CONCAT(e.first_name, ' ', e.last_name) as employee_name, e.job_title, e.rank_category_id, d.department_name,
+$history = $conn->query("SELECT ev.*, CONCAT(e.first_name, ' ', e.last_name) as employee_name, e.job_title, e.rank_category_id, e.profile_picture, d.department_name,
     u.full_name as submitted_by_name, u2.full_name as endorsed_by_name, u3.full_name as approved_by_name, et.template_name,
     ep.package_id, ep.status AS package_status
     FROM evaluations ev
@@ -296,7 +296,13 @@ foreach ($all_history as $row):
 
                     <div class="eval-summary-header">
                         <div class="d-flex align-items-center gap-3">
-                            <div class="history-employee-avatar"><?php echo e($initials); ?></div>
+                            <div class="history-employee-avatar">
+                                <?php if (!empty($row['profile_picture'])): ?>
+                                    <img src="<?php echo e(getEmployeeAvatar($row['profile_picture'])); ?>" alt="<?php echo e($row['employee_name']); ?> profile picture">
+                                <?php else: ?>
+                                    <?php echo e($initials); ?>
+                                <?php endif; ?>
+                            </div>
                             <div class="history-employee-copy">
                                 <h4 class="mb-1 fw-bold text-dark"><?php echo e($row['employee_name']); ?></h4>
                                 <div class="history-employee-meta d-flex align-items-center gap-2 flex-wrap">
