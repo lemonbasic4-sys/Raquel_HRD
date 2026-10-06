@@ -32,7 +32,9 @@ require_once '../includes/header.php';
 
 // Fetch all employees (exclude Admin accounts)
 $employees = $conn->query("
-    SELECT e.*, b.branch_name, d.department_name, jt.rank_category_id
+    SELECT e.*, b.branch_name, d.department_name,
+           COALESCE(jt.rank_category_id, e.rank_category_id) AS rank_category_id,
+           COALESCE(jt.job_title, e.job_title) AS job_title
     FROM employees e
     LEFT JOIN branches b ON e.branch_id = b.branch_id
     LEFT JOIN departments d ON e.department_id = d.department_id
