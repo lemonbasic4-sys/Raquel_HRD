@@ -736,175 +736,6 @@ if ($hero_hire_date) {
 $hero_name = trim($emp['first_name'] . ' ' . ($emp['middle_name'] ? $emp['middle_name'] . ' ' : '') . $emp['last_name'] . ($emp['name_extension'] ? ' ' . $emp['name_extension'] : ''));
 ?>
 
-<div class="d-flex justify-content-between align-items-end flex-wrap gap-3 mb-3">
-    <div>
-        <div class="small text-muted mb-1"><i class="fas fa-users me-1"></i>Employees <span class="mx-1">&rsaquo;</span> Employee Profile</div>
-        <h1 class="employee-page-title mb-0">Employee Profile</h1>
-        <p class="text-muted small mb-0">View and manage employee information, employment details, and performance records.</p>
-    </div>
-    <div class="d-flex gap-2 flex-wrap">
-        <a href="<?php echo BASE_URL; ?>/manager/edit-employee.php?id=<?php echo $eid; ?>&return=<?php echo urlencode($return_to); ?>" class="btn btn-primary"><i class="fas fa-pen me-2"></i>Edit Profile</a>
-        <button type="button" class="btn btn-light border" onclick="window.print()"><i class="fas fa-print me-2"></i>Print</button>
-        <a href="<?php echo htmlspecialchars($return_to, ENT_QUOTES, 'UTF-8'); ?>" class="btn btn-light border" title="Back to employees"><i class="fas fa-arrow-left"></i></a>
-    </div>
-</div>
-
-<div class="employee-reference-hero">
-    <div class="employee-reference-identity">
-        <div class="position-relative cursor-pointer" onclick="viewFullImage('<?php echo getEmployeeAvatar($emp['profile_picture']); ?>', '<?php echo e($hero_name); ?>')">
-            <img src="<?php echo getEmployeeAvatar($emp['profile_picture']); ?>" class="employee-reference-avatar" alt="Employee profile photo">
-            <span class="position-absolute bottom-0 end-0 bg-dark text-white rounded-circle p-2 border border-white" style="font-size:.65rem;line-height:1;"><i class="fas fa-search-plus"></i></span>
-        </div>
-        <div class="employee-reference-copy">
-            <div class="d-flex align-items-center gap-2 flex-wrap">
-                <h2><?php echo e($hero_name); ?></h2>
-                <span class="badge rounded-pill <?php echo $emp['is_active'] ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger'; ?>"><i class="fas fa-circle me-1" style="font-size:.45rem;vertical-align:middle;"></i><?php echo $emp['is_active'] ? 'Active' : 'Inactive'; ?></span>
-            </div>
-            <p><?php echo e($emp['job_title']); ?></p>
-            <p><?php echo e($emp['branch_name'] ?: 'N/A'); ?></p>
-            <div class="employee-reference-contact">
-                <?php if (!empty($emp['rank_name'])): ?><span class="rank-badge <?php echo $rankBadgeClass; ?>"><i class="fas fa-layer-group"></i><?php echo e($emp['rank_name']); ?></span><?php endif; ?>
-                <span><i class="fas fa-id-badge me-1"></i><?php echo e(getEmployeeDisplayId($emp)); ?></span>
-                <span><i class="fas fa-envelope me-1"></i><?php echo e($emp['email'] ?: 'N/A'); ?></span>
-                <span><i class="fas fa-phone me-1"></i><?php echo e($emp['contact_number'] ?: 'N/A'); ?></span>
-            </div>
-        </div>
-        <div class="employee-reference-summary">
-            <div class="employee-reference-summary-item"><small><i class="fas fa-briefcase me-1"></i>Hire Date</small><strong><?php echo formatDate($emp['hire_date']); ?></strong></div>
-            <div class="employee-reference-summary-item"><small><i class="fas fa-calendar me-1"></i>Tenure</small><strong><?php echo e($hero_tenure); ?></strong></div>
-            <div class="employee-reference-summary-item"><small><i class="fas fa-building me-1"></i>Department</small><strong><?php echo e($emp['department_name'] ?: 'N/A'); ?></strong></div>
-        </div>
-    </div>
-    <?php if (!$emp['is_active'] || !empty($emp['separation_date'])): ?>
-        <div class="alert alert-warning text-start py-2 px-3 mt-3 mb-0 border-start border-4 border-warning shadow-sm" style="background-color: #fff9db; border-color: #f59f00 !important;">
-            <div class="fw-bold text-dark mb-1 d-flex align-items-center gap-1" style="font-size: 0.85rem;">
-                <i class="fas fa-user-slash text-warning me-1"></i>Separation Notice
-            </div>
-            <div class="d-flex justify-content-between gap-2 small mb-1">
-                <span class="text-muted">Status:</span>
-                <span class="fw-bold text-dark"><?php echo e($emp['employment_status']); ?></span>
-            </div>
-            <?php if (!empty($emp['separation_date'])): ?>
-                <div class="d-flex justify-content-between gap-2 small mb-1">
-                    <span class="text-muted">Effective:</span>
-                    <span class="fw-bold text-danger"><?php echo formatDate($emp['separation_date']); ?></span>
-                </div>
-            <?php endif; ?>
-            <?php if (!empty($emp['separation_remarks'])): ?>
-                <div class="small mt-1 pt-1 border-top border-warning-subtle text-muted" style="font-size: 0.75rem;">
-                    <strong>Notes:</strong> <?php echo nl2br(e($emp['separation_remarks'])); ?>
-                </div>
-            <?php endif; ?>
-        </div>
-    <?php endif; ?>
-</div>
-
-<nav class="employee-information-tabs" role="tablist" aria-label="Employee information sections">
-    <button class="employee-information-tab" type="button" role="tab" aria-selected="true" tabindex="0" data-profile-tab="all"><i class="fas fa-th-large"></i>All Info</button>
-    <button class="employee-information-tab" type="button" role="tab" aria-selected="false" tabindex="-1" data-profile-tab="personal"><i class="fas fa-user"></i>Personal Info</button>
-    <button class="employee-information-tab" type="button" role="tab" aria-selected="false" tabindex="-1" data-profile-tab="employment"><i class="fas fa-briefcase"></i>Employment</button>
-    <button class="employee-information-tab" type="button" role="tab" aria-selected="false" tabindex="-1" data-profile-tab="contact"><i class="fas fa-envelope"></i>Contact</button>
-    <button class="employee-information-tab" type="button" role="tab" aria-selected="false" tabindex="-1" data-profile-tab="education"><i class="fas fa-graduation-cap"></i>Education</button>
-    <button class="employee-information-tab" type="button" role="tab" aria-selected="false" tabindex="-1" data-profile-tab="family"><i class="fas fa-users"></i>Family</button>
-    <button class="employee-information-tab" type="button" role="tab" aria-selected="false" tabindex="-1" data-profile-tab="training"><i class="fas fa-certificate"></i>Skills &amp; Training</button>
-    <button class="employee-information-tab" type="button" role="tab" aria-selected="false" tabindex="-1" data-profile-tab="performance"><i class="fas fa-chart-line"></i>Performance</button>
-    <button class="employee-information-tab" type="button" role="tab" aria-selected="false" tabindex="-1" data-profile-tab="documents"><i class="fas fa-folder"></i>Documents</button>
-    <button class="employee-information-tab" type="button" role="tab" aria-selected="false" tabindex="-1" data-profile-tab="timeline"><i class="fas fa-calendar"></i>Profile Audit Trail</button>
-</nav>
-
-<div class="row g-4">
-    <div class="col-lg-4 col-xl-3 profile-sticky-col legacy-profile-rail">
-        <div class="content-card employee-profile-card text-center">
-            <div class="card-body py-4">
-                <div class="position-relative d-inline-block cursor-pointer mb-3"
-                    onclick="viewFullImage('<?php echo getEmployeeAvatar($emp['profile_picture']); ?>', '<?php echo e($emp['first_name'] . ' ' . $emp['last_name']); ?>')">
-                    <img src="<?php echo getEmployeeAvatar($emp['profile_picture']); ?>"
-                        class="rounded-circle img-thumbnail shadow-sm hover-zoom"
-                        style="width:120px;height:120px;object-fit:cover; transition: transform 0.2s;">
-                    <div class="position-absolute bottom-0 end-0 bg-primary text-white rounded-circle p-1 border border-white"
-                        style="width: 28px; height: 28px; font-size: 0.75rem; display: flex; align-items: center; justify-content: center;">
-                        <i class="fas fa-search-plus"></i>
-                    </div>
-                </div>
-
-                <h5 class="mb-1">
-                    <?php echo e($emp['first_name'] . ' ' . ($emp['middle_name'] ? $emp['middle_name'] . ' ' : '') . $emp['last_name'] . ($emp['name_extension'] ? ' ' . $emp['name_extension'] : '')); ?>
-                </h5>
-                <p class="text-muted mb-2"><?php echo e($emp['job_title']); ?></p>
-
-                <?php if (!empty($emp['rank_name'])): ?>
-                    <div class="mb-2">
-                        <span class="rank-badge <?php echo $rankBadgeClass; ?>">
-                            <i class="fas fa-layer-group"></i>Rank: <?php echo e($emp['rank_name']); ?>
-                        </span>
-                    </div>
-                <?php endif; ?>
-
-                <p class="company-id-text small mb-3">Company ID:
-                    <span class="company-id-value"><?php echo e(getEmployeeDisplayId($emp)); ?></span>
-                </p>
-
-                <div class="d-flex justify-content-center flex-wrap gap-2 mb-3">
-                    <span class="badge <?php echo $emp['is_active'] ? 'bg-success' : 'bg-danger'; ?> px-3 py-2">
-                        <?php echo $emp['is_active'] ? 'Active' : 'Inactive'; ?>
-                    </span>
-                    <span class="badge bg-primary px-3 py-2"><?php echo e($emp['employment_status']); ?></span>
-                </div>
-
-                <?php if (in_array($emp['employment_status'], ['OJT', 'Probationary', 'Project Based', 'Project-Based', 'Trainee'], true)): ?>
-                    <div class="alert alert-info text-start py-2 px-3 mt-2 mb-3 border-start border-4 border-info shadow-sm">
-                        <div class="fw-bold text-info mb-2"><i class="fas fa-clock me-1"></i>Contract Period</div>
-                        <div class="d-flex justify-content-between gap-3 small">
-                            <span class="text-muted">Start</span>
-                            <span class="fw-bold"><?php echo formatDate($emp['contract_start_date']); ?></span>
-                        </div>
-                        <div class="d-flex justify-content-between gap-3 small">
-                            <span class="text-muted">End</span>
-                            <span class="fw-bold"><?php echo formatDate($emp['contract_end_date']); ?></span>
-                        </div>
-                    </div>
-                <?php endif; ?>
-
-                <div class="profile-meta-list mb-3">
-                    <div class="profile-meta-item">
-                        <span class="profile-meta-icon"><i class="fas fa-envelope"></i></span>
-                        <div>
-                            <span class="profile-meta-label">Email</span>
-                            <span class="profile-meta-value profile-email-value"><?php echo e($emp['email'] ?: 'N/A'); ?></span>
-                        </div>
-                    </div>
-                    <div class="profile-meta-item">
-                        <span class="profile-meta-icon"><i class="fas fa-phone"></i></span>
-                        <div>
-                            <span class="profile-meta-label">Mobile</span>
-                            <span class="profile-meta-value"><?php echo e($emp['contact_number'] ?: 'N/A'); ?></span>
-                        </div>
-                    </div>
-                    <div class="profile-meta-item">
-                        <span class="profile-meta-icon"><i class="fas fa-building"></i></span>
-                        <div>
-                            <span class="profile-meta-label">Branch</span>
-                            <span class="profile-meta-value"><?php echo e($emp['branch_name'] ?: 'N/A'); ?></span>
-                        </div>
-                    </div>
-                    <div class="profile-meta-item">
-                        <span class="profile-meta-icon"><i class="fas fa-calendar"></i></span>
-                        <div>
-                            <span class="profile-meta-label">Hire Date</span>
-                            <span class="profile-meta-value"><?php echo formatDate($emp['hire_date']); ?></span>
-                        </div>
-                    </div>
-                </div>
-
-                <a href="<?php echo BASE_URL; ?>/manager/edit-employee.php?id=<?php echo $eid; ?>&return=<?php echo urlencode($return_to); ?>"
-                    class="btn btn-primary w-100">
-                    <i class="fas fa-edit me-2"></i>Edit
-                </a>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-12">
         <?php
         // Query approved evaluations for 5-Year performance trend
         $perf_history_q = $conn->prepare("
@@ -981,7 +812,784 @@ $hero_name = trim($emp['first_name'] . ' ' . ($emp['middle_name'] ? $emp['middle
         }
         ?>
 
-        <!-- Performance and career data share one full-width, client-side tab interface. -->
+<style>
+/* ═══════════════════════ EMPLOYEE PROFILE REWORK STYLES ═══════════════════════ */
+
+/* ── Hero Card ── */
+.ep-hero-card {
+    background: #fff;
+    border-radius: 16px;
+    padding: 24px 28px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08), 0 6px 20px rgba(0,0,0,.05);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 24px;
+    margin-bottom: 18px;
+    border: 1px solid #e8edf0;
+}
+.ep-avatar {
+    width: 90px; height: 90px; border-radius: 50%;
+    object-fit: cover;
+    border: 4px solid #f0f4ee;
+    box-shadow: 0 4px 12px rgba(15,23,42,.12);
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    flex-shrink: 0;
+}
+.ep-avatar:hover { transform: scale(1.05); box-shadow: 0 6px 18px rgba(41,67,6,.2); }
+.ep-name {
+    font-size: 1.35rem;
+    font-weight: 800;
+    color: #142236;
+    margin: 0;
+    line-height: 1.25;
+}
+.ep-sub {
+    font-size: .82rem;
+    color: #61706b;
+    margin: 3px 0 0;
+    line-height: 1.4;
+}
+.ep-status-pills { display: flex; gap: 7px; margin-top: 10px; flex-wrap: wrap; }
+.ep-pill {
+    padding: 4px 12px;
+    border-radius: 99px;
+    font-size: .74rem;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    letter-spacing: .01em;
+}
+.ep-pill-outline { border: 1.5px solid currentColor; background: transparent; }
+.ep-pill-green  { color: #294306; border-color: #a3c77a; background: #f4fae8; }
+.ep-pill-blue   { color: #1e40af; border-color: #93c5fd; background: #eff6ff; }
+.ep-pill-gray   { color: #4b5563; border-color: #d1d5db; background: #f9fafb; }
+.ep-hire-row {
+    display: flex;
+    gap: 20px;
+    margin-top: 12px;
+    font-size: .8rem;
+    color: #61706b;
+}
+.ep-hire-row strong { color: #1a2e06; font-weight: 700; }
+
+/* Years of service badge */
+.ep-service-years {
+    text-align: center;
+    background: linear-gradient(135deg, #f4fae8, #e6f2cc);
+    border: 1.5px solid #c6e0a0;
+    border-radius: 14px;
+    padding: 14px 22px;
+    flex-shrink: 0;
+    min-width: 90px;
+}
+.ep-service-years .number {
+    font-size: 2.8rem;
+    font-weight: 900;
+    color: #294306;
+    line-height: 1;
+    display: block;
+}
+.ep-service-years .label {
+    font-size: .65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #5a7a30;
+    letter-spacing: .06em;
+    display: block;
+    margin-top: 3px;
+}
+
+/* ── Completion Banner ── */
+.ep-completion-banner {
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    border-radius: 10px;
+    padding: 13px 18px;
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    font-size: .84rem;
+}
+.ep-completion-banner.banner-warning {
+    background: #fffbeb;
+    border-color: #fde68a;
+}
+
+/* ── Section Accordion Rows ── */
+.ep-section-row {
+    background: #fff;
+    border-radius: 12px;
+    margin-bottom: 10px;
+    box-shadow: 0 1px 2px rgba(0,0,0,.06);
+    overflow: hidden;
+    border: 1px solid #eef2f0;
+    transition: box-shadow .2s;
+}
+.ep-section-row:hover { box-shadow: 0 3px 10px rgba(41,67,6,.08); }
+.ep-section-header {
+    padding: 14px 18px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    cursor: pointer;
+    transition: background-color .18s;
+    user-select: none;
+}
+.ep-section-header:hover { background-color: #f8faf8; }
+.ep-section-icon {
+    width: 38px; height: 38px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    flex-shrink: 0;
+}
+.ep-section-title-wrap { flex: 1; min-width: 0; }
+.ep-section-title {
+    font-size: .92rem;
+    font-weight: 700;
+    margin: 0;
+    color: #111827;
+    line-height: 1.3;
+}
+.ep-section-desc {
+    font-size: .74rem;
+    color: #6b7280;
+    margin: 2px 0 0;
+    line-height: 1.3;
+}
+.ep-section-actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.ep-badge-count {
+    font-size: .72rem;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 99px;
+    white-space: nowrap;
+}
+.ep-badge-none   { background: #f3f4f6; color: #6b7280; }
+.ep-badge-has    { background: #dcfce7; color: #166534; }
+.ep-badge-complete { background: #dcfce7; color: #166534; }
+.ep-section-btn {
+    font-size: .74rem;
+    font-weight: 600;
+    padding: 5px 13px;
+    border-radius: 7px;
+    border: 1.5px solid #294306;
+    color: #294306;
+    background: transparent;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background .15s, color .15s;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+.ep-section-btn:hover { background: #294306; color: #fff; }
+.ep-chevron {
+    color: #9ca3af;
+    font-size: .8rem;
+    transition: transform .28s cubic-bezier(.4,0,.2,1);
+    flex-shrink: 0;
+    margin-left: 4px;
+}
+.ep-chevron.open { transform: rotate(180deg); color: #294306; }
+.ep-section-content {
+    display: none;
+    padding: 18px 20px 20px;
+    border-top: 1px solid #f0f4ee;
+    background: #fafafa;
+}
+.ep-section-content.active { display: block; }
+
+/* ── Sidebar ── */
+.ep-sidebar-card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 18px;
+    margin-bottom: 18px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.08);
+    border: 1px solid #eef2f0;
+}
+.ep-sidebar-title {
+    font-size: .75rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .07em;
+    color: #374151;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    border-bottom: 1px solid #f3f4f6;
+    padding-bottom: 10px;
+}
+.ep-sidebar-title i { color: #294306; }
+
+/* Quick Nav */
+.ep-quick-nav { list-style: none; padding: 0; margin: 0; }
+.ep-quick-nav li { margin-bottom: 2px; }
+.ep-quick-nav a {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #4b5563;
+    text-decoration: none;
+    padding: 7px 10px;
+    border-radius: 8px;
+    transition: all .15s;
+    font-size: .8rem;
+    font-weight: 500;
+}
+.ep-quick-nav a:hover { background: #f0f7e8; color: #294306; }
+.ep-quick-nav-icon {
+    width: 22px; height: 22px;
+    border-radius: 6px;
+    background: #f3f4f6;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: .72rem;
+    color: #4b5563;
+    flex-shrink: 0;
+}
+.ep-quick-nav a:hover .ep-quick-nav-icon { background: #e6f2cc; color: #294306; }
+.ep-quick-nav a i.fa-chevron-right { margin-left: auto; font-size: .65rem; color: #d1d5db; }
+.ep-quick-nav a:hover i.fa-chevron-right { color: #294306; }
+
+/* Completion ring */
+.ep-completion-ring { position: relative; display: inline-block; }
+.ep-completion-ring svg circle { transition: stroke-dashoffset .6s ease; }
+.ep-ring-center {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-size: .75rem;
+    font-weight: 800;
+    color: #294306;
+    line-height: 1;
+}
+.ep-ring-center span { font-size: .6rem; font-weight: 600; color: #6b7280; }
+
+/* Sidebar detail items */
+.ep-emp-detail-item, .ep-gov-id-item {
+    padding: 8px 0;
+    border-bottom: 1px solid #f3f4f6;
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+}
+.ep-emp-detail-item:last-child, .ep-gov-id-item:last-child { border-bottom: none; padding-bottom: 0; }
+.ep-emp-detail-item i, .ep-gov-id-item i { color: #294306; font-size: .82rem; margin-top: 2px; flex-shrink: 0; width: 14px; }
+.ep-emp-detail-label, .ep-gov-id-label {
+    font-size: .7rem;
+    color: #6b7280;
+    display: block;
+    margin-bottom: 1px;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+    font-weight: 600;
+}
+.ep-emp-detail-value, .ep-gov-id-value { font-size: .84rem; font-weight: 700; color: #1a2e06; }
+
+/* Missing section alert items */
+.ep-missing-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 10px;
+    border-radius: 7px;
+    font-size: .78rem;
+    font-weight: 600;
+    color: #92400e;
+    background: #fef3c7;
+    margin-bottom: 5px;
+    cursor: pointer;
+}
+.ep-missing-item:hover { background: #fde68a; }
+.ep-missing-item i { color: #d97706; }
+
+/* Icon color helpers */
+.bg-light-primary { background-color: #e0e7ff; color: #4338ca; }
+.bg-light-success { background-color: #dcfce7; color: #166534; }
+.bg-light-info    { background-color: #e0f2fe; color: #0369a1; }
+.bg-light-warning { background-color: #fef9c3; color: #a16207; }
+.bg-light-danger  { background-color: #fee2e2; color: #991b1b; }
+.bg-light-purple  { background-color: #f3e8ff; color: #6b21a8; }
+.bg-light-green   { background-color: #f0fdf4; color: #15803d; }
+.bg-light-teal    { background-color: #f0fdfa; color: #0f766e; }
+.bg-light-rose    { background-color: #fff1f2; color: #9f1239; }
+.bg-light-amber   { background-color: #fffbeb; color: #b45309; }
+.bg-light-indigo  { background-color: #eef2ff; color: #3730a3; }
+.bg-light-brand   { background-color: #f4fae8; color: #294306; }
+
+/* ── OVERRIDE FIXES to match reference image ── */
+
+/* 1. Section action badges — override Bootstrap badges inside accordion rows */
+.ep-section-actions .badge {
+    font-size: .72rem !important;
+    font-weight: 600 !important;
+    padding: 4px 11px !important;
+    border-radius: 99px !important;
+    letter-spacing: .01em;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+.ep-section-actions .badge.bg-secondary {
+    background: #f3f4f6 !important;
+    color: #4b5563 !important;
+    border: 1px solid #e5e7eb;
+}
+.ep-section-actions .badge.bg-success {
+    background: #dcfce7 !important;
+    color: #166534 !important;
+    border: 1px solid #bbf7d0;
+}
+.ep-section-actions .badge.bg-info {
+    background: #e0f2fe !important;
+    color: #0369a1 !important;
+    border: 1px solid #bae6fd;
+}
+.ep-section-actions .badge.bg-warning {
+    background: #fef9c3 !important;
+    color: #854d0e !important;
+    border: 1px solid #fde047;
+}
+
+/* 2. Section action buttons — override Bootstrap btn inside accordion rows */
+.ep-section-actions .btn-outline-success,
+.ep-section-actions .btn-outline-primary {
+    font-size: .74rem !important;
+    font-weight: 600 !important;
+    padding: 4px 13px !important;
+    border-radius: 7px !important;
+    border: 1.5px solid #294306 !important;
+    color: #294306 !important;
+    background: transparent !important;
+    transition: background .15s, color .15s !important;
+    white-space: nowrap;
+}
+.ep-section-actions .btn-outline-success:hover,
+.ep-section-actions .btn-outline-primary:hover {
+    background: #294306 !important;
+    color: #fff !important;
+}
+/* + Add Record button */
+.ep-section-actions .btn-outline-secondary {
+    font-size: .74rem !important;
+    font-weight: 600 !important;
+    padding: 4px 13px !important;
+    border-radius: 7px !important;
+    border: 1.5px solid #294306 !important;
+    color: #294306 !important;
+    background: transparent !important;
+}
+.ep-section-actions .btn-outline-secondary:hover {
+    background: #294306 !important;
+    color: #fff !important;
+}
+
+/* 3. Section icon — square with rounded corners, not full circle */
+.ep-section-icon {
+    border-radius: 10px !important;
+    width: 40px !important;
+    height: 40px !important;
+}
+
+/* 4. SVG completion ring — rotate so gap starts at top */
+.ep-completion-ring svg {
+    transform: rotate(-90deg);
+    display: block;
+}
+
+/* 5. Hero sub — department on own line, smaller text */
+.ep-sub {
+    font-size: .8rem !important;
+    color: #61706b !important;
+    margin: 2px 0 0 !important;
+}
+
+/* 6. Hero card inner left column — limit width so service years box doesn't squish */
+.ep-hero-card > .d-flex:first-child {
+    flex: 1;
+    min-width: 0;
+}
+
+/* 7. Active badge in hero — subtle green pill */
+.ep-hero-card .badge.bg-success {
+    background: #dcfce7 !important;
+    color: #166534 !important;
+    font-size: .72rem !important;
+    font-weight: 700 !important;
+    padding: 3px 10px !important;
+    border-radius: 99px !important;
+    border: 1px solid #86efac;
+}
+.ep-hero-card .badge.bg-danger {
+    background: #fee2e2 !important;
+    color: #991b1b !important;
+    border: 1px solid #fca5a5;
+    font-size: .72rem !important;
+    padding: 3px 10px !important;
+    border-radius: 99px !important;
+}
+
+/* 8. Completion banner — force info-blue look, remove default Bootstrap alert colors */
+.ep-completion-banner {
+    border: 1px solid #bfdbfe !important;
+    background: #eff6ff !important;
+    color: #1e40af;
+}
+.ep-completion-banner.banner-warning {
+    background: #fffbeb !important;
+    border-color: #fde68a !important;
+    color: #92400e;
+}
+.ep-completion-banner h6 { color: #1e3a5f; }
+.ep-completion-banner.banner-warning h6 { color: #78350f; }
+.ep-completion-banner .btn-outline-primary {
+    font-size: .78rem !important;
+    border-color: #294306 !important;
+    color: #294306 !important;
+    padding: 4px 14px !important;
+    border-radius: 7px !important;
+    font-weight: 600 !important;
+    white-space: nowrap;
+}
+.ep-completion-banner .btn-outline-primary:hover {
+    background: #294306 !important;
+    color: #fff !important;
+}
+
+/* 9. Sidebar sticky — ensure it appears alongside left column */
+@media (min-width: 992px) {
+    .profile-sticky-col {
+        position: sticky;
+        top: calc(var(--header-height, 70px) + 18px);
+        align-self: flex-start;
+        max-height: calc(100vh - 110px);
+        overflow-y: auto;
+        scrollbar-width: thin;
+        scrollbar-color: #e5e7eb transparent;
+    }
+}
+
+/* 10. Section header chevron alignment */
+.ep-section-header {
+    border: none !important;
+    background: none !important;
+}
+.ep-chevron {
+    color: #9ca3af;
+    font-size: .8rem;
+    transition: transform .28s cubic-bezier(.4,0,.2,1);
+    margin-left: 6px;
+    flex-shrink: 0;
+}
+.ep-chevron.open { transform: rotate(180deg) !important; color: #294306; }
+
+/* 11. Quick nav chevron arrow on right */
+.ep-quick-nav li a { justify-content: flex-start; }
+
+/* 12. Sidebar completion ring center text absolute positioning */
+.ep-completion-ring {
+    width: 80px;
+    height: 80px;
+    position: relative;
+    flex-shrink: 0;
+}
+.ep-ring-center {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+/* 13. Exact Hero Layout & Meta Box styles */
+.ep-hero-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 24px;
+    padding: 24px 28px;
+    background: #ffffff;
+    border-radius: 16px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04);
+}
+.ep-hero-left {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex: 1;
+    min-width: 320px;
+}
+.ep-hero-info {
+    flex: 1;
+}
+.ep-hero-role {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #1e293b;
+}
+.ep-hero-sub {
+    font-size: 0.8rem;
+    color: #64748b;
+}
+.ep-hero-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-shrink: 0;
+}
+.ep-meta-box {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    padding: 10px 14px;
+    border-radius: 12px;
+}
+.ep-meta-icon {
+    font-size: 1.1rem;
+    color: #294306;
+}
+.ep-badge-status {
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 999px;
+}
+.ep-status-active {
+    background: #ecfdf5;
+    color: #047857;
+    border: 1px solid #a7f3d0;
+}
+.ep-status-inactive {
+    background: #fef2f2;
+    color: #b91c1c;
+    border: 1px solid #fecaca;
+}
+.ep-pill-purple {
+    background: #f5f3ff;
+    color: #6d28d9;
+    border: 1px solid #ddd6fe;
+}
+.ep-pill-blue {
+    background: #eff6ff;
+    color: #1d4ed8;
+    border: 1px solid #bfdbfe;
+}
+.ep-pill-gray {
+    background: #f8fafc;
+    color: #475569;
+    border: 1px solid #e2e8f0;
+}
+.ep-service-years {
+    background: #f0fdf4;
+    border: 1.5px solid #bbf7d0;
+    border-radius: 14px;
+    padding: 10px 18px;
+    text-align: center;
+    min-width: 90px;
+}
+.ep-service-years .number {
+    font-size: 2.2rem;
+    font-weight: 900;
+    color: #294306;
+    line-height: 1;
+}
+.ep-service-years .label {
+    font-size: 0.65rem;
+    font-weight: 800;
+    color: #15803d;
+    letter-spacing: 0.05em;
+    line-height: 1.1;
+    margin-top: 2px;
+}
+</style>
+
+
+<?php
+$completionSections = [
+    'personal'     => !empty($emp['date_of_birth']) || !empty($emp['gender']),
+    'contact'      => !empty($emp['mobile_number']) || !empty($emp['telephone_number']),
+    'family'       => !empty($family) || !empty($children),
+    'education'    => !empty($education),
+    'work'         => !empty($work),
+    'training'     => !empty($trainings),
+    'eligibility'  => !empty($eligibility),
+    'skills'       => !empty($skills) || !empty($recognitions) || !empty($memberships),
+    'disclosures'  => !empty($emp['sss_number']) || !empty($emp['philhealth_number']),
+    'assets'       => !empty($real_props) || !empty($personal_props),
+    'references'   => !empty($refs),
+    'address'      => !empty($resAddr) || !empty($permAddr),
+    'performance'  => !empty($perf_history_data),
+];
+$completedCount = count(array_filter($completionSections));
+$totalSections  = count($completionSections);
+$completionPct  = round($completedCount / $totalSections * 100);
+$missingSections = [];
+$sectionNames = [
+    'personal'=>'Personal Information','contact'=>'Contact & Address',
+    'family'=>'Family Information','education'=>'Education Background',
+    'work'=>'Work Experience','training'=>'Training & Eligibility',
+    'eligibility'=>'Professional Licenses','skills'=>'Skills & Recognitions',
+    'disclosures'=>'Government IDs','assets'=>'Assets & Properties',
+    'references'=>'Character References','address'=>'Address Records',
+    'performance'=>'Performance Records',
+];
+foreach ($completionSections as $k => $done) {
+    if (!$done) $missingSections[] = $sectionNames[$k];
+}
+?>
+
+
+<div class="d-flex justify-content-between align-items-end flex-wrap gap-3 mb-3">
+    <div>
+        <div class="small text-muted mb-1"><i class="fas fa-users me-1"></i>Employees <span class="mx-1">&rsaquo;</span> Employee Profile</div>
+        <h1 class="employee-page-title mb-0">Employee Profile</h1>
+        <p class="text-muted small mb-0">View and manage employee information, employment details, and performance records.</p>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+        <a href="<?php echo BASE_URL; ?>/manager/edit-employee.php?id=<?php echo $eid; ?>&return=<?php echo urlencode($return_to); ?>" class="btn btn-primary"><i class="fas fa-pen me-2"></i>Edit Profile</a>
+        <button type="button" class="btn btn-light border" onclick="window.print()"><i class="fas fa-print me-2"></i>Print</button>
+        <div class="dropdown">
+            <button class="btn btn-light border dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                <i class="fas fa-ellipsis-h"></i>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end">
+                <li><a class="dropdown-item" href="#"><i class="fas fa-download me-2"></i>Download PDS</a></li>
+                <li><a class="dropdown-item" href="#"><i class="fas fa-star me-2"></i>View Evaluations</a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><a class="dropdown-item text-danger" href="#"><i class="fas fa-user-slash me-2"></i>Deactivate</a></li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<div class="ep-hero-card">
+    <div class="ep-hero-left">
+        <div class="position-relative cursor-pointer" onclick="viewFullImage('<?php echo getEmployeeAvatar($emp['profile_picture']); ?>', '<?php echo e($hero_name); ?>')">
+            <img src="<?php echo getEmployeeAvatar($emp['profile_picture']); ?>" class="ep-avatar" alt="Employee profile photo">
+        </div>
+        <div class="ep-hero-info">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <h2 class="ep-name"><?php echo e($hero_name); ?></h2>
+                <span class="badge ep-badge-status <?php echo $emp['is_active'] ? 'ep-status-active' : 'ep-status-inactive'; ?>">
+                    <i class="fas fa-circle me-1" style="font-size:0.4rem; vertical-align: middle;"></i><?php echo $emp['is_active'] ? 'Active' : 'Inactive'; ?>
+                </span>
+            </div>
+            <div class="ep-hero-role mt-1">
+                <?php echo e($emp['job_title']); ?>
+
+            </div>
+            <div class="ep-hero-sub text-muted">
+                <?php echo e($emp['department_name'] ?: 'General Department'); ?> &bull; Employee ID: <?php echo e(getEmployeeDisplayId($emp)); ?>
+
+            </div>
+            <div class="ep-status-pills mt-2">
+                <span class="ep-pill ep-pill-purple"><i class="fas fa-user-check me-1"></i><?php echo e($emp['employment_status']); ?></span>
+                <span class="ep-pill ep-pill-blue"><?php echo e($emp['employment_type'] ?: 'Full-Time'); ?></span>
+                <span class="ep-pill ep-pill-gray"><i class="fas fa-building me-1"></i><?php echo e($emp['branch_name'] ?: 'Head Office'); ?></span>
+            </div>
+        </div>
+    </div>
+    <div class="ep-hero-right">
+        <div class="ep-meta-box">
+            <div class="ep-meta-icon"><i class="fas fa-calendar-alt"></i></div>
+            <div>
+                <small class="text-muted d-block text-uppercase" style="font-size: 0.68rem; font-weight: 700; letter-spacing: 0.05em;">Date Hired</small>
+                <strong><?php echo formatDate($emp['hire_date']); ?></strong>
+            </div>
+        </div>
+        <div class="ep-meta-box">
+            <div class="ep-meta-icon"><i class="fas fa-clock"></i></div>
+            <div>
+                <small class="text-muted d-block text-uppercase" style="font-size: 0.68rem; font-weight: 700; letter-spacing: 0.05em;">Tenure</small>
+                <strong><?php echo e($hero_tenure); ?></strong>
+            </div>
+        </div>
+        <div class="ep-service-years">
+            <?php 
+                $years = 0;
+                if ($hero_hire_date) {
+                    $years = $hero_hire_date->diff(new DateTime())->y;
+                }
+            ?>
+            <div class="number"><?php echo $years; ?></div>
+            <div class="label">YEARS<br><span style="font-size:0.6rem; font-weight:600; text-transform:none; color:#777;">of Service</span></div>
+        </div>
+    </div>
+</div>
+
+<?php if (!$emp['is_active'] || !empty($emp['separation_date'])): ?>
+    <div class="alert alert-warning text-start py-2 px-3 mb-4 border-start border-4 border-warning shadow-sm" style="background-color: #fff9db; border-color: #f59f00 !important;">
+        <div class="fw-bold text-dark mb-1 d-flex align-items-center gap-1" style="font-size: 0.85rem;">
+            <i class="fas fa-user-slash text-warning me-1"></i>Separation Notice
+        </div>
+        <div class="d-flex justify-content-between gap-2 small mb-1">
+            <span class="text-muted">Status:</span>
+            <span class="fw-bold text-dark"><?php echo e($emp['employment_status']); ?></span>
+        </div>
+        <?php if (!empty($emp['separation_date'])): ?>
+            <div class="d-flex justify-content-between gap-2 small mb-1">
+                <span class="text-muted">Effective:</span>
+                <span class="fw-bold text-danger"><?php echo formatDate($emp['separation_date']); ?></span>
+            </div>
+        <?php endif; ?>
+        <?php if (!empty($emp['separation_remarks'])): ?>
+            <div class="small mt-1 pt-1 border-top border-warning-subtle text-muted" style="font-size: 0.75rem;">
+                <strong>Notes:</strong> <?php echo nl2br(e($emp['separation_remarks'])); ?>
+            </div>
+        <?php endif; ?>
+    </div>
+<?php endif; ?>
+
+<div class="ep-completion-banner <?php echo $completionPct < 100 ? 'banner-warning' : ''; ?>">
+    <div class="d-flex align-items-center gap-3">
+        <i class="fas <?php echo $completionPct == 100 ? 'fa-check-circle text-success' : 'fa-info-circle'; ?>" style="font-size:1.5rem;color:#3b82f6;"></i>
+        <div>
+            <h6 class="mb-1 fw-bold" style="font-size:.9rem;">This profile is <?php echo $completionPct; ?>% complete.</h6>
+            <p class="mb-0 small text-muted"><?php echo $totalSections - $completedCount; ?> sections have missing information.</p>
+        </div>
+    </div>
+    <button class="btn btn-sm btn-outline-primary" onclick="document.querySelector('.profile-sticky-col').scrollIntoView({behavior: 'smooth'})">View Details &rarr;</button>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-8">
+
+
+    <div class="ep-section-row" id="section-performance">
+        <div class="ep-section-header" onclick="toggleSection('performance')">
+            <div class="ep-section-icon bg-light-warning"><i class="fas fa-chart-line"></i></div>
+            <div class="ep-section-title-wrap">
+                <h3 class="ep-section-title">Performance & Career</h3>
+                <p class="ep-section-desc">Latest evaluation, performance trend, and career movement history.</p>
+            </div>
+            <div class="ep-section-actions">
+                <?php echo empty($perf_history_data) && empty($cm_history) ? '<span class="badge bg-secondary">No records</span>' : '<span class="badge bg-success">' . (count($perf_history_data) + count($cm_history)) . ' records</span>'; ?>
+                <button class='btn btn-sm btn-outline-success'>View Details</button>
+                <i class="fas fa-chevron-down ep-chevron open" id="chevron-performance"></i>
+            </div>
+        </div>
+        <div class="ep-section-content active" id="content-performance">
+                    <!-- Performance and career data share one full-width, client-side tab interface. -->
         <div class="content-card employee-section-card mb-4" data-profile-panel="performance">
             <div class="employee-section-header">
                 <div>
@@ -1145,9 +1753,24 @@ $hero_name = trim($emp['first_name'] . ' ' . ($emp['middle_name'] ? $emp['middle
                 </div>
             </div>
         </div>
-
-        <div class="row g-4">
-            <div class="col-xl-6">
+    </div>
+</div>
+    
+    <div class="ep-section-row" id="section-personal">
+        <div class="ep-section-header" onclick="toggleSection('personal')">
+            <div class="ep-section-icon bg-light-primary"><i class="fas fa-user"></i></div>
+            <div class="ep-section-title-wrap">
+                <h3 class="ep-section-title">Personal Information</h3>
+                <p class="ep-section-desc">Basic personal details such as name, birth date, gender, and civil status.</p>
+            </div>
+            <div class="ep-section-actions">
+                <?php echo (!empty($emp['date_of_birth']) || !empty($emp['gender'])) ? '<span class="badge bg-success">Complete</span>' : '<span class="badge bg-secondary">Incomplete</span>'; ?>
+                <button class='btn btn-sm btn-outline-success'>View Details</button>
+                <i class="fas fa-chevron-down ep-chevron " id="chevron-personal"></i>
+            </div>
+        </div>
+        <div class="ep-section-content " id="content-personal">
+                        <div class="col-xl-6">
                 <div class="content-card employee-section-card h-100" data-profile-panel="personal">
                     <div class="employee-section-header">
                         <div>
@@ -1180,9 +1803,25 @@ $hero_name = trim($emp['first_name'] . ' ' . ($emp['middle_name'] ? $emp['middle
                         </div>
                     </div>
                 </div>
+        </div>
+    </div>
+</div>
+    
+    <div class="ep-section-row" id="section-contact">
+        <div class="ep-section-header" onclick="toggleSection('contact')">
+            <div class="ep-section-icon bg-light-info"><i class="fas fa-phone"></i></div>
+            <div class="ep-section-title-wrap">
+                <h3 class="ep-section-title">Contact & Address</h3>
+                <p class="ep-section-desc">Contact information, current and permanent address.</p>
             </div>
-
-            <div class="col-xl-6">
+            <div class="ep-section-actions">
+                <?php echo (!empty($emp['mobile_number']) || !empty($resAddr)) ? '<span class="badge bg-success">Complete</span>' : '<span class="badge bg-secondary">Incomplete</span>'; ?>
+                <button class='btn btn-sm btn-outline-success'>View Details</button>
+                <i class="fas fa-chevron-down ep-chevron " id="chevron-contact"></i>
+            </div>
+        </div>
+        <div class="ep-section-content " id="content-contact">
+                        <div class="col-xl-6">
                 <div class="content-card employee-section-card h-100" data-profile-panel="contact">
                     <div class="employee-section-header">
                         <div>
@@ -1236,9 +1875,25 @@ $hero_name = trim($emp['first_name'] . ' ' . ($emp['middle_name'] ? $emp['middle
                         </div>
                     </div>
                 </div>
+        </div>
+    </div>
+</div>
+    
+    <div class="ep-section-row" id="section-family">
+        <div class="ep-section-header" onclick="toggleSection('family')">
+            <div class="ep-section-icon bg-light-danger"><i class="fas fa-people-group"></i></div>
+            <div class="ep-section-title-wrap">
+                <h3 class="ep-section-title">Family Information</h3>
+                <p class="ep-section-desc">Spouse, children, parents, and siblings.</p>
             </div>
-
-            <div class="col-12">
+            <div class="ep-section-actions">
+                <?php echo (empty($family) && empty($children)) ? '<span class="badge bg-secondary">No records</span>' : '<span class="badge bg-success">Has records</span>'; ?>
+                <button class='btn btn-sm btn-outline-success'>+ Add Record</button>
+                <i class="fas fa-chevron-down ep-chevron " id="chevron-family"></i>
+            </div>
+        </div>
+        <div class="ep-section-content " id="content-family">
+                        <div class="col-12">
                 <div class="content-card employee-section-card" data-profile-panel="family">
                     <div class="employee-section-header">
                         <div>
@@ -1342,9 +1997,25 @@ $hero_name = trim($emp['first_name'] . ' ' . ($emp['middle_name'] ? $emp['middle
                         </div>
                     </div>
                 </div>
+        </div>
+    </div>
+</div>
+    
+    <div class="ep-section-row" id="section-education">
+        <div class="ep-section-header" onclick="toggleSection('education')">
+            <div class="ep-section-icon bg-light-success"><i class="fas fa-graduation-cap"></i></div>
+            <div class="ep-section-title-wrap">
+                <h3 class="ep-section-title">Education Background</h3>
+                <p class="ep-section-desc">Educational attainment and academic records.</p>
             </div>
-
-            <div class="col-xl-6">
+            <div class="ep-section-actions">
+                <?php echo empty($education) ? '<span class="badge bg-secondary">No records</span>' : '<span class="badge bg-success">' . count($education) . ' records</span>'; ?>
+                <button class='btn btn-sm btn-outline-success'>+ Add Record</button>
+                <i class="fas fa-chevron-down ep-chevron " id="chevron-education"></i>
+            </div>
+        </div>
+        <div class="ep-section-content " id="content-education">
+                        <div class="col-xl-6">
                 <div class="content-card employee-section-card h-100" data-profile-panel="education">
                     <div class="employee-section-header">
                         <div>
@@ -1386,8 +2057,24 @@ $hero_name = trim($emp['first_name'] . ' ' . ($emp['middle_name'] ? $emp['middle
                     </div>
                 </div>
             </div>
-
-            <div class="col-xl-6">
+        </div>
+    </div>
+    
+    <div class="ep-section-row" id="section-work">
+        <div class="ep-section-header" onclick="toggleSection('work')">
+            <div class="ep-section-icon bg-light-primary"><i class="fas fa-briefcase"></i></div>
+            <div class="ep-section-title-wrap">
+                <h3 class="ep-section-title">Work Experience</h3>
+                <p class="ep-section-desc">Previous and current work experience.</p>
+            </div>
+            <div class="ep-section-actions">
+                <?php echo empty($work) ? '<span class="badge bg-secondary">No records</span>' : '<span class="badge bg-success">' . count($work) . ' records</span>'; ?>
+                <button class='btn btn-sm btn-outline-success'>+ Add Record</button>
+                <i class="fas fa-chevron-down ep-chevron " id="chevron-work"></i>
+            </div>
+        </div>
+        <div class="ep-section-content " id="content-work">
+                        <div class="col-xl-6">
                 <div class="content-card employee-section-card h-100" data-profile-panel="training">
                     <div class="employee-section-header">
                         <div>
@@ -1436,12 +2123,28 @@ $hero_name = trim($emp['first_name'] . ' ' . ($emp['middle_name'] ? $emp['middle
                     </div>
                 </div>
             </div>
-
+        </div>
+    </div>
+    
+    <div class="ep-section-row" id="section-training">
+        <div class="ep-section-header" onclick="toggleSection('training')">
+            <div class="ep-section-icon bg-light-warning"><i class="fas fa-certificate"></i></div>
+            <div class="ep-section-title-wrap">
+                <h3 class="ep-section-title">Training, Eligibility & Licenses</h3>
+                <p class="ep-section-desc">Trainings, seminars, eligibility and professional licenses.</p>
+            </div>
+            <div class="ep-section-actions">
+                <?php echo (empty($trainings) && empty($eligibility)) ? '<span class="badge bg-secondary">No records</span>' : '<span class="badge bg-success">' . (count($trainings) + count($eligibility)) . ' records</span>'; ?>
+                <button class='btn btn-sm btn-outline-success'>+ Add Record</button>
+                <i class="fas fa-chevron-down ep-chevron " id="chevron-training"></i>
+            </div>
+        </div>
+        <div class="ep-section-content " id="content-training">
             <div class="col-12">
                 <div class="content-card employee-section-card" data-profile-panel="training">
                     <div class="employee-section-header">
                         <div>
-                            <div class="employee-section-kicker"><i class="fas fa-certificate"></i>Training</div>
+                            <div class="employee-section-kicker"><i class="fas fa-certificate"></i>Development</div>
                             <h5 class="mb-0">Training, Eligibility & Professional Development</h5>
                         </div>
                     </div>
@@ -1558,7 +2261,28 @@ $hero_name = trim($emp['first_name'] . ' ' . ($emp['middle_name'] ? $emp['middle
                                 <div class="empty-state"><i class="fas fa-id-badge d-block"></i><p>No eligibility or license records.</p></div>
                             <?php endif; ?>
                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
+    
+    <div class="ep-section-row" id="section-skills">
+        <div class="ep-section-header" onclick="toggleSection('skills')">
+            <div class="ep-section-icon bg-light-purple"><i class="fas fa-star"></i></div>
+            <div class="ep-section-title-wrap">
+                <h3 class="ep-section-title">Skills, Hobbies, Recognitions & Memberships</h3>
+                <p class="ep-section-desc">Skills, hobbies, awards and professional memberships.</p>
+            </div>
+            <div class="ep-section-actions">
+                <?php echo (empty($skills) && empty($recognitions) && empty($memberships)) ? '<span class="badge bg-secondary">No records</span>' : '<span class="badge bg-success">' . (count($skills) + count($recognitions) + count($memberships)) . ' records</span>'; ?>
+                <button class='btn btn-sm btn-outline-success'>+ Add Record</button>
+                <i class="fas fa-chevron-down ep-chevron " id="chevron-skills"></i>
+            </div>
+        </div>
+        <div class="ep-section-content " id="content-skills">
+            
                         <div class="row g-3">
                             <div class="col-lg-4">
                                 <div class="employee-subsection h-100">
@@ -1616,10 +2340,23 @@ $hero_name = trim($emp['first_name'] . ' ' . ($emp['middle_name'] ? $emp['middle
                             </div>
                         </div>
                     </div>
-                </div>
+    </div>
+    
+    <div class="ep-section-row" id="section-disclosures">
+        <div class="ep-section-header" onclick="toggleSection('disclosures')">
+            <div class="ep-section-icon bg-light-danger"><i class="fas fa-clipboard-list"></i></div>
+            <div class="ep-section-title-wrap">
+                <h3 class="ep-section-title">Disclosures & Government IDs</h3>
+                <p class="ep-section-desc">Personal disclosures, government IDs and employment details.</p>
             </div>
-
-            <div class="col-xl-6">
+            <div class="ep-section-actions">
+                <?php echo empty($discList) ? '<span class="badge bg-success">Complete</span>' : '<span class="badge bg-success">' . count($discList) . ' records</span>'; ?>
+                <button class='btn btn-sm btn-outline-success'>View Details</button>
+                <i class="fas fa-chevron-down ep-chevron " id="chevron-disclosures"></i>
+            </div>
+        </div>
+        <div class="ep-section-content " id="content-disclosures">
+                        <div class="col-xl-6">
                 <div class="content-card employee-section-card h-100" data-profile-panel="documents">
                     <div class="employee-section-header">
                         <div>
@@ -1691,9 +2428,25 @@ $hero_name = trim($emp['first_name'] . ' ' . ($emp['middle_name'] ? $emp['middle
                         </div>
                     </div>
                 </div>
+        </div>
+    </div>
+</div>
+    
+    <div class="ep-section-row" id="section-assets">
+        <div class="ep-section-header" onclick="toggleSection('assets')">
+            <div class="ep-section-icon bg-light-info"><i class="fas fa-home"></i></div>
+            <div class="ep-section-title-wrap">
+                <h3 class="ep-section-title">Assets, Properties & Liabilities</h3>
+                <p class="ep-section-desc">Declared assets, properties, and liabilities.</p>
             </div>
-
-            <div class="col-12">
+            <div class="ep-section-actions">
+                <?php echo (empty($real_props) && empty($personal_props) && empty($liabilities)) ? '<span class="badge bg-secondary">No records</span>' : '<span class="badge bg-success">' . (count($real_props) + count($personal_props) + count($liabilities)) . ' records</span>'; ?>
+                <button class='btn btn-sm btn-outline-success'>+ Add Record</button>
+                <i class="fas fa-chevron-down ep-chevron " id="chevron-assets"></i>
+            </div>
+        </div>
+        <div class="ep-section-content " id="content-assets">
+                        <div class="col-12">
                 <div class="content-card employee-section-card" data-profile-panel="documents">
                     <div class="employee-section-header">
                         <div>
@@ -1799,8 +2552,24 @@ $hero_name = trim($emp['first_name'] . ' ' . ($emp['middle_name'] ? $emp['middle
                     </div>
                 </div>
             </div>
-
-            <div class="col-12">
+        </div>
+    </div>
+    
+    <div class="ep-section-row" id="section-references">
+        <div class="ep-section-header" onclick="toggleSection('references')">
+            <div class="ep-section-icon bg-light-success"><i class="fas fa-address-book"></i></div>
+            <div class="ep-section-title-wrap">
+                <h3 class="ep-section-title">Character References</h3>
+                <p class="ep-section-desc">Character references.</p>
+            </div>
+            <div class="ep-section-actions">
+                <?php echo empty($refs) ? '<span class="badge bg-secondary">No records</span>' : '<span class="badge bg-success">' . count($refs) . ' records</span>'; ?>
+                <button class='btn btn-sm btn-outline-success'>+ Add Record</button>
+                <i class="fas fa-chevron-down ep-chevron " id="chevron-references"></i>
+            </div>
+        </div>
+        <div class="ep-section-content " id="content-references">
+                        <div class="col-12">
                 <div class="content-card employee-section-card" data-profile-panel="documents">
                     <div class="employee-section-header">
                         <div>
@@ -1836,12 +2605,183 @@ $hero_name = trim($emp['first_name'] . ' ' . ($emp['middle_name'] ? $emp['middle
                     </div>
                 </div>
             </div>
+        </div>
+    </div>
+    
+    <div class="ep-section-row" id="section-history">
+        <div class="ep-section-header" onclick="toggleSection('history')">
+            <div class="ep-section-icon bg-light-gray"><i class="fas fa-clock-rotate-left"></i></div>
+            <div class="ep-section-title-wrap">
+                <h3 class="ep-section-title">Profile Edit History</h3>
+                <p class="ep-section-desc">Track changes made to this employee's profile.</p>
+            </div>
+            <div class="ep-section-actions">
+                <span class="badge bg-success">History</span>
+                <button class='btn btn-sm btn-outline-success'>View History</button>
+                <i class="fas fa-chevron-down ep-chevron " id="chevron-history"></i>
+            </div>
+        </div>
+        <div class="ep-section-content " id="content-history">
+                        <?php require_once '../includes/employee-edit-history-card.php'; ?>
+        </div>
+    </div>
+    
 
-            <?php require_once '../includes/employee-edit-history-card.php'; ?>
+    </div>
+    
+    <div class="col-lg-4 profile-sticky-col">
+        <!-- 1. Quick Navigation Card (Top) -->
+        <div class="ep-sidebar-card">
+            <h4 class="ep-sidebar-title"><i class="fas fa-compass text-primary"></i> Quick Navigation</h4>
+            <ul class="ep-quick-nav">
+                <li><a href="javascript:void(0)" onclick="scrollToSection('performance')"><div class="ep-quick-nav-icon"><i class="fas fa-chart-line"></i></div> <span>Performance & Career</span> <i class="fas fa-chevron-right ms-auto" style="font-size:0.65rem; color:#9ca3af;"></i></a></li>
+                <li><a href="javascript:void(0)" onclick="scrollToSection('personal')"><div class="ep-quick-nav-icon"><i class="fas fa-user"></i></div> <span>Personal Information</span> <i class="fas fa-chevron-right ms-auto" style="font-size:0.65rem; color:#9ca3af;"></i></a></li>
+                <li><a href="javascript:void(0)" onclick="scrollToSection('contact')"><div class="ep-quick-nav-icon"><i class="fas fa-phone"></i></div> <span>Contact & Address</span> <i class="fas fa-chevron-right ms-auto" style="font-size:0.65rem; color:#9ca3af;"></i></a></li>
+                <li><a href="javascript:void(0)" onclick="scrollToSection('family')"><div class="ep-quick-nav-icon"><i class="fas fa-people-group"></i></div> <span>Family Information</span> <i class="fas fa-chevron-right ms-auto" style="font-size:0.65rem; color:#9ca3af;"></i></a></li>
+                <li><a href="javascript:void(0)" onclick="scrollToSection('education')"><div class="ep-quick-nav-icon"><i class="fas fa-graduation-cap"></i></div> <span>Education Background</span> <i class="fas fa-chevron-right ms-auto" style="font-size:0.65rem; color:#9ca3af;"></i></a></li>
+                <li><a href="javascript:void(0)" onclick="scrollToSection('work')"><div class="ep-quick-nav-icon"><i class="fas fa-briefcase"></i></div> <span>Work Experience</span> <i class="fas fa-chevron-right ms-auto" style="font-size:0.65rem; color:#9ca3af;"></i></a></li>
+                <li><a href="javascript:void(0)" onclick="scrollToSection('training')"><div class="ep-quick-nav-icon"><i class="fas fa-certificate"></i></div> <span>Training, Eligibility & Licenses</span> <i class="fas fa-chevron-right ms-auto" style="font-size:0.65rem; color:#9ca3af;"></i></a></li>
+                <li><a href="javascript:void(0)" onclick="scrollToSection('skills')"><div class="ep-quick-nav-icon"><i class="fas fa-star"></i></div> <span>Skills, Hobbies, Recognitions</span> <i class="fas fa-chevron-right ms-auto" style="font-size:0.65rem; color:#9ca3af;"></i></a></li>
+                <li><a href="javascript:void(0)" onclick="scrollToSection('disclosures')"><div class="ep-quick-nav-icon"><i class="fas fa-clipboard-list"></i></div> <span>Disclosures & Government IDs</span> <i class="fas fa-chevron-right ms-auto" style="font-size:0.65rem; color:#9ca3af;"></i></a></li>
+                <li><a href="javascript:void(0)" onclick="scrollToSection('assets')"><div class="ep-quick-nav-icon"><i class="fas fa-home"></i></div> <span>Assets, Properties & Liabilities</span> <i class="fas fa-chevron-right ms-auto" style="font-size:0.65rem; color:#9ca3af;"></i></a></li>
+                <li><a href="javascript:void(0)" onclick="scrollToSection('references')"><div class="ep-quick-nav-icon"><i class="fas fa-address-book"></i></div> <span>Character References</span> <i class="fas fa-chevron-right ms-auto" style="font-size:0.65rem; color:#9ca3af;"></i></a></li>
+                <li><a href="javascript:void(0)" onclick="scrollToSection('history')"><div class="ep-quick-nav-icon"><i class="fas fa-clock-rotate-left"></i></div> <span>Profile Edit History</span> <i class="fas fa-chevron-right ms-auto" style="font-size:0.65rem; color:#9ca3af;"></i></a></li>
+            </ul>
+        </div>
 
+        <!-- 2. Profile Completion Card -->
+        <div class="ep-sidebar-card">
+            <h4 class="ep-sidebar-title"><i class="fas fa-shield-check text-primary"></i> Profile Completion</h4>
+            <div class="d-flex align-items-center gap-3 mb-3">
+                <div class="ep-completion-ring">
+                    <svg width="80" height="80" viewBox="0 0 80 80">
+                      <circle cx="40" cy="40" r="32" fill="none" stroke="#eef2e8" stroke-width="8"/>
+                      <circle cx="40" cy="40" r="32" fill="none" stroke="#294306" stroke-width="8"
+                        stroke-dasharray="201" stroke-dashoffset="<?php echo round(201 * (1 - $completionPct/100)); ?>"
+                        stroke-linecap="round"/>
+                    </svg>
+                    <div class="position-absolute top-50 start-50 translate-middle fw-bold" style="font-size: 1.1rem; color: #294306;"><?php echo $completionPct; ?>%</div>
+                </div>
+                <div>
+                    <div class="text-muted small" style="font-size:0.75rem; text-transform:uppercase; font-weight:700; letter-spacing:0.04em;">Profile Completion</div>
+                    <div class="fw-bold fs-5 text-dark lh-1 mb-1"><?php echo $completionPct; ?>%</div>
+                    <div class="small text-muted" style="font-size:0.75rem;"><?php echo $completedCount; ?> of <?php echo $totalSections; ?> sections completed</div>
+                </div>
+            </div>
+            <div class="progress mb-3" style="height: 6px; border-radius: 99px; background:#eef2e8;">
+                <div class="progress-bar bg-success" role="progressbar" style="width: <?php echo $completionPct; ?>%; border-radius: 99px;" aria-valuenow="<?php echo $completionPct; ?>" aria-valuemin="0" aria-valuemax="100"></div>
+            </div>
+            <?php if (!empty($missingSections)): ?>
+                <div class="p-3 rounded-3" style="background-color: #fffbeb; border: 1px solid #fef3c7;">
+                    <div class="fw-bold mb-2 text-danger small d-flex align-items-center gap-1" style="font-size:0.78rem;">
+                        <i class="fas fa-exclamation-triangle text-warning"></i>
+                        <span>Missing Information</span>
+                    </div>
+                    <div class="small text-muted mb-2" style="font-size:0.72rem;"><?php echo count($missingSections); ?> sections need attention:</div>
+                    <div class="d-flex flex-column gap-1">
+                        <?php 
+                        $secMap = [
+                            'Personal Information' => 'personal',
+                            'Contact & Address' => 'contact',
+                            'Family Information' => 'family',
+                            'Education Background' => 'education',
+                            'Work Experience' => 'work',
+                            'Training & Eligibility' => 'training',
+                            'Professional Licenses' => 'training',
+                            'Skills & Recognitions' => 'skills',
+                            'Government IDs' => 'disclosures',
+                            'Assets & Properties' => 'assets',
+                            'Character References' => 'references',
+                            'Address Records' => 'contact',
+                            'Performance Records' => 'performance'
+                        ];
+                        foreach ($missingSections as $ms): 
+                            $targetSec = $secMap[$ms] ?? 'personal';
+                        ?>
+                            <a href="javascript:void(0)" onclick="scrollToSection('<?php echo $targetSec; ?>')" class="d-flex align-items-center justify-content-between text-decoration-none py-1 px-2 rounded" style="font-size:0.75rem; color:#b45309; background:rgba(251, 191, 36, 0.15);">
+                                <span class="d-flex align-items-center gap-1"><i class="fas fa-exclamation-circle text-danger" style="font-size:0.7rem;"></i> <?php echo $ms; ?></span>
+                                <i class="fas fa-chevron-right" style="font-size:0.65rem;"></i>
+                            </a>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+            <?php endif; ?>
+        </div>
+
+        <div class="ep-sidebar-card">
+            <h4 class="ep-sidebar-title"><i class="fas fa-briefcase text-primary"></i> Employment Details</h4>
+            <div class="ep-emp-detail-item">
+                <div class="ep-emp-detail-label">Position</div>
+                <div class="ep-emp-detail-value"><?php echo e($emp['job_title']); ?></div>
+            </div>
+            <div class="ep-emp-detail-item">
+                <div class="ep-emp-detail-label">Department</div>
+                <div class="ep-emp-detail-value"><?php echo e($emp['department_name'] ?: 'N/A'); ?></div>
+            </div>
+            <div class="ep-emp-detail-item">
+                <div class="ep-emp-detail-label">Employment Status</div>
+                <div class="ep-emp-detail-value"><?php echo e($emp['employment_status']); ?></div>
+            </div>
+            <div class="ep-emp-detail-item">
+                <div class="ep-emp-detail-label">Employment Type</div>
+                <div class="ep-emp-detail-value"><?php echo e($emp['employment_type']); ?></div>
+            </div>
+            <div class="ep-emp-detail-item">
+                <div class="ep-emp-detail-label">Work Location</div>
+                <div class="ep-emp-detail-value"><?php echo e($emp['branch_name'] ?: 'N/A'); ?></div>
+            </div>
+        </div>
+
+        <div class="ep-sidebar-card">
+            <h4 class="ep-sidebar-title"><i class="fas fa-id-card text-primary"></i> Government IDs</h4>
+            <div class="ep-gov-id-item">
+                <div class="ep-gov-id-label"><i class="fas fa-id-card me-1 text-muted"></i>SSS Number</div>
+                <div class="ep-gov-id-value d-flex align-items-center gap-2">
+                    <span class="gov-id-mask" data-value="<?php echo e($emp['sss_number'] ?: 'N/A'); ?>">
+                        <?php echo !empty($emp['sss_number']) ? '&bull;&bull;&bull;&bull;-&bull;&bull;&bull;&bull;&bull;&bull;&bull;-&bull;' : 'N/A'; ?>
+                    </span>
+                    <?php if(!empty($emp['sss_number'])): ?>
+                    <button class="btn btn-sm btn-link p-0 text-muted toggle-gov-id"><i class="fas fa-eye"></i></button>
+                    <?php endif; ?>
+                </div>
+            </div>
+            <div class="ep-gov-id-item">
+                <div class="ep-gov-id-label"><i class="fas fa-id-card me-1 text-muted"></i>PhilHealth Number</div>
+                <div class="ep-gov-id-value d-flex align-items-center gap-2">
+                    <span class="gov-id-mask" data-value="<?php echo e($emp['philhealth_number'] ?: 'N/A'); ?>">
+                        <?php echo !empty($emp['philhealth_number']) ? '&bull;&bull;&bull;&bull;-&bull;&bull;&bull;&bull;-&bull;&bull;&bull;&bull;' : 'N/A'; ?>
+                    </span>
+                    <?php if(!empty($emp['philhealth_number'])): ?>
+                    <button class="btn btn-sm btn-link p-0 text-muted toggle-gov-id"><i class="fas fa-eye"></i></button>
+                    <?php endif; ?>
+                </div>
+            </div>
+            <div class="ep-gov-id-item">
+                <div class="ep-gov-id-label"><i class="fas fa-id-card me-1 text-muted"></i>Pag-IBIG Number</div>
+                <div class="ep-gov-id-value d-flex align-items-center gap-2">
+                    <span class="gov-id-mask" data-value="<?php echo e($emp['pagibig_number'] ?: 'N/A'); ?>">
+                        <?php echo !empty($emp['pagibig_number']) ? '&bull;&bull;&bull;&bull;-&bull;&bull;&bull;&bull;-&bull;&bull;&bull;&bull;' : 'N/A'; ?>
+                    </span>
+                    <?php if(!empty($emp['pagibig_number'])): ?>
+                    <button class="btn btn-sm btn-link p-0 text-muted toggle-gov-id"><i class="fas fa-eye"></i></button>
+                    <?php endif; ?>
+                </div>
+            </div>
+            <div class="ep-gov-id-item">
+                <div class="ep-gov-id-label"><i class="fas fa-id-card me-1 text-muted"></i>TIN Number</div>
+                <div class="ep-gov-id-value d-flex align-items-center gap-2">
+                    <span class="gov-id-mask" data-value="<?php echo e($emp['tin_number'] ?: 'N/A'); ?>">
+                        <?php echo !empty($emp['tin_number']) ? '&bull;&bull;&bull;-&bull;&bull;&bull;-&bull;&bull;&bull;-&bull;&bull;&bull;&bull;' : 'N/A'; ?>
+                    </span>
+                    <?php if(!empty($emp['tin_number'])): ?>
+                    <button class="btn btn-sm btn-link p-0 text-muted toggle-gov-id"><i class="fas fa-eye"></i></button>
+                    <?php endif; ?>
+                </div>
+            </div>
         </div>
     </div>
 </div>
+
 
 
 
@@ -1973,6 +2913,31 @@ $hero_name = trim($emp['first_name'] . ' ' . ($emp['middle_name'] ? $emp['middle
         if (initialProfileTab) activateProfileTab(initialProfileTab, false);
 
     });
+
+function toggleSection(id) {
+    const content = document.getElementById('content-' + id);
+    const chevron = document.getElementById('chevron-' + id);
+    if (content.classList.contains('active')) {
+        content.classList.remove('active');
+        chevron.classList.remove('open');
+    } else {
+        content.classList.add('active');
+        chevron.classList.add('open');
+    }
+}
+function scrollToSection(id) {
+    const section = document.getElementById('section-' + id);
+    if (section) {
+        section.scrollIntoView({behavior: 'smooth', block: 'start'});
+        const content = document.getElementById('content-' + id);
+        const chevron = document.getElementById('chevron-' + id);
+        if (!content.classList.contains('active')) {
+            content.classList.add('active');
+            chevron.classList.add('open');
+        }
+    }
+}
+
 </script>
 
 <?php require_once '../includes/footer.php'; ?>
