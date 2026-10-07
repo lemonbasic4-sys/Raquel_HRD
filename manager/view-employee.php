@@ -118,29 +118,35 @@ $refs = $conn->query("SELECT * FROM employee_references WHERE employee_id=$eid O
 require_once '../includes/header.php';
 
 // Helper
-function field($label, $value, $escape = true)
-{
-    $val = !empty($value) ? ($escape ? e($value) : $value) : '<span class="text-muted">N/A</span>';
-    return "<div class='detail-item'><div class='detail-label'>$label</div><div class='detail-value'>$val</div></div>";
+if (!function_exists('field')) {
+    function field($label, $value, $escape = true)
+    {
+        $val = !empty($value) ? ($escape ? e($value) : $value) : '<span class="text-muted">N/A</span>';
+        return "<div class='detail-item'><div class='detail-label'>$label</div><div class='detail-value'>$val</div></div>";
+    }
 }
-function govField($label, $value)
-{
-    $has_val = !empty(trim((string)$value));
-    $raw = $has_val ? e(trim($value)) : '<span class="text-muted">N/A</span>';
-    $masked = $has_val ? '••••••••••••' : '<span class="text-muted">N/A</span>';
-    $eye_btn = $has_val ? '<i class="fas fa-eye text-muted cursor-pointer single-id-toggle ms-auto" onclick="toggleSingleId(this)" title="Toggle '.$label.'" style="font-size:0.82rem; opacity: 0.55; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.opacity=\'1\'" onmouseout="this.style.opacity=\'0.55\'"></i>' : '';
+if (!function_exists('govField')) {
+    function govField($label, $value)
+    {
+        $has_val = !empty(trim((string)$value));
+        $raw = $has_val ? e(trim($value)) : '<span class="text-muted">N/A</span>';
+        $masked = $has_val ? '••••••••••••' : '<span class="text-muted">N/A</span>';
+        $eye_btn = $has_val ? '<i class="fas fa-eye text-muted cursor-pointer single-id-toggle ms-auto" onclick="toggleSingleId(this)" title="Toggle '.$label.'" style="font-size:0.82rem; opacity: 0.55; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.opacity=\'1\'" onmouseout="this.style.opacity=\'0.55\'"></i>' : '';
 
-    return "<div class='detail-item'>
-        <div class='detail-label'>$label</div>
-        <div class='detail-value d-flex align-items-center gap-2'>
-            <span class='gov-id-val' data-raw='$raw' data-masked='$masked'>$masked</span>
-            $eye_btn
-        </div>
-    </div>";
+        return "<div class='detail-item'>
+            <div class='detail-label'>$label</div>
+            <div class='detail-value d-flex align-items-center gap-2'>
+                <span class='gov-id-val' data-raw='$raw' data-masked='$masked'>$masked</span>
+                $eye_btn
+            </div>
+        </div>";
+    }
 }
-function yn($v)
-{
-    return $v ? '<span class="badge bg-warning text-dark">Yes</span>' : '<span class="badge bg-secondary">No</span>';
+if (!function_exists('yn')) {
+    function yn($v)
+    {
+        return $v ? '<span class="badge bg-warning text-dark">Yes</span>' : '<span class="badge bg-secondary">No</span>';
+    }
 }
 
 $rankBadgeClassMap = [
@@ -1461,20 +1467,21 @@ foreach ($completionSections as $k => $done) {
 
 <div class="d-flex justify-content-between align-items-end flex-wrap gap-3 mb-3">
     <div>
-        <div class="small text-muted mb-1"><i class="fas fa-users me-1"></i>Employees <span class="mx-1">&rsaquo;</span> Employee Profile</div>
+        <div class="small text-muted mb-1"><a href="<?php echo htmlspecialchars($return_to, ENT_QUOTES, 'UTF-8'); ?>" class="text-decoration-none text-muted"><i class="fas fa-users me-1"></i>Employees</a> <span class="mx-1">&rsaquo;</span> Employee Profile</div>
         <h1 class="employee-page-title mb-0">Employee Profile</h1>
         <p class="text-muted small mb-0">View and manage employee information, employment details, and performance records.</p>
     </div>
     <div class="d-flex gap-2 flex-wrap">
         <a href="<?php echo BASE_URL; ?>/manager/edit-employee.php?id=<?php echo $eid; ?>&return=<?php echo urlencode($return_to); ?>" class="btn btn-primary"><i class="fas fa-pen me-2"></i>Edit Profile</a>
         <button type="button" class="btn btn-light border" onclick="window.print()"><i class="fas fa-print me-2"></i>Print</button>
+        <a href="<?php echo htmlspecialchars($return_to, ENT_QUOTES, 'UTF-8'); ?>" class="btn btn-light border" title="Back to employees"><i class="fas fa-arrow-left"></i></a>
         <div class="dropdown">
             <button class="btn btn-light border dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
                 <i class="fas fa-ellipsis-h"></i>
             </button>
             <ul class="dropdown-menu dropdown-menu-end">
-                <li><a class="dropdown-item" href="#"><i class="fas fa-download me-2"></i>Download PDS</a></li>
-                <li><a class="dropdown-item" href="#"><i class="fas fa-star me-2"></i>View Evaluations</a></li>
+                <li><a class="dropdown-item" href="javascript:void(0)" onclick="window.print()"><i class="fas fa-download me-2"></i>Download / Print PDS</a></li>
+                <li><a class="dropdown-item" href="<?php echo BASE_URL; ?>/manager/evaluation-history.php?employee_id=<?php echo $eid; ?>"><i class="fas fa-star me-2"></i>View Evaluations</a></li>
                 <li><hr class="dropdown-divider"></li>
                 <li><a class="dropdown-item text-danger" href="#"><i class="fas fa-user-slash me-2"></i>Deactivate</a></li>
             </ul>
