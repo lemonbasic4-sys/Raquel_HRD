@@ -1770,7 +1770,7 @@ foreach ($completionSections as $k => $done) {
             </div>
         </div>
         <div class="ep-section-content " id="content-personal">
-                        <div class="col-xl-6">
+                        <div class="col-12">
                 <div class="content-card employee-section-card h-100" data-profile-panel="personal">
                     <div class="employee-section-header">
                         <div>
@@ -1821,7 +1821,7 @@ foreach ($completionSections as $k => $done) {
             </div>
         </div>
         <div class="ep-section-content " id="content-contact">
-                        <div class="col-xl-6">
+                        <div class="col-12">
                 <div class="content-card employee-section-card h-100" data-profile-panel="contact">
                     <div class="employee-section-header">
                         <div>
@@ -2015,7 +2015,7 @@ foreach ($completionSections as $k => $done) {
             </div>
         </div>
         <div class="ep-section-content " id="content-education">
-                        <div class="col-xl-6">
+            <div class="col-12">
                 <div class="content-card employee-section-card h-100" data-profile-panel="education">
                     <div class="employee-section-header">
                         <div>
@@ -2074,7 +2074,7 @@ foreach ($completionSections as $k => $done) {
             </div>
         </div>
         <div class="ep-section-content " id="content-work">
-                        <div class="col-xl-6">
+            <div class="col-12">
                 <div class="content-card employee-section-card h-100" data-profile-panel="training">
                     <div class="employee-section-header">
                         <div>
@@ -2356,7 +2356,8 @@ foreach ($completionSections as $k => $done) {
             </div>
         </div>
         <div class="ep-section-content " id="content-disclosures">
-                        <div class="col-xl-6">
+            <div class="row g-4">
+                <div class="col-xl-6">
                 <div class="content-card employee-section-card h-100" data-profile-panel="documents">
                     <div class="employee-section-header">
                         <div>
@@ -2429,6 +2430,7 @@ foreach ($completionSections as $k => $done) {
                     </div>
                 </div>
         </div>
+    </div>
     </div>
 </div>
     
@@ -2941,4 +2943,3 @@ function scrollToSection(id) {
 </script>
 
 <?php require_once '../includes/footer.php'; ?>
-
