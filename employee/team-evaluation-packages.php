@@ -347,13 +347,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $package_update->close();
 
         // ── Late-member merge check ─────────────────────────────────────────────
-        // If the next step is Governance AND a sibling package for the same
-        // dept/template/period is already in governance, merge this package's
-        // members into that sibling so governance reviewers see a unified team.
+        // Join a same-cycle sibling only at the exact same pending review stage.
         $merged_into = tryMergeLateMemberPackageIntoSibling($conn, $package_id, (int)$step['step_order']);
         $was_merged  = ($merged_into !== $package_id);
 
-        $audit_pkg_id = $was_merged ? $merged_into : $package_id;
+        // Keep the approval attached to the package whose reviewer acted.
+        $audit_pkg_id = $package_id;
         $next_name = ((!empty($next['eligible_role']) || !empty($next['eligible_rank_category_id'])) && empty($next['claimed_at']))
             ? (!empty($next['eligible_role']) ? $next['eligible_role'] : ((int)$next['eligible_rank_category_id'] === 4 ? 'Department Supervisor' : 'Department Manager'))
             : getOrganizationPackageReviewerDisplayName($conn, (int)($next['reviewer_user_id'] ?? 0), (int)($next['reviewer_employee_id'] ?? 0));
@@ -367,7 +366,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $audit->close();
 
         if ($was_merged) {
-            redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'success', 'Evaluation approved. This member\'s evaluation has been merged into the main ' . $step['department_name'] . ' team package (Package #' . $merged_into . ') for unified governance review.');
+            redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'success', 'Evaluation approved. This member\'s evaluation has been merged into the main ' . $step['department_name'] . ' team package (Package #' . $merged_into . ') for review at the same approval stage.');
         }
         redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'success', 'Evaluation package successfully adjusted and forwarded to ' . $next_name . ' (' . $next['step_label'] . ').');
     } else {

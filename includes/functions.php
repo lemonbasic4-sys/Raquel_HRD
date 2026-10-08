@@ -3789,11 +3789,9 @@ function isEmployeeInOrganizationReviewHierarchy($conn, $employee_id)
 }
 
 /**
- * After a standalone late-member package has its last internal (non-Governance) step approved,
- * check whether a sibling package for the same department/template/period is already in
- * governance. If so, merge the late member(s) into that main package so governance reviewers
- * (VP, President, Audit Committee, Board) see the complete team together with a unified
- * shared behavior score.
+ * After a standalone late-member package advances to an approval stage,
+ * merge into a sibling at that SAME stage in the same department and cycle.
+ * Original package membership, completed route steps and audit records remain historical.
  *
  * Returns the package_id that the caller should use for further processing:
  *   - The main/sibling package_id if a merge occurred (the standalone is now Cancelled).
@@ -3801,18 +3799,43 @@ function isEmployeeInOrganizationReviewHierarchy($conn, $employee_id)
  */
 function tryMergeLateMemberPackageIntoSibling($conn, $package_id, $just_approved_step_order)
 {
+    $package_id = (int) $package_id;
+    $conn->begin_transaction();
+    try {
+        // Serialize merges within a cohort, then re-read stages under these locks.
+        $conn->query("SELECT ep.package_id FROM evaluation_packages ep
+            JOIN evaluation_packages source ON source.package_id = $package_id
+            WHERE ep.department_id = source.department_id AND ep.template_id = source.template_id
+              AND ep.evaluation_type = source.evaluation_type
+              AND ep.period_start = source.period_start AND ep.period_end = source.period_end
+            ORDER BY ep.package_id FOR UPDATE");
+        $result = mergeOrganizationPackageAtPendingStage($conn, $package_id, $just_approved_step_order);
+        $conn->commit();
+        return $result;
+    } catch (Throwable $e) {
+        $conn->rollback();
+        throw $e;
+    }
+}
+
+// Internal: callers must hold the cohort locks via tryMergeLateMemberPackageIntoSibling.
+function mergeOrganizationPackageAtPendingStage($conn, $package_id, $just_approved_step_order)
+{
     $package_id    = (int) $package_id;
     $next_order    = $just_approved_step_order + 1;
 
-    // Is the next step a Governance step?
-    $next_step_row = $conn->query("SELECT step_type FROM evaluation_package_route_steps
-        WHERE package_id = $package_id AND step_order = $next_order LIMIT 1")->fetch_assoc();
-    if (!$next_step_row || $next_step_row['step_type'] !== 'Governance') {
-        return $package_id; // Still in internal review — nothing to merge yet.
+    // Match the actual pending stage, never merely a broad package status.
+    $next_step_row = $conn->query("SELECT rs.* FROM evaluation_package_route_steps rs
+        JOIN evaluation_packages ep ON ep.package_id = rs.package_id
+        WHERE rs.package_id = $package_id AND rs.step_order = $next_order
+          AND ep.current_step_order = rs.step_order AND rs.action_status = 'Pending'
+          AND ep.status NOT IN ('Cancelled', 'Approved and Applied') LIMIT 1")->fetch_assoc();
+    if (!$next_step_row) {
+        return $package_id;
     }
 
     // Get this package's identity.
-    $pkg = $conn->query("SELECT department_id, template_id, period_start, period_end
+    $pkg = $conn->query("SELECT department_id, template_id, evaluation_type, period_start, period_end
         FROM evaluation_packages WHERE package_id = $package_id LIMIT 1")->fetch_assoc();
     if (!$pkg) return $package_id;
 
@@ -3820,37 +3843,55 @@ function tryMergeLateMemberPackageIntoSibling($conn, $package_id, $just_approved
     $tmpl_id = (int) $pkg['template_id'];
     $pstart  = $conn->real_escape_string($pkg['period_start']);
     $pend    = $conn->real_escape_string($pkg['period_end']);
+    $evaluation_type = $conn->real_escape_string($pkg['evaluation_type']);
 
-    // Look for a sibling package (same dept/template/period, different package_id)
-    // that is currently in governance (status Pending Review / Pending Audit Approval /
-    // Pending Board Approval) and NOT cancelled or finalized.
+    // Labels identify stages even when departments skip VP or route orders differ.
     $sibling = $conn->query("
         SELECT ep.package_id, ep.status, ep.current_step_order
         FROM evaluation_packages ep
+        JOIN evaluation_package_route_steps target ON target.package_id = ep.package_id
+            AND target.step_order = ep.current_step_order AND target.action_status = 'Pending'
+        JOIN evaluation_package_route_steps source ON source.package_id = $package_id
+            AND source.step_order = $next_order
         WHERE ep.department_id = $dept_id
           AND ep.template_id   = $tmpl_id
           AND ep.period_start  = '$pstart'
           AND ep.period_end    = '$pend'
+          AND ep.evaluation_type = '$evaluation_type'
           AND ep.package_id   != $package_id
-          AND ep.status IN ('Pending Review', 'Pending Audit Approval', 'Pending Board Approval')
-        ORDER BY ep.current_step_order DESC
+          AND ep.status NOT IN ('Cancelled', 'Approved and Applied', 'Pending Self-Ratings')
+          AND target.step_type = source.step_type AND target.step_label = source.step_label
+          AND target.eligible_role <=> source.eligible_role
+          AND target.eligible_rank_category_id <=> source.eligible_rank_category_id
+          AND (target.eligible_role IS NOT NULL OR target.eligible_rank_category_id IS NOT NULL
+               OR ((target.reviewer_user_id <=> source.reviewer_user_id)
+                   AND (target.reviewer_employee_id <=> source.reviewer_employee_id)))
+        ORDER BY (target.claimed_at IS NOT NULL) DESC, ep.package_id
         LIMIT 1
     ")->fetch_assoc();
 
-    if (!$sibling) return $package_id; // No eligible sibling — governance will review separately.
+    if (!$sibling) return $package_id;
 
     $main_id = (int) $sibling['package_id'];
 
     // ── Move all members of the standalone package into the main package ──
-    $members_res = $conn->query("SELECT evaluation_id FROM evaluation_package_members WHERE package_id = $package_id");
+    $members_res = $conn->query("SELECT evaluation_id, member_status FROM evaluation_package_members WHERE package_id = $package_id");
     $moved = 0;
     $main_step = (int) ($sibling['current_step_order'] ?? 1);
     while ($m = $members_res->fetch_assoc()) {
         $eval_id = (int) $m['evaluation_id'];
+        $member_status = $conn->real_escape_string($m['member_status']);
         $conn->query("INSERT INTO evaluation_package_members
                 (package_id, evaluation_id, member_status, joined_at_step)
-            VALUES ($main_id, $eval_id, 'Late Rejoined', $main_step)
-            ON DUPLICATE KEY UPDATE member_status = 'Late Rejoined', joined_at_step = $main_step");
+            SELECT $main_id, $eval_id, '$member_status', $main_step
+            WHERE NOT EXISTS (
+                SELECT 1 FROM evaluation_package_members existing
+                JOIN evaluations existing_ev ON existing_ev.evaluation_id = existing.evaluation_id
+                JOIN evaluations incoming_ev ON incoming_ev.evaluation_id = $eval_id
+                WHERE existing.package_id = $main_id
+                  AND existing_ev.employee_id = incoming_ev.employee_id
+            )
+            ON DUPLICATE KEY UPDATE evaluation_id = VALUES(evaluation_id)");
         $moved++;
     }
     if ($moved === 0) return $package_id; // Nothing to move.
@@ -3859,7 +3900,7 @@ function tryMergeLateMemberPackageIntoSibling($conn, $package_id, $just_approved
     recalculateOrganizationPackageBehaviorScore($conn, $main_id);
 
     // ── Cancel & skip the now-merged standalone package ──
-    $conn->query("UPDATE evaluation_packages SET status = 'Cancelled' WHERE package_id = $package_id");
+    $conn->query("UPDATE evaluation_packages SET status = 'Cancelled', current_step_order = NULL WHERE package_id = $package_id");
     $conn->query("UPDATE evaluation_package_route_steps
         SET action_status = 'Skipped'
         WHERE package_id = $package_id AND action_status IN ('Waiting', 'Pending')");
@@ -3867,12 +3908,12 @@ function tryMergeLateMemberPackageIntoSibling($conn, $package_id, $just_approved
     // ── Audit trail ──
     $conn->query("INSERT INTO evaluation_package_audit (package_id, action, remarks)
         VALUES ($package_id, 'MERGED',
-            'Standalone late-member package merged into Package #$main_id at governance stage. Members transferred; shared behavior score recalculated.')");
+            'Package merged into Package #$main_id at the same pending approval stage. Original membership and review history retained.')");
     $conn->query("INSERT INTO evaluation_package_audit (package_id, action, remarks)
         VALUES ($main_id, 'MEMBER_ADDED',
-            'Late member(s) merged from standalone Package #$package_id after completing all internal review steps. Shared behavior score updated.')");
+            'Members joined from Package #$package_id at the same pending approval stage. Prior reviews remain in the source package history.')");
 
-    // ── Notify the active governance reviewer on the main package ──
+    // Notify the active reviewer on the receiving package.
     $pending_step = $conn->query("SELECT reviewer_user_id, reviewer_employee_id, step_label
         FROM evaluation_package_route_steps
         WHERE package_id = $main_id AND action_status = 'Pending'
@@ -3880,7 +3921,7 @@ function tryMergeLateMemberPackageIntoSibling($conn, $package_id, $just_approved
     if ($pending_step) {
         $rev_uid    = (int) ($pending_step['reviewer_user_id']    ?? 0);
         $rev_emp_id = (int) ($pending_step['reviewer_employee_id'] ?? 0);
-        $msg = 'A late team member has completed internal review and been added to this package. The shared behavior score has been updated — please review the full team before approving.';
+        $msg = 'Additional team members reached this approval stage and joined this package. Please review the complete team before approving.';
         if ($rev_uid > 0) {
             createNotification($conn, $rev_uid, 'Team Package Updated — Late Member Joined', $msg, BASE_URL . '/employee/team-evaluation-packages.php');
         } elseif ($rev_emp_id > 0) {
@@ -3920,24 +3961,26 @@ function syncEvaluationToOrganizationPackage($conn, $evaluation_id)
         JOIN evaluation_package_route_steps rs ON rs.package_id = ep.package_id AND rs.step_order = 1
         WHERE ep.department_id = ? AND ep.template_id = ?
           AND ep.period_start = ? AND ep.period_end = ?
+          AND ep.evaluation_type = ?
           AND ep.status NOT IN ('Cancelled', 'Approved and Applied')
           AND rs.action_status IN ('Waiting', 'Pending')
         ORDER BY CASE WHEN NOT EXISTS (
             SELECT 1 FROM evaluation_package_members empty_pm WHERE empty_pm.package_id = ep.package_id
         ) THEN 0 ELSE 1 END, ep.updated_at DESC
         LIMIT 1");
-    $find->bind_param('iiss', $department_id, $template_id, $start, $end); $find->execute();
+    $find->bind_param('iisss', $department_id, $template_id, $start, $end, $type); $find->execute();
     $package = $find->get_result()->fetch_assoc(); $find->close();
     if (!$package) {
         // Fallback: look for exact period match if not found
-        $find = $conn->prepare("SELECT package_id, consolidator_employee_id FROM evaluation_packages WHERE department_id = ? AND template_id = ? AND period_start = ? AND period_end = ? AND status <> 'Cancelled' LIMIT 1");
-        $find->bind_param('iiss', $department_id, $template_id, $start, $end); $find->execute();
+        $find = $conn->prepare("SELECT package_id, consolidator_employee_id FROM evaluation_packages WHERE department_id = ? AND template_id = ? AND period_start = ? AND period_end = ? AND evaluation_type = ? AND status <> 'Cancelled' LIMIT 1");
+        $find->bind_param('iisss', $department_id, $template_id, $start, $end, $type); $find->execute();
         $package = $find->get_result()->fetch_assoc(); $find->close();
     }
     if (!$package) {
         // Check if a cancelled package exists for the same period — reactivate it instead of inserting (avoids UNIQUE KEY duplicate error)
-        $find_cancelled = $conn->prepare("SELECT package_id, consolidator_employee_id FROM evaluation_packages WHERE department_id = ? AND template_id = ? AND period_start = ? AND period_end = ? AND status = 'Cancelled' LIMIT 1");
-        $find_cancelled->bind_param('iiss', $department_id, $template_id, $start, $end); $find_cancelled->execute();
+        $find_cancelled = $conn->prepare("SELECT package_id, consolidator_employee_id FROM evaluation_packages WHERE department_id = ? AND template_id = ? AND period_start = ? AND period_end = ? AND evaluation_type = ? AND status = 'Cancelled'
+            AND NOT EXISTS (SELECT 1 FROM evaluation_package_audit a WHERE a.package_id = evaluation_packages.package_id AND a.action = 'MERGED') LIMIT 1");
+        $find_cancelled->bind_param('iisss', $department_id, $template_id, $start, $end, $type); $find_cancelled->execute();
         $cancelled_pkg = $find_cancelled->get_result()->fetch_assoc(); $find_cancelled->close();
 
         if ($cancelled_pkg) {
@@ -4535,6 +4578,17 @@ function syncWaitingOrganizationPackages($conn)
             $conn->query("UPDATE evaluation_packages SET status = 'Pending Consolidation', current_step_order = 1 WHERE package_id = $pkg_id AND status = 'Pending Self-Ratings'");
             recalculateOrganizationPackageBehaviorScore($conn, $pkg_id);
         }
+    }
+
+    // Repair existing duplicates too, including packages created before this fix.
+    $pending = $conn->query("SELECT ep.package_id, ep.current_step_order
+        FROM evaluation_packages ep
+        JOIN evaluation_package_route_steps rs ON rs.package_id = ep.package_id
+            AND rs.step_order = ep.current_step_order AND rs.action_status = 'Pending'
+        WHERE ep.status NOT IN ('Cancelled', 'Approved and Applied')
+        ORDER BY ep.package_id DESC")->fetch_all(MYSQLI_ASSOC);
+    foreach ($pending as $package) {
+        tryMergeLateMemberPackageIntoSibling($conn, (int)$package['package_id'], (int)$package['current_step_order'] - 1);
     }
 }
 
