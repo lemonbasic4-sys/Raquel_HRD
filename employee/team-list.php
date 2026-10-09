@@ -62,14 +62,25 @@ $like = '%' . $search . '%';
 
 if ($filter === 'direct') {
     $sup_rank = (int)($me['rank_category_id'] ?? 0);
-    $where_supervisor = "e.reports_to = ?";
-    if (in_array($sup_rank, [3, 4])) {
-        $where_supervisor = "(e.reports_to = ? OR (
-            e.branch_id = " . (int)$branch_id . " AND e.department_id = " . (int)$dept_id . " AND e.employee_id != ? AND (
-                (e.rank_category_id = 5 AND $sup_rank IN (3,4)) OR
-                (e.rank_category_id = 4 AND $sup_rank = 3)
-            )
-        ))";
+    $hr_direct_filter = $dept_name === 'Human Resources';
+    if ($hr_direct_filter) {
+        $direct_reports = getEmployeeSubordinates($conn, $employee_id);
+        $direct_report_ids = array_map(static function ($report) {
+            return (int)$report['employee_id'];
+        }, $direct_reports);
+        $where_supervisor = $direct_report_ids
+            ? 'e.employee_id IN (' . implode(',', $direct_report_ids) . ')'
+            : '1 = 0';
+    } else {
+        $where_supervisor = "e.reports_to = ?";
+        if (in_array($sup_rank, [3, 4])) {
+            $where_supervisor = "(e.reports_to = ? OR (
+                e.branch_id = " . (int)$branch_id . " AND e.department_id = " . (int)$dept_id . " AND e.employee_id != ? AND (
+                    (e.rank_category_id = 5 AND $sup_rank IN (3,4)) OR
+                    (e.rank_category_id = 4 AND $sup_rank = 3)
+                )
+            ))";
+        }
     }
 
     $team_stmt = $conn->prepare("
@@ -118,7 +129,9 @@ if ($filter === 'direct') {
           )
         ORDER BY e.last_name, e.first_name
     ");
-    if (in_array($sup_rank, [3, 4])) {
+    if ($hr_direct_filter) {
+        $team_stmt->bind_param("issss", $employee_id, $like, $like, $like, $like);
+    } elseif (in_array($sup_rank, [3, 4])) {
         $team_stmt->bind_param("iisssss", $employee_id, $employee_id, $employee_id, $like, $like, $like, $like);
     } else {
         $team_stmt->bind_param("iissss", $employee_id, $employee_id, $like, $like, $like, $like);

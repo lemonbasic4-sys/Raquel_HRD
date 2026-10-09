@@ -133,9 +133,12 @@ $positions = $conn->query("
     ORDER BY jt.job_title
 ");
 $positionOptions = $conn->query("
-    SELECT job_title_id, job_title, department_id
-    FROM job_titles
-    ORDER BY job_title
+    SELECT parent.job_title_id, parent.job_title, parent.department_id,
+           GROUP_CONCAT(DISTINCT child.department_id ORDER BY child.department_id SEPARATOR ',') AS reporting_departments
+    FROM job_titles parent
+    LEFT JOIN job_titles child ON child.reports_to = parent.job_title_id
+    GROUP BY parent.job_title_id, parent.job_title, parent.department_id
+    ORDER BY parent.job_title
 ")->fetch_all(MYSQLI_ASSOC);
 
 $positionCount = $positions->num_rows;
@@ -505,7 +508,8 @@ $employeesWithManagedPositions = (int) $conn->query("SELECT COUNT(*) AS cnt FROM
                             <?php
                             foreach ($positionOptions as $p): ?>
                                 <option value="<?php echo (int) $p['job_title_id']; ?>"
-                                    data-department="<?php echo (int) ($p['department_id'] ?? 0); ?>">
+                                    data-department="<?php echo (int) ($p['department_id'] ?? 0); ?>"
+                                    data-reporting-departments="<?php echo e($p['reporting_departments'] ?? ''); ?>">
                                     <?php echo e($p['job_title']); ?>
                                 </option>
                             <?php endforeach; ?>
@@ -575,7 +579,8 @@ $employeesWithManagedPositions = (int) $conn->query("SELECT COUNT(*) AS cnt FROM
                             <?php
                             foreach ($positionOptions as $p): ?>
                                 <option value="<?php echo (int) $p['job_title_id']; ?>"
-                                    data-department="<?php echo (int) ($p['department_id'] ?? 0); ?>">
+                                    data-department="<?php echo (int) ($p['department_id'] ?? 0); ?>"
+                                    data-reporting-departments="<?php echo e($p['reporting_departments'] ?? ''); ?>">
                                     <?php echo e($p['job_title']); ?>
                                 </option>
                             <?php endforeach; ?>
@@ -712,17 +717,26 @@ $employeesWithManagedPositions = (int) $conn->query("SELECT COUNT(*) AS cnt FROM
 
         const selectedDept = deptSelect.value;
         const options = reportsToSelect.querySelectorAll('option');
+        let selectedOptionIsVisible = false;
 
         options.forEach(option => {
             if (option.value === "") {
-                option.style.display = ""; // Always show "No Reporting Line"
+                option.hidden = false;
+                option.disabled = false;
                 return;
             }
 
-            // A reporting line can legitimately cross departments (for example,
-            // IT Manager -> VP Operations). Keep every active position available.
-            option.style.display = "";
+            const reportingDepartments = (option.dataset.reportingDepartments || '').split(',');
+            const visible = selectedDept !== ''
+                && (option.dataset.department === selectedDept || reportingDepartments.includes(selectedDept));
+            option.hidden = !visible;
+            option.disabled = !visible;
+            if (option.selected && visible) selectedOptionIsVisible = true;
         });
+
+        if (!selectedOptionIsVisible && reportsToSelect.value !== '') {
+            reportsToSelect.value = '';
+        }
     }
 
     document.addEventListener('DOMContentLoaded', function () {
@@ -731,11 +745,13 @@ $employeesWithManagedPositions = (int) $conn->query("SELECT COUNT(*) AS cnt FROM
         const addDept = document.getElementById('addPositionDepartment');
         if (addDept) {
             addDept.addEventListener('change', () => filterReportsTo('addPositionDepartment', 'addPositionReportsTo'));
+            filterReportsTo('addPositionDepartment', 'addPositionReportsTo');
         }
 
         const editDept = document.getElementById('editPositionDepartment');
         if (editDept) {
             editDept.addEventListener('change', () => filterReportsTo('editPositionDepartment', 'editPositionReportsTo'));
+            filterReportsTo('editPositionDepartment', 'editPositionReportsTo');
         }
     });
 </script>

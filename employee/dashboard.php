@@ -137,29 +137,38 @@ $has_dept_manager = ($my_dept_manager !== null && !empty($my_dept_manager['user_
 // ── Pending subordinate ratings count ──────────────────────────────────────
 $pending_sub_count = 0;
 if ($is_supervisor) {
-    $sup_branch = (int)($emp['branch_id'] ?? 0);
-    $sup_dept   = (int)($emp['department_id'] ?? 0);
-    $sup_rank   = (int)($emp['rank_category_id'] ?? 0);
+    $hr_reporting_line = getHRDirectReportByPosition($conn, $employee_id);
+    if ($hr_reporting_line['is_hr_employee']) {
+        $direct_reports = getEmployeeSubordinates($conn, $employee_id);
+        $direct_report_ids = array_map(static function ($report) {
+            return (int)$report['employee_id'];
+        }, $direct_reports);
 
-    $where_supervisor = "e.reports_to = $employee_id";
-    if (in_array($sup_rank, [3, 4])) {
-        $where_supervisor = "(e.reports_to = $employee_id OR (
-            e.branch_id = $sup_branch AND e.department_id = $sup_dept AND e.employee_id != $employee_id AND (
-                (e.rank_category_id = 5 AND $sup_rank IN (3,4)) OR
-                (e.rank_category_id = 4 AND $sup_rank = 3)
-            )
-        ))";
+        if ($direct_report_ids) {
+            $direct_report_list = implode(',', $direct_report_ids);
+            $ps = $conn->query("
+                SELECT COUNT(*) AS total
+                FROM evaluations ev
+                WHERE ev.employee_id IN ($direct_report_list)
+                  AND ev.status IN ('Pending Dept Supervisor', 'Pending Supervisor')
+                  AND ev.deleted_at IS NULL
+            ");
+            if ($ps) $pending_sub_count = (int)$ps->fetch_assoc()['total'];
+        }
+    } else {
+        $ps = $conn->prepare("
+            SELECT COUNT(*) AS total
+            FROM evaluations ev
+            INNER JOIN employees e ON ev.employee_id = e.employee_id
+            WHERE e.reports_to = ?
+              AND ev.status IN ('Pending Dept Supervisor', 'Pending Supervisor')
+              AND ev.deleted_at IS NULL
+        ");
+        $ps->bind_param("i", $employee_id);
+        $ps->execute();
+        $pending_sub_count = (int)($ps->get_result()->fetch_assoc()['total'] ?? 0);
+        $ps->close();
     }
-
-    $ps = $conn->query("
-        SELECT COUNT(*) AS total
-        FROM evaluations ev
-        INNER JOIN employees e ON ev.employee_id = e.employee_id
-        WHERE e.reports_to = $employee_id
-          AND ev.status IN ('Pending Dept Supervisor', 'Pending Supervisor')
-          AND ev.deleted_at IS NULL
-    ");
-    if ($ps) $pending_sub_count = (int)$ps->fetch_assoc()['total'];
 }
 
 // ── HR Supervisor validation queue (mirrors supervisor Pending Endorsements) ───

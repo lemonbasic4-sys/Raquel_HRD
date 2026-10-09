@@ -1845,6 +1845,44 @@ function getEmployeeSubordinates($conn, $supervisor_employee_id)
 
     $subordinates = [];
 
+    $department_stmt = $conn->prepare("
+        SELECT d.department_name
+        FROM employees e
+        LEFT JOIN departments d ON d.department_id = e.department_id
+        WHERE e.employee_id = ?
+        LIMIT 1
+    ");
+    $department_stmt->bind_param("i", $supervisor_employee_id);
+    $department_stmt->execute();
+    $department_name = $department_stmt->get_result()->fetch_assoc()['department_name'] ?? '';
+    $department_stmt->close();
+
+    if ($department_name === 'Human Resources') {
+        $stmt = $conn->prepare("
+            SELECT e.employee_id, e.employee_code, e.first_name, e.last_name, e.job_title, e.branch_id
+            FROM employees e
+            JOIN departments d ON d.department_id = e.department_id AND d.is_active = 1
+            WHERE d.department_name = 'Human Resources'
+              AND e.is_active = 1
+              AND e.deleted_at IS NULL
+            ORDER BY e.last_name, e.first_name
+        ");
+        $stmt->execute();
+        $result = $stmt->get_result();
+
+        while ($row = $result->fetch_assoc()) {
+            $reporting_line = getHRDirectReportByPosition($conn, (int)$row['employee_id']);
+            if ($reporting_line['is_hr_employee']
+                && $reporting_line['supervisor']
+                && (int)$reporting_line['supervisor']['supervisor_employee_id'] === $supervisor_employee_id) {
+                $subordinates[] = $row;
+            }
+        }
+
+        $stmt->close();
+        return $subordinates;
+    }
+
 
 
     $stmt = $conn->prepare("
@@ -1893,6 +1931,22 @@ function hasEmployeeSubordinates($conn, $employee_id)
     ensureEmployeesReportsTo($conn);
 
     $employee_id = (int) $employee_id;
+
+    $department_stmt = $conn->prepare("
+        SELECT d.department_name
+        FROM employees e
+        LEFT JOIN departments d ON d.department_id = e.department_id
+        WHERE e.employee_id = ?
+        LIMIT 1
+    ");
+    $department_stmt->bind_param("i", $employee_id);
+    $department_stmt->execute();
+    $department_name = $department_stmt->get_result()->fetch_assoc()['department_name'] ?? '';
+    $department_stmt->close();
+
+    if ($department_name === 'Human Resources') {
+        return count(getEmployeeSubordinates($conn, $employee_id)) > 0;
+    }
 
 
 
@@ -5300,6 +5354,153 @@ function syncPendingOrganizationPackageBoardApprover($conn)
 
  */
 
+function getHRDirectReportByPosition($conn, $employee_id)
+{
+    $employee_id = (int)$employee_id;
+    if ($employee_id <= 0) {
+        return ['is_hr_employee' => false, 'supervisor' => null];
+    }
+
+    $employee_stmt = $conn->prepare("
+        SELECT e.job_title_id, e.department_id, e.rank_category_id, e.employment_status,
+               e.is_active, e.deleted_at,
+               d.department_name, d.is_active AS department_is_active
+        FROM employees e
+        LEFT JOIN departments d ON d.department_id = e.department_id
+        WHERE e.employee_id = ?
+        LIMIT 1
+    ");
+    $employee_stmt->bind_param("i", $employee_id);
+    $employee_stmt->execute();
+    $employee = $employee_stmt->get_result()->fetch_assoc();
+    $employee_stmt->close();
+
+    if (!$employee || $employee['department_name'] !== 'Human Resources') {
+        return ['is_hr_employee' => false, 'supervisor' => null];
+    }
+
+    if ((int)$employee['is_active'] !== 1
+        || $employee['deleted_at'] !== null
+        || (int)$employee['department_is_active'] !== 1
+        || !in_array($employee['employment_status'], ['OJT', 'Probationary', 'Project Based', 'Regular', 'Trainee'], true)
+        || empty($employee['job_title_id'])) {
+        return ['is_hr_employee' => true, 'supervisor' => null];
+    }
+
+    $position_stmt = $conn->prepare("
+        SELECT parent.job_title_id, parent.department_id, parent.rank_category_id
+        FROM job_titles child
+        JOIN job_titles parent ON parent.job_title_id = child.reports_to
+        WHERE child.job_title_id = ?
+          AND child.department_id = ?
+          AND child.rank_category_id = ?
+          AND child.is_active = 1
+          AND parent.is_active = 1
+        LIMIT 1
+    ");
+    $position_stmt->bind_param("iii", $employee['job_title_id'], $employee['department_id'], $employee['rank_category_id']);
+    $position_stmt->execute();
+    $reporting_position = $position_stmt->get_result()->fetch_assoc();
+    $position_stmt->close();
+
+    if (!$reporting_position) {
+        return ['is_hr_employee' => true, 'supervisor' => null];
+    }
+
+    $reporting_position_id = (int)$reporting_position['job_title_id'];
+    $reporting_department_id = (int)$reporting_position['department_id'];
+    $reporting_rank_id = (int)$reporting_position['rank_category_id'];
+    $employee_department_id = (int)$employee['department_id'];
+
+    // Keep the configured parent position primary; use Position I first if that position has no active holder.
+    $supervisor_stmt = $conn->prepare("
+        SELECT e.employee_id AS supervisor_employee_id,
+               e.employee_id AS reports_to,
+               e.first_name, e.last_name, e.job_title, e.rank_category_id,
+               u.user_id, u.full_name, u.email
+        FROM employees e
+        JOIN job_titles jt ON jt.job_title_id = e.job_title_id AND jt.is_active = 1
+        JOIN departments d ON d.department_id = e.department_id AND d.is_active = 1
+        LEFT JOIN users u ON u.employee_id = e.employee_id
+                         AND u.is_active = 1
+                         AND u.deleted_at IS NULL
+        WHERE e.employee_id != ?
+          AND e.is_active = 1
+          AND e.deleted_at IS NULL
+          AND e.employment_status IN ('OJT', 'Probationary', 'Project Based', 'Regular', 'Trainee')
+          AND e.department_id = jt.department_id
+          AND e.rank_category_id = jt.rank_category_id
+          AND (
+                e.job_title_id = ?
+                OR (
+                    ? = ?
+                    AND jt.department_id = ?
+                    AND jt.rank_category_id = ?
+                )
+          )
+        ORDER BY (e.job_title_id = ?) DESC,
+                 (jt.job_title REGEXP ' I$') DESC,
+                 jt.job_title,
+                 e.employee_id
+        LIMIT 1
+    ");
+    $supervisor_stmt->bind_param(
+        "iiiiiii",
+        $employee_id,
+        $reporting_position_id,
+        $employee_department_id,
+        $reporting_department_id,
+        $employee_department_id,
+        $reporting_rank_id,
+        $reporting_position_id
+    );
+    $supervisor_stmt->execute();
+    $supervisor = $supervisor_stmt->get_result()->fetch_assoc();
+    $supervisor_stmt->close();
+
+    return ['is_hr_employee' => true, 'supervisor' => $supervisor ?: null];
+}
+
+function getHRDepartmentManager($conn, $employee_id)
+{
+    $employee_id = (int)$employee_id;
+    $stmt = $conn->prepare("
+        SELECT e.rank_category_id, d.department_name
+        FROM employees e
+        LEFT JOIN departments d ON d.department_id = e.department_id
+        WHERE e.employee_id = ?
+        LIMIT 1
+    ");
+    $stmt->bind_param("i", $employee_id);
+    $stmt->execute();
+    $employee = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    if (!$employee || $employee['department_name'] !== 'Human Resources') {
+        return ['is_hr_employee' => false, 'manager' => null];
+    }
+
+    if ((int)$employee['rank_category_id'] === 3) {
+        return ['is_hr_employee' => true, 'manager' => null];
+    }
+
+    $reporting_line = getHRDirectReportByPosition($conn, $employee_id);
+    $manager = $reporting_line['supervisor'];
+    if (!$manager) {
+        return ['is_hr_employee' => true, 'manager' => null];
+    }
+
+    if ((int)$manager['rank_category_id'] !== 3) {
+        $manager_line = getHRDirectReportByPosition($conn, (int)$manager['supervisor_employee_id']);
+        $manager = $manager_line['supervisor'];
+    }
+
+    return [
+        'is_hr_employee' => true,
+        'manager' => $manager && (int)$manager['rank_category_id'] === 3 ? $manager : null
+    ];
+}
+
 function getEmployeeSupervisor($conn, $employee_id)
 {
     $employee_id = (int)$employee_id;
@@ -5308,11 +5509,16 @@ function getEmployeeSupervisor($conn, $employee_id)
     }
 
     static $supervisor_cache = [];
+    ensureEmployeesReportsTo($conn);
+
+    $hr_reporting_line = getHRDirectReportByPosition($conn, $employee_id);
+    if ($hr_reporting_line['is_hr_employee']) {
+        return $hr_reporting_line['supervisor'];
+    }
+
     if (array_key_exists($employee_id, $supervisor_cache)) {
         return $supervisor_cache[$employee_id];
     }
-
-    ensureEmployeesReportsTo($conn);
 
     // Get the employee's direct reports_to, branch_id, and department_id
     $emp_stmt = $conn->prepare("SELECT reports_to, branch_id, department_id FROM employees WHERE employee_id = ? LIMIT 1");
@@ -5431,6 +5637,12 @@ function getDeptSupervisorOfEmployee($conn, $employee_id)
     $employee_id = (int)$employee_id;
     if ($employee_id <= 0) {
         return null;
+    }
+
+    $hr_reporting_line = getHRDirectReportByPosition($conn, $employee_id);
+    if ($hr_reporting_line['is_hr_employee']) {
+        $supervisor = $hr_reporting_line['supervisor'];
+        return $supervisor && (int)$supervisor['rank_category_id'] === 4 ? $supervisor : null;
     }
 
     $stmt = $conn->prepare("SELECT reports_to, branch_id, department_id FROM employees WHERE employee_id = ? LIMIT 1");
@@ -5553,6 +5765,7 @@ function notifySupervisorOfSelfRating($conn, $employee_id, $evaluation_id)
     $branch_id = $emp_info['branch_id'] ? (int) $emp_info['branch_id'] : 0;
     $department_id = $emp_info['department_id'] ? (int) $emp_info['department_id'] : 0;
     $rank_category_id = $emp_info['rank_category_id'] ? (int) $emp_info['rank_category_id'] : 0;
+    $hr_reporting_line = getHRDirectReportByPosition($conn, $employee_id);
 
     // Check if the direct supervisor (reports_to) is active
     $is_reports_to_active = false;
@@ -5564,8 +5777,22 @@ function notifySupervisorOfSelfRating($conn, $employee_id, $evaluation_id)
         $check_stmt->close();
     }
 
+    if ($hr_reporting_line['is_hr_employee']) {
+        $supervisor_employee_id = (int)($hr_reporting_line['supervisor']['supervisor_employee_id'] ?? 0);
+        $query = "
+            SELECT DISTINCT u.user_id
+            FROM users u
+            JOIN employees s ON u.employee_id = s.employee_id
+            WHERE s.employee_id = ?
+              AND s.is_active = 1
+              AND s.deleted_at IS NULL
+              AND u.is_active = 1
+              AND u.deleted_at IS NULL
+        ";
+        $stmt = $conn->prepare($query);
+        $stmt->bind_param("i", $supervisor_employee_id);
     // For Rank & File (rank 5), we always broadcast to all active supervisors in the same branch and department.
-    if ($rank_category_id === 5) {
+    } elseif ($rank_category_id === 5) {
         $query = "
             SELECT DISTINCT u.user_id
             FROM users u
@@ -5684,6 +5911,11 @@ function isSupervisorOfEmployee($conn, $supervisor_user_id, $employee_id)
     }
 
     $supervisor_employee_id = (int)$supervisor['employee_id'];
+    $hr_reporting_line = getHRDirectReportByPosition($conn, $employee_id);
+    if ($hr_reporting_line['is_hr_employee']) {
+        return $hr_reporting_line['supervisor']
+            && (int)$hr_reporting_line['supervisor']['supervisor_employee_id'] === $supervisor_employee_id;
+    }
 
     // Get employee details
     $stmt = $conn->prepare("SELECT reports_to, branch_id, department_id, rank_category_id FROM employees WHERE employee_id = ? LIMIT 1");
@@ -5817,6 +6049,11 @@ function getDeptManagerOfEmployee($conn, $employee_id)
         return null;
     }
 
+    $hr_department_manager = getHRDepartmentManager($conn, $employee_id);
+    if ($hr_department_manager['is_hr_employee']) {
+        return $hr_department_manager['manager'];
+    }
+
     // Get immediate supervisor (reports_to), branch_id, and rank/job title
     $stmt = $conn->prepare("SELECT reports_to, branch_id, department_id, job_title, rank_category_id FROM employees WHERE employee_id = ? LIMIT 1");
     $stmt->bind_param("i", $employee_id);
@@ -5946,6 +6183,12 @@ function getDeptManagersOfEmployee($conn, $employee_id)
     $employee_id = (int)$employee_id;
     if ($employee_id <= 0) {
         return [];
+    }
+
+    $hr_department_manager = getHRDepartmentManager($conn, $employee_id);
+    if ($hr_department_manager['is_hr_employee']) {
+        $manager = $hr_department_manager['manager'];
+        return $manager && !empty($manager['user_id']) ? [$manager] : [];
     }
 
     // Get immediate supervisor (reports_to), branch_id, and rank/job title

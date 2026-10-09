@@ -282,12 +282,14 @@ REPLACE INTO job_titles (job_title_id, job_title, rank_category_id, department_i
 (622, 'Messenger I', 5, 6, 1, 0, 605, NOW(), NOW()),
 (623, 'Messenger II', 5, 6, 1, 0, 605, NOW(), NOW()),
 -- Human Resources (700-729)
-(700, 'HR Manager I', 3, 7, 1, 1, NULL, NOW(), NOW()),
-(701, 'HR Manager II', 3, 7, 1, 1, 700, NOW(), NOW()),
-(702, 'HR Manager III', 3, 7, 1, 1, 700, NOW(), NOW()),
-(703, 'HR Manager IV', 3, 7, 1, 1, 700, NOW(), NOW()),
-(704, 'HR Manager V', 3, 7, 1, 1, 700, NOW(), NOW()),
-(705, 'HR Supervisor I', 4, 7, 1, 1, 705, NOW(), NOW()),
+-- HR managers report to the CEO; HR supervisors report to Manager I; HR staff
+-- report to Supervisor I. Application routing resolves the active position holder.
+(700, 'HR Manager I', 3, 7, 1, 1, 1100, NOW(), NOW()),
+(701, 'HR Manager II', 3, 7, 1, 1, 1100, NOW(), NOW()),
+(702, 'HR Manager III', 3, 7, 1, 1, 1100, NOW(), NOW()),
+(703, 'HR Manager IV', 3, 7, 1, 1, 1100, NOW(), NOW()),
+(704, 'HR Manager V', 3, 7, 1, 1, 1100, NOW(), NOW()),
+(705, 'HR Supervisor I', 4, 7, 1, 1, 700, NOW(), NOW()),
 (706, 'HR Supervisor II', 4, 7, 1, 1, 700, NOW(), NOW()),
 (707, 'HR Supervisor III', 4, 7, 1, 1, 700, NOW(), NOW()),
 (708, 'HR Supervisor IV', 4, 7, 1, 1, 700, NOW(), NOW()),
