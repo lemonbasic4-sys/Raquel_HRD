@@ -38,6 +38,15 @@ if (isset($_SESSION['role']) && $_SESSION['role'] === 'Employee'):
     </nav>
 <?php endif; ?>
 
+<?php if (($_SESSION['role'] ?? '') === 'President and CEO' && basename(dirname($_SERVER['SCRIPT_NAME'])) === 'employee'): ?>
+    <nav class="employee-bottom-nav d-md-none" aria-label="Employee Portal Navigation">
+        <a href="<?php echo BASE_URL; ?>/employee/evaluation-templates.php" class="nav-item <?php echo (($current_page ?? '') === 'evaluation-templates.php') ? 'active' : ''; ?>">
+            <i class="fas fa-file-alt nav-icon"></i>
+            <span class="nav-label">Evaluation Templates</span>
+        </a>
+    </nav>
+<?php endif; ?>
+
 <?php
 /* ============================================================
    HR DEPARTMENT MOBILE BOTTOM NAVIGATION
@@ -393,4 +402,3 @@ if (in_array($_ft_role, ['HR Manager', 'HR Supervisor', 'HR Staff', 'Admin'])):
 })();
 </script>
 </html>
-

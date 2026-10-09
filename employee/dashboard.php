@@ -3,6 +3,10 @@ $page_title = 'My Dashboard';
 require_once '../includes/session-check.php';
 checkRole(['Employee']);
 require_once '../includes/functions.php';
+if (!ensureHierarchicalEvaluationSchema($conn)) {
+    http_response_code(500);
+    exit('Evaluation template schema is unavailable.');
+}
 
 $employee_id = (int)($_SESSION['employee_id'] ?? 0);
 $user_id     = (int)($_SESSION['user_id']     ?? 0);
@@ -10,7 +14,7 @@ $user_id     = (int)($_SESSION['user_id']     ?? 0);
 // ── Employee core info ──────────────────────────────────────────────────────
 $emp_stmt = $conn->prepare("
     SELECT e.employee_id, e.employee_code, e.first_name, e.last_name,
-           e.job_title, e.profile_picture, e.hire_date,
+           e.job_title, e.job_title_id, e.profile_picture, e.hire_date,
            e.employment_status, e.employment_type,
            e.branch_id, e.department_id, e.rank_category_id,
            d.department_name, b.branch_name,
@@ -71,12 +75,19 @@ if ($r2) $completed_evals = (int)$r2->fetch_assoc()['c'];
 
 $pending_template_count = 0;
 $employee_dept = $emp['department_name'] ?? '';
+$allowed_eval_types = getAllowedEvaluationTypesForEmploymentStatus($emp['employment_status'] ?? 'Regular');
+$allowed_eval_type_sql = "'" . implode("','", $allowed_eval_types) . "'";
 $pending_templates_stmt = $conn->prepare("
     SELECT COUNT(*) AS total
     FROM evaluation_templates et
     WHERE et.status = 'Active'
       AND et.deleted_at IS NULL
       AND (et.target_department IS NULL OR et.target_department = '' OR et.target_department = 'All Departments' OR et.target_department = ?)
+      AND ((EXISTS (SELECT 1 FROM evaluation_template_positions etp WHERE etp.template_id = et.template_id)
+            AND EXISTS (SELECT 1 FROM evaluation_template_positions etp WHERE etp.template_id = et.template_id AND etp.job_title_id = ?))
+        OR (NOT EXISTS (SELECT 1 FROM evaluation_template_positions etp WHERE etp.template_id = et.template_id)
+            AND (et.target_job_title_id IS NULL OR et.target_job_title_id = ?)))
+      AND et.evaluation_type IN ($allowed_eval_type_sql)
       AND NOT EXISTS (
           SELECT 1
           FROM evaluations ev
@@ -86,7 +97,7 @@ $pending_templates_stmt = $conn->prepare("
             AND ev.status NOT IN ('Draft', 'Returned', 'Rejected', 'Pending Self-Rating')
       )
 ");
-$pending_templates_stmt->bind_param("si", $employee_dept, $employee_id);
+$pending_templates_stmt->bind_param("siii", $employee_dept, $emp['job_title_id'], $emp['job_title_id'], $employee_id);
 $pending_templates_stmt->execute();
 $pending_template_count = (int) ($pending_templates_stmt->get_result()->fetch_assoc()['total'] ?? 0);
 $pending_templates_stmt->close();

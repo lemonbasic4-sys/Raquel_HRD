@@ -5,6 +5,10 @@ checkRole(['Employee']);
 require_once '../includes/functions.php';
 
 ensureEvaluationWorkflowSchema($conn);
+if (!ensureHierarchicalEvaluationSchema($conn)) {
+    http_response_code(500);
+    exit('Evaluation reporting schema is unavailable.');
+}
 
 $employee_id = (int) ($_SESSION['employee_id'] ?? 0);
 $user_id = (int) ($_SESSION['user_id'] ?? 0);
@@ -59,7 +63,7 @@ if (isset($_GET['discard']) && is_numeric($_GET['discard'])) {
 }
 
 $employee_stmt = $conn->prepare("
-    SELECT e.employee_id, e.employee_code, e.first_name, e.last_name, e.job_title, e.department_id, e.branch_id,
+    SELECT e.employee_id, e.employee_code, e.first_name, e.last_name, e.job_title, e.job_title_id, e.department_id, e.branch_id,
            e.rank_category_id, e.hire_date, e.employment_status,
            d.department_name, b.branch_name
     FROM employees e
@@ -76,6 +80,8 @@ $employee_stmt->close();
 if (!$employee) {
     redirectWith(BASE_URL . '/employee/dashboard.php', 'danger', 'No employee record found for self-rating.');
 }
+$allowed_eval_types = getAllowedEvaluationTypesForEmploymentStatus($employee['employment_status'] ?? 'Regular');
+$in_clause = "'" . implode("','", $allowed_eval_types) . "'";
 
 $edit_eval = null;
 $view_eval = null;
@@ -165,8 +171,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $kra_scores = $_POST['kra_scores'] ?? [];
     $beh_scores = $_POST['beh_scores'] ?? [];
     $editing_id = (int) ($_POST['edit_id'] ?? 0);
+    $is_valid_existing_edit = false;
+    if ($editing_id > 0) {
+        $existing_edit_stmt = $conn->prepare("SELECT template_id FROM evaluations
+            WHERE evaluation_id = ? AND employee_id = ? AND deleted_at IS NULL
+              AND status IN ('Draft', 'Returned', 'Pending Self-Rating') LIMIT 1");
+        $existing_edit_stmt->bind_param('ii', $editing_id, $employee_id);
+        $existing_edit_stmt->execute();
+        $existing_edit = $existing_edit_stmt->get_result()->fetch_assoc();
+        $existing_edit_stmt->close();
+        $is_valid_existing_edit = $existing_edit && (int)$existing_edit['template_id'] === $template_id;
+        if (!$is_valid_existing_edit) {
+            redirectWith(BASE_URL . '/employee/self-rating.php', 'danger', 'That evaluation is not available for editing.');
+        }
+    }
     $employee_consent_agreed = isset($_POST['employee_consent_agreed']) ? 1 : 0;
     $employee_signature_data = trim($_POST['employee_signature_data'] ?? '');
+    $employee_position_id = (int)($employee['job_title_id'] ?? 0);
+    $position_eligibility = $is_valid_existing_edit
+        ? '1 = 1'
+        : "((EXISTS (SELECT 1 FROM evaluation_template_positions etp WHERE etp.template_id = evaluation_templates.template_id)
+                AND EXISTS (SELECT 1 FROM evaluation_template_positions etp WHERE etp.template_id = evaluation_templates.template_id AND etp.job_title_id = $employee_position_id))
+            OR (NOT EXISTS (SELECT 1 FROM evaluation_template_positions etp WHERE etp.template_id = evaluation_templates.template_id)
+                AND (target_job_title_id IS NULL OR target_job_title_id = $employee_position_id)))";
+    $department_eligibility = $is_valid_existing_edit
+        ? '1 = 1'
+        : "(target_department_id IS NULL OR target_department_id = " . (int)$employee['department_id'] . ")";
+    $department_name_eligibility = $is_valid_existing_edit
+        ? '1 = 1'
+        : "(target_department IS NULL OR target_department = '' OR target_department = 'All Departments' OR target_department = '" . $conn->real_escape_string((string)$employee['department_name']) . "')";
+    $active_template_eligibility = $is_valid_existing_edit ? '1 = 1' : "status = 'Active'";
+    $template_access = $conn->prepare("SELECT template_id FROM evaluation_templates
+        WHERE template_id = ? AND $active_template_eligibility AND deleted_at IS NULL
+          AND evaluation_type IN ($in_clause)
+          AND $department_eligibility
+          AND $department_name_eligibility
+          AND $position_eligibility LIMIT 1");
+    $template_access->bind_param('i', $template_id);
+    $template_access->execute();
+    $template_is_accessible = (bool)$template_access->get_result()->fetch_assoc();
+    $template_access->close();
+    if (!$template_is_accessible) {
+        redirectWith(BASE_URL . '/employee/self-rating.php', 'danger', 'That evaluation form is not assigned to your active department and position.');
+    }
     // Safety: ensure oversized uploaded signature data is compressed to fit safely in MySQL
     if (!empty($employee_signature_data) && strlen($employee_signature_data) > 80000) {
         if (preg_match('/^data:image\/(\w+);base64,/', $employee_signature_data)) {
@@ -436,56 +483,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $total_score = calculateEvalTotal($kra_subtotal, $behavior_average, $kra_weight_pct, $beh_weight_pct);
     $performance_level = getPerformanceLevel($total_score);
-    $supervisor = getEmployeeSupervisor($conn, $employee_id); // used for notification routing
-    $genuine_supervisor = getDeptSupervisorOfEmployee($conn, $employee_id); // rank-4 only, no manager fallback
-    $has_supervisor = ($genuine_supervisor !== null && !empty($genuine_supervisor['user_id']));
-    $dept_manager = getDeptManagerOfEmployee($conn, $employee_id);
-    $has_dept_manager = ($dept_manager !== null && !empty($dept_manager['user_id']));
-    $is_supervisor_level_employee = isSupervisorLevelEmployee($employee);
-    
-    // Check if employee has an HR role
-    $hr_role = getEmployeeHRRole($conn, $employee_id);
-    $uses_hr_specific_flow = $hr_role !== null || isMainOfficeHumanResourcesEmployee($conn, $employee_id);
-    
-    if ($action === 'submit') {
-        if ($uses_hr_specific_flow && ($hr_role === 'HR Staff' || $hr_role === null)) {
-            $status = 'Pending Supervisor';
-        } elseif ($hr_role === 'HR Supervisor') {
-            $status = 'Pending Manager';
-        } elseif ($hr_role === 'HR Manager') {
-            $status = 'Pending Supervisor';
-        } elseif ($is_supervisor_level_employee && $has_dept_manager) {
-            $status = 'Pending Dept Manager';
-        } elseif ($is_supervisor_level_employee) {
-            $status = 'Pending HR Consolidation';
-        } elseif (!$uses_hr_specific_flow && (int)($employee['rank_category_id'] ?? 0) === 3) {
-            // Branch Manager self-rating: goes to Branch Supervisor (rank 4) ONLY if one exists in the branch.
-            // Manager-only departments (no rank-4 supervisor) skip directly to HR Consolidation.
-            $branch_has_real_supervisor = getDeptSupervisorOfEmployee($conn, $employee_id) !== null;
-            $status = $branch_has_real_supervisor ? 'Pending Dept Supervisor' : 'Pending HR Consolidation';
-        } else {
-            // R&F employees, or others falling here
-            if ($has_supervisor) {
-                $status = 'Pending Dept Supervisor';
-            } elseif ($has_dept_manager) {
-                $status = 'Pending Dept Manager';
-            } else {
-                $status = 'Pending HR Consolidation';
-            }
-        }
-    } else {
-        $status = $is_assigned_submission ? 'Pending Self-Rating' : 'Draft';
-    }
-
-    // New organization-driven packages own the approval route. Legacy individual
-    // confirmation pages must not receive newly submitted package evaluations.
-    $uses_organization_package_flow = ($action === 'submit') && ensureOrganizationEvaluationPackageSchema($conn);
-    if ($uses_organization_package_flow) {
-        $status = 'Pending Team Consolidation';
-    }
+    $status = $action === 'submit'
+        ? 'Pending Reporting Review'
+        : ($is_assigned_submission ? 'Pending Self-Rating' : 'Draft');
     $submitted_date = ($action === 'submit') ? date('Y-m-d H:i:s') : null;
 
-        $employee_signed_at = !empty($employee_signature_data) ? date('Y-m-d H:i:s') : null;
+    $employee_signed_at = !empty($employee_signature_data) ? date('Y-m-d H:i:s') : null;
 
         if ($editing_id > 0) {
             $stmt = $conn->prepare("
@@ -539,178 +542,70 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $score_stmt->close();
 
     if ($action === 'submit') {
-        $package_id = syncEvaluationToOrganizationPackage($conn, $eval_id);
-        if ($uses_organization_package_flow && $package_id) {
-            logAudit($conn, $user_id, 'CREATE', 'Evaluation', $eval_id, 'Submitted self-rating to organization evaluation package');
-            redirectWith(BASE_URL . '/employee/self-rating.php', 'success', 'Your self-rating was submitted to the team evaluation package. The package will open for consolidation after every required team member submits.');
-        }
-        $employee_name = trim(($employee['first_name'] ?? '') . ' ' . ($employee['last_name'] ?? ''));
-
-        // Check if employee has an HR role
-        $hr_role = getEmployeeHRRole($conn, $employee_id);
-        $uses_hr_specific_flow = $hr_role !== null || isMainOfficeHumanResourcesEmployee($conn, $employee_id);
-        if ($uses_hr_specific_flow) {
-            $display_hr_role = $hr_role ?? 'Human Resources';
-
-            // HRD self-rating notifications go ONLY to the admin portal (HRIS).
-            // No employee-portal notifications are sent to HR Supervisors or HR Managers.
-
-            if ($hr_role === 'HR Staff' || $hr_role === null) {
-                // HR Staff → notify HR Supervisor HRIS (admin portal) only
-                $hr_supervisors_stmt = $conn->prepare("SELECT user_id FROM users WHERE role = 'HR Supervisor' AND is_active = 1");
-                $hr_supervisors_stmt->execute();
-                $hr_supervisors = $hr_supervisors_stmt->get_result();
-                while ($hr_sup = $hr_supervisors->fetch_assoc()) {
-                    createNotification(
-                        $conn,
-                        (int)$hr_sup['user_id'],
-                        'HR Self-Rating Pending Your Review',
-                        $employee_name . ' (' . $display_hr_role . ') submitted a self-rating for your review.',
-                        BASE_URL . '/supervisor/pending-endorsements.php'
-                    );
-                }
-                $hr_supervisors_stmt->close();
-
-            } elseif ($hr_role === 'HR Supervisor') {
-                // HR Supervisor → notify HR Manager HRIS (admin portal) only
-                $hr_managers_stmt = $conn->prepare("SELECT user_id FROM users WHERE role = 'HR Manager' AND is_active = 1");
-                $hr_managers_stmt->execute();
-                $hr_managers_res = $hr_managers_stmt->get_result();
-                while ($hr_mgr = $hr_managers_res->fetch_assoc()) {
-                    createNotification(
-                        $conn,
-                        (int)$hr_mgr['user_id'],
-                        'HR Self-Rating Pending Your Review',
-                        $employee_name . ' (HR Supervisor) submitted a self-rating for your review.',
-                        BASE_URL . '/manager/pending-approvals.php'
-                    );
-                }
-                $hr_managers_stmt->close();
-
-            } elseif ($hr_role === 'HR Manager') {
-                // HR Manager → notify HR Supervisor HRIS (admin portal) only
-                $hr_supervisors_stmt = $conn->prepare("SELECT user_id FROM users WHERE role = 'HR Supervisor' AND is_active = 1");
-                $hr_supervisors_stmt->execute();
-                $hr_supervisors = $hr_supervisors_stmt->get_result();
-                while ($hr_sup = $hr_supervisors->fetch_assoc()) {
-                    createNotification(
-                        $conn,
-                        (int)$hr_sup['user_id'],
-                        'HR Self-Rating Pending Your Review',
-                        $employee_name . ' (HR Manager) submitted a self-rating for your review.',
-                        BASE_URL . '/supervisor/pending-endorsements.php'
-                    );
-                }
-                $hr_supervisors_stmt->close();
+        $hr_staff_assignment_stmt = $conn->prepare("SELECT 1
+            FROM employees e
+            JOIN departments d ON d.department_id = e.department_id
+            JOIN job_titles staff_position ON staff_position.job_title_id = e.job_title_id
+                AND staff_position.is_active = 1
+            JOIN job_titles supervisor_position ON supervisor_position.job_title_id = staff_position.reports_to
+                AND supervisor_position.is_active = 1
+            JOIN rank_categories supervisor_rank ON supervisor_rank.rank_category_id = supervisor_position.rank_category_id
+                AND supervisor_rank.rank_name = 'Supervisor' AND supervisor_rank.is_active = 1
+            WHERE e.employee_id = ? AND e.is_active = 1 AND e.deleted_at IS NULL
+              AND d.department_name = 'Human Resources' AND d.is_active = 1 AND d.deleted_at IS NULL
+            LIMIT 1");
+        $hr_staff_assignment_stmt->bind_param('i', $employee_id);
+        $hr_staff_assignment_stmt->execute();
+        $is_hr_staff_package_flow = (bool)$hr_staff_assignment_stmt->get_result()->fetch_assoc();
+        $hr_staff_assignment_stmt->close();
+        if ($is_hr_staff_package_flow) {
+            if (!ensureOrganizationEvaluationPackageSchema($conn)) {
+                redirectWith(BASE_URL . '/employee/self-rating.php', 'danger', 'The Team Evaluation Packages workflow is unavailable. Please contact HR.');
             }
-        } else {
-            // Normal employee flow
-            if ($status === 'Pending Dept Manager') {
-                // Broadcast to all active branch/department managers
-                $dept_managers = getDeptManagersOfEmployee($conn, $employee_id);
-                foreach ($dept_managers as $dm) {
-                    if (!empty($dm['user_id'])) {
-                        createNotification(
-                            $conn,
-                            (int)$dm['user_id'],
-                            'Evaluation Pending Endorsement',
-                            $employee_name . ' submitted a self-rating requiring your Department Manager review.',
-                            BASE_URL . '/employee/dept-manager-review.php?evaluation_id=' . $eval_id
-                        );
+            $submission_transaction_open = false;
+            try {
+                $conn->begin_transaction();
+                $submission_transaction_open = true;
+                $delete_reporting_steps = $conn->prepare('DELETE FROM evaluation_reporting_review_steps WHERE evaluation_id = ?');
+                $delete_reporting_steps->bind_param('i', $eval_id);
+                $delete_reporting_steps->execute();
+                $delete_reporting_steps->close();
+
+                $package_status = 'Pending Team Consolidation';
+                $update_status = $conn->prepare('UPDATE evaluations SET status = ? WHERE evaluation_id = ? AND employee_id = ?');
+                $update_status->bind_param('sii', $package_status, $eval_id, $employee_id);
+                $update_status->execute();
+                if ($update_status->affected_rows !== 1) {
+                    throw new RuntimeException('The submitted evaluation could not be queued for package consolidation.');
+                }
+                $update_status->close();
+                $conn->commit();
+                $submission_transaction_open = false;
+
+                $package_id = syncEvaluationToOrganizationPackage($conn, $eval_id);
+                if (!$package_id) {
+                    throw new RuntimeException('The submitted evaluation could not be added to a Team Evaluation Package.');
+                }
+            } catch (Throwable $e) {
+                if ($submission_transaction_open) {
+                    try {
+                        $conn->rollback();
+                    } catch (Throwable $rollback_error) {
+                        error_log('Unable to roll back HR staff package submission: ' . $rollback_error->getMessage());
                     }
                 }
-                $supervisor_notified = true;
-            } elseif (!$uses_hr_specific_flow && (int)($employee['rank_category_id'] ?? 0) === 3) {
-                // Branch Manager self-rating: specifically notify Branch Supervisors (rank 4) in same branch
-                $branch_id_mgr = (int)($employee['branch_id'] ?? 0);
-                $supervisor_notified = false;
-                if ($branch_id_mgr > 0) {
-                    $sup_notif_stmt = $conn->prepare("
-                        SELECT DISTINCT u.user_id
-                        FROM users u
-                        JOIN employees s ON u.employee_id = s.employee_id
-                        WHERE s.is_active = 1
-                          AND s.deleted_at IS NULL
-                          AND s.employee_id != ?
-                          AND s.branch_id = ?
-                          AND (s.rank_category_id = 4 OR (s.job_title LIKE '%Supervisor%' AND s.job_title NOT LIKE '%Manager%'))
-                          AND u.role = 'Employee'
-                          AND u.is_active = 1
-                    ");
-                    $sup_notif_stmt->bind_param("ii", $employee_id, $branch_id_mgr);
-                    $sup_notif_stmt->execute();
-                    $sup_notif_result = $sup_notif_stmt->get_result();
-                    while ($sup_row = $sup_notif_result->fetch_assoc()) {
-                        createNotification(
-                            $conn,
-                            (int)$sup_row['user_id'],
-                            'Self-Rating Pending Confirmation',
-                            $employee_name . ' (Branch Manager) submitted a self-rating awaiting your confirmation.',
-                            BASE_URL . '/employee/team-evaluation-packages.php'
-                        );
-                        $supervisor_notified = true;
-                    }
-                    $sup_notif_stmt->close();
-                }
-                if (!$supervisor_notified) {
-                    // Fallback: use general supervisor notification
-                    $supervisor_notified = notifySupervisorOfSelfRating($conn, $employee_id, $eval_id);
-                }
-            } else {
-                $supervisor_notified = notifySupervisorOfSelfRating($conn, $employee_id, $eval_id);
+                error_log('Unable to route HR staff evaluation to Team Evaluation Packages: ' . $e->getMessage());
+                redirectWith(BASE_URL . '/employee/self-rating.php', 'danger', 'Your evaluation was saved, but could not be queued in Team Evaluation Packages. Please contact HR.');
             }
-
-            // If no supervisor found, notify HR Supervisor as fallback (filtered by employee's branch)
-            if (!$supervisor_notified) {
-                $branch_id = (int) ($employee['branch_id'] ?? 0);
-                $hr_supervisors_stmt = $conn->prepare("SELECT user_id FROM users WHERE role = 'HR Supervisor' AND branch_id = ? AND is_active = 1");
-                $hr_supervisors_stmt->bind_param("i", $branch_id);
-                $hr_supervisors_stmt->execute();
-                $hr_supervisors = $hr_supervisors_stmt->get_result();
-                $hr_notified = false;
-                while ($hr_sup = $hr_supervisors->fetch_assoc()) {
-                    createNotification(
-                        $conn,
-                        (int) $hr_sup['user_id'],
-                        'Employee Self-Rating Submitted',
-                        $employee_name . ' submitted a self-rating for review. (No supervisor assigned)',
-                        BASE_URL . '/supervisor/pending-endorsements.php'
-                    );
-                    $hr_notified = true;
-                }
-                $hr_supervisors_stmt->close();
-
-                // If no branch-specific HR Supervisor was notified, notify ALL active HR Supervisors
-                if (!$hr_notified) {
-                    $hr_all_stmt = $conn->prepare("SELECT user_id FROM users WHERE role = 'HR Supervisor' AND is_active = 1");
-                    $hr_all_stmt->execute();
-                    $hr_all_res = $hr_all_stmt->get_result();
-                    while ($hr_sup = $hr_all_res->fetch_assoc()) {
-                        createNotification(
-                            $conn,
-                            (int) $hr_sup['user_id'],
-                            'Employee Self-Rating Submitted',
-                            $employee_name . ' submitted a self-rating for review. (No supervisor assigned)',
-                            BASE_URL . '/supervisor/pending-endorsements.php'
-                        );
-                    }
-                    $hr_all_stmt->close();
-                }
-            }
+            logAudit($conn, $user_id, 'CREATE', 'Evaluation', $eval_id, 'Submitted HR staff self-rating to Team Evaluation Packages');
+            redirectWith(BASE_URL . '/employee/self-rating.php', 'success', 'Your self-rating was submitted to Team Evaluation Packages for HR Supervisor consolidation.');
         }
-        $success_msg = 'Your self-rating was submitted successfully. Awaiting supervisor confirmation.';
-        if ($hr_role === 'HR Manager') {
-            $success_msg = 'Your evaluation was submitted successfully. Awaiting HR supervisor confirmation.';
-        } elseif ($hr_role === 'HR Supervisor') {
-            $success_msg = 'Your evaluation was submitted successfully. Awaiting HR manager confirmation.';
-        } elseif ((int)($employee['rank_category_id'] ?? 0) === 3) {
-            $success_msg = 'Your evaluation was submitted successfully. Awaiting branch supervisor confirmation.';
-        } elseif ($is_supervisor_level_employee) {
-            $success_msg = 'Your evaluation was submitted successfully. Awaiting branch manager confirmation.';
+        if (!submitEvaluationToReportingChain($conn, $eval_id, $employee_id)) {
+            redirectWith(BASE_URL . '/employee/self-rating.php', 'danger', 'The evaluation was saved, but could not be queued for reporting review. Please contact HR.');
         }
+        logAudit($conn, $user_id, 'CREATE', 'Evaluation', $eval_id, 'Submitted employee self-rating to reporting chain');
+        redirectWith(BASE_URL . '/employee/self-rating.php', 'success', 'Your self-rating was submitted to the active reporting chain.');
 
-        logAudit($conn, $user_id, 'CREATE', 'Evaluation', $eval_id, 'Submitted employee self-rating');
-        redirectWith(BASE_URL . '/employee/self-rating.php', 'success', $success_msg);
     }
 
     // Only log manual saves — auto-saves would spam the audit trail with dozens of identical entries
@@ -731,10 +626,6 @@ $employee_dept = $employee['department_name'] ?? '';
 $emp_status = $employee['employment_status'] ?? 'Regular';
 
 // Determine allowed evaluation types based on employment status
-$is_non_regular = in_array($emp_status, ['OJT', 'Probationary', 'Project Based', 'Project-Based', 'Trainee'], true);
-$allowed_eval_types = $is_non_regular ? ['Initial', 'Final'] : ['Annual', 'Quarterly', 'Final'];
-$in_clause = "'" . implode("','", $allowed_eval_types) . "'";
-
 // Filter templates: show if matches employee's department (with 'All' fallbacks) and matches allowed evaluation types
 // Only exclude a template if the employee already has a submitted/in-review/approved evaluation for it
 // (Do NOT exclude if the evaluation is still editable: Draft, Returned, Pending Self-Rating)
@@ -743,6 +634,10 @@ $templates_stmt = $conn->prepare("
     FROM evaluation_templates et
     WHERE et.status = 'Active' 
       AND (target_department IS NULL OR target_department = '' OR target_department = 'All Departments' OR target_department = ?)
+      AND ((EXISTS (SELECT 1 FROM evaluation_template_positions etp WHERE etp.template_id = et.template_id)
+            AND EXISTS (SELECT 1 FROM evaluation_template_positions etp WHERE etp.template_id = et.template_id AND etp.job_title_id = ?))
+        OR (NOT EXISTS (SELECT 1 FROM evaluation_template_positions etp WHERE etp.template_id = et.template_id)
+            AND (et.target_job_title_id IS NULL OR et.target_job_title_id = ?)))
       AND et.evaluation_type IN ($in_clause)
       AND NOT EXISTS (
           SELECT 1
@@ -754,7 +649,7 @@ $templates_stmt = $conn->prepare("
       )
     ORDER BY template_name
 ");
-$templates_stmt->bind_param("si", $employee_dept, $employee_id);
+$templates_stmt->bind_param("siii", $employee_dept, $employee['job_title_id'], $employee['job_title_id'], $employee_id);
 $templates_stmt->execute();
 $templates = $templates_stmt->get_result();
 $available_template_count = (int) $templates->num_rows;
@@ -777,10 +672,14 @@ if ($selected_template_id > 0) {
             FROM evaluation_templates 
             WHERE template_id = ? 
               AND (target_department IS NULL OR target_department = '' OR target_department = 'All Departments' OR target_department = ?)
+              AND ((EXISTS (SELECT 1 FROM evaluation_template_positions etp WHERE etp.template_id = evaluation_templates.template_id)
+                      AND EXISTS (SELECT 1 FROM evaluation_template_positions etp WHERE etp.template_id = evaluation_templates.template_id AND etp.job_title_id = ?))
+                  OR (NOT EXISTS (SELECT 1 FROM evaluation_template_positions etp WHERE etp.template_id = evaluation_templates.template_id)
+                      AND (target_job_title_id IS NULL OR target_job_title_id = ?)))
               AND evaluation_type IN ($in_clause)
             LIMIT 1
         ");
-        $sel_template_stmt->bind_param("is", $selected_template_id, $employee_dept);
+        $sel_template_stmt->bind_param("isii", $selected_template_id, $employee_dept, $employee['job_title_id'], $employee['job_title_id']);
     }
     $sel_template_stmt->execute();
     $selected_template = $sel_template_stmt->get_result()->fetch_assoc();

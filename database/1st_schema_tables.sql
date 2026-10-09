@@ -148,7 +148,7 @@ CREATE TABLE users (
     password_hash VARCHAR(255) NOT NULL,
     full_name VARCHAR(100) NOT NULL,
     profile_picture VARCHAR(255) NULL,
-    role ENUM('Admin', 'HR Manager', 'HR Supervisor', 'HR Staff', 'Employee') NOT NULL,
+    role ENUM('Admin', 'HR Manager', 'HR Supervisor', 'HR Staff', 'Employee', 'President and CEO') NOT NULL,
     branch_id INT NULL,
     is_active TINYINT(1) DEFAULT 1,
     account_hold TINYINT(1) NOT NULL DEFAULT 0,
@@ -400,12 +400,17 @@ CREATE TABLE employee_work_experience (
 -- ============================================
 -- 19. Evaluation Templates
 -- ============================================
+DROP TABLE IF EXISTS evaluation_template_positions;
 DROP TABLE IF EXISTS evaluation_templates;
 CREATE TABLE evaluation_templates (
     template_id INT AUTO_INCREMENT PRIMARY KEY,
     template_name VARCHAR(150) NOT NULL,
     description TEXT NULL,
     target_department VARCHAR(100) NULL,
+    target_department_id INT NULL,
+    target_job_title_id INT NULL,
+    behavior_framework_code VARCHAR(80) NULL,
+    behavior_framework_version VARCHAR(40) NULL,
     evaluation_type ENUM('Initial','Final','Quarterly','Annual') DEFAULT 'Annual',
     kra_weight DECIMAL(5,2) DEFAULT 80.00,
     behavior_weight DECIMAL(5,2) DEFAULT 20.00,
@@ -418,7 +423,19 @@ CREATE TABLE evaluation_templates (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     deleted_at TIMESTAMP NULL DEFAULT NULL,
     CONSTRAINT fk_template_creator FOREIGN KEY (created_by) REFERENCES users(user_id) ON DELETE SET NULL,
+    CONSTRAINT fk_template_department FOREIGN KEY (target_department_id) REFERENCES departments(department_id) ON DELETE SET NULL,
+    CONSTRAINT fk_template_position FOREIGN KEY (target_job_title_id) REFERENCES job_titles(job_title_id) ON DELETE SET NULL,
     INDEX idx_template_status (status, deleted_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE evaluation_template_positions (
+    evaluation_template_position_id INT AUTO_INCREMENT PRIMARY KEY,
+    template_id INT NOT NULL,
+    job_title_id INT NOT NULL,
+    UNIQUE KEY uq_evaluation_template_position (template_id, job_title_id),
+    INDEX idx_evaluation_template_position (job_title_id),
+    CONSTRAINT fk_etp_template FOREIGN KEY (template_id) REFERENCES evaluation_templates(template_id) ON DELETE CASCADE,
+    CONSTRAINT fk_etp_job_title FOREIGN KEY (job_title_id) REFERENCES job_titles(job_title_id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ============================================
@@ -462,7 +479,7 @@ CREATE TABLE evaluations (
     supervisor_altered_scores TINYINT(1) DEFAULT 0,
     sent_to_hr_date DATETIME NULL,
     sent_to_hr_by INT NULL,
-    status ENUM('Draft', 'Pending Self-Rating', 'Pending Supervisor', 'Pending HR Consolidation', 'Pending Manager', 'Supervisor Confirmed', 'Approved', 'Rejected', 'Returned') DEFAULT 'Draft',
+    status ENUM('Draft', 'Pending Self-Rating', 'Pending Reporting Review', 'Pending Dept Supervisor', 'Pending Dept Manager', 'Pending Supervisor', 'Pending HR Consolidation', 'Pending Team Consolidation', 'Pending Manager', 'Supervisor Confirmed', 'Approved', 'Rejected', 'Returned') DEFAULT 'Draft',
     total_score DECIMAL(5,2) NULL,
     kra_subtotal DECIMAL(5,2) NULL,
     behavior_average DECIMAL(5,2) NULL,
@@ -498,6 +515,32 @@ CREATE TABLE evaluations (
     CONSTRAINT fk_eval_approver FOREIGN KEY (approved_by) REFERENCES users(user_id) ON DELETE SET NULL,
     INDEX idx_eval_status (status, deleted_at),
     INDEX idx_eval_date (approved_date, submitted_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ============================================
+-- Individual reporting-chain review steps
+-- ============================================
+CREATE TABLE evaluation_reporting_review_steps (
+    reporting_review_step_id INT AUTO_INCREMENT PRIMARY KEY,
+    evaluation_id INT NOT NULL,
+    step_order INT NOT NULL,
+    eligible_employee_id INT NULL,
+    eligible_job_title_id INT NULL,
+    reviewer_employee_id INT NULL,
+    reviewer_user_id INT NULL,
+    status ENUM('Pending','Claimed','Completed','Blocked','Returned') NOT NULL DEFAULT 'Pending',
+    claimed_at DATETIME NULL,
+    acted_at DATETIME NULL,
+    comments TEXT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_reporting_review_step (evaluation_id, step_order),
+    INDEX idx_reporting_review_claim (status, eligible_employee_id, eligible_job_title_id),
+    INDEX idx_reporting_review_reviewer (reviewer_user_id, status),
+    CONSTRAINT fk_reporting_review_evaluation FOREIGN KEY (evaluation_id) REFERENCES evaluations(evaluation_id) ON DELETE CASCADE,
+    CONSTRAINT fk_reporting_review_eligible_employee FOREIGN KEY (eligible_employee_id) REFERENCES employees(employee_id) ON DELETE SET NULL,
+    CONSTRAINT fk_reporting_review_eligible_position FOREIGN KEY (eligible_job_title_id) REFERENCES job_titles(job_title_id) ON DELETE SET NULL,
+    CONSTRAINT fk_reporting_review_employee FOREIGN KEY (reviewer_employee_id) REFERENCES employees(employee_id) ON DELETE SET NULL,
+    CONSTRAINT fk_reporting_review_user FOREIGN KEY (reviewer_user_id) REFERENCES users(user_id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ============================================

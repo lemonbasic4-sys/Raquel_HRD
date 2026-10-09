@@ -37,6 +37,9 @@ if (isset($_SESSION['user_id'])) {
         case 'HR Staff':
             header("Location: " . BASE_URL . "/staff/dashboard.php");
             break;
+        case 'President and CEO':
+            header("Location: " . BASE_URL . "/employee/evaluation-templates.php");
+            break;
         case 'Employee':
             header("Location: " . BASE_URL . "/employee/dashboard.php");
             break;
@@ -149,6 +152,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         break;
                     case 'HR Staff':
                         header("Location: " . BASE_URL . "/staff/dashboard.php");
+                        break;
+                    case 'President and CEO':
+                        header("Location: " . BASE_URL . "/employee/evaluation-templates.php");
                         break;
                     case 'Employee':
                         header("Location: " . BASE_URL . "/employee/dashboard.php");
@@ -419,4 +425,3 @@ $sys_logo = getSetting($conn, 'system_logo', 'assets/img/logo/logo.png');
 </body>
 
 </html>
-

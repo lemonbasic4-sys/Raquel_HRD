@@ -1,41 +1,69 @@
 <?php
 $page_title = 'Template Archive';
 require_once '../includes/session-check.php';
-checkRole(['HR Manager']);
+checkRole(['HR Manager', 'HR Supervisor', 'HR Staff', 'Employee', 'President and CEO']);
 require_once '../includes/functions.php';
+if (!ensureHierarchicalEvaluationSchema($conn)) {
+    http_response_code(500);
+    exit('Evaluation template schema is unavailable.');
+}
+$creator_context = getEvaluationTemplateCreatorContext($conn, (int)($_SESSION['user_id'] ?? 0));
+if (!canViewEvaluationTemplates($creator_context)) {
+    redirectWith(BASE_URL . '/employee/dashboard.php', 'danger', 'Your account is not authorized to view archived templates.');
+}
+if (!empty($creator_context['is_ceo']) && basename(dirname($_SERVER['SCRIPT_NAME'])) !== 'employee') {
+    redirectWith(BASE_URL . '/employee/evaluation-template-archive.php', 'info', 'President and CEO template archives are available in the Employee Portal.');
+}
+$template_list_url = !empty($creator_context['is_ceo'])
+    ? BASE_URL . '/employee/evaluation-templates.php'
+    : BASE_URL . '/manager/templates.php';
+$template_archive_url = !empty($creator_context['is_ceo'])
+    ? BASE_URL . '/employee/evaluation-template-archive.php'
+    : BASE_URL . '/manager/template-archive.php';
+$template_edit_url = !empty($creator_context['is_ceo'])
+    ? BASE_URL . '/employee/edit-evaluation-template.php'
+    : BASE_URL . '/manager/edit-template.php';
+$template_scope_sql = '1 = 1';
+$owned_template_scope_sql = 'et.created_by = ' . (int)($_SESSION['user_id'] ?? 0);
 
 // Handle restore (reactivate)
 if (isset($_GET['activate']) && is_numeric($_GET['activate'])) {
     $tid = (int)$_GET['activate'];
-    $conn->query("UPDATE evaluation_templates SET status = 'Active' WHERE template_id = $tid");
+    if (!isEvaluationTemplateOwner($conn, $tid, (int)($_SESSION['user_id'] ?? 0))) {
+        redirectWith($template_archive_url, 'danger', 'Only the template creator can restore this template.');
+    }
+    $conn->query("UPDATE evaluation_templates et SET status = 'Active' WHERE et.template_id = $tid AND $owned_template_scope_sql");
     logAudit($conn, $_SESSION['user_id'], 'UPDATE', 'Template', $tid, 'Restored archived template to Active');
-    redirectWith(BASE_URL . '/manager/template-archive.php', 'success', 'Template restored to active successfully.');
+    redirectWith($template_archive_url, 'success', 'Template restored to active successfully.');
 }
 
 // Handle permanent delete
 if (isset($_GET['delete']) && is_numeric($_GET['delete'])) {
     $tid = (int)$_GET['delete'];
+    if (!isEvaluationTemplateOwner($conn, $tid, (int)($_SESSION['user_id'] ?? 0))) {
+        redirectWith($template_archive_url, 'danger', 'Only the template creator can delete this template.');
+    }
     // Delete related evaluation scores that reference this template's criteria
-    $conn->query("DELETE es FROM evaluation_scores es INNER JOIN evaluation_criteria ec ON es.criterion_id = ec.criterion_id WHERE ec.template_id = $tid");
+    $conn->query("DELETE es FROM evaluation_scores es INNER JOIN evaluation_criteria ec ON es.criterion_id = ec.criterion_id INNER JOIN evaluation_templates et ON et.template_id = ec.template_id WHERE ec.template_id = $tid AND $owned_template_scope_sql");
     // Delete evaluations using this template
-    $conn->query("DELETE FROM evaluations WHERE template_id = $tid");
+    $conn->query("DELETE ev FROM evaluations ev INNER JOIN evaluation_templates et ON et.template_id = ev.template_id WHERE ev.template_id = $tid AND $owned_template_scope_sql");
     // Delete criteria
-    $conn->query("DELETE FROM evaluation_criteria WHERE template_id = $tid");
+    $conn->query("DELETE ec FROM evaluation_criteria ec INNER JOIN evaluation_templates et ON et.template_id = ec.template_id WHERE ec.template_id = $tid AND $owned_template_scope_sql");
     // Delete the template
-    $conn->query("DELETE FROM evaluation_templates WHERE template_id = $tid");
+    $conn->query("DELETE et FROM evaluation_templates et WHERE et.template_id = $tid AND $owned_template_scope_sql");
     logAudit($conn, $_SESSION['user_id'], 'DELETE', 'Template', $tid, 'Permanently deleted archived template');
-    redirectWith(BASE_URL . '/manager/template-archive.php', 'success', 'Template deleted permanently.');
+    redirectWith($template_archive_url, 'success', 'Template deleted permanently.');
 }
 
 require_once '../includes/header.php';
 
 // Fetch only archived templates with criteria count
-$templates = $conn->query("SELECT et.*, u.full_name as created_by_name,
+$templates = $conn->query("SELECT et.*, u.full_name as created_by_name, u.role AS created_by_role,
     (SELECT COUNT(*) FROM evaluation_criteria WHERE template_id = et.template_id) as criteria_count,
     (SELECT SUM(weight) FROM evaluation_criteria WHERE template_id = et.template_id) as total_weight
     FROM evaluation_templates et
     LEFT JOIN users u ON et.created_by = u.user_id
-    WHERE et.status = 'Archived'
+    WHERE et.status = 'Archived' AND $template_scope_sql
     ORDER BY et.updated_at DESC");
 $archive_count = $templates->num_rows;
 ?>
@@ -44,7 +72,7 @@ $archive_count = $templates->num_rows;
     <div>
         <p class="text-muted mb-0"><i class="fas fa-archive me-1"></i> Review and manage archived evaluation templates</p>
     </div>
-    <a href="<?php echo BASE_URL; ?>/manager/templates.php" class="btn btn-secondary">
+    <a href="<?php echo $template_list_url; ?>" class="btn btn-secondary">
         <i class="fas fa-arrow-left me-2"></i>Back to Active Templates
     </a>
 </div>
@@ -77,7 +105,7 @@ $archive_count = $templates->num_rows;
             </div>
             <h5 class="text-muted mb-2">Archive is Empty</h5>
             <p class="text-muted small mb-4">No templates have been archived yet. Active templates can be archived from the Templates page.</p>
-            <a href="<?php echo BASE_URL; ?>/manager/templates.php" class="btn btn-outline-primary">
+            <a href="<?php echo $template_list_url; ?>" class="btn btn-outline-primary">
                 <i class="fas fa-file-alt me-2"></i>View Active Templates
             </a>
         </div>
@@ -88,7 +116,8 @@ $archive_count = $templates->num_rows;
             $tw = (float)($t['total_weight'] ?? 0);
             $wclass = abs($tw - 100) < 0.01 ? 'bg-success-subtle text-success border-success-subtle' : 'bg-warning-subtle text-warning border-warning-subtle';
             $archived_date = date('M d, Y', strtotime($t['updated_at']));
-        ?>
+                    $is_template_owner = (int)($t['created_by'] ?? 0) === (int)($_SESSION['user_id'] ?? 0);
+                ?>
             <div class="col-md-6 col-lg-4">
                 <div class="content-card h-100 archive-card">
                     <div class="card-body p-4">
@@ -122,7 +151,7 @@ $archive_count = $templates->num_rows;
 
                         <div class="d-flex justify-content-between align-items-center text-muted small">
                             <?php if (!empty($t['created_by_name'])): ?>
-                                <span><i class="fas fa-user-edit me-1 opacity-50"></i><?php echo e($t['created_by_name']); ?></span>
+                                <span><i class="fas fa-user-edit me-1 opacity-50"></i><?php echo e($t['created_by_name']); ?><?php if (!empty($t['created_by_role'])): ?> · <?php echo e($t['created_by_role']); ?><?php endif; ?></span>
                             <?php else: ?>
                                 <span></span>
                             <?php endif; ?>
@@ -131,12 +160,23 @@ $archive_count = $templates->num_rows;
                     </div>
                     <div class="card-footer bg-transparent border-top p-3">
                         <div class="d-flex gap-2">
+                            <?php
+                            $view_template_path = !empty($creator_context['is_ceo'])
+                                ? '/employee/view-evaluation-template.php?id='
+                                : (($creator_context['role'] ?? '') === 'HR Staff'
+                                    ? '/staff/view-template.php?id='
+                                    : '/manager/view-template.php?id=');
+                            ?>
+                            <a href="<?php echo BASE_URL . $view_template_path . (int)$t['template_id']; ?>" class="btn btn-outline-primary flex-fill">
+                                <i class="fas fa-eye me-1"></i>View
+                            </a>
+                            <?php if ($is_template_owner): ?>
                             <button type="button" class="btn btn-outline-success flex-fill" title="Restore to Active"
                                     onclick="setRestoreTarget(<?php echo $t['template_id']; ?>, '<?php echo e(addslashes($t['template_name'])); ?>')"
                                     data-bs-toggle="modal" data-bs-target="#restoreModal">
                                 <i class="fas fa-undo me-1"></i>Restore
                             </button>
-                            <a href="<?php echo BASE_URL; ?>/manager/edit-template.php?id=<?php echo $t['template_id']; ?>" class="btn btn-outline-primary" title="Edit">
+                            <a href="<?php echo $template_edit_url; ?>?id=<?php echo (int)$t['template_id']; ?>" class="btn btn-outline-primary" title="Edit">
                                 <i class="fas fa-edit"></i>
                             </a>
                             <button type="button" class="btn btn-outline-danger" title="Delete Permanently"
@@ -144,6 +184,9 @@ $archive_count = $templates->num_rows;
                                     data-bs-toggle="modal" data-bs-target="#deleteModal">
                                 <i class="fas fa-trash"></i>
                             </button>
+                            <?php else: ?>
+                            <span class="badge bg-light text-muted border align-self-center"><i class="fas fa-lock me-1"></i>Read only</span>
+                            <?php endif; ?>
                         </div>
                     </div>
                 </div>

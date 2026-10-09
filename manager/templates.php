@@ -1,28 +1,58 @@
 <?php
 $page_title = 'Evaluation Templates';
 require_once '../includes/session-check.php';
-checkRole(['HR Manager']);
 require_once '../includes/functions.php';
+if (!ensureHierarchicalEvaluationSchema($conn)) {
+    http_response_code(500);
+    exit('Evaluation template schema is unavailable.');
+}
+checkRole(['HR Manager', 'HR Supervisor', 'HR Staff', 'Employee', 'President and CEO']);
+$creator_context = getEvaluationTemplateCreatorContext($conn, (int)($_SESSION['user_id'] ?? 0));
+if (!canViewEvaluationTemplates($creator_context)) {
+    redirectWith(BASE_URL . '/employee/dashboard.php', 'danger', 'Your account is not authorized to view evaluation templates.');
+}
+if (!empty($creator_context['is_ceo']) && basename(dirname($_SERVER['SCRIPT_NAME'])) !== 'employee') {
+    redirectWith(BASE_URL . '/employee/evaluation-templates.php', 'info', 'President and CEO template management is available in the Employee Portal.');
+}
+$can_create_templates = !empty($creator_context['can_create_templates']);
+$current_user_id = (int)($_SESSION['user_id'] ?? 0);
+$template_list_url = !empty($creator_context['is_ceo'])
+    ? BASE_URL . '/employee/evaluation-templates.php'
+    : BASE_URL . '/manager/templates.php';
+$template_create_url = !empty($creator_context['is_ceo'])
+    ? BASE_URL . '/employee/create-evaluation-template.php'
+    : BASE_URL . '/manager/create-template.php';
+$template_archive_url = !empty($creator_context['is_ceo'])
+    ? BASE_URL . '/employee/evaluation-template-archive.php'
+    : BASE_URL . '/manager/template-archive.php';
+$template_scope_sql = '1 = 1';
+$owned_template_scope_sql = 'et.created_by = ' . $current_user_id;
 
 // Handle archive action
 if (isset($_GET['archive']) && is_numeric($_GET['archive'])) {
     $tid = (int)$_GET['archive'];
-    $conn->query("UPDATE evaluation_templates SET status = 'Archived' WHERE template_id = $tid");
-    logAudit($conn, $_SESSION['user_id'], 'UPDATE', 'Template', $tid, 'Archived evaluation template');
-    redirectWith(BASE_URL . '/manager/templates.php', 'success', 'Template archived successfully.');
+    if (!isEvaluationTemplateOwner($conn, $tid, $current_user_id)) {
+        redirectWith($template_list_url, 'danger', 'Only the template creator can archive this template.');
+    }
+    $conn->query("UPDATE evaluation_templates et SET status = 'Archived' WHERE et.template_id = $tid AND $owned_template_scope_sql");
+    logAudit($conn, $current_user_id, 'UPDATE', 'Template', $tid, 'Archived evaluation template');
+    redirectWith($template_list_url, 'success', 'Template archived successfully.');
 }
 
 // Handle independent delete
 if (isset($_GET['delete']) && is_numeric($_GET['delete'])) {
     $tid = (int)$_GET['delete'];
-    $usage = $conn->query("SELECT COUNT(*) as cnt FROM evaluations WHERE template_id = $tid")->fetch_assoc()['cnt'];
+    if (!isEvaluationTemplateOwner($conn, $tid, $current_user_id)) {
+        redirectWith($template_list_url, 'danger', 'Only the template creator can delete this template.');
+    }
+    $usage = $conn->query("SELECT COUNT(*) as cnt FROM evaluations WHERE template_id = $tid AND EXISTS (SELECT 1 FROM evaluation_templates et WHERE et.template_id = $tid AND $owned_template_scope_sql)")->fetch_assoc()['cnt'];
     if ($usage > 0) {
-        redirectWith(BASE_URL . '/manager/templates.php', 'danger', "Cannot delete template. It is being used in $usage evaluation(s).");
+        redirectWith($template_list_url, 'danger', "Cannot delete template. It is being used in $usage evaluation(s).");
     } else {
-        $conn->query("DELETE FROM evaluation_criteria WHERE template_id = $tid");
-        $conn->query("DELETE FROM evaluation_templates WHERE template_id = $tid");
+        $conn->query("DELETE ec FROM evaluation_criteria ec JOIN evaluation_templates et ON et.template_id = ec.template_id WHERE et.template_id = $tid AND $owned_template_scope_sql");
+        $conn->query("DELETE et FROM evaluation_templates et WHERE et.template_id = $tid AND $owned_template_scope_sql");
         logAudit($conn, $_SESSION['user_id'], 'DELETE', 'Template', $tid, 'Deleted evaluation template');
-        redirectWith(BASE_URL . '/manager/templates.php', 'success', 'Template deleted successfully.');
+        redirectWith($template_list_url, 'success', 'Template deleted successfully.');
     }
 }
 
@@ -34,12 +64,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     if (is_array($ids)) {
         foreach ($ids as $id) {
             $tid = (int)$id;
-            $usage = $conn->query("SELECT COUNT(*) as cnt FROM evaluations WHERE template_id = $tid")->fetch_assoc()['cnt'];
+            if (!isEvaluationTemplateOwner($conn, $tid, $current_user_id)) {
+                $failed++;
+                continue;
+            }
+            $usage = $conn->query("SELECT COUNT(*) as cnt FROM evaluations WHERE template_id = $tid AND EXISTS (SELECT 1 FROM evaluation_templates et WHERE et.template_id = $tid AND et.created_by = $current_user_id)")->fetch_assoc()['cnt'];
             if ($usage > 0) {
                 $failed++;
             } else {
-                $conn->query("DELETE FROM evaluation_criteria WHERE template_id = $tid");
-                $conn->query("DELETE FROM evaluation_templates WHERE template_id = $tid");
+                $conn->query("DELETE ec FROM evaluation_criteria ec JOIN evaluation_templates et ON et.template_id = ec.template_id WHERE et.template_id = $tid AND $owned_template_scope_sql");
+                $conn->query("DELETE et FROM evaluation_templates et WHERE et.template_id = $tid AND $owned_template_scope_sql");
                 logAudit($conn, $_SESSION['user_id'], 'DELETE', 'Template', $tid, 'Deleted evaluation template via batch');
                 $success++;
             }
@@ -47,7 +81,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     }
     $msg = "$success template(s) deleted successfully.";
     if ($failed > 0) $msg .= " $failed template(s) could not be deleted because they are in use.";
-    redirectWith(BASE_URL . '/manager/templates.php', $failed > 0 ? 'warning' : 'success', $msg);
+    redirectWith($template_list_url, $failed > 0 ? 'warning' : 'success', $msg);
 }
 
 // Handle broadcast notification
@@ -57,7 +91,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $custom_message = trim($_POST['notification_message'] ?? '');
     
     // Fetch template details
-    $stmt = $conn->prepare("SELECT template_name, target_department, evaluation_type FROM evaluation_templates WHERE template_id = ? AND status = 'Active'");
+    $stmt = $conn->prepare("SELECT template_id, template_name, target_department, target_job_title_id, evaluation_type FROM evaluation_templates et WHERE template_id = ? AND status = 'Active' AND $owned_template_scope_sql");
     $stmt->bind_param("i", $tid);
     $stmt->execute();
     $template = $stmt->get_result()->fetch_assoc();
@@ -65,6 +99,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     
     if ($template) {
         $target_dept = $template['target_department'];
+        $target_position_ids = getEvaluationTemplateTargetPositionIds($conn, $tid);
         $eval_type = $template['evaluation_type'];
         $temp_name = $template['template_name'];
         
@@ -80,8 +115,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 $dept_cond = " AND e.department_id = $dept_id";
             }
         }
+        if ($target_position_ids) {
+            $dept_cond .= " AND e.job_title_id IN (" . implode(',', array_map('intval', $target_position_ids)) . ")";
+        }
+        $non_regular_statuses = "'OJT', 'Trainee', 'Probationary', 'Project Based', 'Project-Based'";
+        if (in_array($eval_type, ['Annual', 'Quarterly'], true)) {
+            $dept_cond .= " AND (e.employment_status NOT IN ($non_regular_statuses) OR e.employment_status IS NULL)";
+        } elseif ($eval_type === 'Initial') {
+            $dept_cond .= " AND (e.employment_status IN ($non_regular_statuses)
+                OR EXISTS (SELECT 1 FROM evaluations existing_eval
+                    WHERE existing_eval.employee_id = e.employee_id AND existing_eval.template_id = $tid
+                      AND existing_eval.deleted_at IS NULL))";
+        }
         
-        // Find all active employees who have a portal user account with role='Employee'
+        // Notify active holders of this position regardless of their portal role.
         $query = "
             SELECT e.employee_id, e.first_name, e.last_name, u.user_id
             FROM employees e
@@ -90,6 +137,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
               AND e.deleted_at IS NULL 
               AND u.role = 'Employee'
               AND u.is_active = 1
+              AND COALESCE(u.account_hold, 0) = 0
+              AND u.deleted_at IS NULL
               $dept_cond
         ";
         $employees_res = $conn->query($query);
@@ -116,9 +165,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         
         logAudit($conn, $_SESSION['user_id'], 'CREATE', 'Notification', $tid, "Broadcasted custom notifications for template: $temp_name to $notified_count employee(s)");
         
-        redirectWith(BASE_URL . '/manager/templates.php', 'success', "Notifications successfully broadcasted to $notified_count employee(s) in " . htmlspecialchars($target_dept) . ".");
+        redirectWith($template_list_url, 'success', "Notifications successfully broadcasted to $notified_count employee(s) in " . htmlspecialchars($target_dept) . ".");
     } else {
-        redirectWith(BASE_URL . '/manager/templates.php', 'danger', "Template not found or inactive.");
+        redirectWith($template_list_url, 'danger', "Template not found or inactive.");
     }
 }
 
@@ -129,21 +178,31 @@ if (strlen($selected_department) > 100) {
     $selected_department = substr($selected_department, 0, 100);
 }
 
+$department_scope = '1 = 1';
 $department_options = $conn->query("
     SELECT department_name
     FROM departments
-    WHERE deleted_at IS NULL AND is_active = 1
+    WHERE deleted_at IS NULL AND is_active = 1 AND $department_scope
     ORDER BY department_name
 ");
 
-$template_where = "WHERE et.status = 'Active'";
+$template_where = "WHERE et.status = 'Active' AND ($template_scope_sql)";
 if ($selected_department !== '') {
     $safe_department = $conn->real_escape_string($selected_department);
     $template_where .= " AND (et.target_department = '$safe_department' OR et.target_department = 'All Departments')";
 }
 
 // Fetch active templates with criteria counts
-$templates = $conn->query("SELECT et.*, u.full_name as created_by_name,
+$templates = $conn->query("SELECT et.*,
+    (SELECT GROUP_CONCAT(DISTINCT jt.job_title ORDER BY jt.job_title SEPARATOR ', ')
+        FROM job_titles jt
+        WHERE jt.job_title_id IN (
+            SELECT etp.job_title_id FROM evaluation_template_positions etp WHERE etp.template_id = et.template_id
+            UNION
+            SELECT et.target_job_title_id WHERE et.target_job_title_id IS NOT NULL
+              AND NOT EXISTS (SELECT 1 FROM evaluation_template_positions etp WHERE etp.template_id = et.template_id)
+        )) AS target_position_name,
+    u.full_name as created_by_name, u.role AS created_by_role,
     (SELECT COUNT(*) FROM evaluation_criteria WHERE template_id = et.template_id AND section='KRA') as kra_count,
     (SELECT COUNT(*) FROM evaluation_criteria WHERE template_id = et.template_id AND section='Behavior') as behavior_count,
     (SELECT SUM(weight) FROM evaluation_criteria WHERE template_id = et.template_id AND section='KRA') as kra_total_weight,
@@ -153,28 +212,30 @@ $templates = $conn->query("SELECT et.*, u.full_name as created_by_name,
     $template_where
     ORDER BY et.updated_at DESC");
 $filtered_template_count = $templates->num_rows;
-$active_template_count = (int) $conn->query("SELECT COUNT(*) as cnt FROM evaluation_templates WHERE status = 'Active'")->fetch_assoc()['cnt'];
-$archived_template_count = (int) $conn->query("SELECT COUNT(*) as cnt FROM evaluation_templates WHERE status = 'Archived'")->fetch_assoc()['cnt'];
+$active_template_count = (int) $conn->query("SELECT COUNT(*) as cnt FROM evaluation_templates et WHERE status = 'Active' AND ($template_scope_sql)")->fetch_assoc()['cnt'];
+$archived_template_count = (int) $conn->query("SELECT COUNT(*) as cnt FROM evaluation_templates et WHERE status = 'Archived' AND ($template_scope_sql)")->fetch_assoc()['cnt'];
 $used_template_count = (int) $conn->query("SELECT COUNT(DISTINCT template_id) as cnt FROM evaluations WHERE template_id IS NOT NULL AND deleted_at IS NULL")->fetch_assoc()['cnt'];
 ?>
 
 <div class="page-hero fadeup">
     <div class="d-flex flex-wrap align-items-center justify-content-between mb-4 gap-3">
         <div>
-            <div style="font-size:.72rem;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,.55);">HR Manager · Evaluations</div>
+            <div style="font-size:.72rem;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,.55);"><?php echo !empty($creator_context['is_ceo']) ? 'President and CEO' : e($creator_context['role']); ?> · Evaluations</div>
             <h4 class="text-white fw-bold mb-0 mt-1"><i class="fas fa-file-alt me-2" style="color:#BD9414;"></i>Evaluation Templates</h4>
-            <p class="text-white-50 small mb-0 mt-2">Create and maintain standardized evaluation templates for fair, consistent employee performance reviews.</p>
+            <p class="text-white-50 small mb-0 mt-2"><?php echo $can_create_templates ? 'Create and maintain templates you own; templates created by others are read-only.' : 'Browse evaluation templates. Templates created by others are read-only.'; ?></p>
         </div>
         <div class="d-flex flex-wrap gap-2">
+        <?php if ($can_create_templates): ?>
         <button type="button" class="btn btn-outline-danger d-none shadow-sm" id="batchDeleteBtn" onclick="confirmBatchDelete()">
             <i class="fas fa-trash-alt me-1"></i>Batch Delete (<span id="deleteCount">0</span>)
         </button>
-        <a href="<?php echo BASE_URL; ?>/manager/template-archive.php" class="btn btn-outline-light btn-sm">
+        <a href="<?php echo $template_archive_url; ?>" class="btn btn-outline-light btn-sm">
             <i class="fas fa-archive me-1"></i>Archive
         </a>
-        <a href="<?php echo BASE_URL; ?>/manager/create-template.php" class="btn btn-primary btn-sm">
+        <a href="<?php echo $template_create_url; ?>" class="btn btn-primary btn-sm">
             <i class="fas fa-plus me-1"></i>Create Template
         </a>
+        <?php endif; ?>
         </div>
     </div>
 
@@ -244,7 +305,7 @@ $used_template_count = (int) $conn->query("SELECT COUNT(DISTINCT template_id) as
                 <button type="submit" class="btn btn-primary">
                     <i class="fas fa-filter me-1"></i>Apply
                 </button>
-                <a href="<?php echo BASE_URL; ?>/manager/templates.php" class="btn btn-outline-secondary">
+                <a href="<?php echo $template_list_url; ?>" class="btn btn-outline-secondary">
                     <i class="fas fa-rotate-left me-1"></i>Reset
                 </a>
             </div>
@@ -269,16 +330,18 @@ $used_template_count = (int) $conn->query("SELECT COUNT(DISTINCT template_id) as
             </div>
             <h5 class="text-muted mb-2">No Active Templates Found</h5>
             <p class="text-muted small mb-4">
-                <?php echo $selected_department !== '' ? 'No active templates match the selected department.' : 'Create your first evaluation template to get started.'; ?>
+                <?php echo $selected_department !== '' ? 'No active templates match the selected department.' : 'No active evaluation templates are available.'; ?>
             </p>
-            <a href="<?php echo BASE_URL; ?>/manager/create-template.php" class="btn btn-primary">
+            <?php if ($can_create_templates): ?><a href="<?php echo $template_create_url; ?>" class="btn btn-primary">
                 <i class="fas fa-plus me-2"></i>Create Template
-            </a>
+            </a><?php endif; ?>
         </div>
     </div>
 <?php else: ?>
+    <?php if ($can_create_templates): ?>
     <form method="POST" action="" id="batchDeleteForm">
         <input type="hidden" name="action" value="batch_delete">
+    <?php endif; ?>
         <div class="row g-4 fadeup-1">
             <?php while ($t = $templates->fetch_assoc()):
             $kra_w = (float)($t['kra_total_weight'] ?? 0);
@@ -287,9 +350,12 @@ $used_template_count = (int) $conn->query("SELECT COUNT(DISTINCT template_id) as
             <div class="col-md-6 col-lg-4">
                 <div class="chart-card fadeup h-100 position-relative" style="transition:transform 0.2s,box-shadow 0.2s;cursor:pointer;" onmouseover="this.style.transform='translateY(-4px)';this.style.boxShadow='0 8px 25px rgba(0,0,0,0.08)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
                     <!-- Checkbox for Batch Delete -->
+                    <?php $is_template_owner = (int)($t['created_by'] ?? 0) === $current_user_id; ?>
+                    <?php if ($can_create_templates && $is_template_owner): ?>
                     <div class="position-absolute" style="top: 15px; right: 15px; z-index: 10;">
                         <input class="template-checkbox" type="checkbox" name="template_ids[]" value="<?php echo $t['template_id']; ?>" aria-label="Select <?php echo e($t['template_name']); ?> for batch deletion" onchange="toggleBatchDeleteBtn()">
                     </div>
+                    <?php endif; ?>
                     <div class="card-body p-4 pt-5">
                         <!-- Top -->
                         <div class="d-flex justify-content-between align-items-start mb-3">
@@ -305,10 +371,23 @@ $used_template_count = (int) $conn->query("SELECT COUNT(DISTINCT template_id) as
                                         <?php echo e($t['target_department']); ?>
                                     </span>
                                 <?php endif; ?>
+                                <?php if (!empty($t['target_job_title_id'])): ?>
+                                    <span class="badge bg-secondary-subtle text-secondary border px-2" style="font-size:0.65rem;">
+                                        <?php echo e($t['target_position_name'] ?? 'Position'); ?>
+                                    </span>
+                                <?php endif; ?>
                             </div>
                         </div>
 
                         <h6 class="fw-bold mb-2"><?php echo e($t['template_name']); ?></h6>
+                        <div class="small text-muted mb-2">
+                            <i class="fas fa-user-edit me-1"></i>Created by <?php echo e($t['created_by_name'] ?? 'Unknown'); ?><?php if (!empty($t['created_by_role'])): ?> · <?php echo e($t['created_by_role']); ?><?php endif; ?>
+                            <?php if ($is_template_owner): ?>
+                                <span class="badge bg-success-subtle text-success border ms-1">You own this</span>
+                            <?php else: ?>
+                                <span class="badge bg-light text-muted border ms-1">Read only</span>
+                            <?php endif; ?>
+                        </div>
                         <p class="text-muted small mb-3" style="line-height:1.5;">
                             <?php echo e(substr($t['description'] ?? 'No description.', 0, 80)); ?><?php echo strlen($t['description'] ?? '') > 80 ? '...' : ''; ?>
                         </p>
@@ -341,7 +420,8 @@ $used_template_count = (int) $conn->query("SELECT COUNT(DISTINCT template_id) as
                     </div>
                     <div class="card-footer bg-transparent border-top p-3">
                         <div class="d-flex gap-2">
-                            <a href="<?php echo BASE_URL; ?>/manager/edit-template.php?id=<?php echo $t['template_id']; ?>" class="btn btn-sm btn-outline-primary flex-fill">
+                            <?php if ($is_template_owner): ?>
+                            <a href="<?php echo (!empty($creator_context['is_ceo']) ? BASE_URL . '/employee/edit-evaluation-template.php?id=' : BASE_URL . '/manager/edit-template.php?id=') . (int)$t['template_id']; ?>" class="btn btn-sm btn-outline-primary flex-fill">
                                 <i class="fas fa-edit me-1"></i>Edit
                             </a>
                             <button type="button" class="btn btn-sm btn-outline-success flex-fill" onclick="setBroadcastTarget(<?php echo $t['template_id']; ?>, '<?php echo e(addslashes($t['template_name'])); ?>', '<?php echo e(addslashes($t['target_department'])); ?>', '<?php echo e(addslashes($t['evaluation_type'] ?? 'Annual')); ?>')" data-bs-toggle="modal" data-bs-target="#broadcastModal" title="Notify Employees">
@@ -353,13 +433,26 @@ $used_template_count = (int) $conn->query("SELECT COUNT(DISTINCT template_id) as
                             <button type="button" class="btn btn-sm btn-outline-danger" onclick="setDeleteTarget(<?php echo $t['template_id']; ?>, '<?php echo e(addslashes($t['template_name'])); ?>')" data-bs-toggle="modal" data-bs-target="#deleteModal" title="Delete">
                                 <i class="fas fa-trash-alt"></i>
                             </button>
+                            <?php else: ?>
+                            <?php
+                            $view_template_path = !empty($creator_context['is_ceo'])
+                                ? '/employee/view-evaluation-template.php?id='
+                                : (($creator_context['role'] ?? '') === 'HR Staff'
+                                    ? '/staff/view-template.php?id='
+                                    : '/manager/view-template.php?id=');
+                            ?>
+                            <a href="<?php echo BASE_URL . $view_template_path . (int)$t['template_id']; ?>" class="btn btn-sm btn-outline-primary flex-fill">
+                                <i class="fas fa-eye me-1"></i>View
+                            </a>
+                            <span class="badge bg-light text-muted border align-self-center"><i class="fas fa-lock me-1"></i>Read only</span>
+                            <?php endif; ?>
                         </div>
                     </div>
                 </div>
             </div>
         <?php endwhile; ?>
     </div>
-    </form>
+    <?php if ($can_create_templates): ?></form><?php endif; ?>
 <?php endif; ?>
 
 <!-- Broadcast Modal -->

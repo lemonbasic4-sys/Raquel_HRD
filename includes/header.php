@@ -6,6 +6,10 @@
  */
 
 require_once __DIR__ . '/functions.php';
+if (!ensureHierarchicalEvaluationSchema($conn)) {
+    http_response_code(500);
+    exit('Evaluation template schema is unavailable.');
+}
 
 // Auto-backup scheduler: silently check & trigger if Admin session
 if (isset($_SESSION['role']) && $_SESSION['role'] === 'Admin') {
@@ -21,6 +25,9 @@ $current_page = basename($_SERVER['PHP_SELF']);
 $current_dir = basename(dirname($_SERVER['PHP_SELF']));
 
 $effective_role = $_SESSION['role'] ?? '';
+if ($current_dir === 'employee' && $effective_role === 'President and CEO') {
+    $effective_role = 'Employee';
+}
 
 // Notifications are strictly account-based but now isolated by portal context.
 $notif_context = ($current_dir === 'employee') ? 'employee' : 'hr';
@@ -58,6 +65,7 @@ switch ($effective_role) {
                 ['icon' => 'fas fa-user-lock', 'label' => 'Portal Accounts', 'url' => BASE_URL . '/admin/employee-accounts.php', 'page' => 'employee-accounts.php'],
                 ['icon' => 'fas fa-users', 'label' => 'User Management', 'url' => BASE_URL . '/admin/users.php', 'page' => 'users.php'],
                 ['icon' => 'fas fa-clipboard-list', 'label' => 'Audit Trail', 'url' => BASE_URL . '/admin/audit-trail.php', 'page' => 'audit-trail.php'],
+                ['icon' => 'fas fa-route', 'label' => 'Reporting Reviews', 'url' => BASE_URL . '/employee/reporting-reviews.php', 'page' => 'reporting-reviews.php'],
             ],
             'SYSTEM' => [
                 ['icon' => 'fas fa-database', 'label' => 'System Backup', 'url' => BASE_URL . '/admin/backup.php', 'page' => 'backup.php'],
@@ -93,6 +101,7 @@ switch ($effective_role) {
                 // ['icon' => 'fas fa-project-diagram', 'label' => 'Operation Management', 'url' => BASE_URL . '/manager/operation-management.php', 'page' => 'operation-management.php'],
             ],
             'EVALUATIONS' => [
+                ['icon' => 'fas fa-route', 'label' => 'Reporting Reviews', 'url' => BASE_URL . '/employee/reporting-reviews.php', 'page' => 'reporting-reviews.php'],
                 ['icon' => 'fas fa-file-alt', 'label' => 'Templates', 'url' => BASE_URL . '/manager/templates.php', 'page' => 'templates.php'],
                 ['icon' => 'fas fa-layer-group', 'label' => 'Team Evaluation Packages', 'url' => BASE_URL . '/employee/team-evaluation-packages.php', 'page' => 'team-evaluation-packages.php',
                  'badge' => $_mgr_pkg_pending ?: null, 'badge_class' => 'bg-warning text-dark'],
@@ -140,6 +149,8 @@ switch ($effective_role) {
                 ['icon' => 'fas fa-briefcase', 'label' => 'Positions', 'url' => BASE_URL . '/supervisor/positions.php', 'page' => 'positions.php'],
             ],
             'EVALUATIONS' => [
+                ['icon' => 'fas fa-route', 'label' => 'Reporting Reviews', 'url' => BASE_URL . '/employee/reporting-reviews.php', 'page' => 'reporting-reviews.php'],
+                ['icon' => 'fas fa-file-alt', 'label' => 'Templates', 'url' => BASE_URL . '/manager/templates.php', 'page' => 'templates.php'],
                 ['icon' => 'fas fa-layer-group', 'label' => 'Team Evaluation Packages', 'url' => BASE_URL . '/employee/team-evaluation-packages.php', 'page' => 'team-evaluation-packages.php',
                  'badge' => $_sup_pkg_pending ?: null, 'badge_class' => 'bg-warning text-dark'],
                 ['icon' => 'fas fa-clipboard-check', 'label' => 'Pending Validations', 'url' => BASE_URL . '/supervisor/pending-endorsements.php', 'page' => 'pending-endorsements.php'],
@@ -177,6 +188,7 @@ switch ($effective_role) {
                 ['icon' => 'fas fa-building', 'label' => 'Branches & Roster', 'url' => BASE_URL . '/staff/branches.php', 'page' => 'branches.php'],
             ],
             'EVALUATIONS & MONITORING' => [
+                ['icon' => 'fas fa-route', 'label' => 'Reporting Reviews', 'url' => BASE_URL . '/employee/reporting-reviews.php', 'page' => 'reporting-reviews.php'],
                 ['icon' => 'fas fa-tasks', 'label' => 'Package Tracker', 'url' => BASE_URL . '/staff/package-tracker.php', 'page' => 'package-tracker.php'],
                 ['icon' => 'fas fa-file-alt', 'label' => 'Templates', 'url' => BASE_URL . '/staff/templates.php', 'page' => 'templates.php'],
                 ['icon' => 'fas fa-history', 'label' => 'Evaluation History', 'url' => BASE_URL . '/staff/evaluation-history.php', 'page' => 'evaluation-history.php'],
@@ -188,6 +200,10 @@ switch ($effective_role) {
                 ['icon' => 'fas fa-clipboard-list', 'label' => 'My Audit Trail', 'url' => BASE_URL . '/staff/audit-trail.php', 'page' => 'audit-trail.php'],
             ],
         ];
+        break;
+
+    case 'President and CEO':
+        $sidebar_menus = ['EVALUATIONS' => []];
         break;
 
     case 'Employee':
@@ -204,7 +220,7 @@ switch ($effective_role) {
         if (isset($_SESSION['employee_id']) && $conn) {
             $_hdr_emp_id = (int) $_SESSION['employee_id'];
             $_hdr_dept_stmt = $conn->prepare("
-                SELECT d.department_name, e.branch_id, e.rank_category_id, e.employment_status
+                SELECT d.department_name, e.branch_id, e.rank_category_id, e.job_title_id, e.employment_status
                 FROM employees e 
                 LEFT JOIN departments d ON e.department_id = d.department_id 
                 WHERE e.employee_id = ? 
@@ -216,11 +232,11 @@ switch ($effective_role) {
             $_hdr_emp_dept = $_hdr_dept_row['department_name'] ?? '';
             $_hdr_emp_branch_id = $_hdr_dept_row ? (int)$_hdr_dept_row['branch_id'] : 0;
             $_hdr_emp_rank = $_hdr_dept_row ? (int)$_hdr_dept_row['rank_category_id'] : 0;
+            $_hdr_emp_position_id = $_hdr_dept_row ? (int)$_hdr_dept_row['job_title_id'] : 0;
             $_hdr_emp_status = $_hdr_dept_row['employment_status'] ?? 'Regular';
             $_hdr_dept_stmt->close();
 
-            $_hdr_is_non_regular = in_array($_hdr_emp_status, ['OJT', 'Probationary', 'Project Based', 'Project-Based', 'Trainee'], true);
-            $_hdr_allowed_eval_types = $_hdr_is_non_regular ? ['Initial', 'Final'] : ['Annual', 'Quarterly', 'Final'];
+            $_hdr_allowed_eval_types = getAllowedEvaluationTypesForEmploymentStatus($_hdr_emp_status);
             $_hdr_in_clause = "'" . implode("','", $_hdr_allowed_eval_types) . "'";
 
             $_hdr_pt_stmt = $conn->prepare("
@@ -229,6 +245,10 @@ switch ($effective_role) {
                 WHERE et.status = 'Active'
                   AND et.deleted_at IS NULL
                   AND (et.target_department IS NULL OR et.target_department = '' OR et.target_department = 'All Departments' OR et.target_department = ?)
+                  AND ((EXISTS (SELECT 1 FROM evaluation_template_positions etp WHERE etp.template_id = et.template_id)
+                        AND EXISTS (SELECT 1 FROM evaluation_template_positions etp WHERE etp.template_id = et.template_id AND etp.job_title_id = ?))
+                    OR (NOT EXISTS (SELECT 1 FROM evaluation_template_positions etp WHERE etp.template_id = et.template_id)
+                        AND (et.target_job_title_id IS NULL OR et.target_job_title_id = ?)))
                   AND et.evaluation_type IN ($_hdr_in_clause)
                   AND NOT EXISTS (
                       SELECT 1
@@ -239,7 +259,7 @@ switch ($effective_role) {
                         AND ev.status NOT IN ('Draft', 'Returned', 'Rejected', 'Pending Self-Rating')
                   )
             ");
-            $_hdr_pt_stmt->bind_param("si", $_hdr_emp_dept, $_hdr_emp_id);
+            $_hdr_pt_stmt->bind_param("siii", $_hdr_emp_dept, $_hdr_emp_position_id, $_hdr_emp_position_id, $_hdr_emp_id);
             $_hdr_pt_stmt->execute();
             $m_pending_template_count = (int) ($_hdr_pt_stmt->get_result()->fetch_assoc()['total'] ?? 0);
             $_hdr_pt_stmt->close();
@@ -328,9 +348,22 @@ switch ($effective_role) {
         // ── Section 2: Evaluations ──────────────────────────────────────────
         $menu_evaluations = [
             ['icon' => 'fas fa-star',        'label' => 'Self Rating',        'url' => BASE_URL . '/employee/self-rating.php',      'page' => 'self-rating.php',      'badge' => $m_pending_template_count],
+            ['icon' => 'fas fa-route',       'label' => 'Reporting Reviews',  'url' => BASE_URL . '/employee/reporting-reviews.php', 'page' => 'reporting-reviews.php'],
             ['icon' => 'fas fa-history',     'label' => 'Evaluation History', 'url' => BASE_URL . '/employee/evaluation-history.php', 'page' => 'evaluation-history.php'],
             ['icon' => 'fas fa-chart-line',  'label' => 'My Performance',     'url' => BASE_URL . '/employee/my-performance.php',   'page' => 'my-performance.php'],
         ];
+        $template_creator_context = null;
+        if (in_array($_hdr_emp_rank, [1, 2, 3, 4], true) || ($_SESSION['role'] ?? '') === 'President and CEO') {
+            $template_creator_context = getEvaluationTemplateCreatorContext($conn, (int)($_SESSION['user_id'] ?? 0));
+        }
+        if ($template_creator_context && !empty($template_creator_context['is_ceo'])) {
+            $menu_evaluations[] = ['icon' => 'fas fa-file-alt', 'label' => 'Evaluation Templates', 'url' => BASE_URL . '/employee/evaluation-templates.php', 'page' => 'evaluation-templates.php'];
+        }
+        if (in_array($_hdr_emp_rank, [3, 4], true)) {
+            if (!$template_creator_context || empty($template_creator_context['is_ceo'])) {
+                $menu_evaluations[] = ['icon' => 'fas fa-file-alt', 'label' => 'Evaluation Templates', 'url' => BASE_URL . '/manager/templates.php', 'page' => 'templates.php'];
+            }
+        }
 
         // ── Section 3: My Team (supervisors/managers & assigned package reviewers) ──
         $m_pending_pkg_count = countPendingOrganizationPackagesForUser($conn, (int)($_SESSION['user_id'] ?? 0));
@@ -397,6 +430,13 @@ switch ($effective_role) {
             ['icon' => 'fas fa-bell',     'label' => 'Notifications', 'url' => BASE_URL . '/employee/notifications.php',   'page' => 'notifications.php'],
             ['icon' => 'fas fa-user-cog', 'label' => 'Change Password', 'url' => BASE_URL . '/employee/profile-settings.php', 'page' => 'profile-settings.php'],
         ];
+        if (($_SESSION['role'] ?? '') === 'President and CEO') {
+            $sidebar_menus = [
+                'EVALUATIONS' => [
+                    ['icon' => 'fas fa-file-alt', 'label' => 'Evaluation Templates', 'url' => BASE_URL . '/employee/evaluation-templates.php', 'page' => 'evaluation-templates.php'],
+                ],
+            ];
+        }
         break;
 
 }
@@ -648,7 +688,7 @@ switch ($effective_role) {
     <!-- Top Navbar -->
     <header class="top-navbar">
         <div class="d-flex align-items-center gap-3">
-            <button class="sidebar-toggle <?php echo ($effective_role === 'Employee') ? 'd-none d-md-block' : (in_array($effective_role, ['HR Manager', 'HR Supervisor', 'HR Staff', 'Admin']) ? 'd-lg-block' : ''); ?>" onclick="toggleSidebar()">
+            <button class="sidebar-toggle <?php echo ($effective_role === 'Employee') ? 'd-none d-md-block' : (in_array($effective_role, ['HR Manager', 'HR Supervisor', 'HR Staff', 'Admin', 'President and CEO'], true) ? 'd-lg-block' : ''); ?>" onclick="toggleSidebar()">
                 <i class="fas fa-bars"></i>
             </button>
             <div class="navbar-logo d-flex align-items-center gap-2">
@@ -932,4 +972,3 @@ switch ($effective_role) {
                . "</div>";
         }
         ?>
-

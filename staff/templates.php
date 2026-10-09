@@ -3,18 +3,32 @@ $page_title = 'Template Viewing';
 require_once '../includes/session-check.php';
 checkRole(['HR Staff']);
 require_once '../includes/functions.php';
+if (!ensureHierarchicalEvaluationSchema($conn)) {
+    http_response_code(500);
+    exit('Evaluation template schema is unavailable.');
+}
 require_once '../includes/header.php';
 
 // Fetch active templates with criteria count and total weight
-$templates = $conn->query("SELECT et.*, u.full_name as created_by_name,
+$template_scope = '1 = 1';
+$templates = $conn->query("SELECT et.*,
+    (SELECT GROUP_CONCAT(DISTINCT jt.job_title ORDER BY jt.job_title SEPARATOR ', ')
+        FROM job_titles jt
+        WHERE jt.job_title_id IN (
+            SELECT etp.job_title_id FROM evaluation_template_positions etp WHERE etp.template_id = et.template_id
+            UNION
+            SELECT et.target_job_title_id WHERE et.target_job_title_id IS NOT NULL
+              AND NOT EXISTS (SELECT 1 FROM evaluation_template_positions etp WHERE etp.template_id = et.template_id)
+        )) AS target_position_name,
+    u.full_name as created_by_name,
     (SELECT COUNT(*) FROM evaluation_criteria WHERE template_id = et.template_id) as criteria_count,
     (SELECT SUM(weight) FROM evaluation_criteria WHERE template_id = et.template_id) as total_weight
     FROM evaluation_templates et
     LEFT JOIN users u ON et.created_by = u.user_id
-    WHERE et.status = 'Active' AND et.deleted_at IS NULL
+    WHERE et.status = 'Active' AND et.deleted_at IS NULL AND $template_scope
     ORDER BY et.template_name ASC");
 $template_total = (int) $templates->num_rows;
-$criteria_total = (int) ($conn->query("SELECT COUNT(*) as c FROM evaluation_criteria ec JOIN evaluation_templates et ON ec.template_id = et.template_id WHERE et.status = 'Active' AND et.deleted_at IS NULL")->fetch_assoc()['c'] ?? 0);
+$criteria_total = (int) ($conn->query("SELECT COUNT(*) as c FROM evaluation_criteria ec JOIN evaluation_templates et ON ec.template_id = et.template_id WHERE et.status = 'Active' AND et.deleted_at IS NULL AND $template_scope")->fetch_assoc()['c'] ?? 0);
 ?>
 
 <div class="staff-template-page">
@@ -90,6 +104,9 @@ $criteria_total = (int) ($conn->query("SELECT COUNT(*) as c FROM evaluation_crit
                             </div>
                             <?php if (!empty($t['target_department'])): ?>
                                 <span class="badge bg-success-subtle text-success border border-success-subtle px-2"><?php echo e($t['target_department']); ?></span>
+                            <?php endif; ?>
+                            <?php if (!empty($t['target_position_name'])): ?>
+                                <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle px-2"><?php echo e($t['target_position_name']); ?></span>
                             <?php endif; ?>
                         </div>
                         <h6 class="fw-bold text-dark mb-2"><?php echo e($t['template_name']); ?></h6>

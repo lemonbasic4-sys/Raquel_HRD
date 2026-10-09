@@ -7,8 +7,8 @@ require_once '../includes/functions.php';
 ensureUserAccountSecuritySchema($conn);
 
 // If already logged in as an Employee account, skip to dashboard
-if (isset($_SESSION['user_id']) && ($_SESSION['role'] ?? '') === 'Employee' && (int) ($_SESSION['employee_id'] ?? 0) > 0) {
-    header("Location: dashboard.php");
+if (isset($_SESSION['user_id']) && in_array(($_SESSION['role'] ?? ''), ['Employee', 'President and CEO'], true) && (int) ($_SESSION['employee_id'] ?? 0) > 0) {
+    header("Location: " . (($_SESSION['role'] ?? '') === 'President and CEO' ? 'evaluation-templates.php' : 'dashboard.php'));
     exit();
 }
 
@@ -33,7 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             LEFT JOIN employees e ON u.employee_id = e.employee_id
             WHERE BINARY u.username = ? 
               AND u.employee_id IS NOT NULL
-              AND u.role = 'Employee'
+              AND u.role IN ('Employee', 'President and CEO')
             LIMIT 1
         ");
         $stmt->bind_param("s", $username);
@@ -81,7 +81,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 logLoginAudit($conn, $username, 'Employee Portal', 'Successful', '', (int)$user['user_id']);
 
-                header("Location: dashboard.php");
+                header("Location: " . (($user['role'] ?? '') === 'President and CEO' ? 'evaluation-templates.php' : 'dashboard.php'));
                 exit();
             } else {
                 $error = 'Invalid credentials.';
@@ -89,9 +89,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 logLoginAudit($conn, $username, 'Employee Portal', 'Failed', 'Password did not match the account.', (int)$user['user_id']);
             }
         } else {
-            $error = 'Only Employee accounts can access the Employee Portal.';
+            $error = 'Only Employee and President/CEO accounts can access the Employee Portal.';
             registerLoginAttempt($conn, $username, $ip);
-            logLoginAudit($conn, $username, 'Employee Portal', 'Failed', 'No eligible employee account was found.');
+            logLoginAudit($conn, $username, 'Employee Portal', 'Failed', 'No eligible employee or President/CEO account was found.');
         }
     }
 }
@@ -325,4 +325,3 @@ $sys_logo = getSetting($conn, 'system_logo', 'assets/img/logo/logo.png');
 </body>
 
 </html>
-

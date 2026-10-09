@@ -1,16 +1,35 @@
 <?php
 $page_title = 'Create Evaluation Template';
 require_once '../includes/session-check.php';
-checkRole(['HR Manager']);
+require_once '../includes/functions.php';
+if (!ensureHierarchicalEvaluationSchema($conn)) {
+    http_response_code(500);
+    exit('Evaluation template schema is unavailable.');
+}
+checkRole(['HR Manager', 'HR Supervisor', 'Employee', 'President and CEO']);
+$creator_context = getEvaluationTemplateCreatorContext($conn, (int)($_SESSION['user_id'] ?? 0));
+if (!$creator_context || empty($creator_context['can_create_templates'])) {
+    redirectWith(BASE_URL . '/employee/dashboard.php', 'danger', 'Your active organizational role is not authorized to create evaluation templates.');
+}
+if (!empty($creator_context['is_ceo']) && basename(dirname($_SERVER['SCRIPT_NAME'])) !== 'employee') {
+    redirectWith(BASE_URL . '/employee/evaluation-templates.php', 'info', 'President and CEO template creation is available in the Employee Portal.');
+}
+$template_list_url = !empty($creator_context['is_ceo'])
+    ? BASE_URL . '/employee/evaluation-templates.php'
+    : BASE_URL . '/manager/templates.php';
+$template_create_url = !empty($creator_context['is_ceo'])
+    ? BASE_URL . '/employee/create-evaluation-template.php'
+    : BASE_URL . '/manager/create-template.php';
 
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    require_once '../includes/functions.php';
     verifyCsrfToken();
 
     $template_name = trim($_POST['template_name'] ?? '');
     $description = trim($_POST['description'] ?? '');
     $target_department = trim($_POST['target_department'] ?? '');
+    $behavior_framework_code = strtoupper(trim($_POST['behavior_framework_code'] ?? ''));
+    $behavior_framework_version = trim($_POST['behavior_framework_version'] ?? '');
     $evaluation_type = $_POST['evaluation_type'] ?? 'Annual';
     $kra_weight = floatval($_POST['kra_weight'] ?? 80);
     $behavior_weight = floatval($_POST['behavior_weight'] ?? 20);
@@ -27,22 +46,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $beh_names = $_POST['behavior_name'] ?? [];
     $beh_kpis = $_POST['behavior_kpi'] ?? [];
 
+    $department_stmt = $conn->prepare("SELECT department_id FROM departments WHERE department_name = ? AND is_active = 1 AND deleted_at IS NULL LIMIT 1");
+    $department_stmt->bind_param('s', $target_department);
+    $department_stmt->execute();
+    $target_department_id = (int)($department_stmt->get_result()->fetch_assoc()['department_id'] ?? 0);
+    $department_stmt->close();
+    $target_positions = getEvaluationTemplateTargetPositions($conn, $creator_context, $target_department_id);
+    $target_position_ids = array_map(static function ($position) {
+        return (int)$position['job_title_id'];
+    }, $target_positions);
+    $target_job_title_id = (int)($target_position_ids[0] ?? 0);
+    if (!$target_department_id || !$target_position_ids) {
+        redirectWith($template_create_url, 'danger', 'No active target positions are configured for your role in this department.');
+    }
+
     if (empty($template_name)) {
-        redirectWith(BASE_URL . '/manager/create-template.php', 'danger', 'Template name is required.');
+        redirectWith($template_create_url, 'danger', 'Template name is required.');
     }
     if (empty($kra_names) && empty($beh_names)) {
-        redirectWith(BASE_URL . '/manager/create-template.php', 'danger', 'At least one criterion is required.');
+        redirectWith($template_create_url, 'danger', 'At least one criterion is required.');
     }
 
     // Validate KRA weights sum to 100
     $kra_total_weight = array_sum(array_map('floatval', $kra_weights));
     if (!empty($kra_names) && abs($kra_total_weight - 100) > 0.01) {
-        redirectWith(BASE_URL . '/manager/create-template.php', 'danger', 'KRA weights must total 100%. Current: ' . $kra_total_weight . '%');
+        redirectWith($template_create_url, 'danger', 'KRA weights must total 100%. Current: ' . $kra_total_weight . '%');
     }
 
     // Validate weight split
     if (abs(($kra_weight + $behavior_weight) - 100) > 0.01) {
-        redirectWith(BASE_URL . '/manager/create-template.php', 'danger', 'KRA weight + Behavior weight must equal 100%.');
+        redirectWith($template_create_url, 'danger', 'KRA weight + Behavior weight must equal 100%.');
+    }
+    if ($behavior_framework_code === '' || $behavior_framework_version === '') {
+        redirectWith($template_create_url, 'danger', 'Behavior Framework Code and Version are required for every evaluation template.');
+    }
+    if (!evaluationBehaviorFrameworkMatchesExisting($conn, $behavior_framework_code, $behavior_framework_version, $beh_names, $beh_kpis)) {
+        redirectWith($template_create_url, 'danger', 'Behavior items must match other active forms using this Behavior Framework Code and Version.');
     }
 
     // Validate created_by exists in users
@@ -60,11 +99,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     // Insert template
-    $stmt = $conn->prepare("INSERT INTO evaluation_templates (template_name, description, target_department, evaluation_type, kra_weight, behavior_weight, form_code, revision_date, effective_date_form, status, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Active', ?)");
-    $stmt->bind_param("ssssddsssi", $template_name, $description, $target_department, $evaluation_type, $kra_weight, $behavior_weight, $form_code, $revision_date, $effective_date_form, $creator_id_nullable);
+    $stmt = $conn->prepare("INSERT INTO evaluation_templates
+        (template_name, description, target_department, target_department_id, target_job_title_id,
+         behavior_framework_code, behavior_framework_version, evaluation_type, kra_weight,
+         behavior_weight, form_code, revision_date, effective_date_form, status, created_by)
+        VALUES (?, ?, ?, ?, ?, NULLIF(?, ''), NULLIF(?, ''), ?, ?, ?, ?, ?, ?, 'Active', ?)");
+    $stmt->bind_param("sssiisssddsssi", $template_name, $description, $target_department, $target_department_id,
+        $target_job_title_id, $behavior_framework_code, $behavior_framework_version, $evaluation_type,
+        $kra_weight, $behavior_weight, $form_code, $revision_date, $effective_date_form, $creator_id_nullable);
     $stmt->execute();
     $template_id = $stmt->insert_id;
     $stmt->close();
+    if (!saveEvaluationTemplateTargetPositionIds($conn, $template_id, $target_position_ids)) {
+        throw new RuntimeException('Failed to assign target positions to the evaluation template.');
+    }
 
     // Insert KRA criteria
     $crit_stmt = $conn->prepare("INSERT INTO evaluation_criteria (template_id, section, criterion_name, description, weight, scoring_method, sort_order) VALUES (?, 'KRA', ?, ?, ?, 'Scale_1_4', ?)");
@@ -94,14 +142,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $beh_stmt->close();
 
     logAudit($conn, $_SESSION['user_id'], 'CREATE', 'Template', $template_id, "Created evaluation template: $template_name");
-    redirectWith(BASE_URL . '/manager/templates.php', 'success', "Template '$template_name' created successfully.");
+    redirectWith($template_list_url, 'success', "Template '$template_name' created successfully.");
 }
 
-// Fetch departments for dropdown
-$dept_result = $conn->query("SELECT department_name FROM departments WHERE deleted_at IS NULL AND is_active = 1 ORDER BY department_name");
-$departments = [];
-while ($d = $dept_result->fetch_assoc()) {
-    $departments[] = $d['department_name'];
+// Limit non-CEO template creators to the department of their active position.
+$dept_query = !empty($creator_context['is_ceo'])
+    ? "SELECT department_id, department_name FROM departments WHERE deleted_at IS NULL AND is_active = 1 ORDER BY department_name"
+    : "SELECT department_id, department_name FROM departments WHERE department_id = " . (int)$creator_context['department_id'] . " AND deleted_at IS NULL AND is_active = 1";
+$departments = $conn->query($dept_query)->fetch_all(MYSQLI_ASSOC);
+$target_positions = [];
+foreach ($departments as $department) {
+    $target_positions = array_merge(
+        $target_positions,
+        getEvaluationTemplateTargetPositions($conn, $creator_context, (int)$department['department_id'])
+    );
 }
 
 require_once '../includes/header.php';
@@ -322,7 +376,7 @@ require_once '../includes/header.php';
             <div style="font-size:.72rem;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,.55);">HR Manager · Evaluations</div>
             <h4 class="text-white fw-bold mb-0 mt-1"><i class="fas fa-magic me-2" style="color:#BD9414;"></i>Create Evaluation Template Wizard</h4>
         </div>
-        <a href="<?php echo BASE_URL; ?>/manager/templates.php" class="btn btn-outline-light btn-sm rounded-pill px-3">
+        <a href="<?php echo $template_list_url; ?>" class="btn btn-outline-light btn-sm rounded-pill px-3">
             <i class="fas fa-arrow-left me-1"></i>Back to Templates
         </a>
     </div>
@@ -487,11 +541,29 @@ require_once '../includes/header.php';
                 <div class="col-md-3 mb-3">
                     <label class="form-label fw-semibold">Target Department</label>
                     <select class="form-select" name="target_department" id="inputTargetDept">
-                        <option value="All Departments">All Departments</option>
                         <?php foreach ($departments as $dept): ?>
-                            <option value="<?php echo e($dept); ?>"><?php echo e($dept); ?></option>
+                            <option value="<?php echo e($dept['department_name']); ?>" data-department-id="<?php echo (int)$dept['department_id']; ?>"><?php echo e($dept['department_name']); ?></option>
                         <?php endforeach; ?>
                     </select>
+                </div>
+            </div>
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold">Target Position(s) <span class="text-danger">*</span></label>
+                    <select class="form-select" id="inputTargetPosition" multiple disabled size="4" aria-describedby="targetPositionHelp">
+                        <?php foreach ($target_positions as $position): ?>
+                            <option value="<?php echo (int)$position['job_title_id']; ?>" data-department-id="<?php echo (int)$position['department_id']; ?>"><?php echo e($position['job_title']); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <div class="form-text" id="targetPositionHelp">All active positions assigned to your role in the selected department are included automatically.</div>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold">Behavior Framework Code <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" name="behavior_framework_code" maxlength="80" required placeholder="e.g., CORE-2026">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold">Framework Version <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" name="behavior_framework_version" maxlength="40" required placeholder="e.g., 1.0">
                 </div>
             </div>
             <div class="row mb-3">
@@ -521,7 +593,7 @@ require_once '../includes/header.php';
     <div class="content-card mb-4 border-0 shadow-sm bg-light">
         <div class="card-body p-3">
             <div class="d-flex justify-content-between align-items-center">
-                <a href="<?php echo BASE_URL; ?>/manager/templates.php" class="btn btn-outline-secondary rounded-pill px-4">
+                <a href="<?php echo $template_list_url; ?>" class="btn btn-outline-secondary rounded-pill px-4">
                     <i class="fas fa-arrow-left me-2"></i>Cancel
                 </a>
                 <button type="button" class="btn btn-primary rounded-pill px-5 shadow-sm" onclick="nextStep(1)">
@@ -1540,6 +1612,8 @@ function collectDraft() {
         template_name: document.querySelector('[name="template_name"]')?.value || '',
         description: document.querySelector('[name="description"]')?.value || '',
         target_department: document.querySelector('[name="target_department"]')?.value || '',
+        behavior_framework_code: document.querySelector('[name="behavior_framework_code"]')?.value || '',
+        behavior_framework_version: document.querySelector('[name="behavior_framework_version"]')?.value || '',
         evaluation_type: document.querySelector('[name="evaluation_type"]')?.value || '',
         kra_weight: document.getElementById('kraWeight')?.value || '80',
         behavior_weight: document.getElementById('behaviorWeight')?.value || '20',
@@ -1575,6 +1649,8 @@ function restoreDraft(draft) {
     setVal('[name="template_name"]', draft.template_name);
     setVal('[name="description"]', draft.description);
     setVal('[name="target_department"]', draft.target_department);
+    setVal('[name="behavior_framework_code"]', draft.behavior_framework_code);
+    setVal('[name="behavior_framework_version"]', draft.behavior_framework_version);
     setVal('[name="evaluation_type"]', draft.evaluation_type);
     setVal('[name="form_code"]', draft.form_code);
     setVal('[name="revision_date"]', draft.revision_date);
@@ -1684,6 +1760,26 @@ function attachAutosaveListeners() {
 
 // Initial setup
 document.addEventListener('DOMContentLoaded', function() {
+    const targetDepartment = document.getElementById('inputTargetDept');
+    const targetPosition = document.getElementById('inputTargetPosition');
+    const filterTargetPositions = function() {
+        if (!targetDepartment || !targetPosition) return;
+        const selectedDepartmentId = targetDepartment.selectedOptions[0]?.dataset.departmentId || '';
+        let selectedCount = 0;
+        Array.from(targetPosition.options).forEach(option => {
+            option.hidden = option.dataset.departmentId !== selectedDepartmentId;
+            option.selected = !option.hidden;
+            if (option.selected) selectedCount++;
+        });
+        const help = document.getElementById('targetPositionHelp');
+        if (help) help.textContent = selectedCount
+            ? selectedCount + ' active position(s) assigned to your role will be included automatically.'
+            : 'No active target positions are configured for your role in this department.';
+    };
+    if (targetDepartment && targetPosition) {
+        targetDepartment.addEventListener('change', filterTargetPositions);
+        filterTargetPositions();
+    }
     const saved = localStorage.getItem(DRAFT_KEY);
     if (saved) {
         try {
@@ -1698,6 +1794,7 @@ document.addEventListener('DOMContentLoaded', function() {
         addKRA('', '', ''); addKRA('', '', ''); addKRA('', '', '');
         defaultBehaviors.forEach(b => addBehavior(b.name, b.kpi));
     }
+    filterTargetPositions();
     updateWizardUI();
     updateTemplateIdentifierMarquee();
     attachAutosaveListeners();
