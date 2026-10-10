@@ -7,10 +7,17 @@ ensureHistoricalImportSchema($conn);
 $show_progressive_notice = hasOpenProgressiveEvaluationCohort($conn);
 require_once '../includes/header.php';
 
-// Fetch evaluation history
+// Fetch submitted evaluations, including records still moving through a review route.
 $history = $conn->query("SELECT ev.*, CONCAT(e.first_name, ' ', e.last_name) as employee_name, e.job_title, e.rank_category_id, e.profile_picture, d.department_name,
     u.full_name as submitted_by_name, u2.full_name as endorsed_by_name, u3.full_name as approved_by_name, et.template_name,
-    ep.package_id, ep.status AS package_status
+    ep.package_id, ep.status AS package_status, COALESCE(ep.evaluation_type, et.evaluation_type) AS package_evaluation_type,
+    ep.period_start, ep.period_end, ep.current_step_order,
+    current_route.step_label AS current_step_label,
+    current_reviewer.full_name AS current_reviewer_name,
+    current_reviewer_emp.job_title AS current_reviewer_position,
+    last_route.step_label AS last_step_label,
+    last_reviewer.full_name AS last_reviewer_name,
+    last_reviewer_emp.job_title AS last_reviewer_position
     FROM evaluations ev
     LEFT JOIN employees e ON ev.employee_id = e.employee_id
     LEFT JOIN departments d ON e.department_id = d.department_id
@@ -22,11 +29,26 @@ $history = $conn->query("SELECT ev.*, CONCAT(e.first_name, ' ', e.last_name) as 
         AND EXISTS (SELECT 1 FROM evaluation_packages active_ep
                     WHERE active_ep.package_id = pm.package_id AND active_ep.status <> 'Cancelled')
     LEFT JOIN evaluation_packages ep ON ep.package_id = pm.package_id
-    WHERE ev.status IN ('Approved', 'Rejected', 'Returned')
+    LEFT JOIN evaluation_package_route_steps current_route ON current_route.package_id = ep.package_id
+        AND current_route.step_order = ep.current_step_order
+    LEFT JOIN users current_reviewer ON current_reviewer.user_id = current_route.reviewer_user_id
+    LEFT JOIN employees current_reviewer_emp ON current_reviewer_emp.employee_id = current_route.reviewer_employee_id
+    LEFT JOIN (
+        SELECT package_id, MAX(step_order) AS last_step_order
+        FROM evaluation_package_route_steps
+        WHERE action_status IN ('Approved', 'Returned', 'Skipped')
+        GROUP BY package_id
+    ) last_done ON last_done.package_id = ep.package_id
+    LEFT JOIN evaluation_package_route_steps last_route ON last_route.package_id = last_done.package_id
+        AND last_route.step_order = last_done.last_step_order
+    LEFT JOIN users last_reviewer ON last_reviewer.user_id = last_route.reviewer_user_id
+    LEFT JOIN employees last_reviewer_emp ON last_reviewer_emp.employee_id = last_route.reviewer_employee_id
+    WHERE (ev.status IN ('Approved', 'Rejected', 'Returned') OR (ep.package_id IS NOT NULL AND ep.status NOT IN ('Cancelled')))
     AND ev.employee_id NOT IN (SELECT employee_id FROM users WHERE role = 'Admin' AND employee_id IS NOT NULL)
     ORDER BY ev.updated_at DESC");
 
 $total_c = 0;
+$pending_c = 0;
 $approved_c = 0;
 $rejected_c = 0;
 $returned_c = 0;
@@ -35,9 +57,11 @@ $all_history = [];
 while ($row = $history->fetch_assoc()) {
     $all_history[] = $row;
     $total_c++;
-    if ($row['status'] === 'Approved') $approved_c++;
-    elseif ($row['status'] === 'Rejected') $rejected_c++;
-    elseif ($row['status'] === 'Returned') $returned_c++;
+    $history_status = $row['package_status'] === 'Approved and Applied' ? 'Approved' : ($row['package_status'] ?: $row['status']);
+    if ($history_status === 'Approved' || $history_status === 'Approved and Applied') $approved_c++;
+    elseif ($history_status === 'Rejected') $rejected_c++;
+    elseif ($history_status === 'Returned') $returned_c++;
+    else $pending_c++;
 }
 
 // Extract only existing departments & templates present in the history records
@@ -163,8 +187,56 @@ ksort($existing_templates);
 .hist-status-pill.active-approved { background: #d1fae5; color: #065f46; border-color: #6ee7b7; }
 .hist-status-pill.active-rejected { background: #fee2e2; color: #991b1b; border-color: #fca5a5; }
 .hist-status-pill.active-returned { background: #fef3c7; color: #92400e; border-color: #fcd34d; }
+.hist-status-pill.active-pending { background: #dbeafe; color: #1d4ed8; border-color: #93c5fd; }
+
+.history-review-tabs { align-items: end; border-bottom: 1px solid #dce4d8; display:flex; gap:8px; margin:0 0 14px; }
+.history-review-tab { align-items:center; background:#f1f3f2; border:1px solid transparent; border-bottom:0; border-radius:10px 10px 0 0; color:#64748b; display:flex; gap:10px; min-width:205px; padding:12px 16px; text-align:left; }
+.history-review-tab.active { background:#fff; border-color:#dbe5d8; box-shadow:inset 0 3px #2e7d32; color:#173b1b; font-weight:700; }
+.history-review-tab.probationary.active { box-shadow:inset 0 3px #3730a3; }
+.history-review-tab .tab-count { align-items:center; background:#fff; border-radius:50%; display:inline-flex; font-size:.72rem; height:26px; justify-content:center; margin-left:auto; min-width:26px; }
+.history-section-heading { background:#fff; border:1px solid #edf0eb; border-bottom:0; border-radius:12px 12px 0 0; padding:14px 16px 8px; }
+.history-table-wrap { background:#fff; border:1px solid #edf0eb; border-radius:0 0 12px 12px; overflow:auto; }
+.history-table { margin:0; min-width:940px; }
+.history-table thead th { background:#f0f4ee; border-bottom:1px solid #e1e7df; color:#536052; font-size:.68rem; padding:10px 9px; text-transform:uppercase; white-space:nowrap; }
+.history-table tbody td { border-color:#edf0eb; font-size:.76rem; padding:9px; vertical-align:middle; }
+.history-table .employee-cell { align-items:center; display:flex; gap:8px; min-width:165px; }
+.history-table .hist-card-avatar { height:34px; width:34px; }
+.history-table .employee-copy { min-width:0; }
+.history-table .employee-copy strong, .history-table .employee-copy small { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.history-table .employee-copy strong { color:#253425; font-size:.75rem; }
+.history-table .employee-copy small { color:#94a3b8; font-size:.64rem; }
+.history-table .current-reviewer { color:#475569; font-size:.71rem; }
+.history-period { color:#64748b; font-size:.72rem; }
+.history-table .rating-pill { border-radius:999px; display:inline-block; font-size:.68rem; font-weight:700; padding:4px 9px; }
+.history-table .rating-excellent { background:#dff7e8; color:#166534; }
+.history-table .rating-exceeds { background:#dbeafe; color:#1d4ed8; }
+.history-table .rating-meets { background:#fef3c7; color:#92400e; }
+.history-table .rating-needs { background:#fee2e2; color:#991b1b; }
+.history-table .history-empty-row { color:#94a3b8; padding:40px !important; text-align:center; }
 
 /* ── History Cards ───────────────────────────────── */
+.history-review-tabs { align-items:end; border-bottom:1px solid #dce4d8; display:flex; gap:8px; margin:0 0 14px; }
+.history-review-tab { align-items:center; background:#f1f3f2; border:1px solid transparent; border-bottom:0; border-radius:10px 10px 0 0; color:#64748b; display:flex; gap:10px; min-width:205px; padding:12px 16px; text-align:left; }
+.history-review-tab.active { background:#fff; border-color:#dbe5d8; box-shadow:inset 0 3px #2e7d32; color:#173b1b; font-weight:700; }
+.history-review-tab.probationary.active { box-shadow:inset 0 3px #3730a3; }
+.history-review-tab .tab-count { align-items:center; background:#fff; border-radius:50%; display:inline-flex; font-size:.72rem; height:26px; justify-content:center; margin-left:auto; min-width:26px; }
+.history-section-heading { background:#fff; border:1px solid #edf0eb; border-bottom:0; border-radius:12px 12px 0 0; padding:14px 16px 8px; }
+.history-table-wrap { background:#fff; border:1px solid #edf0eb; border-radius:0 0 12px 12px; overflow:auto; }
+.history-table { margin:0; min-width:940px; }
+.history-table thead th { background:#f0f4ee; border-bottom:1px solid #e1e7df; color:#536052; font-size:.68rem; padding:10px 9px; text-transform:uppercase; white-space:nowrap; }
+.history-table tbody td { border-color:#edf0eb; font-size:.76rem; padding:9px; vertical-align:middle; }
+.history-table .employee-cell { align-items:center; display:flex; gap:8px; min-width:165px; }
+.history-table .hist-card-avatar { height:34px; width:34px; }
+.history-table .employee-copy { min-width:0; }
+.history-table .employee-copy strong,.history-table .employee-copy small { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.history-table .employee-copy strong { color:#253425; font-size:.75rem; }
+.history-table .employee-copy small,.current-reviewer { color:#64748b; font-size:.68rem; }
+.history-table .rating-pill { border-radius:999px; display:inline-block; font-size:.65rem; font-weight:700; padding:4px 9px; }
+.history-table .rating-excellent { background:#dff7e8; color:#166534; }
+.history-table .rating-exceeds { background:#dbeafe; color:#1d4ed8; }
+.history-table .rating-meets { background:#fef3c7; color:#92400e; }
+.history-table .rating-needs { background:#fee2e2; color:#991b1b; }
+.history-table .history-empty-row { color:#94a3b8; padding:40px !important; text-align:center; }
 .hist-card-list { display: flex; flex-direction: column; gap: 10px; }
 .hist-card {
     background: #fff;
@@ -396,6 +468,8 @@ ksort($existing_templates);
 }
 
 @media (max-width: 767px) {
+    .history-review-tabs { gap:4px; }
+    .history-review-tab { flex:1; min-width:0; padding:10px; }
     .history-detail-modal .modal-dialog { margin: 8px; max-width: calc(100vw - 16px); }
     .history-detail-modal .modal-content { max-height: calc(100dvh - 16px); border-radius: 16px !important; }
     .history-detail-modal .history-modal-header { flex-wrap: wrap; gap: 12px; padding: 16px; }
@@ -421,20 +495,30 @@ ksort($existing_templates);
 }
 </style>
 
+<!-- Evaluation type tabs -->
+<div class="history-review-tabs fadeup fadeup-1" role="tablist" aria-label="Evaluation type">
+    <button class="history-review-tab probationary active" type="button" role="tab" aria-selected="true" onclick="histSetType('probationary', this)"><i class="fas fa-users"></i><span><strong>Probationary Evaluation</strong><small class="d-block text-muted fw-normal">Initial and Final evaluations</small></span><span class="tab-count" id="histProbationaryCount">0</span></button>
+    <button class="history-review-tab regular" type="button" role="tab" aria-selected="false" onclick="histSetType('regular', this)"><i class="fas fa-user"></i><span><strong>Regular Employee</strong><small class="d-block text-muted fw-normal">Annual team evaluations</small></span><span class="tab-count" id="histRegularCount">0</span></button>
+</div>
+<section class="history-section-heading"><h5 class="fw-bold mb-1" id="historyTypeHeading">Probationary Evaluation</h5><div class="history-period" id="historyTypePeriod">Initial and Final employee evaluations</div></section>
+
 <!-- Filter Bar -->
 <div class="hist-filter-bar fadeup fadeup-1">
     <div class="hist-status-pills">
         <button class="hist-status-pill active-all" onclick="histFilter('All', this)">
-            <i class="fas fa-list me-1"></i>All <span class="ms-1 opacity-75">(<?php echo $total_c; ?>)</span>
+            <i class="fas fa-list me-1"></i>All <span class="ms-1 opacity-75" data-status-count="All">(<?php echo $total_c; ?>)</span>
+        </button>
+        <button class="hist-status-pill" onclick="histFilter('Pending', this)">
+            <i class="fas fa-hourglass-half me-1"></i>Pending <span class="ms-1 opacity-75" data-status-count="Pending">(<?php echo $pending_c; ?>)</span>
         </button>
         <button class="hist-status-pill" onclick="histFilter('Approved', this)">
-            <i class="fas fa-check-circle me-1"></i>Approved <span class="ms-1 opacity-75">(<?php echo $approved_c; ?>)</span>
+            <i class="fas fa-check-circle me-1"></i>Approved <span class="ms-1 opacity-75" data-status-count="Approved">(<?php echo $approved_c; ?>)</span>
         </button>
         <button class="hist-status-pill" onclick="histFilter('Rejected', this)">
-            <i class="fas fa-times-circle me-1"></i>Rejected <span class="ms-1 opacity-75">(<?php echo $rejected_c; ?>)</span>
+            <i class="fas fa-times-circle me-1"></i>Rejected <span class="ms-1 opacity-75" data-status-count="Rejected">(<?php echo $rejected_c; ?>)</span>
         </button>
         <button class="hist-status-pill" onclick="histFilter('Returned', this)">
-            <i class="fas fa-rotate-left me-1"></i>Returned <span class="ms-1 opacity-75">(<?php echo $returned_c; ?>)</span>
+            <i class="fas fa-rotate-left me-1"></i>Returned <span class="ms-1 opacity-75" data-status-count="Returned">(<?php echo $returned_c; ?>)</span>
         </button>
     </div>
     <div class="d-flex align-items-center gap-2 flex-wrap">
@@ -458,19 +542,15 @@ ksort($existing_templates);
         </div>
         <div class="input-group input-group-sm" style="min-width:200px;">
             <span class="input-group-text bg-white border-end-0 text-muted"><i class="fas fa-search"></i></span>
-            <input type="search" class="form-control border-start-0 ps-0" id="histSearchInput" placeholder="Search employee, job...">
+            <input type="search" class="form-control border-start-0 ps-0" id="histSearchInput" placeholder="Search employee, position...">
         </div>
     </div>
 </div>
 
-<!-- Card List -->
-<div class="hist-card-list fadeup fadeup-2" id="histCardList">
+<!-- Evaluation table -->
+<div class="history-table-wrap fadeup fadeup-2"><table class="table history-table" id="histTable"><thead><tr><th>Employee Name</th><th>Department</th><th>Position</th><th>Overall Rating</th><th>Status</th><th>Current Reviewer</th><th>Date Submitted</th><th>Actions</th></tr></thead><tbody id="histTableBody">
     <?php if (empty($all_history)): ?>
-        <div class="hist-empty">
-            <i class="fas fa-history"></i>
-            <p class="fw-semibold mb-1">No evaluation records yet</p>
-            <small>Approved, rejected, or returned evaluations will appear here.</small>
-        </div>
+        <tr><td colspan="8" class="history-empty-row">No evaluation records yet.</td></tr>
     <?php else: ?>
         <?php foreach ($all_history as $row):
             $h_score = (float)($row['total_score'] ?? 0);
@@ -487,40 +567,41 @@ ksort($existing_templates);
                 str_contains($h_badge_class, 'danger')  => '#ef4444',
                 default                                  => '#94a3b8',
             };
-            $status_lc  = strtolower($row['status']);
-            $status_icon = match($row['status']) {
+            $is_probationary_history = in_array($row['package_evaluation_type'] ?? '', ['Initial', 'Final'], true);
+            $history_status = ($row['package_status'] ?? '') === 'Approved and Applied' ? 'Approved' : (($row['package_status'] ?? '') ?: $row['status']);
+            $history_status_label = $history_status === 'Approved and Applied' ? 'Approved' : $history_status;
+            $status_filter_key = in_array($history_status_label, ['Approved', 'Rejected', 'Returned'], true) ? $history_status_label : 'Pending';
+            $status_display = $status_filter_key === 'Pending' ? 'Pending' : $history_status_label;
+            $status_lc  = strtolower($status_display);
+            $status_icon = $history_status_label === 'Pending Self-Ratings' ? 'fa-hourglass-half' : match($history_status_label) {
                 'Approved' => 'fa-check-circle',
                 'Rejected' => 'fa-times-circle',
                 'Returned' => 'fa-rotate-left',
                 default    => 'fa-circle',
             };
             $is_historical = !empty($row['is_historical']);
+            $reviewer_name = ($row['package_status'] ?? '') === 'Approved and Applied' ? (($row['last_reviewer_name'] ?? '') ?: 'Completed') : trim((string)($row['current_reviewer_name'] ?? ''));
+            $reviewer_position = ($row['package_status'] ?? '') === 'Approved and Applied' ? (string)($row['last_reviewer_position'] ?? '') : (string)($row['current_reviewer_position'] ?? '');
+            if ($reviewer_name === '') $reviewer_name = ($row['package_status'] ?? '') === 'Returned' ? (($row['last_reviewer_name'] ?? '') ?: 'Returned for revision') : (($row['current_step_label'] ?? '') ?: (($row['last_reviewer_name'] ?? '') ?: 'In review'));
+            $submitted_date = $row['submitted_at'] ?? $row['created_at'] ?? $row['updated_at'] ?? null;
             $initials_h = strtoupper(
                 substr($row['employee_name'], 0, 1) .
                 substr(explode(' ', $row['employee_name'])[1] ?? '', 0, 1)
             );
             $avatar_h = getEmployeeAvatar($row['profile_picture'] ?? '');
         ?>
-        <div class="hist-card" data-status="<?php echo e($row['status']); ?>"
+        <tr class="history-row" data-type="<?php echo $is_probationary_history ? 'probationary' : 'regular'; ?>" data-status="<?php echo e($status_filter_key); ?>"
              data-department="<?php echo e($row['department_name'] ?? ''); ?>"
              data-template="<?php echo e($row['template_name'] ?? ''); ?>"
              data-search="<?php echo strtolower(e($row['employee_name']) . ' ' . e($row['department_name'] ?? '') . ' ' . e($row['template_name']) . ' ' . e($row['job_title'])); ?>">
-            <!-- Avatar -->
-            <div class="hist-card-avatar">
+            <td><div class="employee-cell"><div class="hist-card-avatar">
                 <img src="<?php echo e($avatar_h); ?>?v=<?php echo time(); ?>" alt="<?php echo e($row['employee_name']); ?>">
-            </div>
-            <!-- Employee -->
-            <div class="hist-card-employee">
-                <div class="name"><?php echo e($row['employee_name']); ?></div>
-                <div class="sub"><?php echo e($row['job_title']); ?></div>
-            </div>
+            </div><div class="employee-copy"><strong><?php echo e($row['employee_name']); ?></strong><small><?php echo e($row['employee_code'] ?? ('ID ' . $row['employee_id'])); ?></small></div></div></td>
             <!-- Dept + Template -->
-            <div class="hist-card-dept">
-                <div class="dept"><?php echo e($row['department_name'] ?? 'N/A'); ?></div>
-                <div class="tpl"><?php echo e($row['template_name']); ?></div>
-            </div>
+            <td><?php echo e($row['department_name'] ?? 'N/A'); ?></td><td><?php echo e($row['job_title'] ?? 'N/A'); ?></td>
             <!-- Score -->
-            <div class="hist-score-col">
+            <td class="text-center"><strong class="d-block"><?php echo $h_score > 0 ? number_format($h_score, 2) : '—'; ?></strong><?php if ($h_perf): $rating_class = str_contains($h_badge_class, 'success') ? 'rating-excellent' : (str_contains($h_badge_class, 'info') ? 'rating-exceeds' : (str_contains($h_badge_class, 'warning') ? 'rating-meets' : (str_contains($h_badge_class, 'danger') ? 'rating-needs' : ''))); ?><span class="rating-pill <?php echo $rating_class; ?>"><?php echo e($h_perf); ?></span><?php endif; ?></td>
+            <!--
                 <div class="d-flex align-items-center gap-2">
                     <span class="hist-score-val"><?php echo $h_score > 0 ? number_format($h_score, 2) : '—'; ?></span>
                     <?php if ($h_perf): ?>
@@ -533,14 +614,14 @@ ksort($existing_templates);
                 </div>
                 <?php endif; ?>
                 <div style="font-size:.68rem;color:#94a3b8;"><?php echo formatDate($row['updated_at']); ?></div>
-            </div>
+            </div>-->
             <!-- Status -->
-            <div class="hist-status-col">
+            <td>
                 <?php if (!empty($row['package_id'])): ?>
-                    <?php echo renderOrganizationPipelineBadge($conn, (int)$row['package_id']); ?>
+                    <?php echo renderOrganizationPipelineBadge($conn, (int)$row['package_id'], '', (int)$row['evaluation_id']); ?>
                 <?php else: ?>
                     <span class="hist-status-badge <?php echo $status_lc; ?>">
-                        <i class="fas <?php echo $status_icon; ?>"></i><?php echo e($row['status']); ?>
+                        <i class="fas <?php echo $status_icon; ?>"></i><?php echo e($status_display); ?>
                     </span>
                 <?php endif; ?>
                 <?php if ($is_historical): ?>
@@ -548,33 +629,39 @@ ksort($existing_templates);
                         <i class="fas fa-history me-1"></i>Historical Import
                     </span>
                 <?php endif; ?>
-            </div>
-            <!-- Action -->
-            <div class="hist-card-action">
+            </td><td><div class="current-reviewer"><?php echo e($reviewer_name); ?></div></td><td><?php echo $submitted_date ? formatDate($submitted_date) : '—'; ?></td><td>
                 <button class="btn btn-sm btn-primary rounded-pill px-3 fw-semibold shadow-sm"
                         data-bs-toggle="modal" data-bs-target="#reviewModal<?php echo $row['evaluation_id']; ?>">
                     <i class="fas fa-eye me-1"></i>View
                 </button>
-            </div>
-        </div>
+            </td>
+        </tr>
         <?php endforeach; ?>
 
         <!-- No results (search) -->
-        <div class="hist-empty d-none" id="histNoResults">
-            <i class="fas fa-search"></i>
-            <p class="fw-semibold mb-1">No results found</p>
-            <small>Try a different search term or clear your filters.</small>
-        </div>
+    <tr class="d-none" id="histNoResults"><td colspan="8" class="history-empty-row">No evaluations match these filters.</td></tr>
     <?php endif; ?>
-</div>
+</tbody></table></div>
 
 <!-- Meta row -->
 <div class="hist-meta mt-2 px-1" id="histMeta">
-    Showing <span id="histVisibleCount"><?php echo count($all_history); ?></span> of <?php echo count($all_history); ?> records
+    Showing <span id="histVisibleCount">0</span> of <span id="histTypeCount">0</span> results
 </div>
 
 <script>
 let histActiveStatus = 'All';
+let histActiveType = 'probationary';
+
+function histSetType(type, btn) {
+    histActiveType = type;
+    document.querySelectorAll('.history-review-tab').forEach(tab => tab.classList.toggle('active', tab === btn));
+    document.getElementById('historyTypeHeading').textContent = type === 'probationary' ? 'Probationary Evaluation' : 'Regular Employee';
+    document.getElementById('historyTypePeriod').textContent = type === 'probationary' ? 'Initial and Final employee evaluations' : 'Annual team evaluations';
+    histActiveStatus = 'All';
+    document.querySelectorAll('.hist-status-pill').forEach(p => p.className = 'hist-status-pill');
+    document.querySelector('.hist-status-pill')?.classList.add('active-all');
+    applyHistFilters();
+}
 
 function histFilter(status, btn) {
     histActiveStatus = status;
@@ -583,7 +670,7 @@ function histFilter(status, btn) {
     document.querySelectorAll('.hist-status-pill').forEach(p => {
         p.className = 'hist-status-pill';
     });
-    const classMap = { All: 'active-all', Approved: 'active-approved', Rejected: 'active-rejected', Returned: 'active-returned' };
+    const classMap = { All: 'active-all', Pending: 'active-pending', Approved: 'active-approved', Rejected: 'active-rejected', Returned: 'active-returned' };
     btn.classList.add(classMap[status] ?? 'active-all');
 
     applyHistFilters();
@@ -593,30 +680,44 @@ function applyHistFilters() {
     const q = (document.getElementById('histSearchInput')?.value || '').toLowerCase().trim();
     const selDept = document.getElementById('histDeptFilter')?.value || 'All';
     const selTmpl = document.getElementById('histTemplateFilter')?.value || 'All';
-    const cards = document.querySelectorAll('#histCardList .hist-card');
+    const rows = document.querySelectorAll('#histTableBody .history-row');
     let visible = 0;
-
-    cards.forEach(card => {
-        const statusMatch = histActiveStatus === 'All' || card.dataset.status === histActiveStatus;
-        const deptMatch = selDept === 'All' || (card.dataset.department || '') === selDept;
-        const tmplMatch = selTmpl === 'All' || (card.dataset.template || '') === selTmpl;
-        const searchMatch = !q || (card.dataset.search || '').includes(q);
-        const show = statusMatch && deptMatch && tmplMatch && searchMatch;
-        card.style.display = show ? '' : 'none';
+    let typeCount = 0;
+    const typeStatusCounts = { All: 0, Pending: 0, Approved: 0, Rejected: 0, Returned: 0 };
+    rows.forEach(row => {
+        const typeMatch = row.dataset.type === histActiveType;
+        if (typeMatch) {
+            typeCount++;
+            typeStatusCounts.All++;
+            typeStatusCounts[row.dataset.status] = (typeStatusCounts[row.dataset.status] || 0) + 1;
+        }
+        const statusMatch = histActiveStatus === 'All' || row.dataset.status === histActiveStatus;
+        const deptMatch = selDept === 'All' || (row.dataset.department || '') === selDept;
+        const tmplMatch = selTmpl === 'All' || (row.dataset.template || '') === selTmpl;
+        const searchMatch = !q || (row.dataset.search || '').includes(q);
+        const show = typeMatch && statusMatch && deptMatch && tmplMatch && searchMatch;
+        row.style.display = show ? '' : 'none';
         if (show) visible++;
     });
 
     const noRes = document.getElementById('histNoResults');
-    if (noRes) noRes.classList.toggle('d-none', visible > 0);
+    if (noRes) noRes.classList.toggle('d-none', typeCount === 0 || visible > 0);
 
     const meta = document.getElementById('histVisibleCount');
     if (meta) meta.textContent = visible;
+    document.getElementById('histTypeCount').textContent = typeCount;
+    document.getElementById('histProbationaryCount').textContent = [...rows].filter(row => row.dataset.type === 'probationary').length;
+    document.getElementById('histRegularCount').textContent = [...rows].filter(row => row.dataset.type === 'regular').length;
+    document.querySelectorAll('[data-status-count]').forEach(count => {
+        count.textContent = `(${typeStatusCounts[count.dataset.statusCount] || 0})`;
+    });
 }
 
 document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('histSearchInput')?.addEventListener('input', applyHistFilters);
     document.getElementById('histDeptFilter')?.addEventListener('change', applyHistFilters);
     document.getElementById('histTemplateFilter')?.addEventListener('change', applyHistFilters);
+    applyHistFilters();
 });
 </script>
 

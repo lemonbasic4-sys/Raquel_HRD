@@ -515,6 +515,14 @@ $probationary_package_count = count(array_filter($packages, static fn($package) 
     + count(array_filter($waiting_packages, static fn($package) => in_array($package['evaluation_type'] ?? '', ['Initial', 'Final'], true)));
 $regular_package_count = count($packages) + count($waiting_packages) - $probationary_package_count;
 $active_package_tab = $probationary_package_count > 0 ? 'probationary' : 'regular';
+$package_department_options = [];
+foreach (array_merge($packages, $waiting_packages) as $package_option) {
+    $department_option_id = (int)($package_option['department_id'] ?? 0);
+    if ($department_option_id > 0) {
+        $package_department_options[$department_option_id] = (string)($package_option['department_name'] ?? 'Department');
+    }
+}
+asort($package_department_options, SORT_NATURAL | SORT_FLAG_CASE);
 ?>
 <div class="evaluation-packages">
     <section class="package-hero">
@@ -567,9 +575,12 @@ $active_package_tab = $probationary_package_count > 0 ? 'probationary' : 'regula
             .package-category-tab__copy small{color:#6b7280;font-size:.72rem}
             .package-category-tab__count{display:grid;place-items:center;min-width:26px;height:26px;padding:0 .4rem;border-radius:999px;background:#fff;color:#374151;font-size:.76rem;font-weight:700}
             .package-category-tab.active .package-category-tab__count{background:#082e06;color:#fff}
+            .package-department-filter{display:flex;align-items:flex-end;gap:.6rem;justify-content:flex-end;margin:-.35rem 0 1rem}
+            .package-department-filter .form-label{white-space:nowrap;color:#475569}
+            .package-department-filter .form-select{max-width:280px}
             .package-card.package-card--probationary{border-color:#3730a3!important}
             .package-card.package-card--probationary .package-card__header{border-left:4px solid #3730a3}
-            @media(max-width:575.98px){.package-category-tabs{gap:.4rem}.package-category-tab{flex:1;min-width:0;padding:.65rem .5rem;gap:.45rem}.package-category-tab__icon{width:30px;height:30px}.package-category-tab__copy strong{font-size:.76rem}.package-category-tab__copy small{font-size:.65rem}}
+            @media(max-width:575.98px){.package-category-tabs{gap:.4rem}.package-category-tab{flex:1;min-width:0;padding:.65rem .5rem;gap:.45rem}.package-category-tab__icon{width:30px;height:30px}.package-category-tab__copy strong{font-size:.76rem}.package-category-tab__copy small{font-size:.65rem}.package-department-filter{justify-content:stretch;flex-wrap:wrap}.package-department-filter .form-select{max-width:none;width:100%}}
         </style>
         <nav class="package-category-tabs" aria-label="Evaluation package type">
             <button type="button" class="package-category-tab <?php echo $active_package_tab === 'probationary' ? 'active' : ''; ?>" data-package-category-tab="probationary" aria-pressed="<?php echo $active_package_tab === 'probationary' ? 'true' : 'false'; ?>" <?php echo $probationary_package_count === 0 ? 'disabled' : ''; ?>>
@@ -583,6 +594,20 @@ $active_package_tab = $probationary_package_count > 0 ? 'probationary' : 'regula
                 <span class="package-category-tab__count"><?php echo $regular_package_count; ?></span>
             </button>
         </nav>
+        <div class="package-department-filter">
+            <label for="packageDepartmentFilter" class="form-label mb-1 small fw-semibold">Filter department</label>
+            <select id="packageDepartmentFilter" class="form-select form-select-sm" aria-label="Filter evaluation packages by department">
+                <option value="">All Departments</option>
+                <?php foreach ($package_department_options as $department_option_id => $department_option_name): ?>
+                    <option value="<?php echo (int)$department_option_id; ?>"><?php echo e($department_option_name); ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div id="packageFilterEmpty" class="package-empty d-none" role="status">
+            <i class="fas fa-filter fa-2x text-muted mb-2" style="opacity:0.4;"></i>
+            <h2 class="h6 fw-bold mb-1">No packages match these filters</h2>
+            <p class="mb-0 text-muted small">Choose another department or evaluation tab.</p>
+        </div>
     <?php endif; ?>
 
 
@@ -603,7 +628,7 @@ $active_package_tab = $probationary_package_count > 0 ? 'probationary' : 'regula
         $is_probationary_waiting = in_array($package['evaluation_type'] ?? '', ['Initial', 'Final'], true);
         $waiting_category = $is_probationary_waiting ? 'probationary' : 'regular';
         ?>
-        <article class="package-card <?php echo $waiting_category === 'probationary' ? 'package-card--probationary ' : ''; ?><?php echo $waiting_category === $active_package_tab ? '' : 'd-none'; ?>" data-package-category="<?php echo $waiting_category; ?>" role="region" aria-label="<?php echo e($package['department_name']); ?> Pending Submissions">
+        <article class="package-card <?php echo $waiting_category === 'probationary' ? 'package-card--probationary ' : ''; ?><?php echo $waiting_category === $active_package_tab ? '' : 'd-none'; ?>" data-package-category="<?php echo $waiting_category; ?>" data-package-department="<?php echo (int)$package['department_id']; ?>" role="region" aria-label="<?php echo e($package['department_name']); ?> Pending Submissions">
             <header class="package-card__header">
                 <div>
                     <h2 class="h5 mb-1 fw-bold"><?php echo e($package['department_name']); ?> &mdash; <?php echo e($package['template_name']); ?></h2>
@@ -720,7 +745,7 @@ $active_package_tab = $probationary_package_count > 0 ? 'probationary' : 'regula
         $department_team_size = (int)($team_size_stmt->get_result()->fetch_assoc()['team_size'] ?? 0);
         $team_size_stmt->close();
         ?>
-        <article class="package-card <?php echo $is_probationary_package ? 'package-card--probationary ' : ''; ?><?php echo $is_probationary_package === ($active_package_tab === 'probationary') ? '' : 'd-none'; ?>" data-package-category="<?php echo $is_probationary_package ? 'probationary' : 'regular'; ?>" role="region" aria-label="<?php echo e($package['department_name']); ?> Evaluation Action Package">
+        <article class="package-card <?php echo $is_probationary_package ? 'package-card--probationary ' : ''; ?><?php echo $is_probationary_package === ($active_package_tab === 'probationary') ? '' : 'd-none'; ?>" data-package-category="<?php echo $is_probationary_package ? 'probationary' : 'regular'; ?>" data-package-department="<?php echo (int)$package['department_id']; ?>" role="region" aria-label="<?php echo e($package['department_name']); ?> Evaluation Action Package">
             <header class="package-card__header">
                 <div>
                     <h2 class="h5 mb-1 fw-bold"><?php echo e($package['department_name']); ?> &mdash; <?php echo e($package['template_name']); ?></h2>
@@ -1121,20 +1146,50 @@ $active_package_tab = $probationary_package_count > 0 ? 'probationary' : 'regula
 </div>
 
 <script>
-document.querySelectorAll('[data-package-category-tab]').forEach((tab) => {
+const packageCategoryTabs = Array.from(document.querySelectorAll('[data-package-category-tab]'));
+const packageCards = Array.from(document.querySelectorAll('[data-package-category]'));
+const packageDepartmentFilter = document.getElementById('packageDepartmentFilter');
+const packageFilterEmpty = document.getElementById('packageFilterEmpty');
+
+function applyPackageFilters() {
+    const activeTab = packageCategoryTabs.find((tab) => tab.classList.contains('active'));
+    const activeCategory = activeTab ? activeTab.dataset.packageCategoryTab : '';
+    const selectedDepartment = packageDepartmentFilter ? packageDepartmentFilter.value : '';
+    let visibleCardCount = 0;
+
+    packageCards.forEach((card) => {
+        const matchesCategory = card.dataset.packageCategory === activeCategory;
+        const matchesDepartment = !selectedDepartment || card.dataset.packageDepartment === selectedDepartment;
+        const isVisible = matchesCategory && matchesDepartment;
+        card.classList.toggle('d-none', !isVisible);
+        if (isVisible) visibleCardCount++;
+    });
+
+    packageCategoryTabs.forEach((tab) => {
+        const departmentCards = packageCards.filter((card) =>
+            (!selectedDepartment || card.dataset.packageDepartment === selectedDepartment)
+            && card.dataset.packageCategory === tab.dataset.packageCategoryTab
+        );
+        const count = tab.querySelector('.package-category-tab__count');
+        if (count) count.textContent = departmentCards.length;
+    });
+
+    if (packageFilterEmpty) packageFilterEmpty.classList.toggle('d-none', visibleCardCount > 0);
+}
+
+packageCategoryTabs.forEach((tab) => {
     tab.addEventListener('click', () => {
         if (tab.disabled) return;
-        const category = tab.dataset.packageCategoryTab;
-        document.querySelectorAll('[data-package-category-tab]').forEach((item) => {
+        packageCategoryTabs.forEach((item) => {
             const active = item === tab;
             item.classList.toggle('active', active);
             item.setAttribute('aria-pressed', active ? 'true' : 'false');
         });
-        document.querySelectorAll('[data-package-category]').forEach((card) => {
-            card.classList.toggle('d-none', card.dataset.packageCategory !== category);
-        });
+        applyPackageFilters();
     });
 });
+if (packageDepartmentFilter) packageDepartmentFilter.addEventListener('change', applyPackageFilters);
+applyPackageFilters();
 
 function submitPackageForm(packageId) {
     const chk = document.getElementById('chkConfirm-' + packageId);

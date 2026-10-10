@@ -63,6 +63,7 @@ cd C:\xampp\htdocs\Raquel_HRD_Test
 # 2. Source the clean backup snapshot
 & "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source sample_db_seeds/raquel_hris_current_clean_backup.sql;"
 & "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source sample_db_seeds/04_test_probationary_employees.sql;"
+& "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source sample_db_seeds/05_test_probationary_initial_templates.sql;"
 
 Write-Host "Database snapshot restored successfully!" -ForegroundColor Green
 ```
@@ -88,6 +89,7 @@ cd C:\xampp\htdocs\Raquel_HRD
 #& "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source database/data/seed_templates.sql;"
 & "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source sample_db_seeds/02_test_hrd_portal_accounts.sql;"
 & "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source sample_db_seeds/04_test_probationary_employees.sql;"
+& "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source sample_db_seeds/05_test_probationary_initial_templates.sql;"
 & "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source sample_db_seeds/03_test_governance_approvers.sql;"
 & "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source database/zLAST_performance_indexes.sql;"
 & "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source database/04_test_probationary_employees.sql;"
