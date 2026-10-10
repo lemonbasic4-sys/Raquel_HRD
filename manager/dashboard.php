@@ -652,7 +652,7 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
                         <a href="<?php echo BASE_URL; ?>/employee/team-evaluation-packages.php" class="text-decoration-none">
                             <div class="p-3 rounded-3 text-center bg-white bg-opacity-10 border border-white border-opacity-10 text-white hover-zoom" style="transition: all 0.2s;">
                                 <i class="fas fa-layer-group fa-2x mb-2" style="color:#f5a3ab;"></i>
-                                <div class="fw-bold small">Team Packages</div>
+                                <div class="fw-bold small">Performance Evaluation</div>
                                 <div class="text-white-50" style="font-size:0.68rem;">Consolidation Flow</div>
                             </div>
                         </a>

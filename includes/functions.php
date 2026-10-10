@@ -2647,23 +2647,6 @@ function ensureHierarchicalEvaluationSchema($conn)
             if (!isset($template_columns[$column])) $conn->query($sql);
         }
 
-        $conn->query("CREATE TABLE IF NOT EXISTS evaluation_reporting_review_steps (
-            reporting_review_step_id INT AUTO_INCREMENT PRIMARY KEY,
-            evaluation_id INT NOT NULL,
-            step_order INT NOT NULL,
-            eligible_employee_id INT NULL,
-            eligible_job_title_id INT NULL,
-            reviewer_employee_id INT NULL,
-            reviewer_user_id INT NULL,
-            status ENUM('Pending','Claimed','Completed','Blocked','Returned') NOT NULL DEFAULT 'Pending',
-            claimed_at DATETIME NULL,
-            acted_at DATETIME NULL,
-            comments TEXT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE KEY uq_reporting_review_step (evaluation_id, step_order),
-            INDEX idx_reporting_review_claim (status, eligible_employee_id, eligible_job_title_id),
-            INDEX idx_reporting_review_reviewer (reviewer_user_id, status)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
         $conn->query("CREATE TABLE IF NOT EXISTS evaluation_template_positions (
             evaluation_template_position_id INT AUTO_INCREMENT PRIMARY KEY,
             template_id INT NOT NULL,
@@ -2676,12 +2659,6 @@ function ensureHierarchicalEvaluationSchema($conn)
         $conn->query("INSERT IGNORE INTO evaluation_template_positions (template_id, job_title_id)
             SELECT template_id, target_job_title_id FROM evaluation_templates
             WHERE target_job_title_id IS NOT NULL AND target_job_title_id > 0");
-        $conn->query("UPDATE evaluations ev
-            SET status = 'Pending Reporting Review'
-            WHERE ev.status = 'Pending Supervisor'
-              AND EXISTS (SELECT 1 FROM evaluation_reporting_review_steps rs
-                  WHERE rs.evaluation_id = ev.evaluation_id
-                    AND rs.status IN ('Pending', 'Claimed', 'Blocked'))");
         $user_columns = [];
         $result = $conn->query("SHOW COLUMNS FROM users LIKE 'role'");
         if ($row = $result->fetch_assoc()) $user_columns['role'] = $row['Type'];
@@ -2873,263 +2850,6 @@ function evaluationBehaviorFrameworkMatchesExisting($conn, $framework_code, $fra
     return true;
 }
 
-function getEvaluationReportingTarget($conn, $employee_id)
-{
-    $employee_id = (int) $employee_id;
-    $stmt = $conn->prepare("SELECT e.employee_id, e.reports_to, e.job_title_id, e.department_id, jt.reports_to AS position_reports_to
-        FROM employees e LEFT JOIN job_titles jt ON jt.job_title_id = e.job_title_id
-        WHERE e.employee_id = ? AND e.is_active = 1 AND e.deleted_at IS NULL LIMIT 1");
-    $stmt->bind_param('i', $employee_id);
-    $stmt->execute();
-    $employee = $stmt->get_result()->fetch_assoc();
-    $stmt->close();
-    if (!$employee) return ['kind' => 'none'];
-
-    $direct_employee_id = (int)($employee['reports_to'] ?? 0);
-    if ($direct_employee_id > 0 && $direct_employee_id !== $employee_id) {
-        $active = $conn->prepare("SELECT e.employee_id FROM employees e
-            JOIN users u ON u.employee_id = e.employee_id
-            WHERE e.employee_id = ? AND e.is_active = 1 AND e.deleted_at IS NULL
-              AND u.is_active = 1 AND COALESCE(u.account_hold, 0) = 0 AND u.deleted_at IS NULL LIMIT 1");
-        $active->bind_param('i', $direct_employee_id);
-        $active->execute();
-        $active_row = $active->get_result()->fetch_assoc();
-        $active->close();
-        if ($active_row) return ['kind' => 'employee', 'employee_id' => $direct_employee_id];
-    }
-
-    $parent_position_id = (int)($employee['position_reports_to'] ?? 0);
-    if ($parent_position_id <= 0) return ['kind' => 'none'];
-
-    $positions = $conn->prepare("SELECT parent.job_title_id, parent.department_id, parent.rank_category_id,
-            parent.job_title,
-            EXISTS (SELECT 1 FROM employees holder
-                JOIN users holder_user ON holder_user.employee_id = holder.employee_id
-                WHERE holder.job_title_id = parent.job_title_id AND holder.is_active = 1 AND holder.deleted_at IS NULL
-                  AND holder_user.is_active = 1 AND COALESCE(holder_user.account_hold, 0) = 0 AND holder_user.deleted_at IS NULL) AS has_holder
-        FROM job_titles parent WHERE parent.job_title_id = ? AND parent.is_active = 1 LIMIT 1");
-    $positions->bind_param('i', $parent_position_id);
-    $positions->execute();
-    $parent = $positions->get_result()->fetch_assoc();
-    $positions->close();
-    if (!$parent) return ['kind' => 'blocked', 'job_title_id' => $parent_position_id];
-
-    if (!(bool)$parent['has_holder']) {
-        $fallback = $conn->prepare("SELECT jt.job_title_id
-            FROM job_titles jt
-            WHERE jt.department_id = ? AND jt.rank_category_id = ? AND jt.is_active = 1
-              AND EXISTS (SELECT 1 FROM employees holder
-                JOIN users holder_user ON holder_user.employee_id = holder.employee_id
-                WHERE holder.job_title_id = jt.job_title_id AND holder.is_active = 1 AND holder.deleted_at IS NULL
-                  AND holder_user.is_active = 1 AND COALESCE(holder_user.account_hold, 0) = 0 AND holder_user.deleted_at IS NULL)
-            ORDER BY CASE WHEN jt.job_title REGEXP '(^|[[:space:]])I$' THEN 0 ELSE 1 END, jt.job_title, jt.job_title_id
-            LIMIT 1");
-        $dept_id = (int)$parent['department_id'];
-        $rank_id = (int)$parent['rank_category_id'];
-        $fallback->bind_param('ii', $dept_id, $rank_id);
-        $fallback->execute();
-        $fallback_row = $fallback->get_result()->fetch_assoc();
-        $fallback->close();
-        if ($fallback_row) $parent_position_id = (int)$fallback_row['job_title_id'];
-        else return ['kind' => 'blocked', 'job_title_id' => (int)$parent['job_title_id']];
-    }
-    return ['kind' => 'position', 'job_title_id' => $parent_position_id];
-}
-
-function isUserEligibleForEvaluationReportingTarget($conn, $user_id, array $target, $evaluation_id = 0, $step_order = 0)
-{
-    if (!in_array($target['kind'] ?? '', ['employee', 'position'], true)) return false;
-    $stmt = $conn->prepare("SELECT e.employee_id, e.job_title_id
-        FROM users u JOIN employees e ON e.employee_id = u.employee_id
-        WHERE u.user_id = ? AND u.is_active = 1 AND COALESCE(u.account_hold, 0) = 0
-          AND u.deleted_at IS NULL AND e.is_active = 1 AND e.deleted_at IS NULL LIMIT 1");
-    $user_id = (int)$user_id;
-    $stmt->bind_param('i', $user_id);
-    $stmt->execute();
-    $employee = $stmt->get_result()->fetch_assoc();
-    $stmt->close();
-    if (!$employee) return false;
-    $evaluation_id = (int)$evaluation_id;
-    $step_order = (int)$step_order;
-    if ($evaluation_id > 0 && $step_order > 0) {
-        $visited = $conn->prepare("SELECT 1 FROM evaluations ev
-            WHERE ev.evaluation_id = ? AND ev.employee_id = ?
-            UNION ALL
-            SELECT 1 FROM evaluation_reporting_review_steps rs
-            WHERE rs.evaluation_id = ? AND rs.step_order < ?
-              AND rs.status = 'Completed' AND rs.reviewer_employee_id = ?
-            LIMIT 1");
-        $employee_id = (int)$employee['employee_id'];
-        $visited->bind_param('iiiii', $evaluation_id, $employee_id, $evaluation_id, $step_order, $employee_id);
-        $visited->execute();
-        $already_in_chain = (bool)$visited->get_result()->fetch_assoc();
-        $visited->close();
-        if ($already_in_chain) return false;
-    }
-    return ($target['kind'] === 'employee' && (int)$employee['employee_id'] === (int)$target['employee_id'])
-        || ($target['kind'] === 'position' && (int)$employee['job_title_id'] === (int)$target['job_title_id']);
-}
-
-function createEvaluationReportingReviewStep($conn, $evaluation_id, $step_order, $reviewer_employee_id)
-{
-    $target = getEvaluationReportingTarget($conn, $reviewer_employee_id);
-    if ($target['kind'] === 'none') return false;
-
-    $eligible_employee_id = $target['kind'] === 'employee' ? (int)$target['employee_id'] : null;
-    $eligible_job_title_id = in_array($target['kind'], ['position', 'blocked'], true)
-        ? (int)$target['job_title_id'] : null;
-    $state = $target['kind'] === 'blocked' ? 'Blocked' : 'Pending';
-    $stmt = $conn->prepare("INSERT INTO evaluation_reporting_review_steps
-        (evaluation_id, step_order, eligible_employee_id, eligible_job_title_id, status)
-        VALUES (?, ?, ?, ?, ?)");
-    $stmt->bind_param('iiiis', $evaluation_id, $step_order, $eligible_employee_id, $eligible_job_title_id, $state);
-    $stmt->execute();
-    $stmt->close();
-    if ($state === 'Blocked') return true;
-
-    $condition = $eligible_employee_id
-        ? 'e.employee_id = ' . (int)$eligible_employee_id
-        : 'e.job_title_id = ' . (int)$eligible_job_title_id;
-    $users = $conn->query("SELECT DISTINCT u.user_id
-        FROM employees e JOIN users u ON u.employee_id = e.employee_id
-        WHERE $condition AND e.is_active = 1 AND e.deleted_at IS NULL
-          AND e.employee_id <> (SELECT employee_id FROM evaluations WHERE evaluation_id = " . (int)$evaluation_id . ")
-          AND NOT EXISTS (SELECT 1 FROM evaluation_reporting_review_steps prior
-            WHERE prior.evaluation_id = " . (int)$evaluation_id . " AND prior.step_order < " . (int)$step_order . "
-              AND prior.status = 'Completed' AND prior.reviewer_employee_id = e.employee_id)
-          AND u.is_active = 1 AND COALESCE(u.account_hold, 0) = 0 AND u.deleted_at IS NULL");
-    $link = BASE_URL . '/employee/reporting-reviews.php?evaluation_id=' . (int)$evaluation_id;
-    $recipient_count = 0;
-    while ($user = $users->fetch_assoc()) {
-        createNotification($conn, (int)$user['user_id'], 'Evaluation Review Required',
-            'A submitted self-rating is waiting for an eligible reporting reviewer to claim it.', $link);
-        $recipient_count++;
-    }
-    if ($recipient_count === 0) {
-        $block = $conn->prepare("UPDATE evaluation_reporting_review_steps SET status = 'Blocked'
-            WHERE evaluation_id = ? AND step_order = ? AND status = 'Pending'");
-        $block->bind_param('ii', $evaluation_id, $step_order);
-        $block->execute();
-        $block->close();
-    }
-    return true;
-}
-
-function refreshPendingEvaluationReportingStep($conn, $evaluation_id, array $step)
-{
-    if (!in_array($step['status'] ?? '', ['Pending', 'Blocked'], true)) return true;
-    $evaluation_id = (int)$evaluation_id;
-    $step_order = (int)$step['step_order'];
-    if ($step_order === 1) {
-        $source_stmt = $conn->prepare('SELECT employee_id FROM evaluations WHERE evaluation_id = ? LIMIT 1');
-        $source_stmt->bind_param('i', $evaluation_id);
-    } else {
-        $previous_order = $step_order - 1;
-        $source_stmt = $conn->prepare("SELECT reviewer_employee_id FROM evaluation_reporting_review_steps
-            WHERE evaluation_id = ? AND step_order = ? AND status = 'Completed' LIMIT 1");
-        $source_stmt->bind_param('ii', $evaluation_id, $previous_order);
-    }
-    $source_stmt->execute();
-    $source = $source_stmt->get_result()->fetch_assoc();
-    $source_stmt->close();
-    $source_employee_id = (int)($source['employee_id'] ?? $source['reviewer_employee_id'] ?? 0);
-    if ($source_employee_id <= 0) return false;
-
-    $target = getEvaluationReportingTarget($conn, $source_employee_id);
-    if ($target['kind'] === 'none') {
-        $complete = $conn->prepare("UPDATE evaluation_reporting_review_steps SET status = 'Completed', acted_at = NOW()
-            WHERE reporting_review_step_id = ? AND status IN ('Pending','Blocked')");
-        $complete->bind_param('i', $step['reporting_review_step_id']);
-        $complete->execute();
-        $complete->close();
-        $status = 'Pending Team Consolidation';
-        $update_eval = $conn->prepare('UPDATE evaluations SET status = ? WHERE evaluation_id = ?');
-        $update_eval->bind_param('si', $status, $evaluation_id);
-        $update_eval->execute();
-        $update_eval->close();
-        syncEvaluationToOrganizationPackage($conn, $evaluation_id);
-        return false;
-    }
-
-    $employee_target_id = $target['kind'] === 'employee' ? (int)$target['employee_id'] : null;
-    $position_target_id = in_array($target['kind'], ['position', 'blocked'], true)
-        ? (int)$target['job_title_id'] : null;
-    $next_status = $target['kind'] === 'blocked' ? 'Blocked' : 'Pending';
-    $changed = $next_status !== $step['status']
-        || (int)($step['eligible_employee_id'] ?? 0) !== (int)($employee_target_id ?? 0)
-        || (int)($step['eligible_job_title_id'] ?? 0) !== (int)($position_target_id ?? 0);
-    if (!$changed) return true;
-
-    $update = $conn->prepare("UPDATE evaluation_reporting_review_steps
-        SET eligible_employee_id = ?, eligible_job_title_id = ?, reviewer_employee_id = NULL,
-            reviewer_user_id = NULL, claimed_at = NULL, status = ?
-        WHERE reporting_review_step_id = ? AND status IN ('Pending','Blocked')");
-    $update->bind_param('iisi', $employee_target_id, $position_target_id, $next_status, $step['reporting_review_step_id']);
-    $update->execute();
-    $update->close();
-    if ($next_status === 'Pending') {
-        $condition = $employee_target_id
-            ? 'e.employee_id = ' . (int)$employee_target_id
-            : 'e.job_title_id = ' . (int)$position_target_id;
-        $users = $conn->query("SELECT DISTINCT u.user_id FROM employees e JOIN users u ON u.employee_id = e.employee_id
-            WHERE $condition AND e.is_active = 1 AND e.deleted_at IS NULL
-              AND e.employee_id <> (SELECT employee_id FROM evaluations WHERE evaluation_id = " . (int)$evaluation_id . ")
-              AND NOT EXISTS (SELECT 1 FROM evaluation_reporting_review_steps prior
-                WHERE prior.evaluation_id = " . (int)$evaluation_id . " AND prior.step_order < " . (int)$step_order . "
-                  AND prior.status = 'Completed' AND prior.reviewer_employee_id = e.employee_id)
-              AND u.is_active = 1 AND COALESCE(u.account_hold, 0) = 0 AND u.deleted_at IS NULL");
-        $link = BASE_URL . '/employee/reporting-reviews.php?evaluation_id=' . $evaluation_id;
-        $recipient_count = 0;
-        while ($user = $users->fetch_assoc()) {
-            createNotification($conn, (int)$user['user_id'], 'Evaluation Review Required',
-                'A reporting assignment changed and this self-rating is waiting for your review.', $link);
-            $recipient_count++;
-        }
-        if ($recipient_count === 0) {
-            $block = $conn->prepare("UPDATE evaluation_reporting_review_steps SET status = 'Blocked'
-                WHERE reporting_review_step_id = ? AND status = 'Pending'");
-            $block->bind_param('i', $step['reporting_review_step_id']);
-            $block->execute();
-            $block->close();
-        }
-    }
-    return true;
-}
-
-function submitEvaluationToReportingChain($conn, $evaluation_id, $employee_id)
-{
-    if (!ensureHierarchicalEvaluationSchema($conn)) return false;
-    $evaluation_id = (int)$evaluation_id;
-    $employee_id = (int)$employee_id;
-    $conn->begin_transaction();
-    try {
-        $delete = $conn->prepare('DELETE FROM evaluation_reporting_review_steps WHERE evaluation_id = ?');
-        $delete->bind_param('i', $evaluation_id);
-        $delete->execute();
-        $delete->close();
-        $created = createEvaluationReportingReviewStep($conn, $evaluation_id, 1, $employee_id);
-        if (!$created) {
-            $status = 'Pending Team Consolidation';
-            $update = $conn->prepare('UPDATE evaluations SET status = ? WHERE evaluation_id = ?');
-            $update->bind_param('si', $status, $evaluation_id);
-            $update->execute();
-            $update->close();
-        } else {
-            $status = 'Pending Reporting Review';
-            $update = $conn->prepare('UPDATE evaluations SET status = ? WHERE evaluation_id = ?');
-            $update->bind_param('si', $status, $evaluation_id);
-            $update->execute();
-            $update->close();
-        }
-        $conn->commit();
-        if (!$created) syncEvaluationToOrganizationPackage($conn, $evaluation_id);
-        return true;
-    } catch (Throwable $e) {
-        $conn->rollback();
-        error_log('Unable to submit evaluation to reporting chain: ' . $e->getMessage());
-        return false;
-    }
-}
 
 function positionReportsToWouldCreateCycle($conn, $position_id, $parent_position_id)
 {
@@ -4748,19 +4468,19 @@ function syncEvaluationToOrganizationPackage($conn, $evaluation_id)
             $status_upd->bind_param('i', $package_id); $status_upd->execute(); $status_upd->close();
             if ($step1_type === 'Consolidation') {
                 notifyOrganizationPackageStepAssignees($conn, $package_id, 1,
-                    'Team Package Consolidation Started',
+                    'Performance Evaluation Consolidation Started',
                     "$emp_fullname ($dept_name) submitted their self-rating for $tmpl_name. Consolidation can begin — other team members can still submit and will be included automatically."
                 );
             } else {
                 notifyOrganizationPackageStepAssignees($conn, $package_id, 1,
-                    'Team Evaluation Package Ready for Review',
-                    "$emp_fullname ($dept_name) submitted their self-rating for $tmpl_name. The package is ready for $step1_label in Team Evaluation Packages."
+                    'Performance Evaluation Ready for Review',
+                    "$emp_fullname ($dept_name) submitted their self-rating for $tmpl_name. The package is ready for $step1_label in the Performance Evaluation workflow."
                 );
             }
         } else {
             // Step 1 already Pending or active — notify consolidator of the new member.
             notifyOrganizationPackageStepAssignees($conn, $package_id, 1,
-                'New Team Member Self-Rating Submitted',
+                'New Evaluation Self-Rating Submitted',
                 "$emp_fullname ($dept_name) submitted their self-rating for $tmpl_name and has been added to the ongoing consolidation."
             );
         }

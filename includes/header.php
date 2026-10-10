@@ -65,7 +65,6 @@ switch ($effective_role) {
                 ['icon' => 'fas fa-user-lock', 'label' => 'Portal Accounts', 'url' => BASE_URL . '/admin/employee-accounts.php', 'page' => 'employee-accounts.php'],
                 ['icon' => 'fas fa-users', 'label' => 'User Management', 'url' => BASE_URL . '/admin/users.php', 'page' => 'users.php'],
                 ['icon' => 'fas fa-clipboard-list', 'label' => 'Audit Trail', 'url' => BASE_URL . '/admin/audit-trail.php', 'page' => 'audit-trail.php'],
-                ['icon' => 'fas fa-route', 'label' => 'Reporting Reviews', 'url' => BASE_URL . '/employee/reporting-reviews.php', 'page' => 'reporting-reviews.php'],
             ],
             'SYSTEM' => [
                 ['icon' => 'fas fa-database', 'label' => 'System Backup', 'url' => BASE_URL . '/admin/backup.php', 'page' => 'backup.php'],
@@ -101,9 +100,8 @@ switch ($effective_role) {
                 // ['icon' => 'fas fa-project-diagram', 'label' => 'Operation Management', 'url' => BASE_URL . '/manager/operation-management.php', 'page' => 'operation-management.php'],
             ],
             'EVALUATIONS' => [
-                ['icon' => 'fas fa-route', 'label' => 'Reporting Reviews', 'url' => BASE_URL . '/employee/reporting-reviews.php', 'page' => 'reporting-reviews.php'],
                 ['icon' => 'fas fa-file-alt', 'label' => 'Templates', 'url' => BASE_URL . '/manager/templates.php', 'page' => 'templates.php'],
-                ['icon' => 'fas fa-layer-group', 'label' => 'Team Evaluation Packages', 'url' => BASE_URL . '/employee/team-evaluation-packages.php', 'page' => 'team-evaluation-packages.php',
+                ['icon' => 'fas fa-layer-group', 'label' => 'Performance Evaluation', 'url' => BASE_URL . '/employee/team-evaluation-packages.php', 'page' => 'team-evaluation-packages.php',
                  'badge' => $_mgr_pkg_pending ?: null, 'badge_class' => 'bg-warning text-dark'],
                 ['icon' => 'fas fa-check-double', 'label' => 'Pending Approvals', 'url' => BASE_URL . '/manager/pending-approvals.php', 'page' => 'pending-approvals.php',
                  'badge' => (function() use ($conn) {
@@ -149,9 +147,8 @@ switch ($effective_role) {
                 ['icon' => 'fas fa-briefcase', 'label' => 'Positions', 'url' => BASE_URL . '/supervisor/positions.php', 'page' => 'positions.php'],
             ],
             'EVALUATIONS' => [
-                ['icon' => 'fas fa-route', 'label' => 'Reporting Reviews', 'url' => BASE_URL . '/employee/reporting-reviews.php', 'page' => 'reporting-reviews.php'],
                 ['icon' => 'fas fa-file-alt', 'label' => 'Templates', 'url' => BASE_URL . '/manager/templates.php', 'page' => 'templates.php'],
-                ['icon' => 'fas fa-layer-group', 'label' => 'Team Evaluation Packages', 'url' => BASE_URL . '/employee/team-evaluation-packages.php', 'page' => 'team-evaluation-packages.php',
+                ['icon' => 'fas fa-layer-group', 'label' => 'Performance Evaluation', 'url' => BASE_URL . '/employee/team-evaluation-packages.php', 'page' => 'team-evaluation-packages.php',
                  'badge' => $_sup_pkg_pending ?: null, 'badge_class' => 'bg-warning text-dark'],
                 ['icon' => 'fas fa-clipboard-check', 'label' => 'Pending Validations', 'url' => BASE_URL . '/supervisor/pending-endorsements.php', 'page' => 'pending-endorsements.php'],
                 ['icon' => 'fas fa-history', 'label' => 'Evaluation History', 'url' => BASE_URL . '/supervisor/evaluation-history.php', 'page' => 'evaluation-history.php'],
@@ -188,8 +185,7 @@ switch ($effective_role) {
                 ['icon' => 'fas fa-building', 'label' => 'Branches & Roster', 'url' => BASE_URL . '/staff/branches.php', 'page' => 'branches.php'],
             ],
             'EVALUATIONS & MONITORING' => [
-                ['icon' => 'fas fa-route', 'label' => 'Reporting Reviews', 'url' => BASE_URL . '/employee/reporting-reviews.php', 'page' => 'reporting-reviews.php'],
-                ['icon' => 'fas fa-tasks', 'label' => 'Package Tracker', 'url' => BASE_URL . '/staff/package-tracker.php', 'page' => 'package-tracker.php'],
+                ['icon' => 'fas fa-tasks', 'label' => 'Evaluation Tracker', 'url' => BASE_URL . '/staff/package-tracker.php', 'page' => 'package-tracker.php'],
                 ['icon' => 'fas fa-file-alt', 'label' => 'Templates', 'url' => BASE_URL . '/staff/templates.php', 'page' => 'templates.php'],
                 ['icon' => 'fas fa-history', 'label' => 'Evaluation History', 'url' => BASE_URL . '/staff/evaluation-history.php', 'page' => 'evaluation-history.php'],
             ],
@@ -348,7 +344,6 @@ switch ($effective_role) {
         // ── Section 2: Evaluations ──────────────────────────────────────────
         $menu_evaluations = [
             ['icon' => 'fas fa-star',        'label' => 'Self Rating',        'url' => BASE_URL . '/employee/self-rating.php',      'page' => 'self-rating.php',      'badge' => $m_pending_template_count],
-            ['icon' => 'fas fa-route',       'label' => 'Reporting Reviews',  'url' => BASE_URL . '/employee/reporting-reviews.php', 'page' => 'reporting-reviews.php'],
             ['icon' => 'fas fa-history',     'label' => 'Evaluation History', 'url' => BASE_URL . '/employee/evaluation-history.php', 'page' => 'evaluation-history.php'],
             ['icon' => 'fas fa-chart-line',  'label' => 'My Performance',     'url' => BASE_URL . '/employee/my-performance.php',   'page' => 'my-performance.php'],
         ];
@@ -374,7 +369,7 @@ switch ($effective_role) {
         $is_hr_personnel = strcasecmp($_hdr_emp_dept ?? '', 'Human Resources') === 0;
         if (!$is_hr_personnel && ($is_supervisor_menu || $m_pending_pkg_count > 0 || $is_ceo_employee_portal)) {
             $menu_my_team[] = ['icon' => 'fas fa-users',       'label' => 'My Team',                  'url' => BASE_URL . '/employee/team-list.php',              'page' => 'team-list.php'];
-            $menu_my_team[] = ['icon' => 'fas fa-layer-group', 'label' => 'Team Evaluation Packages', 'url' => BASE_URL . '/employee/team-evaluation-packages.php', 'page' => 'team-evaluation-packages.php', 'badge' => $m_pending_pkg_count ?: null, 'badge_class' => 'bg-warning text-dark'];
+            $menu_my_team[] = ['icon' => 'fas fa-layer-group', 'label' => 'Performance Evaluation', 'url' => BASE_URL . '/employee/team-evaluation-packages.php', 'page' => 'team-evaluation-packages.php', 'badge' => $m_pending_pkg_count ?: null, 'badge_class' => 'bg-warning text-dark'];
             $menu_my_team[] = ['icon' => 'fas fa-history',     'label' => 'Team Evaluation History',  'url' => BASE_URL . '/employee/team-evaluation-history.php', 'page' => 'team-evaluation-history.php'];
         }
 

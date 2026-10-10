@@ -412,13 +412,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
     <!-- Stat Cards Row -->
     <div class="row g-3 mb-3">
-        <!-- Team Evaluation Packages -->
+        <!-- Performance Evaluation -->
         <div class="col-6 col-md-3">
             <a href="<?php echo BASE_URL; ?>/employee/team-evaluation-packages.php" class="stat-card text-decoration-none d-block">
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
                         <div class="stat-value"><?php echo $pending_pkg_count > 0 ? $pending_pkg_count : $pending_validations; ?></div>
-                        <div class="stat-label">Team Packages</div>
+                        <div class="stat-label">Performance Evaluations</div>
                     </div>
                     <i class="fas fa-layer-group stat-icon" style="color:#ffc107;"></i>
                 </div>
@@ -510,7 +510,7 @@ document.addEventListener('DOMContentLoaded', function () {
     <div class="col-12">
         <div class="chart-card h-100">
             <div class="cc-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-                <h5 class="mb-0"><i class="fas fa-layer-group me-2"></i>Team Evaluation Packages</h5>
+                <h5 class="mb-0"><i class="fas fa-layer-group me-2"></i>Performance Evaluation</h5>
                 <div class="d-flex align-items-center gap-2">
                     <?php if ($pending_pkg_count > 0): ?>
                         <span class="badge bg-light text-muted border"><?php echo number_format($pending_pkg_count); ?> package<?php echo $pending_pkg_count === 1 ? '' : 's'; ?></span>

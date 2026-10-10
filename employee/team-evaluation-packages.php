@@ -1,5 +1,5 @@
 <?php
-$page_title = 'Team Evaluation Packages';
+$page_title = 'Performance Evaluation';
 require_once '../includes/session-check.php';
 require_once '../includes/functions.php';
 
@@ -491,11 +491,11 @@ if (in_array($session_role, ['HR Manager', 'HR Supervisor', 'Admin'], true) || $
 <div class="evaluation-packages">
     <section class="package-hero">
         <p class="mb-1 text-uppercase fw-bold" style="letter-spacing:1px; color:var(--rp-primary-gold-light); font-size:0.85rem;">
-            Organization-Driven Performance Review
+            Performance Evaluation Process
         </p>
-        <h1 class="h3 mb-2 fw-bold">Team Evaluation Packages</h1>
+        <h1 class="h3 mb-2 fw-bold">Performance Evaluation</h1>
         <p class="mb-3">
-            Review and adjust consolidated department evaluations assigned to you. Individual KRA remains employee-specific; Core Behaviors &amp; Values is consolidated as a shared team result.
+            Review submitted employee ratings and follow their approval progress.
         </p>
         <?php
         $is_hris_user = in_array($_SESSION['role'] ?? '', ['Admin', 'HR Manager', 'HR Supervisor', 'HR Staff']);
@@ -530,7 +530,7 @@ if (in_array($session_role, ['HR Manager', 'HR Supervisor', 'Admin'], true) || $
     <?php if (!$packages && !$waiting_packages): ?>
         <section class="package-empty">
             <i class="fas fa-layer-group fa-3x text-muted mb-3" style="opacity:0.4;"></i>
-            <h2 class="h5 fw-bold">No team package is currently waiting for your review</h2>
+            <h2 class="h5 fw-bold">No performance evaluation is currently waiting for your review</h2>
             <p class="mb-0 text-muted">
                 Eligible supervisors and managers can view department packages here. For an unclaimed stage, the first eligible reviewer to accept becomes responsible for that stage.
             </p>
@@ -700,7 +700,7 @@ if (in_array($session_role, ['HR Manager', 'HR Supervisor', 'Admin'], true) || $
                 <ul class="nav nav-tabs package-nav-tabs mb-3" id="pkgTabs-<?php echo (int)$package['package_id']; ?>" role="tablist">
                     <li class="nav-item" role="presentation">
                         <button class="nav-link active" id="tab-members-btn-<?php echo (int)$package['package_id']; ?>" data-bs-toggle="tab" data-bs-target="#tab-members-<?php echo (int)$package['package_id']; ?>" type="button" role="tab" aria-controls="tab-members-<?php echo (int)$package['package_id']; ?>" aria-selected="true">
-                            <i class="fas fa-users-cog me-2"></i>Team Evaluation Packages
+                            <i class="fas fa-users-cog me-2"></i>Evaluations
                             <span class="badge bg-secondary ms-1 rounded-pill"><?php echo count($members); ?></span>
                         </button>
                     </li>
@@ -718,7 +718,7 @@ if (in_array($session_role, ['HR Manager', 'HR Supervisor', 'Admin'], true) || $
                 </ul>
 
                 <div class="tab-content package-tab-content mb-4" id="pkgTabContent-<?php echo (int)$package['package_id']; ?>">
-                    <!-- Tab 1: Team Evaluation Packages -->
+                    <!-- Tab 1: Evaluations -->
                     <div class="tab-pane fade show active" id="tab-members-<?php echo (int)$package['package_id']; ?>" role="tabpanel" aria-labelledby="tab-members-btn-<?php echo (int)$package['package_id']; ?>">
                         <div class="table-responsive mb-3">
                             <table class="package-table table align-middle mb-0">

@@ -518,32 +518,6 @@ CREATE TABLE evaluations (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ============================================
--- Individual reporting-chain review steps
--- ============================================
-CREATE TABLE evaluation_reporting_review_steps (
-    reporting_review_step_id INT AUTO_INCREMENT PRIMARY KEY,
-    evaluation_id INT NOT NULL,
-    step_order INT NOT NULL,
-    eligible_employee_id INT NULL,
-    eligible_job_title_id INT NULL,
-    reviewer_employee_id INT NULL,
-    reviewer_user_id INT NULL,
-    status ENUM('Pending','Claimed','Completed','Blocked','Returned') NOT NULL DEFAULT 'Pending',
-    claimed_at DATETIME NULL,
-    acted_at DATETIME NULL,
-    comments TEXT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE KEY uq_reporting_review_step (evaluation_id, step_order),
-    INDEX idx_reporting_review_claim (status, eligible_employee_id, eligible_job_title_id),
-    INDEX idx_reporting_review_reviewer (reviewer_user_id, status),
-    CONSTRAINT fk_reporting_review_evaluation FOREIGN KEY (evaluation_id) REFERENCES evaluations(evaluation_id) ON DELETE CASCADE,
-    CONSTRAINT fk_reporting_review_eligible_employee FOREIGN KEY (eligible_employee_id) REFERENCES employees(employee_id) ON DELETE SET NULL,
-    CONSTRAINT fk_reporting_review_eligible_position FOREIGN KEY (eligible_job_title_id) REFERENCES job_titles(job_title_id) ON DELETE SET NULL,
-    CONSTRAINT fk_reporting_review_employee FOREIGN KEY (reviewer_employee_id) REFERENCES employees(employee_id) ON DELETE SET NULL,
-    CONSTRAINT fk_reporting_review_user FOREIGN KEY (reviewer_user_id) REFERENCES users(user_id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- ============================================
 -- 22. Evaluation Scores
 -- ============================================
 DROP TABLE IF EXISTS evaluation_scores;

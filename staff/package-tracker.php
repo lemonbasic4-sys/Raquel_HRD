@@ -2,7 +2,7 @@
 /**
  * HR Staff Portal - read-only evaluation package tracker.
  */
-$page_title = 'Package Tracker';
+$page_title = 'Evaluation Tracker';
 require_once '../includes/session-check.php';
 checkRole(['HR Staff']);
 require_once '../includes/functions.php';
@@ -56,7 +56,7 @@ require_once '../includes/header.php';
     <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
         <div>
             <div class="small text-uppercase text-white-50">HR Staff · Monitoring</div>
-            <h1 class="h4 text-white fw-bold mb-1"><i class="fas fa-layer-group me-2 text-warning"></i>Evaluation Package Tracker</h1>
+            <h1 class="h4 text-white fw-bold mb-1"><i class="fas fa-layer-group me-2 text-warning"></i>Performance Evaluation Tracker</h1>
             <p class="text-white-50 small mb-0">Read-only status and approval-route overview across departments.</p>
         </div>
         <span class="badge bg-light text-dark px-3 py-2"><i class="fas fa-eye me-1"></i>View only</span>

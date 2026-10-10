@@ -484,7 +484,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $total_score = calculateEvalTotal($kra_subtotal, $behavior_average, $kra_weight_pct, $beh_weight_pct);
     $performance_level = getPerformanceLevel($total_score);
     $status = $action === 'submit'
-        ? 'Pending Reporting Review'
+        ? 'Pending Team Consolidation'
         : ($is_assigned_submission ? 'Pending Self-Rating' : 'Draft');
     $submitted_date = ($action === 'submit') ? date('Y-m-d H:i:s') : null;
 
@@ -542,72 +542,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $score_stmt->close();
 
     if ($action === 'submit') {
-        $hr_package_assignment_stmt = $conn->prepare("SELECT parent_rank.rank_category_id AS parent_rank_id
-            FROM employees e
-            JOIN departments d ON d.department_id = e.department_id
-            JOIN job_titles staff_position ON staff_position.job_title_id = e.job_title_id
-                AND staff_position.is_active = 1
-            JOIN job_titles parent_position ON parent_position.job_title_id = staff_position.reports_to
-                AND parent_position.is_active = 1
-            JOIN rank_categories parent_rank ON parent_rank.rank_category_id = parent_position.rank_category_id
-                AND parent_rank.is_active = 1
-            WHERE e.employee_id = ? AND e.is_active = 1 AND e.deleted_at IS NULL
-              AND d.department_name = 'Human Resources' AND d.is_active = 1 AND d.deleted_at IS NULL
-              AND (parent_rank.rank_name IN ('Supervisor', 'Manager')
-                   OR (parent_rank.rank_name = 'Executives'
-                       AND parent_position.job_title REGEXP 'President|Chief Executive Officer|CEO'))
-            LIMIT 1");
-        $hr_package_assignment_stmt->bind_param('i', $employee_id);
-        $hr_package_assignment_stmt->execute();
-        $hr_package_assignment = $hr_package_assignment_stmt->get_result()->fetch_assoc();
-        $hr_package_assignment_stmt->close();
-        if ($hr_package_assignment) {
-            if (!ensureOrganizationEvaluationPackageSchema($conn)) {
-                redirectWith(BASE_URL . '/employee/self-rating.php', 'danger', 'The Team Evaluation Packages workflow is unavailable. Please contact HR.');
+        if (!ensureOrganizationEvaluationPackageSchema($conn)) {
+            redirectWith(BASE_URL . '/employee/self-rating.php', 'danger', 'The Performance Evaluation workflow is unavailable. Please contact HR.');
+        }
+        $submission_transaction_open = false;
+        try {
+            $conn->begin_transaction();
+            $submission_transaction_open = true;
+            $update_status = $conn->prepare('UPDATE evaluations SET status = ? WHERE evaluation_id = ? AND employee_id = ?');
+            $package_status = 'Pending Team Consolidation';
+            $update_status->bind_param('sii', $package_status, $eval_id, $employee_id);
+            $update_status->execute();
+            $update_status->close();
+
+            $package_id = syncEvaluationToOrganizationPackage($conn, $eval_id);
+            if (!$package_id) {
+                throw new RuntimeException('The submitted evaluation could not be added to a Team Evaluation Package.');
             }
+            $conn->commit();
             $submission_transaction_open = false;
-            try {
-                $conn->begin_transaction();
-                $submission_transaction_open = true;
-                $delete_reporting_steps = $conn->prepare('DELETE FROM evaluation_reporting_review_steps WHERE evaluation_id = ?');
-                $delete_reporting_steps->bind_param('i', $eval_id);
-                $delete_reporting_steps->execute();
-                $delete_reporting_steps->close();
-
-                $package_status = 'Pending Team Consolidation';
-                $update_status = $conn->prepare('UPDATE evaluations SET status = ? WHERE evaluation_id = ? AND employee_id = ?');
-                $update_status->bind_param('sii', $package_status, $eval_id, $employee_id);
-                $update_status->execute();
-                if ($update_status->affected_rows !== 1) {
-                    throw new RuntimeException('The submitted evaluation could not be queued for package consolidation.');
+        } catch (Throwable $e) {
+            if ($submission_transaction_open) {
+                try {
+                    $conn->rollback();
+                } catch (Throwable $rollback_error) {
+                    error_log('Unable to roll back evaluation package submission: ' . $rollback_error->getMessage());
                 }
-                $update_status->close();
-
-                $package_id = syncEvaluationToOrganizationPackage($conn, $eval_id);
-                if (!$package_id) {
-                    throw new RuntimeException('The submitted evaluation could not be added to a Team Evaluation Package.');
-                }
-                $conn->commit();
-                $submission_transaction_open = false;
-            } catch (Throwable $e) {
-                if ($submission_transaction_open) {
-                    try {
-                        $conn->rollback();
-                    } catch (Throwable $rollback_error) {
-                        error_log('Unable to roll back HR staff package submission: ' . $rollback_error->getMessage());
-                    }
-                }
-                error_log('Unable to route HR staff evaluation to Team Evaluation Packages: ' . $e->getMessage());
-                redirectWith(BASE_URL . '/employee/self-rating.php', 'danger', 'Your evaluation was saved, but could not be queued in Team Evaluation Packages. Please contact HR.');
             }
-            logAudit($conn, $user_id, 'CREATE', 'Evaluation', $eval_id, 'Submitted HR self-rating to Team Evaluation Packages');
-            redirectWith(BASE_URL . '/employee/self-rating.php', 'success', 'Your self-rating was submitted to Team Evaluation Packages for review by the next active organizational level.');
+            error_log('Unable to route self-rating to the evaluation workflow: ' . $e->getMessage());
+            redirectWith(BASE_URL . '/employee/self-rating.php', 'danger', 'Your evaluation was saved, but could not be queued for review. Please contact HR.');
         }
-        if (!submitEvaluationToReportingChain($conn, $eval_id, $employee_id)) {
-            redirectWith(BASE_URL . '/employee/self-rating.php', 'danger', 'The evaluation was saved, but could not be queued for reporting review. Please contact HR.');
-        }
-        logAudit($conn, $user_id, 'CREATE', 'Evaluation', $eval_id, 'Submitted employee self-rating to reporting chain');
-        redirectWith(BASE_URL . '/employee/self-rating.php', 'success', 'Your self-rating was submitted to the active reporting chain.');
+        logAudit($conn, $user_id, 'CREATE', 'Evaluation', $eval_id, 'Submitted self-rating for performance evaluation review');
+        redirectWith(BASE_URL . '/employee/self-rating.php', 'success', 'Your self-rating was submitted for performance evaluation review.');
 
     }
 

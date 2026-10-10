@@ -242,7 +242,7 @@ if (in_array($_ft_role, ['HR Manager', 'HR Supervisor', 'HR Staff', 'Admin'])):
         <i class="fas fa-ellipsis-h hr-nav-icon"></i>
         <span class="hr-nav-label">More</span>
         <div class="hr-nav-more-dropdown" id="hrNavMoreMenu" role="menu">
-            <a href="<?php echo BASE_URL; ?>/staff/package-tracker.php"><i class="fas fa-tasks"></i>Package Tracker</a>
+            <a href="<?php echo BASE_URL; ?>/staff/package-tracker.php"><i class="fas fa-tasks"></i>Evaluation Tracker</a>
             <a href="<?php echo BASE_URL; ?>/staff/templates.php"><i class="fas fa-file-alt"></i>Templates</a>
             <a href="<?php echo BASE_URL; ?>/staff/branches.php"><i class="fas fa-building"></i>Branches &amp; Roster</a>
             <a href="<?php echo BASE_URL; ?>/staff/add-employee.php"><i class="fas fa-user-plus"></i>Add Employee</a>
