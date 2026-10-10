@@ -4182,13 +4182,34 @@ function createOrganizationPackageRoute($conn, $package_id, $consolidator_employ
     if ($pkg_row) $package_department_id = (int) $pkg_row['department_id'];
 
     if ($package_department_id && isHumanResourcesPackageDepartment($conn, $package_department_id)) {
+        $template_stmt = $conn->prepare('SELECT template_id, target_job_title_id FROM evaluation_templates WHERE template_id = (SELECT template_id FROM evaluation_packages WHERE package_id = ?) LIMIT 1');
+        $template_stmt->bind_param('i', $package_id);
+        $template_stmt->execute();
+        $template = $template_stmt->get_result()->fetch_assoc();
+        $template_stmt->close();
+        $target_rank_stmt = $conn->prepare("SELECT MIN(jt.rank_category_id) AS target_rank
+            FROM job_titles jt
+            WHERE jt.is_active = 1 AND jt.department_id = ?
+              AND (jt.job_title_id IN (SELECT etp.job_title_id FROM evaluation_template_positions etp WHERE etp.template_id = ?)
+                   OR (NOT EXISTS (SELECT 1 FROM evaluation_template_positions etp WHERE etp.template_id = ?)
+                       AND jt.job_title_id = ?))");
+        $template_id = (int)($template['template_id'] ?? 0);
+        $legacy_target_position_id = (int)($template['target_job_title_id'] ?? 0);
+        $target_rank_stmt->bind_param('iiii', $package_department_id, $template_id, $template_id, $legacy_target_position_id);
+        $target_rank_stmt->execute();
+        $target_rank = (int)($target_rank_stmt->get_result()->fetch_assoc()['target_rank'] ?? 0);
+        $target_rank_stmt->close();
+
         $group_step = $conn->prepare("INSERT INTO evaluation_package_route_steps
             (package_id, step_order, step_label, step_type, eligible_role, action_status)
             VALUES (?, ?, ?, ?, ?, 'Waiting')");
-        $role_stages = [
-            [1, 'Team consolidation — HR Supervisor', 'Consolidation', 'HR Supervisor'],
-            [2, 'Final HR review — HR Manager', 'Review', 'HR Manager'],
-        ];
+        $role_stages = [];
+        if ($target_rank >= 5) {
+            $role_stages[] = [1, 'Team consolidation — HR Supervisor', 'Consolidation', 'HR Supervisor'];
+            $role_stages[] = [2, 'Final HR review — HR Manager', 'Review', 'HR Manager'];
+        } elseif ($target_rank === 4) {
+            $role_stages[] = [1, 'HR Manager review — HR Manager', 'Review', 'HR Manager'];
+        }
         foreach ($role_stages as [$step_order, $step_label, $step_type, $eligible_role]) {
             $group_step->bind_param('iisss', $package_id, $step_order, $step_label, $step_type, $eligible_role);
             $group_step->execute();
@@ -4196,12 +4217,15 @@ function createOrganizationPackageRoute($conn, $package_id, $consolidator_employ
         $group_step->close();
 
         // Governance remains configured independently of HR job-title ranks.
-        $order = 3;
+        $order = count($role_stages) + 1;
         $div_vp = getDepartmentDesignatedOfficial($conn, 'Division VP', $package_department_id);
         if ($div_vp) {
             $order = appendOrganizationGovernanceRouteStep($conn, $package_id, $order, 'Division VP', 'Division VP Review — ' . $div_vp['job_title'], $package_department_id);
         }
-        $order = appendOrganizationGovernanceRouteStep($conn, $package_id, $order, 'President', 'Executive Approval — President & CEO');
+        $president_label = $target_rank === 3
+            ? 'Manager Evaluation Review — President & CEO'
+            : 'Executive Approval — President & CEO';
+        $order = appendOrganizationGovernanceRouteStep($conn, $package_id, $order, 'President', $president_label);
         $order = appendOrganizationGovernanceRouteStep($conn, $package_id, $order, 'Audit Committee', 'Audit Committee approval');
         appendOrganizationGovernanceRouteStep($conn, $package_id, $order, 'Board of Directors', 'Board of Directors approval');
         return;
@@ -4598,8 +4622,10 @@ function syncEvaluationToOrganizationPackage($conn, $evaluation_id)
     $pkg_status = $pkg_info['status'] ?? 'Pending Self-Ratings';
     $pkg_step = (int)($pkg_info['current_step_order'] ?? 0);
 
-    $step1_row = $conn->query("SELECT action_status FROM evaluation_package_route_steps WHERE package_id = $package_id AND step_order = 1 LIMIT 1")->fetch_assoc();
+    $step1_row = $conn->query("SELECT action_status, step_label, step_type FROM evaluation_package_route_steps WHERE package_id = $package_id AND step_order = 1 LIMIT 1")->fetch_assoc();
     $step1_status = $step1_row['action_status'] ?? 'Waiting';
+    $step1_type = $step1_row['step_type'] ?? 'Consolidation';
+    $step1_label = $step1_row['step_label'] ?? 'the next reviewer';
 
     $emp_fullname = trim(($evaluation['first_name'] ?? '') . ' ' . ($evaluation['last_name'] ?? ''));
     $emp_job_title = $evaluation['job_title'] ?? '';
@@ -4715,15 +4741,22 @@ function syncEvaluationToOrganizationPackage($conn, $evaluation_id)
             notifyOrganizationPackageStepAssignees($conn, $package_id, 1, $notif_title, $notif_body);
         }
         if ($step1_status === 'Waiting') {
-            // First submission for this package — open consolidation immediately.
+            // First submission for this package — open its configured first review stage.
             $open = $conn->prepare("UPDATE evaluation_package_route_steps SET action_status = 'Pending' WHERE package_id = ? AND step_order = 1 AND action_status = 'Waiting'");
             $open->bind_param('i', $package_id); $open->execute(); $open->close();
             $status_upd = $conn->prepare("UPDATE evaluation_packages SET status = 'Pending Consolidation', current_step_order = 1 WHERE package_id = ? AND status = 'Pending Self-Ratings'");
             $status_upd->bind_param('i', $package_id); $status_upd->execute(); $status_upd->close();
-            notifyOrganizationPackageStepAssignees($conn, $package_id, 1,
-                'Team Package Consolidation Started',
-                "$emp_fullname ($dept_name) submitted their self-rating for $tmpl_name. Consolidation can begin — other team members can still submit and will be included automatically."
-            );
+            if ($step1_type === 'Consolidation') {
+                notifyOrganizationPackageStepAssignees($conn, $package_id, 1,
+                    'Team Package Consolidation Started',
+                    "$emp_fullname ($dept_name) submitted their self-rating for $tmpl_name. Consolidation can begin — other team members can still submit and will be included automatically."
+                );
+            } else {
+                notifyOrganizationPackageStepAssignees($conn, $package_id, 1,
+                    'Team Evaluation Package Ready for Review',
+                    "$emp_fullname ($dept_name) submitted their self-rating for $tmpl_name. The package is ready for $step1_label in Team Evaluation Packages."
+                );
+            }
         } else {
             // Step 1 already Pending or active — notify consolidator of the new member.
             notifyOrganizationPackageStepAssignees($conn, $package_id, 1,

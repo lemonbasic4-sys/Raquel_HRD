@@ -542,23 +542,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $score_stmt->close();
 
     if ($action === 'submit') {
-        $hr_staff_assignment_stmt = $conn->prepare("SELECT 1
+        $hr_package_assignment_stmt = $conn->prepare("SELECT parent_rank.rank_category_id AS parent_rank_id
             FROM employees e
             JOIN departments d ON d.department_id = e.department_id
             JOIN job_titles staff_position ON staff_position.job_title_id = e.job_title_id
                 AND staff_position.is_active = 1
-            JOIN job_titles supervisor_position ON supervisor_position.job_title_id = staff_position.reports_to
-                AND supervisor_position.is_active = 1
-            JOIN rank_categories supervisor_rank ON supervisor_rank.rank_category_id = supervisor_position.rank_category_id
-                AND supervisor_rank.rank_name = 'Supervisor' AND supervisor_rank.is_active = 1
+            JOIN job_titles parent_position ON parent_position.job_title_id = staff_position.reports_to
+                AND parent_position.is_active = 1
+            JOIN rank_categories parent_rank ON parent_rank.rank_category_id = parent_position.rank_category_id
+                AND parent_rank.is_active = 1
             WHERE e.employee_id = ? AND e.is_active = 1 AND e.deleted_at IS NULL
               AND d.department_name = 'Human Resources' AND d.is_active = 1 AND d.deleted_at IS NULL
+              AND (parent_rank.rank_name IN ('Supervisor', 'Manager')
+                   OR (parent_rank.rank_name = 'Executives'
+                       AND parent_position.job_title REGEXP 'President|Chief Executive Officer|CEO'))
             LIMIT 1");
-        $hr_staff_assignment_stmt->bind_param('i', $employee_id);
-        $hr_staff_assignment_stmt->execute();
-        $is_hr_staff_package_flow = (bool)$hr_staff_assignment_stmt->get_result()->fetch_assoc();
-        $hr_staff_assignment_stmt->close();
-        if ($is_hr_staff_package_flow) {
+        $hr_package_assignment_stmt->bind_param('i', $employee_id);
+        $hr_package_assignment_stmt->execute();
+        $hr_package_assignment = $hr_package_assignment_stmt->get_result()->fetch_assoc();
+        $hr_package_assignment_stmt->close();
+        if ($hr_package_assignment) {
             if (!ensureOrganizationEvaluationPackageSchema($conn)) {
                 redirectWith(BASE_URL . '/employee/self-rating.php', 'danger', 'The Team Evaluation Packages workflow is unavailable. Please contact HR.');
             }
@@ -579,13 +582,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     throw new RuntimeException('The submitted evaluation could not be queued for package consolidation.');
                 }
                 $update_status->close();
-                $conn->commit();
-                $submission_transaction_open = false;
 
                 $package_id = syncEvaluationToOrganizationPackage($conn, $eval_id);
                 if (!$package_id) {
                     throw new RuntimeException('The submitted evaluation could not be added to a Team Evaluation Package.');
                 }
+                $conn->commit();
+                $submission_transaction_open = false;
             } catch (Throwable $e) {
                 if ($submission_transaction_open) {
                     try {
@@ -597,8 +600,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 error_log('Unable to route HR staff evaluation to Team Evaluation Packages: ' . $e->getMessage());
                 redirectWith(BASE_URL . '/employee/self-rating.php', 'danger', 'Your evaluation was saved, but could not be queued in Team Evaluation Packages. Please contact HR.');
             }
-            logAudit($conn, $user_id, 'CREATE', 'Evaluation', $eval_id, 'Submitted HR staff self-rating to Team Evaluation Packages');
-            redirectWith(BASE_URL . '/employee/self-rating.php', 'success', 'Your self-rating was submitted to Team Evaluation Packages for HR Supervisor consolidation.');
+            logAudit($conn, $user_id, 'CREATE', 'Evaluation', $eval_id, 'Submitted HR self-rating to Team Evaluation Packages');
+            redirectWith(BASE_URL . '/employee/self-rating.php', 'success', 'Your self-rating was submitted to Team Evaluation Packages for review by the next active organizational level.');
         }
         if (!submitEvaluationToReportingChain($conn, $eval_id, $employee_id)) {
             redirectWith(BASE_URL . '/employee/self-rating.php', 'danger', 'The evaluation was saved, but could not be queued for reporting review. Please contact HR.');
