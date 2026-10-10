@@ -7,6 +7,18 @@ if (!ensureHierarchicalEvaluationSchema($conn)) {
     exit('Evaluation template schema is unavailable.');
 }
 checkRole(['HR Manager', 'HR Supervisor', 'HR Staff', 'Employee', 'President and CEO']);
+// HR employees use the HRIS portal for template management, not the Employee Portal.
+if (($_SESSION['role'] ?? '') === 'Employee' && !empty($_SESSION['employee_id'])) {
+    $template_dept_stmt = $conn->prepare("SELECT d.department_name FROM employees e LEFT JOIN departments d ON e.department_id = d.department_id WHERE e.employee_id = ? LIMIT 1");
+    $template_employee_id = (int) $_SESSION['employee_id'];
+    $template_dept_stmt->bind_param('i', $template_employee_id);
+    $template_dept_stmt->execute();
+    $template_department = $template_dept_stmt->get_result()->fetch_assoc()['department_name'] ?? '';
+    $template_dept_stmt->close();
+    if (strcasecmp($template_department, 'Human Resources') === 0) {
+        redirectWith(BASE_URL . '/employee/dashboard.php', 'info', 'Evaluation Templates are managed from the HRIS portal for Human Resources employees.');
+    }
+}
 $creator_context = getEvaluationTemplateCreatorContext($conn, (int)($_SESSION['user_id'] ?? 0));
 if (!canViewEvaluationTemplates($creator_context)) {
     redirectWith(BASE_URL . '/employee/dashboard.php', 'danger', 'Your account is not authorized to view evaluation templates.');
@@ -346,9 +358,10 @@ $used_template_count = (int) $conn->query("SELECT COUNT(DISTINCT template_id) as
             <?php while ($t = $templates->fetch_assoc()):
             $kra_w = (float)($t['kra_total_weight'] ?? 0);
             $wclass = abs($kra_w - 100) < 0.01 ? 'bg-success' : 'bg-warning text-dark';
+            $is_probationary_template = in_array($t['evaluation_type'] ?? '', ['Initial', 'Final'], true);
         ?>
             <div class="col-md-6 col-lg-4">
-                <div class="chart-card fadeup h-100 position-relative" style="transition:transform 0.2s,box-shadow 0.2s;cursor:pointer;" onmouseover="this.style.transform='translateY(-4px)';this.style.boxShadow='0 8px 25px rgba(0,0,0,0.08)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
+                <div class="chart-card fadeup h-100 position-relative<?php echo $is_probationary_template ? ' probation-template-card' : ''; ?>" style="transition:transform 0.2s,box-shadow 0.2s;cursor:pointer;" onmouseover="this.style.transform='translateY(-4px)';this.style.boxShadow='0 8px 25px rgba(0,0,0,0.08)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
                     <!-- Checkbox for Batch Delete -->
                     <?php $is_template_owner = (int)($t['created_by'] ?? 0) === $current_user_id; ?>
                     <?php if ($can_create_templates && $is_template_owner): ?>
@@ -592,6 +605,7 @@ function confirmBatchDelete() {
 .bg-primary-subtle { background-color: #e3f2fd; }
 .bg-success-subtle { background-color: #e8f5e9; }
 .bg-info-subtle { background-color: #e0f7fa; }
+.chart-card.probation-template-card { border-color: #3730a3; }
 .template-checkbox {
     appearance: none;
     -webkit-appearance: none;

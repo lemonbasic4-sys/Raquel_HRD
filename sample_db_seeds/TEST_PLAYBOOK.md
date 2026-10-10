@@ -20,9 +20,13 @@ All Employee portal passwords: `password`
 | Department | Portal Login | Name | Job Title | Reports To |
 |---|---|---|---|---|
 | **Human Resources** | `HRD-003` | Miguel Torres | HR Staff I | `HRD-002` (Patricia Gomez) |
+| **Human Resources** | `HRD-P01` | Sofia Navarro | HR Staff I (Probationary) | `HRD-002` (Patricia Gomez) |
+| **Human Resources** | `HRD-P02` | Alyssa Reyes | HR Staff I (Probationary) | `HRD-002` (Patricia Gomez) |
 | **Human Resources** | `HRD-002` | Patricia Gomez | HR Supervisor I | `HRD-001` (Elena Delgado) |
 | **Human Resources** | `HRD-001` | Elena Delgado | HR Manager I | *(Direct to President)* |
 | **Acquired Properties** | `AP-T01` | Leonora Gomez | AP Staff I | `AP-T02` (Ronald Lopez) |
+| **Acquired Properties** | `AP-P01` | Marco Salcedo | AP Staff I (Probationary) | `AP-T02` (Ronald Lopez) |
+| **Acquired Properties** | `AP-P02` | Nathan Garcia | AP Staff I (Probationary) | `AP-T02` (Ronald Lopez) |
 | **Acquired Properties** | `AP-T02` | Ronald Lopez | AP Supervisor I | `AP-T03` (Christopher Tolentino) |
 | **Acquired Properties** | `AP-T03` | Christopher Tolentino | AP Manager I | `AP-T04` (Eduardo Aquino) |
 | **Acquired Properties** | `AP-T04` | Eduardo Aquino | VP for Acquired Properties | *(Executive)* |
@@ -58,6 +62,7 @@ cd C:\xampp\htdocs\Raquel_HRD_Test
 
 # 2. Source the clean backup snapshot
 & "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source sample_db_seeds/raquel_hris_current_clean_backup.sql;"
+& "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source sample_db_seeds/04_test_probationary_employees.sql;"
 
 Write-Host "Database snapshot restored successfully!" -ForegroundColor Green
 ```
@@ -82,8 +87,10 @@ cd C:\xampp\htdocs\Raquel_HRD
 & "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source database/xPortal_accounts.sql;"
 #& "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source database/data/seed_templates.sql;"
 & "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source sample_db_seeds/02_test_hrd_portal_accounts.sql;"
+& "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source sample_db_seeds/04_test_probationary_employees.sql;"
 & "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source sample_db_seeds/03_test_governance_approvers.sql;"
 & "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source database/zLAST_performance_indexes.sql;"
+& "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source database/04_test_probationary_employees.sql;"
 
 Write-Host "Database reset and seeded successfully!" -ForegroundColor Green
 ```

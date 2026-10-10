@@ -28,7 +28,7 @@ $reviewer_match = organizationPackageReviewerMatchSql('rs');
 // 1. They have already acted on the package step (rs.action_status IN ('Approved', 'Returned'))
 // 2. The package is fully finalized (ep.status = 'Approved and Applied')
 // Current working packages pending action belong on Team Evaluation Packages (team-evaluation-packages.php).
-$packages_stmt = $conn->prepare("SELECT DISTINCT ep.package_id, ep.status, ep.period_start, ep.period_end, ep.shared_behavior_score,
+$packages_stmt = $conn->prepare("SELECT DISTINCT ep.package_id, ep.status, ep.evaluation_type, ep.period_start, ep.period_end, ep.shared_behavior_score,
         ep.department_id, ep.template_id, d.department_name, et.template_name, et.kra_weight, et.behavior_weight
     FROM evaluation_packages ep
     JOIN evaluation_package_route_steps rs ON rs.package_id = ep.package_id
@@ -92,6 +92,7 @@ require_once '../includes/header.php';
         $members_stmt->execute();
         $members = $members_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
         $members_stmt->close();
+        $is_probationary_package = in_array($package['evaluation_type'], ['Initial', 'Final'], true);
         ?>
         <section class="package-card" role="region" aria-label="<?php echo e($package['department_name']); ?> Evaluation Package">
             <header class="package-card__header">
@@ -115,11 +116,11 @@ require_once '../includes/header.php';
                     <div class="shared-behavior-banner d-flex flex-wrap align-items-center justify-content-between gap-3">
                         <div>
                             <i class="fas fa-users-cog me-2"></i>
-                            Shared Core Behaviors &amp; Values Score:
-                            <strong><?php echo $package['shared_behavior_score'] !== null ? number_format((float) $package['shared_behavior_score'], 2) : 'Pending Consolidation'; ?></strong>
+                            <?php echo $is_probationary_package ? 'Individual Core Values Score:' : 'Shared Core Behaviors &amp; Values Score:'; ?>
+                            <strong><?php echo $is_probationary_package ? number_format((float)($members[0]['individual_behavior'] ?? $members[0]['behavior_average'] ?? 0), 2) : ($package['shared_behavior_score'] !== null ? number_format((float) $package['shared_behavior_score'], 2) : 'Pending Consolidation'); ?></strong>
                         </div>
                         <div class="small text-muted">
-                            Applied across all <?php echo count($members); ?> package members upon Board approval.
+                            <?php echo $is_probationary_package ? 'Finalized upon HR Manager approval.' : 'Applied across all ' . count($members) . ' package members upon Board approval.'; ?>
                         </div>
                     </div>
 
@@ -140,11 +141,11 @@ require_once '../includes/header.php';
                             <tbody>
                                 <?php foreach ($members as $member): ?>
                                     <?php
-                                    $kra_w = isset($package['kra_weight']) && (float)$package['kra_weight'] > 0 ? (float)$package['kra_weight'] : 80;
-                                    $beh_w = isset($package['behavior_weight']) && (float)$package['behavior_weight'] > 0 ? (float)$package['behavior_weight'] : 20;
+                                    $kra_w = $is_probationary_package ? 80 : (isset($package['kra_weight']) && (float)$package['kra_weight'] > 0 ? (float)$package['kra_weight'] : 80);
+                                    $beh_w = $is_probationary_package ? 20 : (isset($package['behavior_weight']) && (float)$package['behavior_weight'] > 0 ? (float)$package['behavior_weight'] : 20);
                                     $beh_val = (float)($member['individual_behavior'] ?? $member['behavior_average']);
                                     $total_score_val = calculateEvalTotal((float)$member['kra_subtotal'], $beh_val, $kra_w, $beh_w);
-                                    $shared_beh_val = $package['shared_behavior_score'] !== null ? (float)$package['shared_behavior_score'] : $beh_val;
+                                    $shared_beh_val = $is_probationary_package ? $beh_val : ($package['shared_behavior_score'] !== null ? (float)$package['shared_behavior_score'] : $beh_val);
                                     $final_score_val = calculateEvalTotal((float)$member['kra_subtotal'], $shared_beh_val, $kra_w, $beh_w);
                                     ?>
                                     <tr>

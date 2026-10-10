@@ -126,7 +126,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $audit->bind_param('iis', $package_id, $user_id, $remarks);
         $audit->execute();
         $audit->close();
-        redirectWith(BASE_URL . '/employee/package-member-review.php?package_id=' . $package_id . '&evaluation_id=' . $evaluation_id, 'success', 'Individual ratings, shared Behavior score, and Developmental Plan were saved successfully.');
+        redirectWith(BASE_URL . '/employee/package-member-review.php?package_id=' . $package_id . '&evaluation_id=' . $evaluation_id, 'success', 'Individual ratings and Developmental Plan were saved successfully.');
     }
 
     if ($sort_idx > 0) {
@@ -171,8 +171,9 @@ $dev_plan_stmt->execute();
 $existing_dev_plans = $dev_plan_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $dev_plan_stmt->close();
 
-$kra_w = (float)($evaluation['kra_weight'] ?? 80);
-$beh_w = (float)($evaluation['behavior_weight'] ?? 20);
+$is_probationary = in_array($evaluation['evaluation_type'], ['Initial', 'Final'], true);
+$kra_w = $is_probationary ? 80 : (float)($evaluation['kra_weight'] ?? 80);
+$beh_w = $is_probationary ? 20 : (float)($evaluation['behavior_weight'] ?? 20);
 $shared_beh = $evaluation['shared_behavior_score'] !== null ? (float)$evaluation['shared_behavior_score'] : (float)$evaluation['behavior_average'];
 $beh_val = (float)$evaluation['behavior_average'];
 
@@ -203,6 +204,7 @@ $self_kra_subtotal = round($self_kra_subtotal, 2);
 $adj_kra_subtotal = round($adj_kra_subtotal, 2);
 $self_beh_avg = $beh_count > 0 ? round($self_beh_total / $beh_count, 2) : 0.0;
 $adj_beh_avg = $beh_count > 0 ? round($adj_beh_total / $beh_count, 2) : 0.0;
+if ($is_probationary) $shared_beh = $adj_beh_avg;
 
 $est_final_score = calculateEvalTotal($adj_kra_subtotal, $shared_beh, $kra_w, $beh_w);
 $est_perf_level = getPerformanceLevel($est_final_score);
@@ -249,9 +251,9 @@ $devplan_count = count($existing_dev_plans);
                     <div class="package-stat h-100 d-flex flex-column justify-content-between" style="background: #F4FBF7; border: 2px solid #86EFAC; border-radius: 12px; padding: 1.1rem 1.25rem;">
                         <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
                             <strong class="tabular-nums text-success m-0" id="stat-shared-behavior" style="font-size: 1.6rem; line-height: 1;"><?php echo number_format((float)$shared_beh, 2); ?></strong>
-                            <span class="badge bg-success-subtle text-success border border-success px-2 py-1 small">Department Shared</span>
+                            <span class="badge bg-success-subtle text-success border border-success px-2 py-1 small"><?php echo $is_probationary ? 'Individual' : 'Department Shared'; ?></span>
                         </div>
-                        <div class="text-muted fw-semibold" style="font-size: 0.85rem;">Shared Department Behavior Result</div>
+                        <div class="text-muted fw-semibold" style="font-size: 0.85rem;"><?php echo $is_probationary ? 'Individual Core Values Result' : 'Shared Department Behavior Result'; ?></div>
                     </div>
                 </div>
                 <div class="col-md-6 col-sm-6">
@@ -474,7 +476,7 @@ $devplan_count = count($existing_dev_plans);
             <!-- TAB 2: Core Behaviors & Values -->
             <div id="tab-behaviors" class="eval-tab-content" role="tabpanel" aria-labelledby="btn-tab-behaviors">
                 <div class="eval-section-title">
-                    <span><i class="fas fa-users me-2"></i>Core Behaviors &amp; Values (Shared Score Component)</span>
+                    <span><i class="fas fa-users me-2"></i>Core Behaviors &amp; Values (<?php echo $is_probationary ? 'Individual' : 'Shared'; ?> Score Component)</span>
                     <span class="badge bg-light text-secondary border px-3 py-2 fw-semibold" style="font-size:0.85rem;">
                         Behavior Weight: <strong class="text-dark"><?php echo $beh_w; ?>%</strong>
                     </span>
@@ -640,6 +642,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const kraWeightPct = <?php echo $kra_w; ?>;
     const behWeightPct = <?php echo $beh_w; ?>;
     const sharedBehVal = <?php echo $shared_beh; ?>;
+    const individualBehavior = <?php echo $is_probationary ? 'true' : 'false'; ?>;
 
     const ratingInputs = document.querySelectorAll('.eval-score-input');
     const statEstTotal = document.getElementById('stat-est-total-score');
@@ -671,7 +674,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const behAverage = behCount > 0 ? (behTotal / behCount) : 0;
         const kraWeighted = kraSubtotal * (kraWeightPct / 100);
-        const behWeighted = sharedBehVal * (behWeightPct / 100);
+        const behWeighted = (individualBehavior ? behAverage : sharedBehVal) * (behWeightPct / 100);
         const estTotal = kraWeighted + behWeighted;
         const estTotalRounded = estTotal.toFixed(2);
         const level = getPerfLevel(estTotal);

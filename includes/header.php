@@ -212,6 +212,7 @@ switch ($effective_role) {
         $m_hr_review_count = 0;
         $is_dept_manager_menu = false;
         $is_supervisor_menu  = false;
+        $is_hr_personnel     = false;
         $hdr_sup_dept_name   = '';
         if (isset($_SESSION['employee_id']) && $conn) {
             $_hdr_emp_id = (int) $_SESSION['employee_id'];
@@ -226,6 +227,7 @@ switch ($effective_role) {
             $_hdr_dept_stmt->execute();
             $_hdr_dept_row = $_hdr_dept_stmt->get_result()->fetch_assoc();
             $_hdr_emp_dept = $_hdr_dept_row['department_name'] ?? '';
+            $is_hr_personnel = strcasecmp($_hdr_emp_dept, 'Human Resources') === 0;
             $_hdr_emp_branch_id = $_hdr_dept_row ? (int)$_hdr_dept_row['branch_id'] : 0;
             $_hdr_emp_rank = $_hdr_dept_row ? (int)$_hdr_dept_row['rank_category_id'] : 0;
             $_hdr_emp_position_id = $_hdr_dept_row ? (int)$_hdr_dept_row['job_title_id'] : 0;
@@ -351,10 +353,10 @@ switch ($effective_role) {
         if (in_array($_hdr_emp_rank, [1, 2, 3, 4], true) || ($_SESSION['role'] ?? '') === 'President and CEO') {
             $template_creator_context = getEvaluationTemplateCreatorContext($conn, (int)($_SESSION['user_id'] ?? 0));
         }
-        if ($template_creator_context && !empty($template_creator_context['is_ceo'])) {
+        if (!$is_hr_personnel && $template_creator_context && !empty($template_creator_context['is_ceo'])) {
             $menu_evaluations[] = ['icon' => 'fas fa-file-alt', 'label' => 'Evaluation Templates', 'url' => BASE_URL . '/employee/evaluation-templates.php', 'page' => 'evaluation-templates.php'];
         }
-        if (in_array($_hdr_emp_rank, [3, 4], true)) {
+        if (!$is_hr_personnel && in_array($_hdr_emp_rank, [3, 4], true)) {
             if (!$template_creator_context || empty($template_creator_context['is_ceo'])) {
                 $menu_evaluations[] = ['icon' => 'fas fa-file-alt', 'label' => 'Evaluation Templates', 'url' => BASE_URL . '/manager/templates.php', 'page' => 'templates.php'];
             }
@@ -366,7 +368,6 @@ switch ($effective_role) {
         $is_ceo_employee_portal = $template_creator_context && !empty($template_creator_context['is_ceo']);
         // The current department controls this Employee Portal menu. A held
         // former HRIS role may remain linked for audit/history after transfer.
-        $is_hr_personnel = strcasecmp($_hdr_emp_dept ?? '', 'Human Resources') === 0;
         if (!$is_hr_personnel && ($is_supervisor_menu || $m_pending_pkg_count > 0 || $is_ceo_employee_portal)) {
             $menu_my_team[] = ['icon' => 'fas fa-users',       'label' => 'My Team',                  'url' => BASE_URL . '/employee/team-list.php',              'page' => 'team-list.php'];
             $menu_my_team[] = ['icon' => 'fas fa-layer-group', 'label' => 'Performance Evaluation', 'url' => BASE_URL . '/employee/team-evaluation-packages.php', 'page' => 'team-evaluation-packages.php', 'badge' => $m_pending_pkg_count ?: null, 'badge_class' => 'bg-warning text-dark'];

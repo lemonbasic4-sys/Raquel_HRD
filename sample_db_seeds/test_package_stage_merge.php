@@ -60,6 +60,14 @@ try {
         check(tryMergeLateMemberPackageIntoSibling($conn, 2, 1) === 2, 'Cancelled package merged twice');
         echo "PASS: $label, preserved history/status, idempotency\n";
     }
+    foreach (['Initial', 'Final'] as $probationary_type) {
+        fixture($conn);
+        $conn->query("UPDATE evaluation_packages SET evaluation_type='$probationary_type'");
+        check(tryMergeLateMemberPackageIntoSibling($conn, 2, 1) === 2, "$probationary_type evaluations must stay individual");
+        check((int)$conn->query('SELECT COUNT(*) c FROM evaluation_package_members WHERE package_id=1')->fetch_assoc()['c'] === 2,
+            "$probationary_type member merged into another evaluation");
+    }
+    echo "PASS: probationary Initial/Final packages never merge\n";
     foreach ([
         "UPDATE evaluation_package_route_steps SET step_label='President' WHERE package_id=1 AND step_order=2",
         "UPDATE evaluation_packages SET evaluation_type='Quarterly' WHERE package_id=1",

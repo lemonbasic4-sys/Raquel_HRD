@@ -44,8 +44,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $behavior_framework_code = strtoupper(trim($_POST['behavior_framework_code'] ?? ''));
     $behavior_framework_version = trim($_POST['behavior_framework_version'] ?? '');
     $evaluation_type = $_POST['evaluation_type'] ?? 'Annual';
+    $is_probationary_template = isset($_POST['probationary_template']) || in_array($evaluation_type, ['Initial', 'Final'], true);
+    if (!in_array($evaluation_type, ['Initial', 'Final', 'Quarterly', 'Annual'], true)) $evaluation_type = 'Annual';
+    if ($is_probationary_template && !in_array($evaluation_type, ['Initial', 'Final'], true)) $evaluation_type = 'Initial';
     $kra_weight = floatval($_POST['kra_weight'] ?? 80);
     $behavior_weight = floatval($_POST['behavior_weight'] ?? 20);
+    if ($is_probationary_template) { $kra_weight = 80; $behavior_weight = 20; }
     $form_code = trim($_POST['form_code'] ?? '');
     $revision_date = $_POST['revision_date'] ?: null;
     $effective_date_form = $_POST['effective_date_form'] ?: null;
@@ -63,7 +67,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $target_department_id = (int)($department_stmt->get_result()->fetch_assoc()['department_id'] ?? 0);
     $department_stmt->close();
     $target_positions = [];
-    if (!empty($creator_context['can_create_templates'])) {
+    if ($is_probationary_template) {
+        $target_position_ids = [];
+    } elseif (!empty($creator_context['can_create_templates'])) {
         $target_positions = getEvaluationTemplateTargetPositions($conn, $creator_context, $target_department_id);
         $target_position_ids = array_map(static function ($position) {
             return (int)$position['job_title_id'];
@@ -73,7 +79,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($target_department_id !== (int)($tmpl['target_department_id'] ?? 0)) $target_position_ids = [];
     }
     $target_job_title_id = (int)($target_position_ids[0] ?? 0);
-    if (!$target_department_id || !$target_position_ids) {
+    if (!$target_department_id || (!$is_probationary_template && !$target_position_ids)) {
         redirectWith($template_edit_url . "?id=$template_id", 'danger', 'No active target positions are configured for your role in this department.');
     }
 
@@ -89,16 +95,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (abs(($kra_weight + $behavior_weight) - 100) > 0.01) {
         redirectWith($template_edit_url . "?id=$template_id", 'danger', 'KRA weight + Behavior weight must equal 100%.');
     }
-    if ($behavior_framework_code === '' || $behavior_framework_version === '') {
-        redirectWith($template_edit_url . "?id=$template_id", 'danger', 'Behavior Framework Code and Version are required for every evaluation template.');
+    if (!$is_probationary_template && ($behavior_framework_code === '' || $behavior_framework_version === '')) {
+        redirectWith($template_edit_url . "?id=$template_id", 'danger', 'Behavior Framework Code and Version are required for Annual and Quarterly templates.');
     }
-    if (!evaluationBehaviorFrameworkMatchesExisting($conn, $behavior_framework_code, $behavior_framework_version, $beh_names, $beh_kpis, $template_id)) {
+    if (!$is_probationary_template && !evaluationBehaviorFrameworkMatchesExisting($conn, $behavior_framework_code, $behavior_framework_version, $beh_names, $beh_kpis, $template_id)) {
         redirectWith($template_edit_url . "?id=$template_id", 'danger', 'Behavior items must match other active forms using this Behavior Framework Code and Version.');
+    }
+    if ($is_probationary_template) {
+        $behavior_framework_code = '';
+        $behavior_framework_version = '';
     }
 
     // Update template
     $stmt = $conn->prepare("UPDATE evaluation_templates
-        SET template_name=?, description=?, target_department=?, target_department_id=?, target_job_title_id=?,
+        SET template_name=?, description=?, target_department=?, target_department_id=?, target_job_title_id=NULLIF(?, 0),
             behavior_framework_code=NULLIF(?, ''), behavior_framework_version=NULLIF(?, ''),
             evaluation_type=?, kra_weight=?, behavior_weight=?, form_code=?, revision_date=?, effective_date_form=?
         WHERE template_id=? AND created_by=?");
@@ -565,6 +575,12 @@ require_once '../includes/header.php';
                     </select>
                 </div>
             </div>
+            <div class="form-check form-switch mb-3">
+                <input class="form-check-input" type="checkbox" role="switch" id="probationaryTemplateToggle" name="probationary_template" value="1" <?php echo in_array($tmpl['evaluation_type'] ?? '', ['Initial', 'Final'], true) ? 'checked' : ''; ?>>
+                <label class="form-check-label fw-semibold" for="probationaryTemplateToggle">This template is exclusively for probationary employees</label>
+                <div class="form-text">Uses 80% KRA and 20% individual Core Values for Initial or Final reviews. Core Values questions remain part of this template.</div>
+            </div>
+            <div id="probationaryTargetFields">
             <div class="row mb-3">
                 <div class="col-md-6">
                     <label class="form-label fw-semibold">Target Position(s) <span class="text-danger">*</span></label>
@@ -583,6 +599,7 @@ require_once '../includes/header.php';
                     <label class="form-label fw-semibold">Framework Version <span class="text-danger">*</span></label>
                     <input type="text" class="form-control" name="behavior_framework_version" maxlength="40" required value="<?php echo e($tmpl['behavior_framework_version'] ?? ''); ?>" placeholder="e.g., 1.0">
                 </div>
+            </div>
             </div>
             <div class="row mb-3">
                 <div class="col-md-12 mb-3">
@@ -1566,6 +1583,37 @@ function updateTemplateIdentifierMarquee() {
 document.addEventListener('DOMContentLoaded', function() {
     const targetDepartment = document.getElementById('inputTargetDept');
     const targetPosition = document.getElementById('inputTargetPosition');
+    const probationToggle = document.getElementById('probationaryTemplateToggle');
+    const evaluationType = document.getElementById('inputEvalType');
+    const probationaryFields = document.getElementById('probationaryTargetFields');
+    const kraWeightInput = document.getElementById('kraWeight');
+    const behaviorWeightInput = document.getElementById('behaviorWeight');
+    const updateProbationaryFields = function() {
+        if (!probationToggle || !probationaryFields) return;
+        const enabled = probationToggle.checked;
+        probationaryFields.classList.toggle('d-none', enabled);
+        probationaryFields.querySelectorAll('input').forEach(input => {
+            input.disabled = enabled;
+            if (input.name === 'behavior_framework_code' || input.name === 'behavior_framework_version') input.required = !enabled;
+        });
+        if (kraWeightInput && behaviorWeightInput) {
+            if (enabled) { kraWeightInput.value = '80'; behaviorWeightInput.value = '20'; }
+            kraWeightInput.readOnly = enabled;
+            behaviorWeightInput.readOnly = enabled;
+            updateWeightSplit();
+        }
+    };
+    probationToggle?.addEventListener('change', function() {
+        if (evaluationType) {
+            if (probationToggle.checked && !['Initial', 'Final'].includes(evaluationType.value)) evaluationType.value = 'Initial';
+            if (!probationToggle.checked && ['Initial', 'Final'].includes(evaluationType.value)) evaluationType.value = 'Annual';
+        }
+        updateProbationaryFields();
+    });
+    evaluationType?.addEventListener('change', function() {
+        if (probationToggle) probationToggle.checked = ['Initial', 'Final'].includes(evaluationType.value);
+        updateProbationaryFields();
+    });
     const filterTargetPositions = function() {
         if (!targetDepartment || !targetPosition) return;
         const selectedDepartmentId = targetDepartment.selectedOptions[0]?.dataset.departmentId || '';
@@ -1584,6 +1632,7 @@ document.addEventListener('DOMContentLoaded', function() {
         targetDepartment.addEventListener('change', filterTargetPositions);
         filterTargetPositions();
     }
+    updateProbationaryFields();
     <?php foreach ($kra_criteria as $k): ?>
         addKRA(<?php echo json_encode($k['criterion_name']); ?>, <?php echo json_encode($k['description'] ?? ''); ?>, '<?php echo $k['weight']; ?>');
     <?php endforeach; ?>

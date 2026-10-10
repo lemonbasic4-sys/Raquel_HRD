@@ -446,6 +446,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $kra_weight_pct = (float) ($template['kra_weight'] ?? 80);
     $beh_weight_pct = (float) ($template['behavior_weight'] ?? 20);
+    if (in_array($evaluation_type, ['Initial', 'Final'], true)) {
+        $kra_weight_pct = 80;
+        $beh_weight_pct = 20;
+    }
 
     $kra_subtotal = 0;
     $kra_score_data = [];
@@ -1888,9 +1892,12 @@ require_once '../includes/header.php';
                                         <option value="" disabled <?php echo $selected_template_id <= 0 ? 'selected' : ''; ?>>-- Choose an Active Template --</option>
                                         <?php while ($template = $templates->fetch_assoc()): ?>
                                             <?php
-                                            $template_label = $template['template_name'] . ' (' . (float) $template['kra_weight'] . '% KRA / ' . (float) $template['behavior_weight'] . '% Behavior)';
+                                            $probationary_template = in_array($template['evaluation_type'], ['Initial', 'Final'], true);
+                                            $display_kra_weight = $probationary_template ? 80 : (float)$template['kra_weight'];
+                                            $display_behavior_weight = $probationary_template ? 20 : (float)$template['behavior_weight'];
+                                            $template_label = $template['template_name'] . ' (' . $display_kra_weight . '% KRA / ' . $display_behavior_weight . '% Behavior)';
                                             $opt_display = str_replace(['All Departments', 'Template'], ['All Depts', 'Temp'], $template['template_name']);
-                                            $opt_display .= ' (' . (int)$template['kra_weight'] . '/' . (int)$template['behavior_weight'] . ')';
+                                            $opt_display .= ' (' . (int)$display_kra_weight . '/' . (int)$display_behavior_weight . ')';
                                             ?>
                                             <option value="<?php echo (int) $template['template_id']; ?>" title="<?php echo e($template_label); ?>" data-title="<?php echo e($template_label); ?>" <?php echo $selected_template_id === (int) $template['template_id'] ? 'selected' : ''; ?>>
                                                 <?php echo e($opt_display); ?>

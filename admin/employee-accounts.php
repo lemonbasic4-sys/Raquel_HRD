@@ -12,6 +12,7 @@ $current_page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
 $offset = ($current_page - 1) * $per_page;
 $selected_department = isset($_GET['department']) && $_GET['department'] !== '' ? max(0, (int)$_GET['department']) : 0;
 $selected_position   = isset($_GET['position'])   && $_GET['position']   !== '' ? trim($_GET['position'])   : '';
+$employee_search     = trim($_GET['search'] ?? '');
 
 $department_options = $conn->query("
     SELECT department_id, department_name
@@ -57,6 +58,17 @@ if ($selected_position !== '') {
     $base_where_conditions .= " AND e.job_title = '$safe_position'";
 }
 
+// Search the entire employee directory, rather than only the current page.
+if ($employee_search !== '') {
+    $safe_search = $conn->real_escape_string($employee_search);
+    $search_like = "%$safe_search%";
+    $base_where_conditions .= " AND (e.employee_code LIKE '$search_like'
+        OR e.first_name LIKE '$search_like'
+        OR e.middle_name LIKE '$search_like'
+        OR e.last_name LIKE '$search_like'
+        OR e.job_title LIKE '$search_like')";
+}
+
 // Fast COUNT — LEFT JOIN anti-join to exclude Admin-linked employees
 $total_accounts_result = $conn->query("
     SELECT COUNT(*) AS total
@@ -99,6 +111,7 @@ if (!empty($emp_ids)) {
             e.last_name,
             e.middle_name,
             e.job_title,
+            e.employment_status,
             d.department_name,
             b.branch_name,
             e.profile_picture,
@@ -246,7 +259,9 @@ document.addEventListener('DOMContentLoaded', () => new bootstrap.Modal(document
                         </option>
                     <?php endwhile; ?>
                 </select>
-                <?php if ($selected_department > 0 || $selected_position !== ''): ?>
+                <input type="search" class="form-control form-control-sm" name="search" value="<?php echo e($employee_search); ?>" placeholder="Name or employee ID" aria-label="Search all employees" style="width: 200px;">
+                <button class="btn btn-sm btn-primary" type="submit"><i class="fas fa-search me-1"></i>Find</button>
+                <?php if ($selected_department > 0 || $selected_position !== '' || $employee_search !== ''): ?>
                     <a href="employee-accounts.php" class="btn btn-sm btn-outline-secondary" title="Clear filters">
                         <i class="fas fa-times me-1"></i>Clear
                     </a>
@@ -254,7 +269,7 @@ document.addEventListener('DOMContentLoaded', () => new bootstrap.Modal(document
             </form>
             <div class="search-box" style="min-width: 240px; flex: 1 1 240px; max-width: 320px;">
                 <i class="fas fa-search search-icon"></i>
-                <input type="text" class="form-control form-control-sm" id="searchPortal" placeholder="Search employees..." onkeyup="filterTable('searchPortal', 'portalTable')">
+                <input type="text" class="form-control form-control-sm" id="searchPortal" placeholder="Filter this page..." onkeyup="filterTable('searchPortal', 'portalTable')">
             </div>
         </div>
     </div>
@@ -290,6 +305,9 @@ document.addEventListener('DOMContentLoaded', () => new bootstrap.Modal(document
                                 <td data-label="Employee Name">
                                     <div><strong><?php echo e($emp['last_name'] . ', ' . $emp['first_name']); ?></strong></div>
                                     <small class="text-muted"><?php echo e($emp['job_title']); ?> <span class="company-id-text">(Company ID: <span class="company-id-value"><?php echo e(getEmployeeDisplayId($emp)); ?></span>)</span></small>
+                                    <?php if (($emp['employment_status'] ?? '') === 'Probationary'): ?>
+                                        <div><span class="badge" style="background:#3730a3;">Probationary</span></div>
+                                    <?php endif; ?>
                                 </td>
                                 <td data-label="Department"><?php echo e($emp['department_name'] ?? 'N/A'); ?></td>
                                 <td data-label="Branch"><?php echo e($emp['branch_name'] ?? 'N/A'); ?></td>
@@ -495,7 +513,7 @@ document.addEventListener('DOMContentLoaded', () => new bootstrap.Modal(document
                     <input type="hidden" name="full_name" id="modal_full_name">
                     <input type="hidden" name="email" id="modal_email">
                     <input type="hidden" name="role" value="Employee">
-                    <input type="hidden" name="redirect" value="employee-accounts.php?page=<?php echo $current_page; ?><?php echo $selected_department > 0 ? '&department=' . (int) $selected_department : ''; ?><?php echo $selected_position !== '' ? '&position=' . urlencode($selected_position) : ''; ?>">
+                    <input type="hidden" name="redirect" value="employee-accounts.php?page=<?php echo $current_page; ?><?php echo $selected_department > 0 ? '&department=' . (int) $selected_department : ''; ?><?php echo $selected_position !== '' ? '&position=' . urlencode($selected_position) : ''; ?><?php echo $employee_search !== '' ? '&search=' . urlencode($employee_search) : ''; ?>">
                     
                     <!-- Employee Badge Info -->
                     <div class="portal-emp-badge">

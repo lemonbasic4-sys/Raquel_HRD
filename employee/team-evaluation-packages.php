@@ -180,7 +180,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'This package is locked after Board approval. Scores and route actions can no longer be changed.');
     }
 
-    $step_stmt = $conn->prepare("SELECT rs.*, ep.department_id, ep.template_id, ep.period_start, ep.period_end, ep.status AS package_status, d.department_name
+    $step_stmt = $conn->prepare("SELECT rs.*, ep.department_id, ep.template_id, ep.evaluation_type, ep.period_start, ep.period_end, ep.status AS package_status, d.department_name
         FROM evaluation_package_route_steps rs
         JOIN evaluation_packages ep ON ep.package_id = rs.package_id
         JOIN departments d ON d.department_id = ep.department_id
@@ -202,17 +202,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ((int)$step['step_order'] !== 1) {
             redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'Only the initial consolidator can return individual member evaluations to employees.');
         }
+        if (in_array($step['evaluation_type'], ['Initial', 'Final'], true) && $comments === '') {
+            redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'A return reason is required for the probationary employee.');
+        }
 
+        $member_check = $conn->prepare('SELECT 1 FROM evaluation_package_members WHERE package_id = ? AND evaluation_id = ? LIMIT 1');
+        $member_check->bind_param('ii', $package_id, $member_eval_id);
+        $member_check->execute();
+        $belongs_to_package = (bool)$member_check->get_result()->fetch_assoc();
+        $member_check->close();
+        if (!$belongs_to_package) {
+            redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'This evaluation is not part of the current review.');
+        }
         $conn->query("UPDATE evaluations SET status = 'Returned' WHERE evaluation_id = $member_eval_id");
-        $conn->query("DELETE FROM evaluation_package_members WHERE package_id = $package_id AND evaluation_id = $member_eval_id");
+        if (!in_array($step['evaluation_type'], ['Initial', 'Final'], true)) {
+            $conn->query("DELETE FROM evaluation_package_members WHERE package_id = $package_id AND evaluation_id = $member_eval_id");
+        }
         $remaining_members = (int)($conn->query("SELECT COUNT(*) AS total FROM evaluation_package_members WHERE package_id = $package_id")->fetch_assoc()['total'] ?? 0);
-        if ($remaining_members > 0) {
+        if ($remaining_members > 0 && !in_array($step['evaluation_type'], ['Initial', 'Final'], true)) {
             recalculateOrganizationPackageBehaviorScore($conn, $package_id);
             $msg = 'Member evaluation returned to employee for revision. Package consolidation remains active with remaining members.';
         } else {
             $conn->query("UPDATE evaluation_packages SET status = 'Pending Self-Ratings', current_step_order = NULL, shared_behavior_score = NULL WHERE package_id = $package_id");
             $conn->query("UPDATE evaluation_package_route_steps SET action_status = 'Waiting', acted_at = NULL, comments = NULL WHERE package_id = $package_id");
-            $msg = 'Member evaluation returned to employee for revision. Package reset to Waiting for Team Self-Ratings.';
+            $msg = in_array($step['evaluation_type'], ['Initial', 'Final'], true)
+                ? 'Probationary evaluation returned to the employee for revision. Review will resume after resubmission.'
+                : 'Member evaluation returned to employee for revision. Package reset to Waiting for Team Self-Ratings.';
         }
 
         $audit = $conn->prepare("INSERT INTO evaluation_package_audit (package_id, user_id, action, remarks) VALUES (?, ?, 'MEMBER_RETURNED', ?)");
@@ -223,7 +238,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $emp_user = $conn->query("SELECT u.user_id, e.first_name, e.last_name FROM evaluations ev JOIN employees e ON e.employee_id = ev.employee_id JOIN users u ON u.employee_id = ev.employee_id WHERE ev.evaluation_id = $member_eval_id LIMIT 1")->fetch_assoc();
         if ($emp_user) {
-            createNotification($conn, (int)$emp_user['user_id'], 'Self-Rating Returned for Revision', 'Your standing supervisor returned your self-rating for revision. Remarks: ' . ($comments ?: 'Please review and resubmit.'), BASE_URL . '/employee/self-rating.php?edit=' . $member_eval_id);
+            createNotification($conn, (int)$emp_user['user_id'], 'Self-Rating Returned for Revision', 'Your reviewer returned your self-rating for revision. Remarks: ' . ($comments ?: 'Please review and resubmit.'), BASE_URL . '/employee/self-rating.php?edit=' . $member_eval_id);
         }
         redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'success', $msg);
     }
@@ -332,10 +347,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $next = $next_stmt->get_result()->fetch_assoc();
     $next_stmt->close();
 
+    $is_probationary = in_array($step['evaluation_type'], ['Initial', 'Final'], true);
     $is_final_board = ($step['step_type'] === 'Governance') && (stripos($step['step_label'], 'Board') !== false);
+    $is_final_hr = $is_probationary && $step['eligible_role'] === 'HR Manager' && !$next;
 
     if ($next && !$is_final_board) {
-        $next_update = $conn->prepare("UPDATE evaluation_package_route_steps SET action_status = 'Pending' WHERE package_route_step_id = ?");
+        $next_update = $conn->prepare("UPDATE evaluation_package_route_steps SET action_status = 'Pending' WHERE package_route_step_id = ? AND action_status IN ('Waiting', 'Returned')");
         $next_update->bind_param('i', $next['package_route_step_id']);
         $next_update->execute();
         $next_update->close();
@@ -371,7 +388,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'success', 'Evaluation package successfully adjusted and forwarded to ' . $next_name . ' (' . $next['step_label'] . ').');
     } else {
         // Final governance step (Board of Directors) locks and applies.
-        if (!$is_final_board) {
+        if (!$is_final_board && !$is_final_hr) {
             redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'Final application requires Board of Directors approval. Assign a Board approver under Evaluation Governance.');
         }
 
@@ -384,7 +401,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $package_update->close();
 
             $lock_audit = $conn->prepare("INSERT INTO evaluation_package_audit (package_id, user_id, action, remarks) VALUES (?, ?, 'LOCKED_AND_APPLIED', ?)");
-            $lock_remark = 'Board approval locked and applied final package results to all team members.';
+            $lock_remark = $is_final_hr ? 'HR Manager approved and applied the individual probationary evaluation.' : 'Board approval locked and applied final package results to all team members.';
             $lock_audit->bind_param('iis', $package_id, $user_id, $lock_remark);
             $lock_audit->execute();
             $lock_audit->close();
@@ -396,7 +413,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $members_stmt->execute();
             $member_users = $members_stmt->get_result();
             while ($member_user = $member_users->fetch_assoc()) {
-                createNotification($conn, (int) $member_user['user_id'], 'Evaluation Approved & Finalized', 'Your team evaluation package (' . $step['department_name'] . ') has completed final Board approval and all scores are locked and applied.', BASE_URL . '/employee/evaluation-history.php');
+                $member_message = $is_final_hr
+                    ? 'Your probationary evaluation has completed HR Manager approval and its final score is available.'
+                    : 'Your team evaluation package (' . $step['department_name'] . ') has completed final Board approval and all scores are locked and applied.';
+                createNotification($conn, (int) $member_user['user_id'], 'Evaluation Approved & Finalized', $member_message, BASE_URL . '/employee/evaluation-history.php');
             }
             $members_stmt->close();
 
@@ -409,9 +429,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $rev_uid = (int)($r_row['reviewer_user_id'] ?? 0);
                 $rev_emp_id = (int)($r_row['reviewer_employee_id'] ?? 0);
                 if ($rev_uid > 0) {
-                    createNotification($conn, $rev_uid, 'Team Package Approved & Finalized', 'The ' . $step['department_name'] . ' evaluation package has received Board approval and all scores are locked and applied.', BASE_URL . '/employee/team-evaluation-history.php');
+                    createNotification($conn, $rev_uid, 'Evaluation Approved & Finalized', $is_final_hr ? 'The probationary evaluation has received final HR Manager approval.' : 'The ' . $step['department_name'] . ' evaluation package has received Board approval and all scores are locked and applied.', BASE_URL . '/employee/team-evaluation-history.php');
                 } elseif ($rev_emp_id > 0) {
-                    notifyUsersForEmployee($conn, $rev_emp_id, 'Team Package Approved & Finalized', 'The ' . $step['department_name'] . ' evaluation package has received Board approval and all scores are locked and applied.', BASE_URL . '/employee/team-evaluation-history.php');
+                    notifyUsersForEmployee($conn, $rev_emp_id, 'Evaluation Approved & Finalized', $is_final_hr ? 'The probationary evaluation has received final HR Manager approval.' : 'The ' . $step['department_name'] . ' evaluation package has received Board approval and all scores are locked and applied.', BASE_URL . '/employee/team-evaluation-history.php');
                 }
             }
             $reviewers_stmt->close();
@@ -419,10 +439,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // 3. Notify ALL HR Personnel (Admin, HR Manager, HR Supervisor, HR Staff)
             notifyHRPersonnelPackageFinalized($conn, $package_id, $step['department_name'], $step['template_name'] ?? 'Evaluation');
 
-            redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'success', 'Evaluation package approved, locked, and applied to all team members. HR personnel and team members have been notified.');
+            redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'success', $is_final_hr ? 'Probationary evaluation approved and finalized by HR Manager.' : 'Evaluation package approved, locked, and applied to all team members. HR personnel and team members have been notified.');
         } else {
             $conn->rollback();
-            redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'The package could not be applied because its shared behavior score is incomplete.');
+            $restore = $conn->prepare("UPDATE evaluation_package_route_steps SET action_status = 'Pending', acted_at = NULL WHERE package_route_step_id = ? AND action_status = 'Approved'");
+            $restore->bind_param('i', $step['package_route_step_id']);
+            $restore->execute();
+            $restore->close();
+            redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', $is_probationary ? 'The individual probationary evaluation could not be applied.' : 'The package could not be applied because its shared behavior score is incomplete.');
         }
     }
 }
@@ -602,6 +626,8 @@ if (in_array($session_role, ['HR Manager', 'HR Supervisor', 'Admin'], true) || $
             : ((int)($package['eligible_rank_category_id'] ?? 0) === 4 ? 'Department Supervisor' : 'Department Manager');
         $can_adjust = !$is_unclaimed_group_step && !isOrganizationPackageLocked($conn, (int)$package['package_id']);
         $is_board_step = ($package['step_type'] === 'Governance') && (stripos($package['step_label'], 'Board') !== false);
+        $is_probationary_package = in_array($package['evaluation_type'], ['Initial', 'Final'], true);
+        $is_final_hr_step = $is_probationary_package && $package['eligible_role'] === 'HR Manager';
         $members_stmt = $conn->prepare("SELECT e.evaluation_id, emp.first_name, emp.last_name, emp.job_title,
                 e.kra_subtotal, e.behavior_average, e.total_score, e.status, pm.member_status,
                 (SELECT AVG(COALESCE(es.manager_override_score, es.supervisor_override_score,
@@ -648,7 +674,7 @@ if (in_array($session_role, ['HR Manager', 'HR Supervisor', 'Admin'], true) || $
             ? ((!empty($next_rev_info['eligible_role']) || !empty($next_rev_info['eligible_rank_category_id'])) && empty($next_rev_info['claimed_at'])
                 ? (!empty($next_rev_info['eligible_role']) ? $next_rev_info['eligible_role'] : ((int)$next_rev_info['eligible_rank_category_id'] === 4 ? 'Department Supervisor' : 'Department Manager'))
                 : getOrganizationPackageReviewerDisplayName($conn, (int)($next_rev_info['reviewer_user_id'] ?? 0), (int)($next_rev_info['reviewer_employee_id'] ?? 0)))
-            : 'Board of Directors';
+            : ($is_probationary_package ? 'Final approval' : 'Board of Directors');
         $package_next_check = checkNextPackageStepIsAssigned($conn, (int)$package['package_id'], (int)$package['current_step_order']);
         $team_size_stmt = $conn->prepare("SELECT COUNT(*) AS team_size FROM employees
             WHERE department_id = ? AND is_active = 1 AND deleted_at IS NULL");
@@ -678,8 +704,8 @@ if (in_array($session_role, ['HR Manager', 'HR Supervisor', 'Admin'], true) || $
                             <i class="fas fa-users"></i>
                         </div>
                         <div class="package-stat-content">
-                            <strong><?php echo $department_team_size; ?> Employees</strong>
-                            <span>Department Team Size</span>
+                            <strong><?php echo $is_probationary_package ? count($members) : $department_team_size; ?> <?php echo $is_probationary_package ? 'Employee' : 'Employees'; ?></strong>
+                            <span><?php echo $is_probationary_package ? 'Individual Review' : 'Department Team Size'; ?></span>
                         </div>
                     </div>
                     <div class="package-stat">
@@ -687,11 +713,13 @@ if (in_array($session_role, ['HR Manager', 'HR Supervisor', 'Admin'], true) || $
                             <i class="fas fa-handshake"></i>
                         </div>
                         <div class="package-stat-content">
-                            <strong><?php echo $package['shared_behavior_score'] !== null ? number_format((float)$package['shared_behavior_score'], 2) : 'Calculating…'; ?></strong>
-                            <span>Shared Behavior Score</span>
+                            <strong><?php echo $is_probationary_package ? number_format((float)($members[0]['individual_behavior'] ?? $members[0]['behavior_average'] ?? 0), 2) : ($package['shared_behavior_score'] !== null ? number_format((float)$package['shared_behavior_score'], 2) : 'Calculating…'); ?></strong>
+                            <span><?php echo $is_probationary_package ? 'Individual Core Values Score' : 'Shared Behavior Score'; ?></span>
+                            <?php if (!$is_probationary_package): ?>
                             <small class="d-block text-muted mt-1" style="font-size: 0.72rem; line-height: 1.25;">
                                 Starts with the first submitted Individual Behavior score and updates as more department employees submit, including employees in other packages.
                             </small>
+                            <?php endif; ?>
                         </div>
                     </div>
                 </div>
@@ -737,11 +765,11 @@ if (in_array($session_role, ['HR Manager', 'HR Supervisor', 'Admin'], true) || $
                                 <tbody>
                                     <?php foreach ($members as $member): ?>
                                         <?php
-                                        $kra_w = isset($package['kra_weight']) && (float)$package['kra_weight'] > 0 ? (float)$package['kra_weight'] : 80;
-                                        $beh_w = isset($package['behavior_weight']) && (float)$package['behavior_weight'] > 0 ? (float)$package['behavior_weight'] : 20;
+                                        $kra_w = $is_probationary_package ? 80 : (isset($package['kra_weight']) && (float)$package['kra_weight'] > 0 ? (float)$package['kra_weight'] : 80);
+                                        $beh_w = $is_probationary_package ? 20 : (isset($package['behavior_weight']) && (float)$package['behavior_weight'] > 0 ? (float)$package['behavior_weight'] : 20);
                                         $beh_val = (float)($member['individual_behavior'] ?? $member['behavior_average']);
                                         $total_score_val = calculateEvalTotal((float)$member['kra_subtotal'], $beh_val, $kra_w, $beh_w);
-                                        $shared_beh_val = $package['shared_behavior_score'] !== null ? (float)$package['shared_behavior_score'] : $beh_val;
+                                        $shared_beh_val = $is_probationary_package ? $beh_val : ($package['shared_behavior_score'] !== null ? (float)$package['shared_behavior_score'] : $beh_val);
                                         $final_score_val = calculateEvalTotal((float)$member['kra_subtotal'], $shared_beh_val, $kra_w, $beh_w);
                                         ?>
                                         <tr>
@@ -779,12 +807,15 @@ if (in_array($session_role, ['HR Manager', 'HR Supervisor', 'Admin'], true) || $
                                                     <a class="btn-action-adjust btn btn-sm" href="<?php echo BASE_URL; ?>/employee/package-member-review.php?package_id=<?php echo (int)$package['package_id']; ?>&evaluation_id=<?php echo (int)$member['evaluation_id']; ?>" title="View ratings and make supervisor adjustments">
                                                         <i class="fas fa-sliders-h me-1"></i>Adjust
                                                     </a>
-                                                    <?php if ($package['step_type'] === 'Consolidation'): ?>
+                                                    <?php if ($package['step_type'] === 'Consolidation' || ($is_probationary_package && (int)$package['current_step_order'] === 1)): ?>
                                                         <form method="post" class="d-inline" onsubmit="return confirm('Return self-rating for <?php echo e($member['first_name'] . ' ' . $member['last_name']); ?> back to employee for revision?');">
                                                             <input type="hidden" name="package_id" value="<?php echo (int)$package['package_id']; ?>">
                                                             <input type="hidden" name="member_evaluation_id" value="<?php echo (int)$member['evaluation_id']; ?>">
                                                             <input type="hidden" name="package_action" value="return_member">
                                                             <?php echo csrfField(); ?>
+                                                            <?php if ($is_probationary_package): ?>
+                                                                <input type="text" name="comments" class="form-control form-control-sm d-inline-block w-auto" required placeholder="Return reason" aria-label="Return reason">
+                                                            <?php endif; ?>
                                                             <button type="submit" class="btn btn-sm btn-outline-warning ms-1" title="Return this member evaluation to employee for revision">
                                                                 <i class="fas fa-undo me-1"></i>Return
                                                             </button>
@@ -922,6 +953,10 @@ if (in_array($session_role, ['HR Manager', 'HR Supervisor', 'Admin'], true) || $
                         <div class="alert alert-warning py-2 px-3 small mb-3">
                             <i class="fas fa-shield-alt me-1"></i><strong>Final Board Step:</strong> Approving will lock this evaluation package, apply shared Behavior scores to all <?php echo count($members); ?> members, and publish final appraisal results.
                         </div>
+                    <?php elseif ($is_final_hr_step): ?>
+                        <div class="alert alert-info py-2 px-3 small mb-3">
+                            <strong>Final HR approval:</strong> Approving applies this employee's individual KRA and Core Values scores and completes the probationary evaluation.
+                        </div>
                     <?php elseif ($package['step_type'] === 'Governance'): ?>
                         <div class="alert alert-secondary py-2 px-3 small mb-3">
                             <i class="fas fa-balance-scale me-1"></i>Governance review stage. Review and adjust scores if necessary before forwarding or approving.
@@ -939,12 +974,12 @@ if (in_array($session_role, ['HR Manager', 'HR Supervisor', 'Admin'], true) || $
                         <?php if (!$package_next_check['ok']): ?>
                             <!-- Blocked Action Button with direct modal to explain reason and route to config -->
                             <button class="btn btn-warning px-4 py-2 fw-bold text-dark" type="button" data-bs-toggle="modal" data-bs-target="#confirmApproveModal-<?php echo (int)$package['package_id']; ?>" style="min-height:46px; border-radius:8px;">
-                                <i class="fas fa-exclamation-triangle me-1"></i>Consolidation Blocked &mdash; Check Next Reviewer
+                                <i class="fas fa-exclamation-triangle me-1"></i>Review Blocked &mdash; Check Next Reviewer
                             </button>
                         <?php else: ?>
                             <!-- F3: Trigger Pre-Submission Confirmation Modal -->
                             <button class="btn-action-primary btn" type="button" data-bs-toggle="modal" data-bs-target="#confirmApproveModal-<?php echo (int)$package['package_id']; ?>">
-                                <?php if ($is_board_step): ?>
+                                <?php if ($is_board_step || $is_final_hr_step): ?>
                                     <i class="fas fa-lock me-1"></i>Approve, Lock, and Apply Results
                                 <?php else: ?>
                                     <i class="fas fa-check-circle me-1"></i>Approve &amp; Forward to Next Reviewer
@@ -952,7 +987,7 @@ if (in_array($session_role, ['HR Manager', 'HR Supervisor', 'Admin'], true) || $
                             </button>
                         <?php endif; ?>
 
-                        <?php if ($package['step_type'] !== 'Consolidation'): ?>
+                        <?php if ($package['step_type'] !== 'Consolidation' && !($is_probationary_package && (int)$package['current_step_order'] === 1)): ?>
                             <button class="btn btn-outline-danger px-4 py-2 fw-bold" type="submit" onclick="document.getElementById('actionInput-<?php echo (int)$package['package_id']; ?>').value='return';" style="min-height:46px; border-radius:8px;">
                                 <i class="fas fa-undo me-1"></i>Return for Revision
                             </button>
@@ -981,7 +1016,7 @@ if (in_array($session_role, ['HR Manager', 'HR Supervisor', 'Admin'], true) || $
                                     <div class="alert alert-info py-2 px-3 small mb-3">
                                         <strong>Department:</strong> <?php echo e($package['department_name']); ?> &bull; 
                                         <strong>Cycle:</strong> <?php echo e($package['period_start']); ?> to <?php echo e($package['period_end']); ?><br>
-                                        <strong>Next Stage:</strong> <?php echo e($next_rev_info['step_label'] ?? ($is_board_step ? 'Final Lock' : 'Next Reviewer')); ?> (<?php echo e($next_reviewer_name); ?>)
+                                        <strong>Next Stage:</strong> <?php echo e($next_rev_info['step_label'] ?? (($is_board_step || $is_final_hr_step) ? 'Final Approval' : 'Next Reviewer')); ?> (<?php echo e($next_reviewer_name); ?>)
                                     </div>
 
                                     <h6 class="fw-bold mb-2 text-dark">Package Members Summary:</h6>

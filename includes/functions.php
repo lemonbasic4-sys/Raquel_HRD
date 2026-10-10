@@ -2776,7 +2776,7 @@ function getAllowedEvaluationTypesForEmploymentStatus($employment_status)
     $non_regular_statuses = ['OJT', 'Trainee', 'Probationary', 'Project Based', 'Project-Based'];
     return in_array((string)$employment_status, $non_regular_statuses, true)
         ? ['Initial', 'Final']
-        : ['Annual', 'Quarterly', 'Final'];
+        : ['Annual', 'Quarterly'];
 }
 
 function saveEvaluationTemplateTargetPositionIds($conn, $template_id, array $position_ids)
@@ -2790,7 +2790,7 @@ function saveEvaluationTemplateTargetPositionIds($conn, $template_id, array $pos
     $delete->bind_param('i', $template_id);
     $delete->execute();
     $delete->close();
-    if (!$position_ids) return false;
+    if (!$position_ids) return true;
 
     $insert = $conn->prepare('INSERT INTO evaluation_template_positions (template_id, job_title_id) VALUES (?, ?)');
     foreach ($position_ids as $position_id) {
@@ -3272,7 +3272,7 @@ function checkNextPackageStepIsAssigned($conn, $package_id, $current_step_order)
     ensureOrganizationPackageGovernanceSteps($conn, $package_id);
 
     // 2. Fetch package details
-    $pkg_stmt = $conn->prepare("SELECT p.department_id, d.department_name, p.status 
+    $pkg_stmt = $conn->prepare("SELECT p.department_id, d.department_name, p.status, p.evaluation_type
         FROM evaluation_packages p 
         LEFT JOIN departments d ON d.department_id = p.department_id 
         WHERE p.package_id = ? LIMIT 1");
@@ -3304,6 +3304,10 @@ function checkNextPackageStepIsAssigned($conn, $package_id, $current_step_order)
 
     // If current step is the Board of Directors, it's the final lock step — no next step needed.
     if ($current_step['step_type'] === 'Governance' && stripos($current_step['step_label'], 'Board') !== false) {
+        return ['ok' => true, 'message' => ''];
+    }
+    if (in_array($pkg['evaluation_type'], ['Initial', 'Final'], true)
+        && $current_step['step_label'] === 'HR Manager final approval') {
         return ['ok' => true, 'message' => ''];
     }
 
@@ -3894,12 +3898,32 @@ function createOrganizationPackageRoute($conn, $package_id, $consolidator_employ
     $package_department_id = null;
 
     // Fetch the package department_id so we can pull the right Division VP.
-    $pkg_stmt = $conn->prepare('SELECT department_id FROM evaluation_packages WHERE package_id = ? LIMIT 1');
+    $pkg_stmt = $conn->prepare('SELECT department_id, evaluation_type FROM evaluation_packages WHERE package_id = ? LIMIT 1');
     $pkg_stmt->bind_param('i', $package_id);
     $pkg_stmt->execute();
     $pkg_row = $pkg_stmt->get_result()->fetch_assoc();
     $pkg_stmt->close();
     if ($pkg_row) $package_department_id = (int) $pkg_row['department_id'];
+
+    // Probationary reviews are individual and end with HR Manager approval.
+    // Keep every stage even when the position is vacant; the next-stage check
+    // will hold the evaluation until an active reviewer is available.
+    if (in_array($pkg_row['evaluation_type'] ?? '', ['Initial', 'Final'], true)) {
+        $steps = isHumanResourcesPackageDepartment($conn, $package_department_id)
+            ? [['HR Supervisor review', 'HR Supervisor', null], ['HR Manager final approval', 'HR Manager', null]]
+            : [['Department Supervisor review', null, 4], ['Department Manager review', null, 3],
+               ['HR Supervisor review', 'HR Supervisor', null], ['HR Manager final approval', 'HR Manager', null]];
+        $insert = $conn->prepare("INSERT INTO evaluation_package_route_steps
+            (package_id, step_order, step_label, step_type, eligible_role, eligible_rank_category_id, action_status)
+            VALUES (?, ?, ?, 'Review', ?, ?, 'Waiting')");
+        foreach ($steps as $index => [$label, $role, $rank]) {
+            $step_order = $index + 1;
+            $insert->bind_param('iissi', $package_id, $step_order, $label, $role, $rank);
+            $insert->execute();
+        }
+        $insert->close();
+        return;
+    }
 
     if ($package_department_id && isHumanResourcesPackageDepartment($conn, $package_department_id)) {
         $template_stmt = $conn->prepare('SELECT template_id, target_job_title_id FROM evaluation_templates WHERE template_id = (SELECT template_id FROM evaluation_packages WHERE package_id = ?) LIMIT 1');
@@ -4109,6 +4133,8 @@ function isEmployeeInOrganizationReviewHierarchy($conn, $employee_id)
 function tryMergeLateMemberPackageIntoSibling($conn, $package_id, $just_approved_step_order)
 {
     $package_id = (int) $package_id;
+    $type_row = $conn->query("SELECT evaluation_type FROM evaluation_packages WHERE package_id = $package_id LIMIT 1")->fetch_assoc();
+    if (in_array($type_row['evaluation_type'] ?? '', ['Initial', 'Final'], true)) return $package_id;
     $conn->begin_transaction();
     try {
         // Serialize merges within a cohort, then re-read stages under these locks.
@@ -4261,6 +4287,45 @@ function syncEvaluationToOrganizationPackage($conn, $evaluation_id)
     $is_group_routed_package = isOrganizationPackageGroupRoutedDepartment($conn, $department_id);
     $template_id = (int) $evaluation['template_id'];
     $type = $evaluation['evaluation_type']; $start = $evaluation['evaluation_period_start']; $end = $evaluation['evaluation_period_end'];
+    if (in_array($type, ['Initial', 'Final'], true)) {
+        // An Initial/Final review belongs to exactly one employee. Never find a
+        // same-cycle sibling or wait for the rest of the department to submit.
+        $existing = $conn->prepare("SELECT ep.package_id, ep.status FROM evaluation_package_members pm
+            JOIN evaluation_packages ep ON ep.package_id = pm.package_id
+            WHERE pm.evaluation_id = ? AND ep.status <> 'Cancelled' ORDER BY ep.package_id DESC LIMIT 1");
+        $existing->bind_param('i', $evaluation_id);
+        $existing->execute();
+        $individual_package = $existing->get_result()->fetch_assoc();
+        $existing->close();
+        if ($individual_package) {
+            $package_id = (int)$individual_package['package_id'];
+            if ($individual_package['status'] === 'Approved and Applied') return $package_id;
+            $conn->query("UPDATE evaluation_package_members SET member_status = 'Normal', joined_at_step = 1 WHERE package_id = $package_id AND evaluation_id = " . (int)$evaluation_id);
+        } else {
+            $insert = $conn->prepare('INSERT INTO evaluation_packages (department_id, template_id, evaluation_type, period_start, period_end) VALUES (?, ?, ?, ?, ?)');
+            $insert->bind_param('iisss', $department_id, $template_id, $type, $start, $end);
+            $insert->execute();
+            $package_id = (int)$insert->insert_id;
+            $insert->close();
+            createOrganizationPackageRoute($conn, $package_id, 0);
+            $member = $conn->prepare("INSERT INTO evaluation_package_members (package_id, evaluation_id, member_status, joined_at_step) VALUES (?, ?, 'Normal', 1)");
+            $member->bind_param('ii', $package_id, $evaluation_id);
+            $member->execute();
+            $member->close();
+            $audit = $conn->prepare("INSERT INTO evaluation_package_audit (package_id, action, remarks) VALUES (?, 'CREATED', 'Individual probationary evaluation submitted.')");
+            $audit->bind_param('i', $package_id);
+            $audit->execute();
+            $audit->close();
+        }
+        // A returned self-rating resumes at its first reviewer after resubmission.
+        $conn->query("UPDATE evaluation_package_route_steps SET action_status = 'Waiting', acted_at = NULL, comments = NULL WHERE package_id = $package_id AND step_order > 1");
+        $conn->query("UPDATE evaluation_package_route_steps SET action_status = 'Pending', acted_at = NULL WHERE package_id = $package_id AND step_order = 1");
+        $conn->query("UPDATE evaluation_packages SET status = 'Pending Review', current_step_order = 1, shared_behavior_score = NULL WHERE package_id = $package_id");
+        notifyOrganizationPackageStepAssignees($conn, $package_id, 1,
+            'Probationary Evaluation Ready for Review',
+            trim(($evaluation['first_name'] ?? '') . ' ' . ($evaluation['last_name'] ?? '')) . " submitted their $type evaluation for review.");
+        return $package_id;
+    }
     // Prefer a same-cycle package that is still at step 1. This lets a
     // resubmission reuse its reset, empty package instead of creating another
     // active package beside it. Packages already past consolidation remain
@@ -4515,15 +4580,13 @@ function getOrganizationPackageSubmissionSummary($conn, array $package)
 
     $non_reg_sql = "('Probationary', 'OJT', 'Trainee', 'Project Based', 'Project-Based')";
     if (in_array($eval_type, ['Initial', 'Final'], true)) {
-        $stmt = $conn->prepare("SELECT DISTINCT e.employee_id, CONCAT(e.first_name, ' ', e.last_name) AS employee_name, e.job_title,
-            (EXISTS(SELECT 1 FROM evaluation_package_members pm JOIN evaluations ev ON ev.evaluation_id = pm.evaluation_id WHERE pm.package_id = ? AND ev.employee_id = e.employee_id AND ev.deleted_at IS NULL AND ev.status NOT IN ('Draft','Pending Self-Rating','Returned','Rejected'))
-             OR EXISTS(SELECT 1 FROM evaluations ev WHERE ev.employee_id = e.employee_id AND ev.template_id = ? AND ev.deleted_at IS NULL AND ev.status NOT IN ('Draft','Pending Self-Rating','Returned','Rejected'))) AS is_submitted
-            FROM employees e JOIN users u ON u.employee_id = e.employee_id AND u.is_active = 1
-            WHERE e.department_id = ? AND e.is_active = 1 AND e.deleted_at IS NULL
-              AND $target_position_condition
-              AND (e.employment_status IN $non_reg_sql OR EXISTS(SELECT 1 FROM evaluations ev2 WHERE ev2.employee_id = e.employee_id AND ev2.template_id = ? AND ev2.deleted_at IS NULL))
-            ORDER BY e.last_name, e.first_name");
-        $stmt->bind_param('iiii', $package_id, $template_id, $department_id, $template_id);
+        $stmt = $conn->prepare("SELECT e.employee_id, CONCAT(e.first_name, ' ', e.last_name) AS employee_name, e.job_title,
+            (ev.deleted_at IS NULL AND ev.status NOT IN ('Draft','Pending Self-Rating','Returned','Rejected')) AS is_submitted
+            FROM evaluation_package_members pm
+            JOIN evaluations ev ON ev.evaluation_id = pm.evaluation_id
+            JOIN employees e ON e.employee_id = ev.employee_id
+            WHERE pm.package_id = ? ORDER BY e.last_name, e.first_name");
+        $stmt->bind_param('i', $package_id);
     } else {
         $stmt = $conn->prepare("SELECT DISTINCT e.employee_id, CONCAT(e.first_name, ' ', e.last_name) AS employee_name, e.job_title,
             (EXISTS(SELECT 1 FROM evaluation_package_members pm JOIN evaluations ev ON ev.evaluation_id = pm.evaluation_id WHERE pm.package_id = ? AND ev.employee_id = e.employee_id AND ev.deleted_at IS NULL AND ev.status NOT IN ('Draft','Pending Self-Rating','Returned','Rejected'))
@@ -4546,7 +4609,7 @@ function getOrganizationPackageSubmissionSummary($conn, array $package)
 function recalculateOrganizationPackageBehaviorScore($conn, $package_id)
 {
     $package_id = (int) $package_id;
-    $package_stmt = $conn->prepare('SELECT ep.department_id, ep.template_id, ep.period_start, ep.period_end,
+    $package_stmt = $conn->prepare('SELECT ep.department_id, ep.template_id, ep.period_start, ep.period_end, ep.evaluation_type,
             et.behavior_framework_code, et.behavior_framework_version
         FROM evaluation_packages ep JOIN evaluation_templates et ON et.template_id = ep.template_id
         WHERE ep.package_id = ? LIMIT 1');
@@ -4555,6 +4618,10 @@ function recalculateOrganizationPackageBehaviorScore($conn, $package_id)
     $package = $package_stmt->get_result()->fetch_assoc();
     $package_stmt->close();
     if (!$package) return 0.0;
+    if (in_array($package['evaluation_type'], ['Initial', 'Final'], true)) {
+        $conn->query("UPDATE evaluation_packages SET shared_behavior_score = NULL WHERE package_id = $package_id");
+        return 0.0;
+    }
 
     $department_id = (int) $package['department_id'];
     $template_id = (int) $package['template_id'];
@@ -4604,6 +4671,7 @@ function recalculateOrganizationPackageBehaviorScore($conn, $package_id)
                     AND cohort_pkg.period_start = ev.evaluation_period_start
                     AND cohort_pkg.period_end = ev.evaluation_period_end
                     AND cohort_pkg.status <> 'Cancelled'
+                    AND cohort_pkg.evaluation_type NOT IN ('Initial', 'Final')
               )
               AND NOT EXISTS (
                   SELECT 1
@@ -4625,6 +4693,7 @@ function recalculateOrganizationPackageBehaviorScore($conn, $package_id)
                           AND newer_pkg.period_start = newer_ev.evaluation_period_start
                           AND newer_pkg.period_end = newer_ev.evaluation_period_end
                           AND newer_pkg.status <> 'Cancelled'
+                          AND newer_pkg.evaluation_type NOT IN ('Initial', 'Final')
                     )
                     AND (newer_ev.submitted_date > ev.submitted_date
                          OR (newer_ev.submitted_date = ev.submitted_date
@@ -4665,7 +4734,8 @@ function recalculateOrganizationPackageBehaviorScore($conn, $package_id)
     $update = $conn->prepare("UPDATE evaluation_packages
         SET $score_assignment
         WHERE department_id = ? AND $package_template_filter AND period_start = ? AND period_end = ?
-          AND status NOT IN ('Approved and Applied', 'Cancelled')");
+          AND status NOT IN ('Approved and Applied', 'Cancelled')
+          AND evaluation_type NOT IN ('Initial', 'Final')");
     if ($score === null) {
         if ($use_framework) {
             $update->bind_param('issss', $department_id, $framework_code, $framework_version, $package['period_start'], $package['period_end']);
@@ -4889,6 +4959,7 @@ function hasOpenProgressiveEvaluationCohort($conn)
         JOIN evaluation_package_members completed_member ON completed_member.package_id = completed_pkg.package_id
         JOIN evaluations completed_eval ON completed_eval.evaluation_id = completed_member.evaluation_id
         WHERE completed_pkg.status = 'Approved and Applied'
+          AND completed_pkg.evaluation_type NOT IN ('Initial', 'Final')
           AND completed_eval.status = 'Approved'
           AND EXISTS (
               SELECT 1
@@ -4900,6 +4971,7 @@ function hasOpenProgressiveEvaluationCohort($conn)
                 AND open_pkg.period_end = completed_pkg.period_end
                 AND open_pkg.package_id <> completed_pkg.package_id
                 AND open_pkg.status NOT IN ('Approved and Applied', 'Cancelled')
+                AND open_pkg.evaluation_type NOT IN ('Initial', 'Final')
                 AND open_member.evaluation_id <> completed_eval.evaluation_id
           )
     ) AS has_open_cohort");
@@ -5244,16 +5316,38 @@ function finalizeLatePackageMember($conn, $package_id, $evaluation_id)
 function applyOrganizationPackageResults($conn, $package_id)
 {
     $package_id = (int) $package_id;
-    $stmt = $conn->prepare("SELECT ep.status, ep.shared_behavior_score, ep.department_id, ep.template_id,
+    $stmt = $conn->prepare("SELECT ep.status, ep.evaluation_type, ep.shared_behavior_score, ep.department_id, ep.template_id,
             ep.period_start, ep.period_end, et.kra_weight, et.behavior_weight
         FROM evaluation_packages ep JOIN evaluation_templates et ON et.template_id = ep.template_id
         WHERE ep.package_id = ? LIMIT 1");
     $stmt->bind_param('i', $package_id); $stmt->execute(); $package = $stmt->get_result()->fetch_assoc(); $stmt->close();
-    if (!$package || $package['shared_behavior_score'] === null) return false;
+    if (!$package) return false;
     // Idempotent lock: never re-apply or mutate an already finalized package.
     if (($package['status'] ?? '') === 'Approved and Applied') {
         return true;
     }
+    if (in_array($package['evaluation_type'], ['Initial', 'Final'], true)) {
+        $members = $conn->prepare("SELECT ev.evaluation_id FROM evaluation_package_members pm
+            JOIN evaluations ev ON ev.evaluation_id = pm.evaluation_id
+            WHERE pm.package_id = ? AND ev.status = 'Pending Team Consolidation'
+              AND EXISTS (SELECT 1 FROM evaluation_scores es JOIN evaluation_criteria ec ON ec.criterion_id = es.criterion_id
+                          WHERE es.evaluation_id = ev.evaluation_id AND ec.section = 'KRA')
+              AND EXISTS (SELECT 1 FROM evaluation_scores es JOIN evaluation_criteria ec ON ec.criterion_id = es.criterion_id
+                          WHERE es.evaluation_id = ev.evaluation_id AND ec.section = 'Behavior')");
+        $members->bind_param('i', $package_id);
+        $members->execute();
+        $result = $members->get_result();
+        if ($result->num_rows !== 1) { $members->close(); return false; }
+        $evaluation_id = (int)$result->fetch_assoc()['evaluation_id'];
+        $members->close();
+        if (!recalculateEvaluationScores($conn, $evaluation_id)) return false;
+        $approved = $conn->prepare("UPDATE evaluations SET status = 'Approved', approved_date = NOW() WHERE evaluation_id = ?");
+        $approved->bind_param('i', $evaluation_id);
+        $approved->execute();
+        $approved->close();
+        return true;
+    }
+    if ($package['shared_behavior_score'] === null) return false;
     $score = (float) $package['shared_behavior_score'];
     $kra_weight = (float) $package['kra_weight']; $behavior_weight = (float) $package['behavior_weight'];
     $members = $conn->prepare("SELECT e.evaluation_id, e.kra_subtotal FROM evaluation_package_members pm JOIN evaluations e ON e.evaluation_id = pm.evaluation_id WHERE pm.package_id = ? AND pm.member_status IN ('Normal', 'Late Rejoined', 'Catchup Endorsed')");
@@ -5282,6 +5376,7 @@ function applyOrganizationPackageResults($conn, $package_id)
           AND prior_pkg.period_start = '$period_start'
           AND prior_pkg.period_end = '$period_end'
           AND prior_pkg.status = 'Approved and Applied'
+          AND prior_pkg.evaluation_type NOT IN ('Initial', 'Final')
           AND prior_pkg.package_id <> $package_id
           AND pm.member_status IN ('Normal', 'Late Rejoined', 'Catchup Endorsed', 'Catchup Complete')");
     if ($prior_members) {
@@ -5299,7 +5394,7 @@ function applyOrganizationPackageResults($conn, $package_id)
 
         $update_prior_packages = $conn->prepare("UPDATE evaluation_packages SET shared_behavior_score = ?
             WHERE department_id = ? AND template_id = ? AND period_start = ? AND period_end = ?
-              AND status = 'Approved and Applied'");
+              AND status = 'Approved and Applied' AND evaluation_type NOT IN ('Initial', 'Final')");
         $update_prior_packages->bind_param('diiss', $score, $department_id, $template_id, $package['period_start'], $package['period_end']);
         $update_prior_packages->execute();
         $update_prior_packages->close();
@@ -5307,7 +5402,7 @@ function applyOrganizationPackageResults($conn, $package_id)
         $prior_packages = $conn->query("SELECT DISTINCT package_id FROM evaluation_packages
             WHERE department_id = $department_id AND template_id = $template_id
               AND period_start = '$period_start' AND period_end = '$period_end'
-              AND status = 'Approved and Applied' AND package_id <> $package_id");
+              AND status = 'Approved and Applied' AND evaluation_type NOT IN ('Initial', 'Final') AND package_id <> $package_id");
         $audit_prior = $conn->prepare("INSERT INTO evaluation_package_audit (package_id, action, remarks)
             VALUES (?, 'PROGRESSIVE_SHARED_SCORE_UPDATED', ?)");
         $audit_remark = "A later cohort package finalized. Progressive shared behavior score updated to $score and applied to this package's finalized evaluations.";
@@ -5357,10 +5452,14 @@ function notifyHRPersonnelPackageFinalized($conn, $package_id, $department_name 
     $m_count_stmt->execute();
     $m_count = (int)($m_count_stmt->get_result()->fetch_assoc()['c'] ?? 0);
     $m_count_stmt->close();
+    $type_row = $conn->query("SELECT evaluation_type FROM evaluation_packages WHERE package_id = $package_id LIMIT 1")->fetch_assoc();
+    $is_probationary = in_array($type_row['evaluation_type'] ?? '', ['Initial', 'Final'], true);
     $members_text = $m_count > 0 ? " ($m_count team members)" : "";
 
-    $notif_title = "Evaluation Package Finalized & In Effect";
-    $notif_body  = "The $dept_label ($tmpl_label) evaluation package has completed Board approval and is now locked and applied.$members_text Final appraisals and shared behavior scores are now active across the system.";
+    $notif_title = $is_probationary ? 'Probationary Evaluation Finalized' : 'Evaluation Package Finalized & In Effect';
+    $notif_body = $is_probationary
+        ? "The $dept_label ($tmpl_label) probationary evaluation has completed HR Manager approval. Its individual KRA and Core Values results are now final."
+        : "The $dept_label ($tmpl_label) evaluation package has completed Board approval and is now locked and applied.$members_text Final appraisals and shared behavior scores are now active across the system.";
 
     $notified_count = 0;
     // Fetch all active HR Personnel & Admin users
@@ -5395,7 +5494,8 @@ function ensureOrganizationPackageGovernanceSteps($conn, $package_id)
     if ($package_id <= 0) return false;
 
     // Fetch package department for Division VP lookup.
-    $pkg = $conn->query("SELECT department_id, current_step_order, status FROM evaluation_packages WHERE package_id = $package_id")->fetch_assoc();
+    $pkg = $conn->query("SELECT department_id, current_step_order, status, evaluation_type FROM evaluation_packages WHERE package_id = $package_id")->fetch_assoc();
+    if (in_array($pkg['evaluation_type'] ?? '', ['Initial', 'Final'], true)) return true;
     $package_department_id = $pkg ? (int)($pkg['department_id'] ?? 0) : 0;
 
     // 0. Clean up any invalid steps placed AFTER Board of Directors (Board is always the final step).
@@ -6287,6 +6387,10 @@ function recalculateEvaluationScores($conn, $evaluation_id)
     $eval = $eval_q->fetch_assoc();
     $kra_weight_pct = (float)($eval['kra_weight'] ?? 80);
     $beh_weight_pct = (float)($eval['behavior_weight'] ?? 20);
+    if (in_array($eval['evaluation_type'] ?? '', ['Initial', 'Final'], true)) {
+        $kra_weight_pct = 80;
+        $beh_weight_pct = 20;
+    }
 
     // Fetch all scores for this evaluation
     $scores_q = $conn->query("SELECT es.*, ec.section, ec.weight 

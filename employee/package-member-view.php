@@ -64,8 +64,9 @@ $criteria_stmt->close();
 $kra = array_values(array_filter($criteria, static fn($criterion) => $criterion['section'] === 'KRA'));
 $behavior = array_values(array_filter($criteria, static fn($criterion) => $criterion['section'] !== 'KRA'));
 
-$kra_w = (float)($evaluation['kra_weight'] ?? 80);
-$beh_w = (float)($evaluation['behavior_weight'] ?? 20);
+$is_probationary = in_array($evaluation['evaluation_type'], ['Initial', 'Final'], true);
+$kra_w = $is_probationary ? 80 : (float)($evaluation['kra_weight'] ?? 80);
+$beh_w = $is_probationary ? 20 : (float)($evaluation['behavior_weight'] ?? 20);
 $shared_beh = $evaluation['shared_behavior_score'] !== null ? (float)$evaluation['shared_behavior_score'] : (float)$evaluation['behavior_average'];
 
 $self_kra_subtotal = 0.0;
@@ -135,10 +136,10 @@ require_once '../includes/header.php';
                 <div class="col-sm-6">
                     <div class="package-stat h-100 d-flex flex-column justify-content-between" style="background: #F4FBF7; border: 2px solid #86EFAC; border-radius: 12px; padding: 1.1rem 1.25rem;">
                         <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
-                            <strong class="tabular-nums text-success m-0" style="font-size: 1.6rem; line-height: 1;"><?php echo $evaluation['shared_behavior_score'] !== null ? number_format((float) $evaluation['shared_behavior_score'], 2) : 'Pending'; ?></strong>
-                            <span class="badge bg-success-subtle text-success border border-success px-2 py-1 small">Department Shared</span>
+                            <strong class="tabular-nums text-success m-0" style="font-size: 1.6rem; line-height: 1;"><?php echo $is_probationary ? number_format((float)$evaluation['behavior_average'], 2) : ($evaluation['shared_behavior_score'] !== null ? number_format((float) $evaluation['shared_behavior_score'], 2) : 'Pending'); ?></strong>
+                            <span class="badge bg-success-subtle text-success border border-success px-2 py-1 small"><?php echo $is_probationary ? 'Individual' : 'Department Shared'; ?></span>
                         </div>
-                        <div class="text-muted fw-semibold" style="font-size: 0.85rem;">Shared Department Behavior</div>
+                        <div class="text-muted fw-semibold" style="font-size: 0.85rem;"><?php echo $is_probationary ? 'Individual Core Values' : 'Shared Department Behavior'; ?></div>
                     </div>
                 </div>
                 <div class="col-sm-6">
@@ -154,8 +155,8 @@ require_once '../includes/header.php';
 
             <div class="shared-behavior-banner d-flex align-items-center justify-content-between flex-wrap gap-2 mb-0">
                 <div>
-                    <i class="fas fa-users me-2"></i>Current Shared Core Behaviors &amp; Values Score:
-                    <strong><?php echo $evaluation['shared_behavior_score'] !== null ? number_format((float) $evaluation['shared_behavior_score'], 2) : 'Pending'; ?></strong>
+                    <i class="fas fa-users me-2"></i><?php echo $is_probationary ? 'Individual Core Values Score:' : 'Current Shared Core Behaviors &amp; Values Score:'; ?>
+                    <strong><?php echo $is_probationary ? number_format((float)$evaluation['behavior_average'], 2) : ($evaluation['shared_behavior_score'] !== null ? number_format((float) $evaluation['shared_behavior_score'], 2) : 'Pending'); ?></strong>
                 </div>
                 <div>
                     <?php echo renderOrganizationPipelineBadge($conn, (int)$package_id); ?>
