@@ -473,7 +473,7 @@ $packages = $packages_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $packages_stmt->close();
 
 // F2/F8: Waiting packages (strictly step 1 consolidators whose teams are still submitting self-ratings or where members were returned)
-$waiting_stmt = $conn->prepare("SELECT ep.*, d.department_name, et.template_name, et.kra_weight, et.behavior_weight, rs.step_label
+$waiting_stmt = $conn->prepare("SELECT ep.*, d.department_name, et.template_name, et.evaluation_type, et.kra_weight, et.behavior_weight, rs.step_label
     FROM evaluation_packages ep
     JOIN evaluation_package_route_steps rs ON rs.package_id = ep.package_id AND rs.step_order = 1
     JOIN departments d ON d.department_id = ep.department_id
@@ -511,6 +511,10 @@ if (in_array($session_role, ['HR Manager', 'HR Supervisor', 'Admin'], true) || $
     // HR managers/supervisors/admins can also endorse any package at the HR level
     $catchup_hr_members = getLatePackageMembersForHRManager($conn);
 }
+$probationary_package_count = count(array_filter($packages, static fn($package) => in_array($package['evaluation_type'] ?? '', ['Initial', 'Final'], true)))
+    + count(array_filter($waiting_packages, static fn($package) => in_array($package['evaluation_type'] ?? '', ['Initial', 'Final'], true)));
+$regular_package_count = count($packages) + count($waiting_packages) - $probationary_package_count;
+$active_package_tab = $probationary_package_count > 0 ? 'probationary' : 'regular';
 ?>
 <div class="evaluation-packages">
     <section class="package-hero">
@@ -550,6 +554,37 @@ if (in_array($session_role, ['HR Manager', 'HR Supervisor', 'Admin'], true) || $
     </div>
     </section>
 
+    <?php if ($packages || $waiting_packages): ?>
+        <style>
+            .package-category-tabs{display:flex;gap:.75rem;align-items:stretch;margin:1rem 0 1.25rem;border-bottom:1px solid #dce5dc}
+            .package-category-tab{display:flex;align-items:center;gap:.75rem;min-width:240px;padding:.8rem 1rem;background:#f3f4f6;border:0;border-bottom:3px solid transparent;border-radius:.5rem .5rem 0 0;color:#374151;text-align:left;transition:background .15s,color .15s,border-color .15s}
+            .package-category-tab:hover:not(:disabled){background:#e9f2e9}
+            .package-category-tab.active{background:#eef7ed;border-bottom-color:#d4a900;color:#082e06}
+            .package-category-tab:disabled{opacity:.48;cursor:not-allowed}
+            .package-category-tab__icon{display:grid;place-items:center;width:38px;height:38px;border-radius:50%;background:rgba(8,46,6,.08);font-size:1.1rem}
+            .package-category-tab__copy{display:flex;flex:1;flex-direction:column;gap:.15rem}
+            .package-category-tab__copy strong{font-size:.9rem}
+            .package-category-tab__copy small{color:#6b7280;font-size:.72rem}
+            .package-category-tab__count{display:grid;place-items:center;min-width:26px;height:26px;padding:0 .4rem;border-radius:999px;background:#fff;color:#374151;font-size:.76rem;font-weight:700}
+            .package-category-tab.active .package-category-tab__count{background:#082e06;color:#fff}
+            .package-card.package-card--probationary{border-color:#3730a3!important}
+            .package-card.package-card--probationary .package-card__header{border-left:4px solid #3730a3}
+            @media(max-width:575.98px){.package-category-tabs{gap:.4rem}.package-category-tab{flex:1;min-width:0;padding:.65rem .5rem;gap:.45rem}.package-category-tab__icon{width:30px;height:30px}.package-category-tab__copy strong{font-size:.76rem}.package-category-tab__copy small{font-size:.65rem}}
+        </style>
+        <nav class="package-category-tabs" aria-label="Evaluation package type">
+            <button type="button" class="package-category-tab <?php echo $active_package_tab === 'probationary' ? 'active' : ''; ?>" data-package-category-tab="probationary" aria-pressed="<?php echo $active_package_tab === 'probationary' ? 'true' : 'false'; ?>" <?php echo $probationary_package_count === 0 ? 'disabled' : ''; ?>>
+                <span class="package-category-tab__icon"><i class="fas fa-users"></i></span>
+                <span class="package-category-tab__copy"><strong>Probationary Employee</strong><small>Initial and Final evaluations</small></span>
+                <span class="package-category-tab__count"><?php echo $probationary_package_count; ?></span>
+            </button>
+            <button type="button" class="package-category-tab <?php echo $active_package_tab === 'regular' ? 'active' : ''; ?>" data-package-category-tab="regular" aria-pressed="<?php echo $active_package_tab === 'regular' ? 'true' : 'false'; ?>" <?php echo $regular_package_count === 0 ? 'disabled' : ''; ?>>
+                <span class="package-category-tab__icon"><i class="fas fa-user"></i></span>
+                <span class="package-category-tab__copy"><strong>Regular Employee</strong><small>Annual team evaluations</small></span>
+                <span class="package-category-tab__count"><?php echo $regular_package_count; ?></span>
+            </button>
+        </nav>
+    <?php endif; ?>
+
 
     <?php if (!$packages && !$waiting_packages): ?>
         <section class="package-empty">
@@ -565,8 +600,10 @@ if (in_array($session_role, ['HR Manager', 'HR Supervisor', 'Admin'], true) || $
     <?php foreach ($waiting_packages as $package): ?>
         <?php
         $summary = getOrganizationPackageSubmissionSummary($conn, $package);
+        $is_probationary_waiting = in_array($package['evaluation_type'] ?? '', ['Initial', 'Final'], true);
+        $waiting_category = $is_probationary_waiting ? 'probationary' : 'regular';
         ?>
-        <article class="package-card" role="region" aria-label="<?php echo e($package['department_name']); ?> Pending Submissions">
+        <article class="package-card <?php echo $waiting_category === 'probationary' ? 'package-card--probationary ' : ''; ?><?php echo $waiting_category === $active_package_tab ? '' : 'd-none'; ?>" data-package-category="<?php echo $waiting_category; ?>" role="region" aria-label="<?php echo e($package['department_name']); ?> Pending Submissions">
             <header class="package-card__header">
                 <div>
                     <h2 class="h5 mb-1 fw-bold"><?php echo e($package['department_name']); ?> &mdash; <?php echo e($package['template_name']); ?></h2>
@@ -683,7 +720,7 @@ if (in_array($session_role, ['HR Manager', 'HR Supervisor', 'Admin'], true) || $
         $department_team_size = (int)($team_size_stmt->get_result()->fetch_assoc()['team_size'] ?? 0);
         $team_size_stmt->close();
         ?>
-        <article class="package-card" role="region" aria-label="<?php echo e($package['department_name']); ?> Evaluation Action Package">
+        <article class="package-card <?php echo $is_probationary_package ? 'package-card--probationary ' : ''; ?><?php echo $is_probationary_package === ($active_package_tab === 'probationary') ? '' : 'd-none'; ?>" data-package-category="<?php echo $is_probationary_package ? 'probationary' : 'regular'; ?>" role="region" aria-label="<?php echo e($package['department_name']); ?> Evaluation Action Package">
             <header class="package-card__header">
                 <div>
                     <h2 class="h5 mb-1 fw-bold"><?php echo e($package['department_name']); ?> &mdash; <?php echo e($package['template_name']); ?></h2>
@@ -1084,6 +1121,21 @@ if (in_array($session_role, ['HR Manager', 'HR Supervisor', 'Admin'], true) || $
 </div>
 
 <script>
+document.querySelectorAll('[data-package-category-tab]').forEach((tab) => {
+    tab.addEventListener('click', () => {
+        if (tab.disabled) return;
+        const category = tab.dataset.packageCategoryTab;
+        document.querySelectorAll('[data-package-category-tab]').forEach((item) => {
+            const active = item === tab;
+            item.classList.toggle('active', active);
+            item.setAttribute('aria-pressed', active ? 'true' : 'false');
+        });
+        document.querySelectorAll('[data-package-category]').forEach((card) => {
+            card.classList.toggle('d-none', card.dataset.packageCategory !== category);
+        });
+    });
+});
+
 function submitPackageForm(packageId) {
     const chk = document.getElementById('chkConfirm-' + packageId);
     if (chk && !chk.checked) {
