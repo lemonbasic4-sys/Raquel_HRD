@@ -13,27 +13,26 @@ REPLACE INTO employees (employee_id, employee_code, first_name, last_name, middl
 (2004, 'AUD-004', 'Jose', 'Perez', 'Mendoza', '2018-05-23', '1990-08-23', 'Lucena City, Quezon', 'Male', 'Single', 203, 'Audit Supervisor I', 2, 4, 102, 'Regular', 'Full-time', 'avatar_m.jpg'),
 (2005, 'AUD-005', 'Francis', 'De Leon', 'Pascual', '2022-02-11', '1990-01-15', 'Lucena City, Quezon', 'Male', 'Widowed', 204, 'Audit Supervisor II', 2, 4, 102, 'Regular', 'Full-time', 'avatar_m.jpg'),
 (2006, 'AUD-006', 'Christopher', 'Valenzuela', 'Bautista', '2023-12-10', '1985-03-16', 'Lucena City, Quezon', 'Male', 'Married', 205, 'Audit Supervisor III', 2, 4, 102, 'Regular', 'Full-time', 'avatar_m.jpg'),
-(2008, 'AUD-008', 'Albert', 'Evangelista', 'Mendoza', '2021-11-23', '2002-07-04', 'Lucena City, Quezon', 'Male', 'Married', 207, 'Auditor I', 2, 5, 102, 'Regular', 'Full-time', 'avatar_m.jpg'),
-(2009, 'AUD-009', 'Carmelita', 'Aquino', 'Torres', '2024-04-13', '2001-08-04', 'Lucena City, Quezon', 'Female', 'Separated', 208, 'Auditor II', 2, 5, 102, 'Regular', 'Full-time', 'avatar_f.jpg'),
-(2010, 'AUD-010', 'Elizabeth', 'Santiago', 'Ocampo', '2023-05-27', '1993-09-17', 'Lucena City, Quezon', 'Female', 'Separated', 209, 'Auditor III', 2, 5, 102, 'Regular', 'Full-time', 'avatar_f.jpg'),
-(2011, 'AUD-011', 'Gloria', 'Castillo', 'Salvador', '2022-11-27', '2000-11-03', 'Lucena City, Quezon', 'Female', 'Single', 210, 'Auditor IV', 2, 5, 102, 'Regular', 'Full-time', 'avatar_f.jpg'),
-(2012, 'AUD-012', 'Sarah', 'Gomez', 'Gonzales', '2023-06-02', '2004-09-21', 'Lucena City, Quezon', 'Female', 'Separated', 211, 'Auditor V', 2, 5, 102, 'Regular', 'Full-time', 'avatar_f.jpg'),
+(2008, 'AUD-008', 'Albert', 'Evangelista', 'Mendoza', '2021-11-23', '2002-07-04', 'Lucena City, Quezon', 'Male', 'Married', 206, 'Auditor I', 2, 5, 102, 'Regular', 'Full-time', 'avatar_m.jpg'),
+(2009, 'AUD-009', 'Carmelita', 'Aquino', 'Torres', '2024-04-13', '2001-08-04', 'Lucena City, Quezon', 'Female', 'Separated', 207, 'Auditor II', 2, 5, 102, 'Regular', 'Full-time', 'avatar_f.jpg'),
+(2010, 'AUD-010', 'Elizabeth', 'Santiago', 'Ocampo', '2023-05-27', '1993-09-17', 'Lucena City, Quezon', 'Female', 'Separated', 208, 'Auditor III', 2, 5, 102, 'Regular', 'Full-time', 'avatar_f.jpg'),
+(2011, 'AUD-011', 'Gloria', 'Castillo', 'Salvador', '2022-11-27', '2000-11-03', 'Lucena City, Quezon', 'Female', 'Single', 209, 'Auditor IV', 2, 5, 102, 'Regular', 'Full-time', 'avatar_f.jpg'),
+(2012, 'AUD-012', 'Sarah', 'Gomez', 'Gonzales', '2023-06-02', '2004-09-21', 'Lucena City, Quezon', 'Female', 'Separated', 210, 'Auditor V', 2, 5, 102, 'Regular', 'Full-time', 'avatar_f.jpg'),
 
 -- Probationary
-(2007, 'AUD-007', 'Jose', 'Torres', 'Pascual', '2024-11-05', '1994-11-26', 'Lucena City, Quezon', 'Male', 'Separated', 206, 'Auditor on Probation', 2, 5, 102, 'Probationary', 'Full-time', 'avatar_m.jpg'),
-(2017, 'AUD-017', 'Leonora', 'Lopez', 'Garcia', '2026-01-18', '1997-06-25', 'Lucena City, Quezon', 'Female', 'Married', 206, 'Auditor on Probation', 2, 5, 102, 'Probationary', 'Full-time', 'avatar_f.jpg'),
+
 
 -- OJT
-(2013, 'AUD-013', 'Ramon', 'Salvador', 'Aquino', '2026-08-01', '1998-03-24', 'Lucena City, Quezon', 'Male', 'Married', 207, 'Auditor I', 2, 5, 102, 'OJT', 'Full-time', 'avatar_m.jpg'),
-(2014, 'AUD-014', 'Mark', 'Castillo', 'Garcia', '2026-08-01', '1995-12-15', 'Lucena City, Quezon', 'Male', 'Separated', 207, 'Auditor I', 2, 5, 102, 'OJT', 'Full-time', 'avatar_m.jpg'),
+(2013, 'AUD-013', 'Ramon', 'Salvador', 'Aquino', '2026-08-01', '1998-03-24', 'Lucena City, Quezon', 'Male', 'Married', 206, 'Auditor I', 2, 5, 102, 'OJT', 'Full-time', 'avatar_m.jpg'),
+(2014, 'AUD-014', 'Mark', 'Castillo', 'Garcia', '2026-08-01', '1995-12-15', 'Lucena City, Quezon', 'Male', 'Separated', 206, 'Auditor I', 2, 5, 102, 'OJT', 'Full-time', 'avatar_m.jpg'),
 
 -- Trainee
-(2015, 'AUD-015', 'Miguel', 'Salvador', 'Santos', '2026-08-10', '2002-07-09', 'Lucena City, Quezon', 'Male', 'Married', 207, 'Auditor I', 2, 5, 102, 'Trainee', 'Full-time', 'avatar_m.jpg'),
-(2016, 'AUD-016', 'Gloria', 'Santos', 'De Leon', '2026-08-10', '1996-01-28', 'Lucena City, Quezon', 'Female', 'Widowed', 207, 'Auditor I', 2, 5, 102, 'Trainee', 'Full-time', 'avatar_f.jpg'),
+(2015, 'AUD-015', 'Miguel', 'Salvador', 'Santos', '2026-08-10', '2002-07-09', 'Lucena City, Quezon', 'Male', 'Married', 206, 'Auditor I', 2, 5, 102, 'Trainee', 'Full-time', 'avatar_m.jpg'),
+(2016, 'AUD-016', 'Gloria', 'Santos', 'De Leon', '2026-08-10', '1996-01-28', 'Lucena City, Quezon', 'Female', 'Widowed', 206, 'Auditor I', 2, 5, 102, 'Trainee', 'Full-time', 'avatar_f.jpg'),
 
 -- Project Based
-(2018, 'AUD-018', 'Aurora', 'Cruz', 'Torres', '2026-08-01', '2002-09-15', 'Lucena City, Quezon', 'Female', 'Separated', 207, 'Auditor I', 2, 5, 102, 'Project Based', 'Full-time', 'avatar_f.jpg'),
-(2019, 'AUD-019', 'Kenneth', 'Perez', 'Cruz', '2026-08-01', '2000-07-14', 'Lucena City, Quezon', 'Male', 'Widowed', 207, 'Auditor I', 2, 5, 102, 'Project Based', 'Full-time', 'avatar_m.jpg');
+(2018, 'AUD-018', 'Aurora', 'Cruz', 'Torres', '2026-08-01', '2002-09-15', 'Lucena City, Quezon', 'Female', 'Separated', 206, 'Auditor I', 2, 5, 102, 'Project Based', 'Full-time', 'avatar_f.jpg'),
+(2019, 'AUD-019', 'Kenneth', 'Perez', 'Cruz', '2026-08-01', '2000-07-14', 'Lucena City, Quezon', 'Male', 'Widowed', 206, 'Auditor I', 2, 5, 102, 'Project Based', 'Full-time', 'avatar_m.jpg');
 
 REPLACE INTO employee_contacts (employee_id, personal_email, mobile_number, telephone_number) VALUES
 (2001, 'manuel.ramos@example.com', '09179234615', '888-2001'),

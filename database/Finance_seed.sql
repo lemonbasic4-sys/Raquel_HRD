@@ -17,29 +17,28 @@ REPLACE INTO employees (employee_id, employee_code, first_name, last_name, middl
 (5008, 'FIN-008', 'Sarah', 'Mendoza', 'Bautista', '2021-04-28', '1998-10-14', 'Lucena City, Quezon', 'Female', 'Married', 508, 'Treasury Supervisor III', 5, 4, 102, 'Regular', 'Full-time', 'avatar_f.jpg'),
 (5009, 'FIN-009', 'Jose', 'Madrigal', 'Salvador', '2022-07-17', '1993-05-03', 'Lucena City, Quezon', 'Male', 'Separated', 509, 'Treasury Supervisor IV', 5, 4, 102, 'Regular', 'Full-time', 'avatar_m.jpg'),
 (5010, 'FIN-010', 'Carmelita', 'Madrigal', 'Mendoza', '2020-02-14', '1984-06-22', 'Lucena City, Quezon', 'Female', 'Separated', 510, 'Treasury Supervisor V', 5, 4, 102, 'Regular', 'Full-time', 'avatar_f.jpg'),
-(5012, 'FIN-012', 'Lourdes', 'Aquino', 'Pascual', '2025-12-09', '2002-05-18', 'Lucena City, Quezon', 'Female', 'Separated', 512, 'Accounting Staff I', 5, 5, 102, 'Regular', 'Full-time', 'avatar_f.jpg'),
-(5013, 'FIN-013', 'Stephen', 'Soriano', 'Aquino', '2024-05-02', '2005-03-24', 'Lucena City, Quezon', 'Male', 'Separated', 513, 'Accounting Staff II', 5, 5, 102, 'Regular', 'Full-time', 'avatar_m.jpg'),
-(5014, 'FIN-014', 'Antonio', 'Villanueva', 'Castro', '2023-08-25', '2002-07-08', 'Lucena City, Quezon', 'Male', 'Married', 514, 'Accounting Staff III', 5, 5, 102, 'Regular', 'Full-time', 'avatar_m.jpg'),
-(5015, 'FIN-015', 'Joseph', 'Gonzales', 'Ocampo', '2021-01-27', '1994-10-04', 'Lucena City, Quezon', 'Male', 'Single', 515, 'Accounting Staff IV', 5, 5, 102, 'Regular', 'Full-time', 'avatar_m.jpg'),
-(5016, 'FIN-016', 'Jose', 'Garcia', 'Rivera', '2024-08-28', '2003-06-13', 'Lucena City, Quezon', 'Male', 'Separated', 516, 'Accounting Staff V', 5, 5, 102, 'Regular', 'Full-time', 'avatar_m.jpg'),
-(5017, 'FIN-017', 'Jose', 'Gonzales', 'Gomez', '2021-01-13', '1995-04-24', 'Lucena City, Quezon', 'Male', 'Married', 517, 'Treasury Staff I', 5, 5, 102, 'Regular', 'Full-time', 'avatar_m.jpg'),
-(5018, 'FIN-018', 'Rosario', 'Cruz', 'Pascual', '2023-08-02', '2002-12-05', 'Lucena City, Quezon', 'Female', 'Married', 518, 'Treasury Staff II', 5, 5, 102, 'Regular', 'Full-time', 'avatar_f.jpg'),
+(5012, 'FIN-012', 'Lourdes', 'Aquino', 'Pascual', '2025-12-09', '2002-05-18', 'Lucena City, Quezon', 'Female', 'Separated', 511, 'Accounting Staff I', 5, 5, 102, 'Regular', 'Full-time', 'avatar_f.jpg'),
+(5013, 'FIN-013', 'Stephen', 'Soriano', 'Aquino', '2024-05-02', '2005-03-24', 'Lucena City, Quezon', 'Male', 'Separated', 512, 'Accounting Staff II', 5, 5, 102, 'Regular', 'Full-time', 'avatar_m.jpg'),
+(5014, 'FIN-014', 'Antonio', 'Villanueva', 'Castro', '2023-08-25', '2002-07-08', 'Lucena City, Quezon', 'Male', 'Married', 513, 'Accounting Staff III', 5, 5, 102, 'Regular', 'Full-time', 'avatar_m.jpg'),
+(5015, 'FIN-015', 'Joseph', 'Gonzales', 'Ocampo', '2021-01-27', '1994-10-04', 'Lucena City, Quezon', 'Male', 'Single', 514, 'Accounting Staff IV', 5, 5, 102, 'Regular', 'Full-time', 'avatar_m.jpg'),
+(5016, 'FIN-016', 'Jose', 'Garcia', 'Rivera', '2024-08-28', '2003-06-13', 'Lucena City, Quezon', 'Male', 'Separated', 515, 'Accounting Staff V', 5, 5, 102, 'Regular', 'Full-time', 'avatar_m.jpg'),
+(5017, 'FIN-017', 'Jose', 'Gonzales', 'Gomez', '2021-01-13', '1995-04-24', 'Lucena City, Quezon', 'Male', 'Married', 516, 'Treasury Staff I', 5, 5, 102, 'Regular', 'Full-time', 'avatar_m.jpg'),
+(5018, 'FIN-018', 'Rosario', 'Cruz', 'Pascual', '2023-08-02', '2002-12-05', 'Lucena City, Quezon', 'Female', 'Married', 517, 'Treasury Staff II', 5, 5, 102, 'Regular', 'Full-time', 'avatar_f.jpg'),
 
 -- Probationary
-(5011, 'FIN-011', 'Arthur', 'Torres', 'Pascual', '2023-09-11', '1997-03-15', 'Lucena City, Quezon', 'Male', 'Married', 511, 'Accounting Staff on Probation', 5, 5, 102, 'Probationary', 'Full-time', 'avatar_m.jpg'),
-(5022, 'FIN-022', 'John', 'Aquino', 'Gonzales', '2026-01-18', '2001-09-27', 'Lucena City, Quezon', 'Male', 'Single', 511, 'Accounting Staff on Probation', 5, 5, 102, 'Probationary', 'Full-time', 'avatar_m.jpg'),
+
 
 -- OJT
-(5018, 'FIN-018', 'Emilio', 'Bautista', 'De Leon', '2026-08-01', '1995-01-18', 'Lucena City, Quezon', 'Male', 'Separated', 512, 'Accounting Staff I', 5, 5, 102, 'OJT', 'Full-time', 'avatar_m.jpg'),
-(5019, 'FIN-019', 'Virginia', 'Garcia', 'Pascual', '2026-08-01', '2003-07-15', 'Lucena City, Quezon', 'Female', 'Married', 512, 'Accounting Staff I', 5, 5, 102, 'OJT', 'Full-time', 'avatar_f.jpg'),
+(5018, 'FIN-018', 'Emilio', 'Bautista', 'De Leon', '2026-08-01', '1995-01-18', 'Lucena City, Quezon', 'Male', 'Separated', 511, 'Accounting Staff I', 5, 5, 102, 'OJT', 'Full-time', 'avatar_m.jpg'),
+(5019, 'FIN-019', 'Virginia', 'Garcia', 'Pascual', '2026-08-01', '2003-07-15', 'Lucena City, Quezon', 'Female', 'Married', 511, 'Accounting Staff I', 5, 5, 102, 'OJT', 'Full-time', 'avatar_f.jpg'),
 
 -- Trainee
-(5020, 'FIN-020', 'Andrea', 'Tolentino', 'Fernandez', '2026-08-10', '1999-11-19', 'Lucena City, Quezon', 'Female', 'Married', 512, 'Accounting Staff I', 5, 5, 102, 'Trainee', 'Full-time', 'avatar_f.jpg'),
-(5021, 'FIN-021', 'Rose', 'Fernandez', 'Santos', '2026-08-10', '2005-05-19', 'Lucena City, Quezon', 'Female', 'Single', 512, 'Accounting Staff I', 5, 5, 102, 'Trainee', 'Full-time', 'avatar_f.jpg'),
+(5020, 'FIN-020', 'Andrea', 'Tolentino', 'Fernandez', '2026-08-10', '1999-11-19', 'Lucena City, Quezon', 'Female', 'Married', 511, 'Accounting Staff I', 5, 5, 102, 'Trainee', 'Full-time', 'avatar_f.jpg'),
+(5021, 'FIN-021', 'Rose', 'Fernandez', 'Santos', '2026-08-10', '2005-05-19', 'Lucena City, Quezon', 'Female', 'Single', 511, 'Accounting Staff I', 5, 5, 102, 'Trainee', 'Full-time', 'avatar_f.jpg'),
 
 -- Project Based
-(5023, 'FIN-023', 'Kenneth', 'Tolentino', 'Perez', '2026-08-01', '2002-12-10', 'Lucena City, Quezon', 'Male', 'Married', 512, 'Accounting Staff I', 5, 5, 102, 'Project Based', 'Full-time', 'avatar_m.jpg'),
-(5024, 'FIN-024', 'Corazon', 'Gonzales', 'Evangelista', '2026-08-01', '2004-07-08', 'Lucena City, Quezon', 'Female', 'Married', 512, 'Accounting Staff I', 5, 5, 102, 'Project Based', 'Full-time', 'avatar_f.jpg');
+(5023, 'FIN-023', 'Kenneth', 'Tolentino', 'Perez', '2026-08-01', '2002-12-10', 'Lucena City, Quezon', 'Male', 'Married', 511, 'Accounting Staff I', 5, 5, 102, 'Project Based', 'Full-time', 'avatar_m.jpg'),
+(5024, 'FIN-024', 'Corazon', 'Gonzales', 'Evangelista', '2026-08-01', '2004-07-08', 'Lucena City, Quezon', 'Female', 'Married', 511, 'Accounting Staff I', 5, 5, 102, 'Project Based', 'Full-time', 'avatar_f.jpg');
 
 REPLACE INTO employee_contacts (employee_id, personal_email, mobile_number, telephone_number) VALUES
 (5001, 'david.sarmiento@example.com', '09179854536', '888-5001'),

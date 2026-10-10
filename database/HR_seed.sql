@@ -15,26 +15,25 @@ REPLACE INTO employees (employee_id, employee_code, first_name, last_name, middl
 (7009, 'HRD-009', 'Bernadette', 'Mendoza', 'Ocampo', '2022-05-28', '1996-02-26', 'Lucena City, Quezon', 'Female', 'Single', 707, 'HR Supervisor III', 7, 4, 102, 'Regular', 'Full-time', 'avatar_f.jpg'),
 (7010, 'HRD-010', 'Grace', 'Aquino', 'Rivera', '2021-07-24', '1997-04-27', 'Lucena City, Quezon', 'Female', 'Separated', 708, 'HR Supervisor IV', 7, 4, 102, 'Regular', 'Full-time', 'avatar_f.jpg'),
 (7011, 'HRD-011', 'Mark', 'Flores', 'Aquino', '2020-01-06', '1991-01-13', 'Lucena City, Quezon', 'Male', 'Separated', 709, 'HR Supervisor V', 7, 4, 102, 'Regular', 'Full-time', 'avatar_m.jpg'),
-(7013, 'HRD-013', 'Catherine', 'Mendoza', 'Garcia', '2022-11-03', '1994-11-11', 'Lucena City, Quezon', 'Female', 'Single', 712, 'HR Staff II', 7, 5, 102, 'Regular', 'Full-time', 'avatar_f.jpg'),
-(7014, 'HRD-014', 'Kenneth', 'De Leon', 'Aquino', '2024-03-11', '1993-06-21', 'Lucena City, Quezon', 'Male', 'Widowed', 713, 'HR Staff III', 7, 5, 102, 'Regular', 'Full-time', 'avatar_m.jpg'),
-(7015, 'HRD-015', 'Danilo', 'Bautista', 'Ocampo', '2022-01-10', '1996-02-27', 'Lucena City, Quezon', 'Male', 'Widowed', 714, 'HR Staff IV', 7, 5, 102, 'Regular', 'Full-time', 'avatar_m.jpg'),
-(7016, 'HRD-016', 'Albert', 'Soriano', 'Santos', '2021-07-04', '2005-07-15', 'Lucena City, Quezon', 'Male', 'Single', 715, 'HR Staff V', 7, 5, 102, 'Regular', 'Full-time', 'avatar_m.jpg'),
+(7013, 'HRD-013', 'Catherine', 'Mendoza', 'Garcia', '2022-11-03', '1994-11-11', 'Lucena City, Quezon', 'Female', 'Single', 711, 'HR Staff II', 7, 5, 102, 'Regular', 'Full-time', 'avatar_f.jpg'),
+(7014, 'HRD-014', 'Kenneth', 'De Leon', 'Aquino', '2024-03-11', '1993-06-21', 'Lucena City, Quezon', 'Male', 'Widowed', 712, 'HR Staff III', 7, 5, 102, 'Regular', 'Full-time', 'avatar_m.jpg'),
+(7015, 'HRD-015', 'Danilo', 'Bautista', 'Ocampo', '2022-01-10', '1996-02-27', 'Lucena City, Quezon', 'Male', 'Widowed', 713, 'HR Staff IV', 7, 5, 102, 'Regular', 'Full-time', 'avatar_m.jpg'),
+(7016, 'HRD-016', 'Albert', 'Soriano', 'Santos', '2021-07-04', '2005-07-15', 'Lucena City, Quezon', 'Male', 'Single', 714, 'HR Staff V', 7, 5, 102, 'Regular', 'Full-time', 'avatar_m.jpg'),
 
 -- Probationary
-(7012, 'HRD-012', 'Patricia', 'Villanueva', 'Reyes', '2023-11-23', '2000-05-09', 'Lucena City, Quezon', 'Female', 'Widowed', 710, 'HR Staff on Probation', 7, 5, 102, 'Probationary', 'Full-time', 'avatar_f.jpg'),
-(7021, 'HRD-021', 'Patricia', 'Mendoza', 'Salvador', '2026-01-18', '2001-01-15', 'Lucena City, Quezon', 'Female', 'Single', 710, 'HR Staff on Probation', 7, 5, 102, 'Probationary', 'Full-time', 'avatar_f.jpg'),
+
 
 -- OJT
-(7017, 'HRD-017', 'Angelo', 'Torres', 'Rivera', '2026-08-01', '2001-08-08', 'Lucena City, Quezon', 'Male', 'Married', 711, 'HR Staff I', 7, 5, 102, 'OJT', 'Full-time', 'avatar_m.jpg'),
-(7018, 'HRD-018', 'Carla', 'Santiago', 'Gomez', '2026-08-01', '2000-02-19', 'Lucena City, Quezon', 'Female', 'Separated', 711, 'HR Staff I', 7, 5, 102, 'OJT', 'Full-time', 'avatar_f.jpg'),
+(7017, 'HRD-017', 'Angelo', 'Torres', 'Rivera', '2026-08-01', '2001-08-08', 'Lucena City, Quezon', 'Male', 'Married', 710, 'HR Staff I', 7, 5, 102, 'OJT', 'Full-time', 'avatar_m.jpg'),
+(7018, 'HRD-018', 'Carla', 'Santiago', 'Gomez', '2026-08-01', '2000-02-19', 'Lucena City, Quezon', 'Female', 'Separated', 710, 'HR Staff I', 7, 5, 102, 'OJT', 'Full-time', 'avatar_f.jpg'),
 
 -- Trainee
-(7019, 'HRD-019', 'Joshua', 'Cruz', 'Mendoza', '2026-08-10', '1997-12-21', 'Lucena City, Quezon', 'Male', 'Single', 711, 'HR Staff I', 7, 5, 102, 'Trainee', 'Full-time', 'avatar_m.jpg'),
-(7020, 'HRD-020', 'Paul', 'Lopez', 'Perez', '2026-08-10', '2001-02-10', 'Lucena City, Quezon', 'Male', 'Separated', 711, 'HR Staff I', 7, 5, 102, 'Trainee', 'Full-time', 'avatar_m.jpg'),
+(7019, 'HRD-019', 'Joshua', 'Cruz', 'Mendoza', '2026-08-10', '1997-12-21', 'Lucena City, Quezon', 'Male', 'Single', 710, 'HR Staff I', 7, 5, 102, 'Trainee', 'Full-time', 'avatar_m.jpg'),
+(7020, 'HRD-020', 'Paul', 'Lopez', 'Perez', '2026-08-10', '2001-02-10', 'Lucena City, Quezon', 'Male', 'Separated', 710, 'HR Staff I', 7, 5, 102, 'Trainee', 'Full-time', 'avatar_m.jpg'),
 
 -- Project Based
-(7022, 'HRD-022', 'Danilo', 'Torres', 'Perez', '2026-08-01', '2000-06-24', 'Lucena City, Quezon', 'Male', 'Married', 711, 'HR Staff I', 7, 5, 102, 'Project Based', 'Full-time', 'avatar_m.jpg'),
-(7023, 'HRD-023', 'Mark', 'Lopez', 'Fernandez', '2026-08-01', '2002-08-02', 'Lucena City, Quezon', 'Male', 'Separated', 711, 'HR Staff I', 7, 5, 102, 'Project Based', 'Full-time', 'avatar_m.jpg');
+(7022, 'HRD-022', 'Danilo', 'Torres', 'Perez', '2026-08-01', '2000-06-24', 'Lucena City, Quezon', 'Male', 'Married', 710, 'HR Staff I', 7, 5, 102, 'Project Based', 'Full-time', 'avatar_m.jpg'),
+(7023, 'HRD-023', 'Mark', 'Lopez', 'Fernandez', '2026-08-01', '2002-08-02', 'Lucena City, Quezon', 'Male', 'Separated', 710, 'HR Staff I', 7, 5, 102, 'Project Based', 'Full-time', 'avatar_m.jpg');
 
 REPLACE INTO employee_contacts (employee_id, personal_email, mobile_number, telephone_number) VALUES
 (7004, 'juan.torres@example.com', '09171367637', '888-7004'),

@@ -11,24 +11,23 @@ REPLACE INTO employees (employee_id, employee_code, first_name, last_name, middl
 (9002, 'MKT-002', 'Rose', 'Tolentino', 'Villanueva', '2018-09-01', '1987-06-17', 'Lucena City, Quezon', 'Female', 'Single', 901, 'Marketing Manager II', 9, 3, 102, 'Regular', 'Full-time', 'avatar_f.jpg'),
 (9003, 'MKT-003', 'Mark', 'Sarmiento', 'Castro', '2021-09-09', '1984-03-25', 'Lucena City, Quezon', 'Male', 'Single', 902, 'Marketing Supervisor I', 9, 4, 102, 'Regular', 'Full-time', 'avatar_m.jpg'),
 (9004, 'MKT-004', 'Francis', 'Santiago', 'Rivera', '2021-03-19', '1988-05-15', 'Lucena City, Quezon', 'Male', 'Separated', 903, 'Marketing Supervisor II', 9, 4, 102, 'Regular', 'Full-time', 'avatar_m.jpg'),
-(9006, 'MKT-006', 'Gloria', 'Tolentino', 'Perez', '2023-09-15', '2001-12-19', 'Lucena City, Quezon', 'Female', 'Widowed', 905, 'Marketing Staff I', 9, 5, 102, 'Regular', 'Full-time', 'avatar_f.jpg'),
-(9007, 'MKT-007', 'Juan', 'Santos', 'Gonzales', '2024-09-15', '2000-09-09', 'Lucena City, Quezon', 'Male', 'Married', 906, 'Marketing Staff II', 9, 5, 102, 'Regular', 'Full-time', 'avatar_m.jpg'),
+(9006, 'MKT-006', 'Gloria', 'Tolentino', 'Perez', '2023-09-15', '2001-12-19', 'Lucena City, Quezon', 'Female', 'Widowed', 904, 'Marketing Staff I', 9, 5, 102, 'Regular', 'Full-time', 'avatar_f.jpg'),
+(9007, 'MKT-007', 'Juan', 'Santos', 'Gonzales', '2024-09-15', '2000-09-09', 'Lucena City, Quezon', 'Male', 'Married', 905, 'Marketing Staff II', 9, 5, 102, 'Regular', 'Full-time', 'avatar_m.jpg'),
 
 -- Probationary
-(9005, 'MKT-005', 'Teresa', 'Pascual', 'Castro', '2023-05-12', '2001-09-18', 'Lucena City, Quezon', 'Female', 'Single', 904, 'Marketing Staff on Probation', 9, 5, 102, 'Probationary', 'Full-time', 'avatar_f.jpg'),
-(9012, 'MKT-012', 'Jessica', 'Valenzuela', 'Gonzales', '2026-01-18', '2000-09-10', 'Lucena City, Quezon', 'Female', 'Married', 904, 'Marketing Staff on Probation', 9, 5, 102, 'Probationary', 'Full-time', 'avatar_f.jpg'),
+
 
 -- OJT
-(9008, 'MKT-008', 'Gloria', 'Pascual', 'Lopez', '2026-08-01', '1996-12-14', 'Lucena City, Quezon', 'Female', 'Separated', 905, 'Marketing Staff I', 9, 5, 102, 'OJT', 'Full-time', 'avatar_f.jpg'),
-(9009, 'MKT-009', 'Ramon', 'De Leon', 'Garcia', '2026-08-01', '1995-03-03', 'Lucena City, Quezon', 'Male', 'Widowed', 905, 'Marketing Staff I', 9, 5, 102, 'OJT', 'Full-time', 'avatar_m.jpg'),
+(9008, 'MKT-008', 'Gloria', 'Pascual', 'Lopez', '2026-08-01', '1996-12-14', 'Lucena City, Quezon', 'Female', 'Separated', 904, 'Marketing Staff I', 9, 5, 102, 'OJT', 'Full-time', 'avatar_f.jpg'),
+(9009, 'MKT-009', 'Ramon', 'De Leon', 'Garcia', '2026-08-01', '1995-03-03', 'Lucena City, Quezon', 'Male', 'Widowed', 904, 'Marketing Staff I', 9, 5, 102, 'OJT', 'Full-time', 'avatar_m.jpg'),
 
 -- Trainee
-(9010, 'MKT-010', 'Rhea', 'Aquino', 'Ocampo', '2026-08-10', '1998-10-10', 'Lucena City, Quezon', 'Female', 'Widowed', 905, 'Marketing Staff I', 9, 5, 102, 'Trainee', 'Full-time', 'avatar_f.jpg'),
-(9011, 'MKT-011', 'Rose', 'Castillo', 'Bautista', '2026-08-10', '2002-09-05', 'Lucena City, Quezon', 'Female', 'Separated', 905, 'Marketing Staff I', 9, 5, 102, 'Trainee', 'Full-time', 'avatar_f.jpg'),
+(9010, 'MKT-010', 'Rhea', 'Aquino', 'Ocampo', '2026-08-10', '1998-10-10', 'Lucena City, Quezon', 'Female', 'Widowed', 904, 'Marketing Staff I', 9, 5, 102, 'Trainee', 'Full-time', 'avatar_f.jpg'),
+(9011, 'MKT-011', 'Rose', 'Castillo', 'Bautista', '2026-08-10', '2002-09-05', 'Lucena City, Quezon', 'Female', 'Separated', 904, 'Marketing Staff I', 9, 5, 102, 'Trainee', 'Full-time', 'avatar_f.jpg'),
 
 -- Project Based
-(9013, 'MKT-013', 'Leonora', 'Bautista', 'Gomez', '2026-08-01', '2002-04-26', 'Lucena City, Quezon', 'Female', 'Separated', 905, 'Marketing Staff I', 9, 5, 102, 'Project Based', 'Full-time', 'avatar_f.jpg'),
-(9014, 'MKT-014', 'Stephen', 'Mendoza', 'Garcia', '2026-08-01', '1998-03-27', 'Lucena City, Quezon', 'Male', 'Widowed', 905, 'Marketing Staff I', 9, 5, 102, 'Project Based', 'Full-time', 'avatar_m.jpg');
+(9013, 'MKT-013', 'Leonora', 'Bautista', 'Gomez', '2026-08-01', '2002-04-26', 'Lucena City, Quezon', 'Female', 'Separated', 904, 'Marketing Staff I', 9, 5, 102, 'Project Based', 'Full-time', 'avatar_f.jpg'),
+(9014, 'MKT-014', 'Stephen', 'Mendoza', 'Garcia', '2026-08-01', '1998-03-27', 'Lucena City, Quezon', 'Male', 'Widowed', 904, 'Marketing Staff I', 9, 5, 102, 'Project Based', 'Full-time', 'avatar_m.jpg');
 
 REPLACE INTO employee_contacts (employee_id, personal_email, mobile_number, telephone_number) VALUES
 (9001, 'manuel.valenzuela@example.com', '09175639031', '888-9001'),

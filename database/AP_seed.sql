@@ -14,29 +14,28 @@ REPLACE INTO employees (employee_id, employee_code, first_name, last_name, middl
 (1006, 'AP-006', 'Ronald', 'Lopez', 'Del Rosario', '2023-07-14', '1996-07-12', 'Lucena City, Quezon', 'Male', 'Separated', 105, 'AP Supervisor I', 1, 4, 102, 'Regular', 'Full-time', 1002, null, null, 'avatar_m.jpg'),
 (1007, 'AP-007', 'Virginia', 'Bautista', 'Cruz', '2018-08-10', '1994-07-09', 'Lucena City, Quezon', 'Female', 'Married', 106, 'AP Supervisor II', 1, 4, 102, 'Regular', 'Full-time', 1002, null, null, 'avatar_f.jpg'),
 (1008, 'AP-008', 'Edward', 'Madrigal', 'Soriano', '2019-06-08', '1989-11-23', 'Lucena City, Quezon', 'Male', 'Separated', 107, 'AP Supervisor III', 1, 4, 102, 'Regular', 'Full-time', 1002, null, null, 'avatar_m.jpg'),
-(1010, 'AP-010', 'Leonora', 'Gomez', 'Cruz', '2022-06-25', '2000-11-04', 'Lucena City, Quezon', 'Female', 'Widowed', 109, 'AP Staff I', 1, 5, 102, 'Regular', 'Full-time', 1006, null, null, 'avatar_f.jpg'),
-(1011, 'AP-011', 'Mark', 'Tolentino', 'Ocampo', '2025-02-09', '1999-06-01', 'Lucena City, Quezon', 'Male', 'Widowed', 110, 'AP Staff II', 1, 5, 102, 'Regular', 'Full-time', 1006, null, null, 'avatar_m.jpg'),
-(1012, 'AP-012', 'Carmelita', 'Garcia', 'Salvador', '2024-11-24', '2003-11-13', 'Lucena City, Quezon', 'Female', 'Separated', 111, 'AP Staff III', 1, 5, 102, 'Regular', 'Full-time', 1006, null, null, 'avatar_f.jpg'),
-(1013, 'AP-013', 'Michael', 'Villanueva', 'Gomez', '2024-10-07', '1993-07-21', 'Lucena City, Quezon', 'Male', 'Single', 112, 'AP Staff IV', 1, 5, 102, 'Regular', 'Full-time', 1006, null, null, 'avatar_m.jpg'),
-(1014, 'AP-014', 'Elena', 'De Leon', 'Mendoza', '2023-02-05', '2002-06-18', 'Lucena City, Quezon', 'Female', 'Married', 113, 'AP Staff V', 1, 5, 102, 'Regular', 'Full-time', 1006, null, null, 'avatar_f.jpg'),
-(1016, 'AP-016', 'Santiago', 'Mendoza', 'Villanueva', '2021-08-23', '2003-10-07', 'Lucena City, Quezon', 'Male', 'Single', 115, 'Sales Associate I', 1, 5, 102, 'Regular', 'Full-time', 1006, null, null, 'avatar_m.jpg'),
-(1017, 'AP-017', 'Christopher', 'Villanueva', 'Bautista', '2024-07-06', '1999-12-05', 'Lucena City, Quezon', 'Male', 'Separated', 116, 'Sales Associate II', 1, 5, 102, 'Regular', 'Full-time', 1006, null, null, 'avatar_m.jpg'),
+(1010, 'AP-010', 'Leonora', 'Gomez', 'Cruz', '2022-06-25', '2000-11-04', 'Lucena City, Quezon', 'Female', 'Widowed', 108, 'AP Staff I', 1, 5, 102, 'Regular', 'Full-time', 1006, null, null, 'avatar_f.jpg'),
+(1011, 'AP-011', 'Mark', 'Tolentino', 'Ocampo', '2025-02-09', '1999-06-01', 'Lucena City, Quezon', 'Male', 'Widowed', 109, 'AP Staff II', 1, 5, 102, 'Regular', 'Full-time', 1006, null, null, 'avatar_m.jpg'),
+(1012, 'AP-012', 'Carmelita', 'Garcia', 'Salvador', '2024-11-24', '2003-11-13', 'Lucena City, Quezon', 'Female', 'Separated', 110, 'AP Staff III', 1, 5, 102, 'Regular', 'Full-time', 1006, null, null, 'avatar_f.jpg'),
+(1013, 'AP-013', 'Michael', 'Villanueva', 'Gomez', '2024-10-07', '1993-07-21', 'Lucena City, Quezon', 'Male', 'Single', 111, 'AP Staff IV', 1, 5, 102, 'Regular', 'Full-time', 1006, null, null, 'avatar_m.jpg'),
+(1014, 'AP-014', 'Elena', 'De Leon', 'Mendoza', '2023-02-05', '2002-06-18', 'Lucena City, Quezon', 'Female', 'Married', 112, 'AP Staff V', 1, 5, 102, 'Regular', 'Full-time', 1006, null, null, 'avatar_f.jpg'),
+(1016, 'AP-016', 'Santiago', 'Mendoza', 'Villanueva', '2021-08-23', '2003-10-07', 'Lucena City, Quezon', 'Male', 'Single', 113, 'Sales Associate I', 1, 5, 102, 'Regular', 'Full-time', 1006, null, null, 'avatar_m.jpg'),
+(1017, 'AP-017', 'Christopher', 'Villanueva', 'Bautista', '2024-07-06', '1999-12-05', 'Lucena City, Quezon', 'Male', 'Separated', 114, 'Sales Associate II', 1, 5, 102, 'Regular', 'Full-time', 1006, null, null, 'avatar_m.jpg'),
 
 -- Probationary
-(1009, 'AP-009', 'Danilo', 'Castillo', 'Bautista', '2026-01-18', '1994-05-10', 'Lucena City, Quezon', 'Male', 'Widowed', 108, 'AP Staff on Probation', 1, 5, 102, 'Probationary', 'Full-time', 1006, '2026-01-18', '2026-11-19', 'avatar_m.jpg'),
-(1015, 'AP-015', 'Josefina', 'Evangelista', 'Perez', '2026-01-18', '1994-03-20', 'Lucena City, Quezon', 'Female', 'Widowed', 114, 'Sales Associate on Probation', 1, 5, 102, 'Probationary', 'Full-time', 1006, '2026-01-18', '2026-11-19', 'avatar_f.jpg'),
+
 
 -- OJT
-(1018, 'AP-018', 'Andrea', 'Santos', 'Reyes', '2026-08-01', '2004-03-12', 'Lucena City, Quezon', 'Female', 'Single', 109, 'AP Staff I', 1, 5, 102, 'OJT', 'Full-time', 1006, '2026-08-01', '2026-09-30', 'avatar_f.jpg'),
-(1019, 'AP-019', 'Miguel', 'Dela Cruz', 'Ramos', '2026-08-05', '2003-10-21', 'Tayabas City, Quezon', 'Male', 'Single', 109, 'AP Staff I', 1, 5, 102, 'OJT', 'Full-time', 1006, '2026-08-05', '2026-10-04', 'avatar_m.jpg'),
+(1018, 'AP-018', 'Andrea', 'Santos', 'Reyes', '2026-08-01', '2004-03-12', 'Lucena City, Quezon', 'Female', 'Single', 108, 'AP Staff I', 1, 5, 102, 'OJT', 'Full-time', 1006, '2026-08-01', '2026-09-30', 'avatar_f.jpg'),
+(1019, 'AP-019', 'Miguel', 'Dela Cruz', 'Ramos', '2026-08-05', '2003-10-21', 'Tayabas City, Quezon', 'Male', 'Single', 108, 'AP Staff I', 1, 5, 102, 'OJT', 'Full-time', 1006, '2026-08-05', '2026-10-04', 'avatar_m.jpg'),
 
 -- Trainee
-(1020, 'AP-020', 'Carla', 'Mendoza', 'Lopez', '2026-07-15', '2001-06-18', 'Pagbilao, Quezon', 'Female', 'Single', 109, 'AP Staff I', 1, 5, 102, 'Trainee', 'Full-time', 1006, '2026-07-15', '2026-09-13', 'avatar_f.jpg'),
-(1021, 'AP-021', 'Joshua', 'Garcia', 'Torres', '2026-08-10', '2000-12-08', 'Lucena City, Quezon', 'Male', 'Single', 109, 'AP Staff I', 1, 5, 102, 'Trainee', 'Full-time', 1006, '2026-08-10', '2026-10-09', 'avatar_m.jpg'),
+(1020, 'AP-020', 'Carla', 'Mendoza', 'Lopez', '2026-07-15', '2001-06-18', 'Pagbilao, Quezon', 'Female', 'Single', 108, 'AP Staff I', 1, 5, 102, 'Trainee', 'Full-time', 1006, '2026-07-15', '2026-09-13', 'avatar_f.jpg'),
+(1021, 'AP-021', 'Joshua', 'Garcia', 'Torres', '2026-08-10', '2000-12-08', 'Lucena City, Quezon', 'Male', 'Single', 108, 'AP Staff I', 1, 5, 102, 'Trainee', 'Full-time', 1006, '2026-08-10', '2026-10-09', 'avatar_m.jpg'),
  
  -- Project Based
-(1022, 'AP-022', 'Rhea', 'Bautista', 'Castillo', '2026-06-01', '1998-05-26', 'Sariaya, Quezon', 'Female', 'Married', 109, 'AP Staff I', 1, 5, 102, 'Project Based', 'Full-time', 1006, '2026-06-01', '2026-11-30', 'avatar_f.jpg'),
-(1023, 'AP-023', 'Kevin', 'Villanueva', 'Santos', '2026-08-01', '1999-09-14', 'Lucena City, Quezon', 'Male', 'Single', 109, 'AP Staff I', 1, 5, 102, 'Project Based', 'Full-time', 1006, '2026-08-01', '2027-01-31', 'avatar_m.jpg');
+(1022, 'AP-022', 'Rhea', 'Bautista', 'Castillo', '2026-06-01', '1998-05-26', 'Sariaya, Quezon', 'Female', 'Married', 108, 'AP Staff I', 1, 5, 102, 'Project Based', 'Full-time', 1006, '2026-06-01', '2026-11-30', 'avatar_f.jpg'),
+(1023, 'AP-023', 'Kevin', 'Villanueva', 'Santos', '2026-08-01', '1999-09-14', 'Lucena City, Quezon', 'Male', 'Single', 108, 'AP Staff I', 1, 5, 102, 'Project Based', 'Full-time', 1006, '2026-08-01', '2027-01-31', 'avatar_m.jpg');
 
 REPLACE INTO employee_contacts (employee_id, personal_email, mobile_number, telephone_number) VALUES
 (1001, 'eduardo.aquino@example.com', '09178078673', '888-1001'),

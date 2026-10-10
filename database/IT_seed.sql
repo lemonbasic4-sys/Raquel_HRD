@@ -16,31 +16,30 @@ REPLACE INTO employees (employee_id, employee_code, first_name, last_name, middl
 (8007, 'IT-007', 'Ana', 'Santiago', 'Garcia', '2023-01-23', '1994-05-05', 'Lucena City, Quezon', 'Female', 'Married', 806, 'IT Supervisor III', 8, 4, 102, 'Regular', 'Full-time', 'avatar_f.jpg'),
 (8008, 'IT-008', 'David', 'Perez', 'Reyes', '2023-07-02', '1994-09-04', 'Lucena City, Quezon', 'Male', 'Widowed', 807, 'IT Supervisor IV', 8, 4, 102, 'Regular', 'Full-time', 'avatar_m.jpg'),
 (8009, 'IT-009', 'John', 'Flores', 'Mendoza', '2022-02-22', '1993-11-01', 'Lucena City, Quezon', 'Male', 'Widowed', 808, 'IT Supervisor V', 8, 4, 102, 'Regular', 'Full-time', 'avatar_m.jpg'),
-(8011, 'IT-011', 'George', 'Valenzuela', 'Torres', '2021-09-08', '1999-08-06', 'Lucena City, Quezon', 'Male', 'Widowed', 810, 'Programmer I', 8, 5, 102, 'Regular', 'Full-time', 'avatar_m.jpg'),
-(8012, 'IT-012', 'Albert', 'Cruz', 'Reyes', '2021-04-24', '2001-05-04', 'Lucena City, Quezon', 'Male', 'Separated', 811, 'Technical Support Staff I', 8, 5, 102, 'Regular', 'Full-time', 'avatar_m.jpg'),
-(8013, 'IT-013', 'Teresa', 'Flores', 'Mendoza', '2021-10-03', '1998-03-21', 'Lucena City, Quezon', 'Female', 'Separated', 812, 'Technical Support Staff II', 8, 5, 102, 'Regular', 'Full-time', 'avatar_f.jpg'),
-(8014, 'IT-014', 'Kenneth', 'Salvador', 'Gomez', '2025-03-06', '1995-03-15', 'Lucena City, Quezon', 'Male', 'Married', 813, 'Technical Support Staff III', 8, 5, 102, 'Regular', 'Full-time', 'avatar_m.jpg'),
-(8015, 'IT-015', 'Mark', 'Soriano', 'Gonzales', '2025-03-15', '1998-01-17', 'Lucena City, Quezon', 'Male', 'Separated', 814, 'Technical Support Staff IV', 8, 5, 102, 'Regular', 'Full-time', 'avatar_m.jpg'),
-(8016, 'IT-016', 'Angelo', 'Valenzuela', 'Aquino', '2025-01-24', '1997-10-21', 'Lucena City, Quezon', 'Male', 'Married', 815, 'Technical Support Staff V', 8, 5, 102, 'Regular', 'Full-time', 'avatar_m.jpg'),
-(8017, 'IT-017', 'Christian', 'Evangelista', 'Ocampo', '2021-07-17', '1996-11-21', 'Lucena City, Quezon', 'Male', 'Single', 816, 'Helpdesk Assistant I', 8, 5, 102, 'Regular', 'Full-time', 'avatar_m.jpg'),
-(8018, 'IT-018', 'Christina', 'Lopez', 'Soriano', '2025-06-20', '2001-07-19', 'Lucena City, Quezon', 'Female', 'Separated', 817, 'Helpdesk Assistant II', 8, 5, 102, 'Regular', 'Full-time', 'avatar_f.jpg'),
-(8019, 'IT-019', 'Elena', 'Reyes', 'Garcia', '2021-12-13', '2002-10-02', 'Lucena City, Quezon', 'Female', 'Separated', 818, 'Helpdesk Assistant III', 8, 5, 102, 'Regular', 'Full-time', 'avatar_f.jpg'),
+(8011, 'IT-011', 'George', 'Valenzuela', 'Torres', '2021-09-08', '1999-08-06', 'Lucena City, Quezon', 'Male', 'Widowed', 809, 'Programmer I', 8, 5, 102, 'Regular', 'Full-time', 'avatar_m.jpg'),
+(8012, 'IT-012', 'Albert', 'Cruz', 'Reyes', '2021-04-24', '2001-05-04', 'Lucena City, Quezon', 'Male', 'Separated', 810, 'Technical Support Staff I', 8, 5, 102, 'Regular', 'Full-time', 'avatar_m.jpg'),
+(8013, 'IT-013', 'Teresa', 'Flores', 'Mendoza', '2021-10-03', '1998-03-21', 'Lucena City, Quezon', 'Female', 'Separated', 811, 'Technical Support Staff II', 8, 5, 102, 'Regular', 'Full-time', 'avatar_f.jpg'),
+(8014, 'IT-014', 'Kenneth', 'Salvador', 'Gomez', '2025-03-06', '1995-03-15', 'Lucena City, Quezon', 'Male', 'Married', 812, 'Technical Support Staff III', 8, 5, 102, 'Regular', 'Full-time', 'avatar_m.jpg'),
+(8015, 'IT-015', 'Mark', 'Soriano', 'Gonzales', '2025-03-15', '1998-01-17', 'Lucena City, Quezon', 'Male', 'Separated', 813, 'Technical Support Staff IV', 8, 5, 102, 'Regular', 'Full-time', 'avatar_m.jpg'),
+(8016, 'IT-016', 'Angelo', 'Valenzuela', 'Aquino', '2025-01-24', '1997-10-21', 'Lucena City, Quezon', 'Male', 'Married', 814, 'Technical Support Staff V', 8, 5, 102, 'Regular', 'Full-time', 'avatar_m.jpg'),
+(8017, 'IT-017', 'Christian', 'Evangelista', 'Ocampo', '2021-07-17', '1996-11-21', 'Lucena City, Quezon', 'Male', 'Single', 815, 'Helpdesk Assistant I', 8, 5, 102, 'Regular', 'Full-time', 'avatar_m.jpg'),
+(8018, 'IT-018', 'Christina', 'Lopez', 'Soriano', '2025-06-20', '2001-07-19', 'Lucena City, Quezon', 'Female', 'Separated', 816, 'Helpdesk Assistant II', 8, 5, 102, 'Regular', 'Full-time', 'avatar_f.jpg'),
+(8019, 'IT-019', 'Elena', 'Reyes', 'Garcia', '2021-12-13', '2002-10-02', 'Lucena City, Quezon', 'Female', 'Separated', 817, 'Helpdesk Assistant III', 8, 5, 102, 'Regular', 'Full-time', 'avatar_f.jpg'),
 
 -- Probationary
-(8010, 'IT-010', 'Jessica', 'Cruz', 'Rivera', '2022-12-11', '1995-01-15', 'Lucena City, Quezon', 'Female', 'Single', 809, 'Programmer on Probation', 8, 5, 102, 'Probationary', 'Full-time', 'avatar_f.jpg'),
-(8022, 'IT-022', 'Andrea', 'De Leon', 'Rivera', '2026-01-18', '2002-10-01', 'Lucena City, Quezon', 'Female', 'Widowed', 809, 'Programmer on Probation', 8, 5, 102, 'Probationary', 'Full-time', 'avatar_f.jpg'),
+
 
 -- OJT
-(8018, 'IT-018', 'Mark', 'Castillo', 'Gomez', '2026-08-01', '2001-06-22', 'Lucena City, Quezon', 'Male', 'Widowed', 810, 'Programmer I', 8, 5, 102, 'OJT', 'Full-time', 'avatar_m.jpg'),
-(8019, 'IT-019', 'Mary', 'Cruz', 'Ocampo', '2026-08-01', '2005-11-14', 'Lucena City, Quezon', 'Female', 'Single', 810, 'Programmer I', 8, 5, 102, 'OJT', 'Full-time', 'avatar_f.jpg'),
+(8018, 'IT-018', 'Mark', 'Castillo', 'Gomez', '2026-08-01', '2001-06-22', 'Lucena City, Quezon', 'Male', 'Widowed', 809, 'Programmer I', 8, 5, 102, 'OJT', 'Full-time', 'avatar_m.jpg'),
+(8019, 'IT-019', 'Mary', 'Cruz', 'Ocampo', '2026-08-01', '2005-11-14', 'Lucena City, Quezon', 'Female', 'Single', 809, 'Programmer I', 8, 5, 102, 'OJT', 'Full-time', 'avatar_f.jpg'),
 
 -- Trainee
-(8020, 'IT-020', 'Elizabeth', 'Sarmiento', 'Castillo', '2026-08-10', '2002-10-10', 'Lucena City, Quezon', 'Female', 'Married', 810, 'Programmer I', 8, 5, 102, 'Trainee', 'Full-time', 'avatar_f.jpg'),
-(8021, 'IT-021', 'Michelle', 'Perez', 'Ocampo', '2026-08-10', '1999-02-25', 'Lucena City, Quezon', 'Female', 'Single', 810, 'Programmer I', 8, 5, 102, 'Trainee', 'Full-time', 'avatar_f.jpg'),
+(8020, 'IT-020', 'Elizabeth', 'Sarmiento', 'Castillo', '2026-08-10', '2002-10-10', 'Lucena City, Quezon', 'Female', 'Married', 809, 'Programmer I', 8, 5, 102, 'Trainee', 'Full-time', 'avatar_f.jpg'),
+(8021, 'IT-021', 'Michelle', 'Perez', 'Ocampo', '2026-08-10', '1999-02-25', 'Lucena City, Quezon', 'Female', 'Single', 809, 'Programmer I', 8, 5, 102, 'Trainee', 'Full-time', 'avatar_f.jpg'),
 
 -- Project Based
-(8023, 'IT-023', 'Sarah', 'Soriano', 'Sarmiento', '2026-08-01', '2005-11-03', 'Lucena City, Quezon', 'Female', 'Married', 810, 'Programmer I', 8, 5, 102, 'Project Based', 'Full-time', 'avatar_f.jpg'),
-(8024, 'IT-024', 'George', 'De Leon', 'Fernandez', '2026-08-01', '1995-05-07', 'Lucena City, Quezon', 'Male', 'Widowed', 810, 'Programmer I', 8, 5, 102, 'Project Based', 'Full-time', 'avatar_m.jpg');
+(8023, 'IT-023', 'Sarah', 'Soriano', 'Sarmiento', '2026-08-01', '2005-11-03', 'Lucena City, Quezon', 'Female', 'Married', 809, 'Programmer I', 8, 5, 102, 'Project Based', 'Full-time', 'avatar_f.jpg'),
+(8024, 'IT-024', 'George', 'De Leon', 'Fernandez', '2026-08-01', '1995-05-07', 'Lucena City, Quezon', 'Male', 'Widowed', 809, 'Programmer I', 8, 5, 102, 'Project Based', 'Full-time', 'avatar_m.jpg');
 
 REPLACE INTO employee_contacts (employee_id, personal_email, mobile_number, telephone_number) VALUES
 (8001, 'john.ramos@example.com', '09179289690', '888-8001'),

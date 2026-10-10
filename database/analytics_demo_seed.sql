@@ -40,12 +40,10 @@ REPLACE INTO employees (
 (9101, 'ANA-AP-002', 'Maribel',   'Santos',     'Cruz',      '2018-06-15', '1985-04-10', 'Lucena City, Quezon', 'Female', 'Single',    101, 'AP Manager I',                 1, 3, 102, 'Regular',      'Full-time', 'avatar_f.jpg'),
 (9102, 'ANA-AP-003', 'Ramon',     'Dela Cruz',  'Gomez',     '2019-09-01', '1988-11-03', 'Lucena City, Quezon', 'Male',   'Single',    102, 'AP Manager II',                1, 3, 102, 'Regular',      'Full-time', 'avatar_m.jpg'),
 (9103, 'ANA-AP-004', 'Gloria',    'Madrigal',   'Torres',    '2020-02-20', '1991-02-28', 'Lucena City, Quezon', 'Female', 'Married',   105, 'AP Supervisor I',              1, 4, 102, 'Regular',      'Full-time', 'avatar_f.jpg'),
-(9104, 'ANA-AP-005', 'Albert',    'Valenzuela', 'Rivera',    '2021-07-12', '1994-09-14', 'Lucena City, Quezon', 'Male',   'Single',    109, 'AP Staff I',                   1, 5, 102, 'Regular',      'Full-time', 'avatar_m.jpg'),
-(9105, 'ANA-AP-006', 'Catherine', 'Ocampo',     'Pascual',   '2022-01-05', '1997-06-07', 'Lucena City, Quezon', 'Female', 'Single',    110, 'AP Staff II',                  1, 5, 102, 'Regular',      'Full-time', 'avatar_f.jpg'),
-(9106, 'ANA-AP-007', 'Joshua',    'Castillo',   'Salvador',  '2023-03-18', '1999-08-30', 'Lucena City, Quezon', 'Male',   'Single',    111, 'AP Staff III',                 1, 5, 102, 'Regular',      'Full-time', 'avatar_m.jpg'),
-(9107, 'ANA-AP-008', 'Angela',    'Fernandez',  'Bautista',  '2024-06-01', '2000-12-15', 'Lucena City, Quezon', 'Female', 'Single',    115, 'Sales Associate I',            1, 5, 102, 'Probationary', 'Full-time', 'avatar_f.jpg'),
-(9108, 'ANA-AP-009', 'Rommel',    'Tolentino',  'De Leon',   '2026-08-01', '2002-04-20', 'Lucena City, Quezon', 'Male',   'Single',    108, 'AP Staff on Probation',        1, 5, 102, 'OJT',          'Full-time', 'avatar_m.jpg'),
-(9109, 'ANA-AP-010', 'Bianca',    'Evangelista','Garcia',    '2026-03-01', '2001-09-05', 'Lucena City, Quezon', 'Female', 'Single',    108, 'AP Staff on Probation',        1, 5, 102, 'Trainee',      'Full-time', 'avatar_f.jpg'),
+(9104, 'ANA-AP-005', 'Albert',    'Valenzuela', 'Rivera',    '2021-07-12', '1994-09-14', 'Lucena City, Quezon', 'Male',   'Single',    108, 'AP Staff I',                   1, 5, 102, 'Regular',      'Full-time', 'avatar_m.jpg'),
+(9105, 'ANA-AP-006', 'Catherine', 'Ocampo',     'Pascual',   '2022-01-05', '1997-06-07', 'Lucena City, Quezon', 'Female', 'Single',    108, 'AP Staff II',                  1, 5, 102, 'Regular',      'Full-time', 'avatar_f.jpg'),
+(9106, 'ANA-AP-007', 'Joshua',    'Castillo',   'Salvador',  '2023-03-18', '1999-08-30', 'Lucena City, Quezon', 'Male',   'Single',    109, 'AP Staff III',                 1, 5, 102, 'Regular',      'Full-time', 'avatar_m.jpg'),
+(9107, 'ANA-AP-008', 'Angela',    'Fernandez',  'Bautista',  '2024-06-01', '2000-12-15', 'Lucena City, Quezon', 'Female', 'Single',    112, 'Sales Associate I',            1, 5, 102, 'Probationary', 'Full-time', 'avatar_f.jpg'),
 
 -- =====================================================
 -- Dept 2: Audit (dept_id=2)
@@ -53,10 +51,8 @@ REPLACE INTO employees (
 (9200, 'ANA-AU-001', 'Ricardo',   'Cruz',       'Mendoza',   '2014-01-10', '1978-10-05', 'Lucena City, Quezon', 'Male',   'Married',   200, 'Audit Manager I',              2, 3, 102, 'Regular',      'Full-time', 'avatar_m.jpg'),
 (9201, 'ANA-AU-002', 'Lorna',     'Santiago',   'Aquino',    '2017-04-22', '1984-02-14', 'Lucena City, Quezon', 'Female', 'Married',   203, 'Audit Supervisor I',           2, 4, 102, 'Regular',      'Full-time', 'avatar_f.jpg'),
 (9202, 'ANA-AU-003', 'Eduardo',   'Flores',     'Rivera',    '2019-08-15', '1989-05-18', 'Lucena City, Quezon', 'Male',   'Single',    204, 'Audit Supervisor II',          2, 4, 102, 'Regular',      'Full-time', 'avatar_m.jpg'),
-(9203, 'ANA-AU-004', 'Michelle',  'Sarmiento',  'Perez',     '2021-02-01', '1993-07-27', 'Lucena City, Quezon', 'Female', 'Single',    207, 'Auditor I',                    2, 5, 102, 'Regular',      'Full-time', 'avatar_f.jpg'),
-(9204, 'ANA-AU-005', 'Angelo',    'Lopez',      'Castillo',  '2022-06-06', '1996-03-11', 'Lucena City, Quezon', 'Male',   'Single',    208, 'Auditor II',                   2, 5, 102, 'Regular',      'Full-time', 'avatar_m.jpg'),
-(9205, 'ANA-AU-006', 'Rowena',    'Ramos',      'Soriano',   '2024-01-15', '2000-11-22', 'Lucena City, Quezon', 'Female', 'Single',    206, 'Auditor on Probation',         2, 5, 102, 'Probationary', 'Full-time', 'avatar_f.jpg'),
-(9206, 'ANA-AU-007', 'Gideon',    'Pascual',    'Gonzales',  '2026-08-01', '2002-06-18', 'Lucena City, Quezon', 'Male',   'Single',    206, 'Auditor on Probation',         2, 5, 102, 'OJT',          'Full-time', 'avatar_m.jpg'),
+(9203, 'ANA-AU-004', 'Michelle',  'Sarmiento',  'Perez',     '2021-02-01', '1993-07-27', 'Lucena City, Quezon', 'Female', 'Single',    205, 'Auditor I',                    2, 5, 102, 'Regular',      'Full-time', 'avatar_f.jpg'),
+(9204, 'ANA-AU-005', 'Angelo',    'Lopez',      'Castillo',  '2022-06-06', '1996-03-11', 'Lucena City, Quezon', 'Male',   'Single',    206, 'Auditor II',                   2, 5, 102, 'Regular',      'Full-time', 'avatar_m.jpg'),
 
 -- =====================================================
 -- Dept 3: Business Development (dept_id=3)
@@ -84,12 +80,11 @@ REPLACE INTO employees (
 (9501, 'ANA-FN-002', 'Isabelita', 'Cruz',       'Flores',    '2016-04-18', '1983-03-22', 'Lucena City, Quezon', 'Female', 'Married',   501, 'Accounting Manager I',         5, 3, 102, 'Regular',      'Full-time', 'avatar_f.jpg'),
 (9502, 'ANA-FN-003', 'Eduardo',   'Sarmiento',  'Pascual',   '2018-07-09', '1987-08-08', 'Lucena City, Quezon', 'Male',   'Single',    502, 'Accounting Supervisor I',      5, 4, 102, 'Regular',      'Full-time', 'avatar_m.jpg'),
 (9503, 'ANA-FN-004', 'Corazon',   'Gonzales',   'Salvador',  '2019-10-15', '1990-01-17', 'Lucena City, Quezon', 'Female', 'Single',    506, 'Treasury Supervisor I',        5, 4, 102, 'Regular',      'Full-time', 'avatar_f.jpg'),
-(9504, 'ANA-FN-005', 'Renato',    'Tolentino',  'Ocampo',    '2020-03-01', '1993-06-30', 'Lucena City, Quezon', 'Male',   'Single',    512, 'Accounting Staff I',           5, 5, 102, 'Regular',      'Full-time', 'avatar_m.jpg'),
-(9505, 'ANA-FN-006', 'Divina',    'Ramos',      'Aquino',    '2021-09-20', '1996-10-04', 'Lucena City, Quezon', 'Female', 'Single',    517, 'Treasury Staff I',             5, 5, 102, 'Regular',      'Full-time', 'avatar_f.jpg'),
-(9506, 'ANA-FN-007', 'Nelson',    'Bautista',   'Diaz',      '2023-02-14', '1999-04-12', 'Lucena City, Quezon', 'Male',   'Single',    513, 'Accounting Staff II',          5, 5, 102, 'Regular',      'Full-time', 'avatar_m.jpg'),
-(9507, 'ANA-FN-008', 'Sheryl',    'Evangelista','Torres',    '2024-07-22', '2001-08-23', 'Lucena City, Quezon', 'Female', 'Single',    511, 'Accounting Staff on Probation',5, 5, 102, 'Probationary', 'Full-time', 'avatar_f.jpg'),
-(9508, 'ANA-FN-009', 'Manuel',    'Reyes',      'Villanueva','2026-08-01', '2003-02-01', 'Lucena City, Quezon', 'Male',   'Single',    512, 'Accounting Staff I',           5, 5, 102, 'OJT',          'Full-time', 'avatar_m.jpg'),
-(9509, 'ANA-FN-010', 'Analiza',   'Garcia',     'Castillo',  '2026-08-10', '2002-12-19', 'Lucena City, Quezon', 'Female', 'Single',    512, 'Accounting Staff I',           5, 5, 102, 'Trainee',      'Full-time', 'avatar_f.jpg'),
+(9504, 'ANA-FN-005', 'Renato',    'Tolentino',  'Ocampo',    '2020-03-01', '1993-06-30', 'Lucena City, Quezon', 'Male',   'Single',    510, 'Accounting Staff I',           5, 5, 102, 'Regular',      'Full-time', 'avatar_m.jpg'),
+(9505, 'ANA-FN-006', 'Divina',    'Ramos',      'Aquino',    '2021-09-20', '1996-10-04', 'Lucena City, Quezon', 'Female', 'Single',    515, 'Treasury Staff I',             5, 5, 102, 'Regular',      'Full-time', 'avatar_f.jpg'),
+(9506, 'ANA-FN-007', 'Nelson',    'Bautista',   'Diaz',      '2023-02-14', '1999-04-12', 'Lucena City, Quezon', 'Male',   'Single',    511, 'Accounting Staff II',          5, 5, 102, 'Regular',      'Full-time', 'avatar_m.jpg'),
+(9508, 'ANA-FN-009', 'Manuel',    'Reyes',      'Villanueva','2026-08-01', '2003-02-01', 'Lucena City, Quezon', 'Male',   'Single',    510, 'Accounting Staff I',           5, 5, 102, 'OJT',          'Full-time', 'avatar_m.jpg'),
+(9509, 'ANA-FN-010', 'Analiza',   'Garcia',     'Castillo',  '2026-08-10', '2002-12-19', 'Lucena City, Quezon', 'Female', 'Single',    510, 'Accounting Staff I',           5, 5, 102, 'Trainee',      'Full-time', 'avatar_f.jpg'),
 
 -- =====================================================
 -- Dept 6: General Services (dept_id=6)
@@ -113,10 +108,9 @@ REPLACE INTO employees (
 -- =====================================================
 (9700, 'ANA-HR-001', 'Maricel',   'Bautista',   'Reyes',     '2016-09-01', '1983-12-02', 'Lucena City, Quezon', 'Female', 'Married',   700, 'HR Manager I',                 7, 3, 102, 'Regular',      'Full-time', 'avatar_f.jpg'),
 (9701, 'ANA-HR-002', 'Roberto',   'Evangelista','Aquino',    '2018-04-10', '1987-06-14', 'Lucena City, Quezon', 'Male',   'Single',    706, 'HR Supervisor II',             7, 4, 102, 'Regular',      'Full-time', 'avatar_m.jpg'),
-(9702, 'ANA-HR-003', 'Aileen',    'Madrigal',   'Soriano',   '2020-01-20', '1991-09-21', 'Lucena City, Quezon', 'Female', 'Single',    711, 'HR Staff I',                   7, 5, 102, 'Regular',      'Full-time', 'avatar_f.jpg'),
-(9703, 'ANA-HR-004', 'Leandro',   'Valenzuela', 'Perez',     '2022-05-02', '1995-03-08', 'Lucena City, Quezon', 'Male',   'Single',    712, 'HR Staff II',                  7, 5, 102, 'Regular',      'Full-time', 'avatar_m.jpg'),
-(9704, 'ANA-HR-005', 'Flordeliza','Cruz',        'Mendoza',   '2024-08-01', '2000-07-17', 'Lucena City, Quezon', 'Female', 'Single',    710, 'HR Staff on Probation',        7, 5, 102, 'Probationary', 'Full-time', 'avatar_f.jpg'),
-(9705, 'ANA-HR-006', 'Dario',     'Santos',     'Lopez',     '2026-08-01', '2002-11-03', 'Lucena City, Quezon', 'Male',   'Single',    711, 'HR Staff I',                   7, 5, 102, 'OJT',          'Full-time', 'avatar_m.jpg'),
+(9702, 'ANA-HR-003', 'Aileen',    'Madrigal',   'Soriano',   '2020-01-20', '1991-09-21', 'Lucena City, Quezon', 'Female', 'Single',    709, 'HR Staff I',                   7, 5, 102, 'Regular',      'Full-time', 'avatar_f.jpg'),
+(9703, 'ANA-HR-004', 'Leandro',   'Valenzuela', 'Perez',     '2022-05-02', '1995-03-08', 'Lucena City, Quezon', 'Male',   'Single',    710, 'HR Staff II',                  7, 5, 102, 'Regular',      'Full-time', 'avatar_m.jpg'),
+(9705, 'ANA-HR-006', 'Dario',     'Santos',     'Lopez',     '2026-08-01', '2002-11-03', 'Lucena City, Quezon', 'Male',   'Single',    709, 'HR Staff I',                   7, 5, 102, 'OJT',          'Full-time', 'avatar_m.jpg'),
 
 -- =====================================================
 -- Dept 8: Information Technology (dept_id=8)
@@ -124,29 +118,26 @@ REPLACE INTO employees (
 (9800, 'ANA-IT-001', 'Allan',     'Reyes',      'Ocampo',    '2014-11-03', '1980-04-16', 'Lucena City, Quezon', 'Male',   'Married',   800, 'IT Manager I',                 8, 3, 102, 'Regular',      'Full-time', 'avatar_m.jpg'),
 (9801, 'ANA-IT-002', 'Marianne',  'Lopez',      'Castillo',  '2017-07-17', '1985-01-29', 'Lucena City, Quezon', 'Female', 'Single',    804, 'IT Supervisor I',              8, 4, 102, 'Regular',      'Full-time', 'avatar_f.jpg'),
 (9802, 'ANA-IT-003', 'Juanito',   'Salvador',   'Gonzales',  '2019-03-25', '1989-08-11', 'Lucena City, Quezon', 'Male',   'Single',    805, 'IT Supervisor II',             8, 4, 102, 'Regular',      'Full-time', 'avatar_m.jpg'),
-(9803, 'ANA-IT-004', 'Cristina',  'Flores',     'Bautista',  '2021-01-11', '1993-05-06', 'Lucena City, Quezon', 'Female', 'Single',    810, 'Programmer I',                 8, 5, 102, 'Regular',      'Full-time', 'avatar_f.jpg'),
-(9804, 'ANA-IT-005', 'Hernando',  'De Leon',    'Ramos',     '2022-04-04', '1996-02-27', 'Lucena City, Quezon', 'Male',   'Single',    811, 'Technical Support Staff I',    8, 5, 102, 'Regular',      'Full-time', 'avatar_m.jpg'),
-(9805, 'ANA-IT-006', 'Annabelle', 'Garcia',     'Torres',    '2023-08-28', '1999-12-05', 'Lucena City, Quezon', 'Female', 'Single',    816, 'Helpdesk Assistant I',         8, 5, 102, 'Regular',      'Full-time', 'avatar_f.jpg'),
-(9806, 'ANA-IT-007', 'Christian', 'Sarmiento',  'Perez',     '2024-11-11', '2001-09-15', 'Lucena City, Quezon', 'Male',   'Single',    809, 'Programmer on Probation',      8, 5, 102, 'Probationary', 'Full-time', 'avatar_m.jpg'),
-(9807, 'ANA-IT-008', 'Sheila',    'Villanueva', 'Aquino',    '2026-08-01', '2003-05-25', 'Lucena City, Quezon', 'Female', 'Single',    816, 'Helpdesk Assistant I',         8, 5, 102, 'OJT',          'Full-time', 'avatar_f.jpg'),
-(9808, 'ANA-IT-009', 'Archie',    'Mendoza',    'Salvador',  '2026-08-10', '2002-03-10', 'Lucena City, Quezon', 'Male',   'Single',    810, 'Programmer I',                 8, 5, 102, 'Trainee',      'Full-time', 'avatar_m.jpg'),
+(9803, 'ANA-IT-004', 'Cristina',  'Flores',     'Bautista',  '2021-01-11', '1993-05-06', 'Lucena City, Quezon', 'Female', 'Single',    808, 'Programmer I',                 8, 5, 102, 'Regular',      'Full-time', 'avatar_f.jpg'),
+(9804, 'ANA-IT-005', 'Hernando',  'De Leon',    'Ramos',     '2022-04-04', '1996-02-27', 'Lucena City, Quezon', 'Male',   'Single',    809, 'Technical Support Staff I',    8, 5, 102, 'Regular',      'Full-time', 'avatar_m.jpg'),
+(9805, 'ANA-IT-006', 'Annabelle', 'Garcia',     'Torres',    '2023-08-28', '1999-12-05', 'Lucena City, Quezon', 'Female', 'Single',    814, 'Helpdesk Assistant I',         8, 5, 102, 'Regular',      'Full-time', 'avatar_f.jpg'),
+(9807, 'ANA-IT-008', 'Sheila',    'Villanueva', 'Aquino',    '2026-08-01', '2003-05-25', 'Lucena City, Quezon', 'Female', 'Single',    814, 'Helpdesk Assistant I',         8, 5, 102, 'OJT',          'Full-time', 'avatar_f.jpg'),
+(9808, 'ANA-IT-009', 'Archie',    'Mendoza',    'Salvador',  '2026-08-10', '2002-03-10', 'Lucena City, Quezon', 'Male',   'Single',    808, 'Programmer I',                 8, 5, 102, 'Trainee',      'Full-time', 'avatar_m.jpg'),
 
 -- =====================================================
 -- Dept 9: Marketing (dept_id=9)
 -- =====================================================
 (9900, 'ANA-MK-001', 'Cynthia',   'Aquino',     'Sarmiento', '2016-06-20', '1982-07-04', 'Lucena City, Quezon', 'Female', 'Married',   900, 'Marketing Manager I',          9, 3, 102, 'Regular',      'Full-time', 'avatar_f.jpg'),
 (9901, 'ANA-MK-002', 'Bernard',   'Diaz',       'Santos',    '2019-02-12', '1988-10-21', 'Lucena City, Quezon', 'Male',   'Single',    902, 'Marketing Supervisor I',       9, 4, 102, 'Regular',      'Full-time', 'avatar_m.jpg'),
-(9902, 'ANA-MK-003', 'Fatima',    'Ocampo',     'Rivera',    '2021-04-05', '1993-01-15', 'Lucena City, Quezon', 'Female', 'Single',    905, 'Marketing Staff I',            9, 5, 102, 'Regular',      'Full-time', 'avatar_f.jpg'),
-(9903, 'ANA-MK-004', 'Kevin',     'Pascual',    'Gonzales',  '2023-07-17', '1997-06-28', 'Lucena City, Quezon', 'Male',   'Single',    906, 'Marketing Staff II',           9, 5, 102, 'Regular',      'Full-time', 'avatar_m.jpg'),
-(9904, 'ANA-MK-005', 'Princess',  'Santos',     'Castillo',  '2025-03-10', '2001-11-09', 'Lucena City, Quezon', 'Female', 'Single',    904, 'Marketing Staff on Probation', 9, 5, 102, 'Probationary', 'Full-time', 'avatar_f.jpg'),
-(9905, 'ANA-MK-006', 'Renz',      'Bautista',   'Lopez',     '2026-08-01', '2003-08-14', 'Lucena City, Quezon', 'Male',   'Single',    904, 'Marketing Staff on Probation', 9, 5, 102, 'OJT',          'Full-time', 'avatar_m.jpg'),
+(9902, 'ANA-MK-003', 'Fatima',    'Ocampo',     'Rivera',    '2021-04-05', '1993-01-15', 'Lucena City, Quezon', 'Female', 'Single',    903, 'Marketing Staff I',            9, 5, 102, 'Regular',      'Full-time', 'avatar_f.jpg'),
+(9903, 'ANA-MK-004', 'Kevin',     'Pascual',    'Gonzales',  '2023-07-17', '1997-06-28', 'Lucena City, Quezon', 'Male',   'Single',    904, 'Marketing Staff II',           9, 5, 102, 'Regular',      'Full-time', 'avatar_m.jpg'),
 
 -- =====================================================
 -- Dept 10: Office of the President (dept_id=10)
 -- =====================================================
 (9010, 'ANA-OP-001', 'Alejandro', 'Madrigal',   'Reyes',     '2010-01-05', '1970-03-18', 'Lucena City, Quezon', 'Male',   'Married',  1100, 'President and CEO',           10, 1, 102, 'Regular',      'Full-time', 'avatar_m.jpg'),
 (9011, 'ANA-OP-002', 'Priscilla', 'Santos',     'Ramos',     '2015-06-01', '1980-11-28', 'Lucena City, Quezon', 'Female', 'Single',   1101, 'Executive Assistant I',        10, 5, 102, 'Regular',      'Full-time', 'avatar_f.jpg'),
-(9012, 'ANA-OP-003', 'Domingo',   'Cruz',       'Evangelista','2019-08-19','1988-04-07', 'Lucena City, Quezon', 'Male',   'Single',   1102, 'Executive Assistant II',       10, 5, 102, 'Regular',      'Full-time', 'avatar_m.jpg'),
+
 (9013, 'ANA-OP-004', 'Rachelle',  'Villanueva', 'Torres',    '2023-11-01', '1996-09-30', 'Lucena City, Quezon', 'Female', 'Single',   1103, 'Executive Assistant III',      10, 5, 102, 'Regular',      'Full-time', 'avatar_f.jpg'),
 
 -- =====================================================
@@ -156,10 +147,9 @@ REPLACE INTO employees (
 (9111, 'ANA-OPR-002','Leonila',   'Soriano',    'Aquino',    '2015-09-07', '1981-05-14', 'Lucena City, Quezon', 'Female', 'Married',  1001, 'Regional Manager I',          11, 3, 1,   'Regular',      'Full-time', 'avatar_f.jpg'),
 (9112, 'ANA-OPR-003','Bonifacio', 'Ramos',      'Gomez',     '2017-02-28', '1985-08-22', 'Lucena City, Quezon', 'Male',   'Single',   1004, 'Area Coordinator I',          11, 4, 10,  'Regular',      'Full-time', 'avatar_m.jpg'),
 (9113, 'ANA-OPR-004','Roselyn',   'Castillo',   'Salvador',  '2019-05-20', '1990-12-11', 'Lucena City, Quezon', 'Female', 'Single',   1007, 'Focal Person I',              11, 4, 20,  'Regular',      'Full-time', 'avatar_f.jpg'),
-(9114, 'ANA-OPR-005','Jerome',    'Evangelista','Perez',     '2020-10-01', '1994-03-05', 'Lucena City, Quezon', 'Male',   'Single',   1013, 'Branch Staff I',              11, 5, 30,  'Regular',      'Full-time', 'avatar_m.jpg'),
-(9115, 'ANA-OPR-006','Maylene',   'Tolentino',  'Cruz',      '2022-01-17', '1997-06-16', 'Lucena City, Quezon', 'Female', 'Single',   1014, 'Branch Staff II',             11, 5, 40,  'Regular',      'Full-time', 'avatar_f.jpg'),
-(9116, 'ANA-OPR-007','Aldrin',    'Mendoza',    'Lopez',     '2024-04-22', '2001-01-24', 'Lucena City, Quezon', 'Male',   'Single',   1012, 'Branch Staff on Probation',   11, 5, 50,  'Probationary', 'Full-time', 'avatar_m.jpg'),
-(9117, 'ANA-OPR-008','Glenda',    'Diaz',       'Villanueva','2026-08-01', '2003-07-08', 'Lucena City, Quezon', 'Female', 'Single',   1013, 'Branch Staff I',              11, 5, 60,  'OJT',          'Full-time', 'avatar_f.jpg'),
+(9114, 'ANA-OPR-005','Jerome',    'Evangelista','Perez',     '2020-10-01', '1994-03-05', 'Lucena City, Quezon', 'Male',   'Single',   1011, 'Branch Staff I',              11, 5, 30,  'Regular',      'Full-time', 'avatar_m.jpg'),
+(9115, 'ANA-OPR-006','Maylene',   'Tolentino',  'Cruz',      '2022-01-17', '1997-06-16', 'Lucena City, Quezon', 'Female', 'Single',   1012, 'Branch Staff II',             11, 5, 40,  'Regular',      'Full-time', 'avatar_f.jpg'),
+(9117, 'ANA-OPR-008','Glenda',    'Diaz',       'Villanueva','2026-08-01', '2003-07-08', 'Lucena City, Quezon', 'Female', 'Single',   1011, 'Branch Staff I',              11, 5, 60,  'OJT',          'Full-time', 'avatar_f.jpg'),
 
 -- =====================================================
 -- Dept 12: Purchasing (dept_id=12)
@@ -2178,7 +2168,7 @@ REPLACE INTO career_movements (movement_id, employee_id, movement_type, previous
 (9008,9403,'Promotion','Compliance Staff I','Compliance Staff II',102,102,'2025-09-01','Completed compliance certification with outstanding results.',1,1,'2025-08-15','Approved',1),
 -- Pending approval
 (9009,9606,'Promotion','Facilities Maintenance Staff I','Facilities Maintenance Staff II',102,102,'2026-09-01','Pending: Consistent above-satisfactory performance.',1,NULL,NULL,'Pending',0),
-(9010,9904,'Promotion','Marketing Staff on Probation','Marketing Staff I',102,102,'2026-09-01','Pending: Successfully completed probationary period.',1,NULL,NULL,'Pending',0);
+;
 
 -- ============================================================
 -- SECTION 17: REAL & PERSONAL PROPERTIES (dept heads)

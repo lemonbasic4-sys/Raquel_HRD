@@ -18,27 +18,26 @@ REPLACE INTO employees (employee_id, employee_code, first_name, last_name, middl
 (11010, 'OPS-010', 'David', 'Gonzales', 'Cruz', '2023-07-17', '1992-01-18', 'Lucena City, Quezon', 'Male', 'Single', 1009, 'Focal Person III', 11, 4, 1, 'Regular', 'Full-time', 'avatar_m.jpg'),
 (11011, 'OPS-011', 'Carmelita', 'Tolentino', 'Aquino', '2018-11-12', '1996-12-15', 'Lucena City, Quezon', 'Female', 'Widowed', 1010, 'Focal Person IV', 11, 4, 2, 'Regular', 'Full-time', 'avatar_f.jpg'),
 (11012, 'OPS-012', 'Jessica', 'Madrigal', 'Pascual', '2021-10-01', '1985-02-20', 'Lucena City, Quezon', 'Female', 'Married', 1011, 'Focal Person V', 11, 4, 4, 'Regular', 'Full-time', 'avatar_f.jpg'),
-(11014, 'OPS-014', 'Maria', 'Tolentino', 'Del Rosario', '2023-05-17', '1994-02-10', 'Lucena City, Quezon', 'Female', 'Married', 1013, 'Branch Staff I', 11, 5, 9, 'Regular', 'Full-time', 'avatar_f.jpg'),
-(11015, 'OPS-015', 'Angelo', 'Soriano', 'Santos', '2025-10-13', '2000-03-19', 'Lucena City, Quezon', 'Male', 'Married', 1014, 'Branch Staff II', 11, 5, 3, 'Regular', 'Full-time', 'avatar_m.jpg'),
-(11016, 'OPS-016', 'Christina', 'Ocampo', 'Bautista', '2022-01-15', '1997-04-24', 'Lucena City, Quezon', 'Female', 'Widowed', 1015, 'Branch Staff III', 11, 5, 7, 'Regular', 'Full-time', 'avatar_f.jpg'),
-(11017, 'OPS-017', 'Arthur', 'Flores', 'Salvador', '2022-05-19', '2000-12-26', 'Lucena City, Quezon', 'Male', 'Married', 1016, 'Branch Staff IV', 11, 5, 4, 'Regular', 'Full-time', 'avatar_m.jpg'),
-(11018, 'OPS-018', 'Teresa', 'Garcia', 'Torres', '2022-10-09', '1998-03-28', 'Lucena City, Quezon', 'Female', 'Single', 1017, 'Branch Staff V', 11, 5, 6, 'Regular', 'Full-time', 'avatar_f.jpg'),
+(11014, 'OPS-014', 'Maria', 'Tolentino', 'Del Rosario', '2023-05-17', '1994-02-10', 'Lucena City, Quezon', 'Female', 'Married', 1012, 'Branch Staff I', 11, 5, 9, 'Regular', 'Full-time', 'avatar_f.jpg'),
+(11015, 'OPS-015', 'Angelo', 'Soriano', 'Santos', '2025-10-13', '2000-03-19', 'Lucena City, Quezon', 'Male', 'Married', 1013, 'Branch Staff II', 11, 5, 3, 'Regular', 'Full-time', 'avatar_m.jpg'),
+(11016, 'OPS-016', 'Christina', 'Ocampo', 'Bautista', '2022-01-15', '1997-04-24', 'Lucena City, Quezon', 'Female', 'Widowed', 1014, 'Branch Staff III', 11, 5, 7, 'Regular', 'Full-time', 'avatar_f.jpg'),
+(11017, 'OPS-017', 'Arthur', 'Flores', 'Salvador', '2022-05-19', '2000-12-26', 'Lucena City, Quezon', 'Male', 'Married', 1015, 'Branch Staff IV', 11, 5, 4, 'Regular', 'Full-time', 'avatar_m.jpg'),
+(11018, 'OPS-018', 'Teresa', 'Garcia', 'Torres', '2022-10-09', '1998-03-28', 'Lucena City, Quezon', 'Female', 'Single', 1016, 'Branch Staff V', 11, 5, 6, 'Regular', 'Full-time', 'avatar_f.jpg'),
 
 -- Probationary
-(11013, 'OPS-013', 'Carmelita', 'Gomez', 'Garcia', '2024-12-07', '2000-09-07', 'Lucena City, Quezon', 'Female', 'Separated', 1012, 'Branch Staff on Probation', 11, 5, 10, 'Probationary', 'Full-time', 'avatar_f.jpg'),
-(11022, 'OPS-022', 'Eduardo', 'Lopez', 'Gomez', '2026-01-18', '2004-06-19', 'Lucena City, Quezon', 'Male', 'Married', 1012, 'Branch Staff on Probation', 11, 5, 102, 'Probationary', 'Full-time', 'avatar_m.jpg'),
+
 
 -- OJT
-(11019, 'OPS-019', 'Patricia', 'Soriano', 'Perez', '2026-08-01', '2003-09-07', 'Lucena City, Quezon', 'Female', 'Single', 1013, 'Branch Staff I', 11, 5, 102, 'OJT', 'Full-time', 'avatar_f.jpg'),
-(11020, 'OPS-020', 'Albert', 'Sarmiento', 'Castillo', '2026-08-01', '2003-01-03', 'Lucena City, Quezon', 'Male', 'Single', 1013, 'Branch Staff I', 11, 5, 102, 'OJT', 'Full-time', 'avatar_m.jpg'),
+(11019, 'OPS-019', 'Patricia', 'Soriano', 'Perez', '2026-08-01', '2003-09-07', 'Lucena City, Quezon', 'Female', 'Single', 1012, 'Branch Staff I', 11, 5, 102, 'OJT', 'Full-time', 'avatar_f.jpg'),
+(11020, 'OPS-020', 'Albert', 'Sarmiento', 'Castillo', '2026-08-01', '2003-01-03', 'Lucena City, Quezon', 'Male', 'Single', 1012, 'Branch Staff I', 11, 5, 102, 'OJT', 'Full-time', 'avatar_m.jpg'),
 
 -- Trainee
 (11004, 'OPS-004', 'Angelo', 'Salvador', 'Mendoza', '2022-02-24', '1997-04-24', 'Lucena City, Quezon', 'Male', 'Married', 1003, 'Area Coordinator on Training', 11, 4, 6, 'Trainee', 'Full-time', 'avatar_m.jpg'),
 (11021, 'OPS-021', 'Carmelita', 'Salvador', 'Bautista', '2026-08-10', '2003-07-27', 'Lucena City, Quezon', 'Female', 'Widowed', 1003, 'Area Coordinator on Training', 11, 4, 102, 'Trainee', 'Full-time', 'avatar_f.jpg'),
 
 -- Project Based
-(11023, 'OPS-023', 'Sarah', 'Santos', 'Gomez', '2026-08-01', '2002-01-18', 'Lucena City, Quezon', 'Female', 'Married', 1013, 'Branch Staff I', 11, 5, 102, 'Project Based', 'Full-time', 'avatar_f.jpg'),
-(11024, 'OPS-024', 'Catherine', 'Ramos', 'Evangelista', '2026-08-01', '1996-12-25', 'Lucena City, Quezon', 'Female', 'Married', 1013, 'Branch Staff I', 11, 5, 102, 'Project Based', 'Full-time', 'avatar_f.jpg');
+(11023, 'OPS-023', 'Sarah', 'Santos', 'Gomez', '2026-08-01', '2002-01-18', 'Lucena City, Quezon', 'Female', 'Married', 1012, 'Branch Staff I', 11, 5, 102, 'Project Based', 'Full-time', 'avatar_f.jpg'),
+(11024, 'OPS-024', 'Catherine', 'Ramos', 'Evangelista', '2026-08-01', '1996-12-25', 'Lucena City, Quezon', 'Female', 'Married', 1012, 'Branch Staff I', 11, 5, 102, 'Project Based', 'Full-time', 'avatar_f.jpg');
 
 REPLACE INTO employee_contacts (employee_id, personal_email, mobile_number, telephone_number) VALUES
 (11001, 'george.sarmiento@example.com', '09173585897', '888-11001'),
