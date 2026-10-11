@@ -1,20 +1,10 @@
-# Executables & Binaries
+# Exe
 *.exe
 cloudflared.exe
-
-# Temporary & Scratch scripts
-*_tmp.php
-check_positions_tmp.php
-scratch/
 
 # Environment files
 .env
 .env.*
-
-# Logs & Cache
-*.log
-Thumbs.db
-.DS_Store
 
 # IDE / Editor settings
 .vscode/
