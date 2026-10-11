@@ -72,9 +72,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     // Validate KRA weights sum to 100
-    $kra_total_weight = array_sum(array_map('floatval', $kra_weights));
-    if (!empty($kra_names) && abs($kra_total_weight - 100) > 0.01) {
-        redirectWith($template_create_url, 'danger', 'KRA weights must total 100%. Current: ' . $kra_total_weight . '%');
+    // Sum percentages as integer hundredths to avoid floating-point errors
+    // rejecting values such as 99.99% even though the UI tolerance is 0.01%.
+    $kra_total_cents = array_sum(array_map(static function ($weight) {
+        return (int) round((float)$weight * 100);
+    }, $kra_weights));
+    if (!empty($kra_names) && abs($kra_total_cents - 10000) > 1) {
+        redirectWith($template_create_url, 'danger', 'KRA weights must total 100%. Current: ' . number_format($kra_total_cents / 100, 2) . '%');
     }
 
     // Validate weight split
@@ -1120,19 +1124,20 @@ function validateStep(step) {
         if (rows.length === 0) {
             errors.push('At least one Key Result Area (KRA) item is required.');
         } else {
-            let kraSum = 0;
+            let kraSumCents = 0;
             let missingName = false;
             rows.forEach(r => {
                 const n = r.querySelector('input[name="kra_name[]"]')?.value?.trim();
                 const w = parseFloat(r.querySelector('input[name="kra_weight_item[]"]')?.value) || 0;
                 if (!n) missingName = true;
-                kraSum += w;
+                kraSumCents += Math.round(w * 100);
             });
+            const kraSum = kraSumCents / 100;
             if (missingName) {
                 errors.push('All KRA items must have a KRA Name specified.');
             }
-            if (Math.abs(kraSum - 100) > 0.01) {
-                errors.push(`KRA item weights must sum to exactly 100%. Current sum: <strong>${kraSum.toFixed(1)}%</strong>.`);
+            if (Math.abs(kraSumCents - 10000) > 1) {
+                errors.push(`KRA item weights must sum to 100%. Current sum: <strong>${kraSum.toFixed(2)}%</strong>.`);
             }
         }
     } else if (step === 4) {
@@ -1251,14 +1256,15 @@ function renumberKRA() {
 }
 
 function updateKRAWeight() {
-    let total = 0;
+    let totalCents = 0;
     document.querySelectorAll('.kra-weight-input').forEach(input => {
-        total += parseFloat(input.value) || 0;
+        totalCents += Math.round((parseFloat(input.value) || 0) * 100);
     });
+    const total = totalCents / 100;
     const badge = document.getElementById('kraWeightBadge');
     if (badge) {
-        badge.textContent = 'Total: ' + total.toFixed(1) + '%';
-        badge.className = 'badge px-3 py-2 shadow-sm fs-6 ' + (Math.abs(total - 100) < 0.01 ? 'bg-success' : 'bg-danger');
+        badge.textContent = 'Total: ' + total.toFixed(2) + '%';
+        badge.className = 'badge px-3 py-2 shadow-sm fs-6 ' + (Math.abs(totalCents - 10000) <= 1 ? 'bg-success' : 'bg-danger');
     }
 }
 
@@ -1496,18 +1502,18 @@ function openTemplateStatusModal() {
     // --- Section 3: KRA Items Table ---
     const kraRows = document.querySelectorAll('#kraContainer .kra-criterion-row');
     let kraTbody = '';
-    let kraSum = 0;
+    let kraSumCents = 0;
     kraRows.forEach((row, idx) => {
         const name = row.querySelector('input[name="kra_name[]"]')?.value || '—';
         const desc = row.querySelector('input[name="kra_description[]"]')?.value || '—';
         const wt = parseFloat(row.querySelector('input[name="kra_weight_item[]"]')?.value) || 0;
-        kraSum += wt;
+        kraSumCents += Math.round(wt * 100);
         kraTbody += `
             <tr>
                 <td class="text-center fw-bold text-muted">${idx + 1}</td>
                 <td class="fw-semibold text-dark">${escAttr(name)}</td>
                 <td class="text-muted small">${escAttr(desc)}</td>
-                <td class="text-end fw-bold text-success">${wt.toFixed(1)}%</td>
+                <td class="text-end fw-bold text-success">${wt.toFixed(2)}%</td>
             </tr>
         `;
     });
@@ -1516,8 +1522,8 @@ function openTemplateStatusModal() {
     }
     document.querySelector('#modalKraTable tbody').innerHTML = kraTbody;
     const modalKraBadge = document.getElementById('modalKraBadge');
-    modalKraBadge.textContent = `Total KRA Weight: ${kraSum.toFixed(1)}%`;
-    modalKraBadge.className = 'badge px-3 py-1 ' + (Math.abs(kraSum - 100) < 0.01 ? 'bg-success' : 'bg-danger');
+    modalKraBadge.textContent = `Total KRA Weight: ${(kraSumCents / 100).toFixed(2)}%`;
+    modalKraBadge.className = 'badge px-3 py-1 ' + (Math.abs(kraSumCents - 10000) <= 1 ? 'bg-success' : 'bg-danger');
 
     // --- Section 4: Behavior Items Table ---
     const behRows = document.querySelectorAll('#behaviorContainer .behavior-criterion-row');
