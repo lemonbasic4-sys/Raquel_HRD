@@ -250,13 +250,18 @@ $templates = $conn->query("SELECT et.*,
             SELECT et.target_job_title_id WHERE et.target_job_title_id IS NOT NULL
               AND NOT EXISTS (SELECT 1 FROM evaluation_template_positions etp WHERE etp.template_id = et.template_id)
         )) AS target_position_name,
-    u.full_name as created_by_name, u.role AS created_by_role,
+    u.full_name as created_by_name,
+    CASE WHEN u.role = 'Employee' AND creator_emp.rank_category_id IN (3, 4)
+         THEN COALESCE(creator_position.job_title, u.role)
+         ELSE u.role END AS created_by_role,
     (SELECT COUNT(*) FROM evaluation_criteria WHERE template_id = et.template_id AND section='KRA') as kra_count,
     (SELECT COUNT(*) FROM evaluation_criteria WHERE template_id = et.template_id AND section='Behavior') as behavior_count,
     (SELECT SUM(weight) FROM evaluation_criteria WHERE template_id = et.template_id AND section='KRA') as kra_total_weight,
     (SELECT COUNT(*) FROM evaluations WHERE template_id = et.template_id AND deleted_at IS NULL) as usage_count
     FROM evaluation_templates et
     LEFT JOIN users u ON et.created_by = u.user_id
+    LEFT JOIN employees creator_emp ON creator_emp.employee_id = u.employee_id
+    LEFT JOIN job_titles creator_position ON creator_position.job_title_id = creator_emp.job_title_id
     $template_where
     ORDER BY et.updated_at DESC");
 $filtered_template_count = $templates->num_rows;
