@@ -213,6 +213,7 @@ switch ($effective_role) {
         $is_dept_manager_menu = false;
         $is_supervisor_menu  = false;
         $is_hr_personnel     = false;
+        $is_probationary_employee = false;
         $hdr_sup_dept_name   = '';
         if (isset($_SESSION['employee_id']) && $conn) {
             $_hdr_emp_id = (int) $_SESSION['employee_id'];
@@ -232,6 +233,7 @@ switch ($effective_role) {
             $_hdr_emp_rank = $_hdr_dept_row ? (int)$_hdr_dept_row['rank_category_id'] : 0;
             $_hdr_emp_position_id = $_hdr_dept_row ? (int)$_hdr_dept_row['job_title_id'] : 0;
             $_hdr_emp_status = $_hdr_dept_row['employment_status'] ?? 'Regular';
+            $is_probationary_employee = strcasecmp(trim((string)$_hdr_emp_status), 'Probationary') === 0;
             $_hdr_dept_stmt->close();
 
             $_hdr_allowed_eval_types = getAllowedEvaluationTypesForEmploymentStatus($_hdr_emp_status);
@@ -347,10 +349,15 @@ switch ($effective_role) {
         $menu_evaluations = [
             ['icon' => 'fas fa-star',        'label' => 'Self Rating',        'url' => BASE_URL . '/employee/self-rating.php',      'page' => 'self-rating.php',      'badge' => $m_pending_template_count],
             ['icon' => 'fas fa-history',     'label' => 'Evaluation History', 'url' => BASE_URL . '/employee/evaluation-history.php', 'page' => 'evaluation-history.php'],
-            ['icon' => 'fas fa-chart-line',  'label' => 'My Performance',     'url' => BASE_URL . '/employee/my-performance.php',   'page' => 'my-performance.php'],
         ];
+        // Probationary employees only need their assigned self-ratings and the
+        // status/history of those evaluations. Expand automatically when HR
+        // changes employment_status to Regular.
+        if (!$is_probationary_employee) {
+            $menu_evaluations[] = ['icon' => 'fas fa-chart-line', 'label' => 'My Performance', 'url' => BASE_URL . '/employee/my-performance.php', 'page' => 'my-performance.php'];
+        }
         $template_creator_context = null;
-        if (in_array($_hdr_emp_rank, [1, 2, 3, 4], true) || ($_SESSION['role'] ?? '') === 'President and CEO') {
+        if (!$is_probationary_employee && (in_array($_hdr_emp_rank, [1, 2, 3, 4], true) || ($_SESSION['role'] ?? '') === 'President and CEO')) {
             $template_creator_context = getEvaluationTemplateCreatorContext($conn, (int)($_SESSION['user_id'] ?? 0));
         }
         if (!$is_hr_personnel && $template_creator_context && !empty($template_creator_context['is_ceo'])) {
@@ -368,7 +375,7 @@ switch ($effective_role) {
         $is_ceo_employee_portal = $template_creator_context && !empty($template_creator_context['is_ceo']);
         // The current department controls this Employee Portal menu. A held
         // former HRIS role may remain linked for audit/history after transfer.
-        if (!$is_hr_personnel && ($is_supervisor_menu || $m_pending_pkg_count > 0 || $is_ceo_employee_portal)) {
+        if (!$is_probationary_employee && !$is_hr_personnel && ($is_supervisor_menu || $m_pending_pkg_count > 0 || $is_ceo_employee_portal)) {
             $menu_my_team[] = ['icon' => 'fas fa-users',       'label' => 'My Team',                  'url' => BASE_URL . '/employee/team-list.php',              'page' => 'team-list.php'];
             $menu_my_team[] = ['icon' => 'fas fa-layer-group', 'label' => 'Performance Evaluation', 'url' => BASE_URL . '/employee/team-evaluation-packages.php', 'page' => 'team-evaluation-packages.php', 'badge' => $m_pending_pkg_count ?: null, 'badge_class' => 'bg-warning text-dark'];
             $menu_my_team[] = ['icon' => 'fas fa-history',     'label' => 'Team Evaluation History',  'url' => BASE_URL . '/employee/team-evaluation-history.php', 'page' => 'team-evaluation-history.php'];
@@ -377,7 +384,7 @@ switch ($effective_role) {
         // ── Section 4: Career (rank-based) ─────────────────────────────────
         $menu_career = [];
         // Branch Manager (rank 3): can approve/reject Transfer requests from their branch
-        if ($_hdr_emp_rank === 3) {
+        if (!$is_probationary_employee && $_hdr_emp_rank === 3) {
             // Count pending BM approvals for badge — guarded in case schema migration hasn't run yet
             $_hdr_bm_pending = 0;
             if ($_hdr_emp_branch_id > 0) {
@@ -400,7 +407,7 @@ switch ($effective_role) {
         }
         // Branch Supervisor (rank 4): can file career movement requests for
         // employees in their branch through the Employee Portal workflow.
-        if ($_hdr_emp_rank === 4) {
+        if (!$is_probationary_employee && $_hdr_emp_rank === 4) {
             $menu_career[] = ['icon' => 'fas fa-route', 'label' => 'Career Movements', 'url' => BASE_URL . '/employee/career-movement-request.php', 'page' => 'career-movement-request.php'];
         }
 
