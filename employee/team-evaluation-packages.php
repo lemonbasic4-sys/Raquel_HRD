@@ -463,7 +463,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         // Final governance step (Board of Directors) locks and applies.
         if (!$is_final_board && !$is_final_probationary) {
-            redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'Final application requires Board of Directors approval. Assign a Board approver under Evaluation Governance.');
+            redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'Final application requires Board of Directors approval. Please contact an administrator.');
         }
 
         $conn->begin_transaction();
@@ -1267,9 +1267,9 @@ asort($package_department_options, SORT_NATURAL | SORT_FLAG_CASE);
                                             <i class="fas fa-paper-plane me-1"></i>Confirm &amp; Forward Package
                                         </button>
                                     <?php else: ?>
-                                        <a href="<?php echo BASE_URL; ?>/manager/evaluation-governance.php" class="btn btn-danger px-4 fw-bold">
-                                            <i class="fas fa-sliders-h me-1"></i>Configure Routing &amp; Governance
-                                        </a>
+                                        <button type="button" class="btn btn-danger px-4 fw-bold" disabled>
+                                            <i class="fas fa-exclamation-triangle me-1"></i>Routing Not Configured
+                                        </button>
                                     <?php endif; ?>
                                 </div>
                             </div>

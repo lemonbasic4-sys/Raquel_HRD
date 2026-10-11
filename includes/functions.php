@@ -3512,7 +3512,6 @@ function checkNextPackageStepIsAssigned($conn, $package_id, $current_step_order)
 
     $dept_name = $pkg['department_name'] ?? 'Department';
     $dept_id   = (int)($pkg['department_id'] ?? 0);
-    $gov_url   = BASE_URL . '/manager/evaluation-governance.php';
 
     // 3. Fetch current step
     $curr_stmt = $conn->prepare("SELECT package_route_step_id, step_order, reviewer_user_id, reviewer_employee_id, step_label, step_type, action_status 
@@ -3607,22 +3606,22 @@ function checkNextPackageStepIsAssigned($conn, $package_id, $current_step_order)
             if (stripos($label, 'Division VP') !== false) {
                 return [
                     'ok' => false,
-                    'message' => "Cannot forward package: The next consolidator (<strong>Division VP</strong> for <strong>" . htmlspecialchars($dept_name) . "</strong>) is not assigned or has no active account. Please assign one in <a href='{$gov_url}' class='alert-link'>Evaluation Routing &amp; Governance</a>."
+                    'message' => "Cannot forward package: The next consolidator (<strong>Division VP</strong> for <strong>" . htmlspecialchars($dept_name) . "</strong>) is not assigned or has no active account. Please contact an administrator."
                 ];
             } elseif (stripos($label, 'President') !== false) {
                 return [
                     'ok' => false,
-                    'message' => "Cannot forward package: The next consolidator (<strong>President &amp; CEO</strong>) is not assigned or has no active account. Please assign one in <a href='{$gov_url}' class='alert-link'>Evaluation Routing &amp; Governance</a>."
+                    'message' => "Cannot forward package: The next consolidator (<strong>President &amp; CEO</strong>) is not assigned or has no active account. Please contact an administrator."
                 ];
             } elseif (stripos($label, 'Audit') !== false) {
                 return [
                     'ok' => false,
-                    'message' => "Cannot forward package: The next consolidator (<strong>Audit Committee</strong>) is not assigned or has no active account. Please assign one in <a href='{$gov_url}' class='alert-link'>Evaluation Routing &amp; Governance</a>."
+                    'message' => "Cannot forward package: The next consolidator (<strong>Audit Committee</strong>) is not assigned or has no active account. Please contact an administrator."
                 ];
             } elseif (stripos($label, 'Board') !== false) {
                 return [
                     'ok' => false,
-                    'message' => "Cannot forward package: The next consolidator (<strong>Board of Directors</strong>) is not assigned or has no active account. Please assign one in <a href='{$gov_url}' class='alert-link'>Evaluation Routing &amp; Governance</a>."
+                    'message' => "Cannot forward package: The next consolidator (<strong>Board of Directors</strong>) is not assigned or has no active account. Please contact an administrator."
                 ];
             }
         }
@@ -3662,27 +3661,27 @@ function checkNextPackageStepIsAssigned($conn, $package_id, $current_step_order)
     if (!$has_vp_step && $dept_has_vp_position && !$div_vp_official) {
         return [
             'ok' => false,
-            'message' => "Cannot forward package: The next consolidator (<strong>Division VP</strong> for <strong>" . htmlspecialchars($dept_name) . "</strong>) has not been assigned yet. Please configure the Division VP in <a href='{$gov_url}' class='alert-link'>Evaluation Routing &amp; Governance &rarr; Department Division VP Matrix</a>."
+            'message' => "Cannot forward package: The next consolidator (<strong>Division VP</strong> for <strong>" . htmlspecialchars($dept_name) . "</strong>) has not been assigned yet. Please contact an administrator."
         ];
     }
 
     if (!$has_pres_step && !$pres_official) {
         return [
             'ok' => false,
-            'message' => "Cannot forward package: The next consolidator (<strong>President &amp; CEO</strong>) has not been assigned yet. Please configure the President &amp; CEO in <a href='{$gov_url}' class='alert-link'>Evaluation Routing &amp; Governance &rarr; Corporate Governance Officials</a>."
+            'message' => "Cannot forward package: The next consolidator (<strong>President &amp; CEO</strong>) has not been assigned yet. Please contact an administrator."
         ];
     }
 
     if (!$has_board_step && !$board_official) {
         return [
             'ok' => false,
-            'message' => "Cannot forward package: The final sign-off authority (<strong>Board of Directors</strong>) has not been assigned yet. Please configure the Board of Directors in <a href='{$gov_url}' class='alert-link'>Evaluation Routing &amp; Governance &rarr; Corporate Governance Officials</a>."
+            'message' => "Cannot forward package: The final sign-off authority (<strong>Board of Directors</strong>) has not been assigned yet. Please contact an administrator."
         ];
     }
 
     return [
         'ok' => false,
-        'message' => "Cannot forward package: The next review stage has not been configured yet. Please configure the governance approvers in <a href='{$gov_url}' class='alert-link'>Evaluation Routing &amp; Governance</a>."
+        'message' => "Cannot forward package: The next review stage has not been configured yet. Please contact an administrator."
     ];
 }
 
