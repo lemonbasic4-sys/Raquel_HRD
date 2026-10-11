@@ -37,7 +37,17 @@ $branches_insights_res = $conn->query("
     ORDER BY b.branch_name ASC
 ");
 $branches_insights = $branches_insights_res->fetch_all(MYSQLI_ASSOC);
+$departments_dashboard = $conn->query("SELECT department_id, department_name FROM departments WHERE is_active = 1 AND deleted_at IS NULL ORDER BY department_name")->fetch_all(MYSQLI_ASSOC);
 $total_emp_calc = $total_employees > 0 ? $total_employees : 1;
+
+$recent_evaluations = $conn->query("SELECT ev.evaluation_id, ev.evaluation_type, ev.status, ev.total_score,
+        ev.submitted_date, CONCAT(e.first_name, ' ', e.last_name) AS employee_name,
+        e.job_title, d.department_name
+    FROM evaluations ev
+    JOIN employees e ON e.employee_id = ev.employee_id
+    LEFT JOIN departments d ON d.department_id = e.department_id
+    ORDER BY COALESCE(ev.submitted_date, ev.created_at) DESC, ev.evaluation_id DESC
+    LIMIT 5")->fetch_all(MYSQLI_ASSOC);
 
 
 // Gender Counts (Excluding Admins)
@@ -118,7 +128,6 @@ while ($row = $perf_dist->fetch_assoc()) {
     }
 }
 $has_queue_content = $queue_employee_count > 0;
-$has_distribution_content = array_sum($perf_data) > 0;
 
 // 2. Evaluation Status Data
 $status_dist = $conn->query("SELECT status, COUNT(*) as count FROM evaluations GROUP BY status");
@@ -230,6 +239,73 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
         height: 3px;
         background: var(--primary-blue);
         border-radius: 10px;
+    }
+
+    /* Give the dashboard queue the same strong section-heading treatment as
+       the other HR dashboard panels, using the established system colors. */
+    #approvalQueueSection > .col-12 > .chart-card {
+        overflow: hidden;
+        border-radius: 16px;
+    }
+
+    #approvalQueueSection .approval-queue-heading {
+        min-height: 58px;
+        padding: 12px 20px;
+        background: #1b2e04;
+        color: #fff;
+    }
+
+    #approvalQueueSection .approval-queue-heading h5 {
+        color: #fff;
+        font-size: 1rem;
+        font-weight: 700;
+    }
+
+    #approvalQueueSection .approval-queue-heading .queue-count {
+        display: inline-flex;
+        min-width: 24px;
+        height: 24px;
+        align-items: center;
+        justify-content: center;
+        margin-left: 7px;
+        padding: 0 7px;
+        border-radius: 20px;
+        background: #bd9414;
+        color: #17220d;
+        font-size: .72rem;
+        font-weight: 800;
+    }
+
+    #approvalQueueSection .approval-queue-heading .queue-view-all {
+        border: 1px solid rgba(255, 255, 255, .35);
+        border-radius: 8px;
+        color: #fff;
+        font-size: .76rem;
+        font-weight: 600;
+        padding: 7px 13px;
+        text-decoration: none;
+        transition: background .15s ease;
+    }
+
+    #approvalQueueSection .approval-queue-heading .queue-view-all:hover {
+        background: rgba(255, 255, 255, .12);
+    }
+
+    #approvalQueueSection .approval-list {
+        padding: 14px 18px;
+        background: #f8faf7;
+    }
+
+    #approvalQueueSection .approval-item,
+    #approvalQueueSection .approval-group-wrap {
+        border-color: #e6ebe3;
+        box-shadow: 0 2px 8px rgba(23, 50, 13, .045);
+    }
+
+    #approvalQueueSection .approval-item:hover {
+        border-color: #bd9414;
+        transform: translateY(-1px);
+        box-shadow: 0 5px 14px rgba(23, 50, 13, .09);
     }
 
     /* Approval List Cards */
@@ -432,29 +508,6 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
         background-color: #00c0eb !important;
     }
 
-    /* Distribution Table Styles */
-    .perf-filter-btn {
-        border: none;
-        padding: 6px 14px;
-        border-radius: 20px;
-        font-size: 0.75rem;
-        font-weight: 600;
-        transition: all 0.2s;
-        background: #f8f9fa;
-        color: var(--text-muted);
-    }
-    .perf-filter-btn:hover {
-        background: #eee;
-    }
-    .perf-filter-btn.active {
-        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-        transform: translateY(-1px);
-    }
-    .perf-filter-btn.active.outstanding { background: #28a745; color: #fff; }
-    .perf-filter-btn.active.exceeds { background: #17a2b8; color: #fff; }
-    .perf-filter-btn.active.meets { background: #ffc107; color: #000; }
-    .perf-filter-btn.active.needs { background: #dc3545; color: #fff; }
-    
     /* Responsive Filter Group */
     @media (max-width: 768px) {
         .approval-item,
@@ -479,23 +532,6 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
             align-items: stretch;
         }
 
-        .filter-group {
-            width: 100%;
-            overflow-x: auto;
-            white-space: nowrap;
-            padding: 5px 2px 10px;
-            display: flex !important;
-            gap: 8px;
-            -webkit-overflow-scrolling: touch;
-            scrollbar-width: none; /* Firefox */
-            -ms-overflow-style: none; /* IE/Edge */
-        }
-        .filter-group::-webkit-scrollbar {
-            display: none; /* Chrome/Safari */
-        }
-        .perf-filter-btn {
-            flex: 0 0 auto;
-        }
         .cc-header.d-flex.justify-content-between {
             flex-direction: column;
             align-items: flex-start !important;
@@ -694,27 +730,20 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
     </div>
 </div>
 
+<div id="approvalQueueTop"></div>
+
 <div class="row manager-dashboard-queue" id="approvalQueueSection">
     <div class="col-12">
         <div class="chart-card">
-            <div class="cc-header d-flex justify-content-between align-items-center py-2 flex-wrap gap-2">
-                <ul class="nav nav-tabs cc-header-tabs approval-tabs" id="pendingTabs" role="tablist">
-                    <li class="nav-item">
-                        <button class="nav-link active" id="eval-tab" data-bs-toggle="tab" data-bs-target="#evals"
-                            type="button" role="tab">
-                            Approval Queue
-                            <?php if ($pending_evals + $pending_package_count > 0): ?>
-                                <span class="badge bg-warning text-dark ms-1"><?php echo $pending_evals + $pending_package_count; ?></span>
-                            <?php endif; ?>
-                        </button>
-                    </li>
-                </ul>
-                <div class="d-flex align-items-center gap-2">
-                    <?php if ($dashboard_queue_count > 0): ?>
-                        <span class="badge bg-light text-muted border"><?php echo number_format($dashboard_queue_count); ?> item<?php echo $dashboard_queue_count === 1 ? '' : 's'; ?></span>
+            <div class="approval-queue-heading d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <h5 class="mb-0"><i class="fas fa-clock me-2" style="color:#BD9414;"></i>Approval Queue
+                    <?php if ($pending_evals + $pending_package_count > 0): ?>
+                        <span class="queue-count"><?php echo $pending_evals + $pending_package_count; ?></span>
                     <?php endif; ?>
-                    <a href="<?php echo BASE_URL; ?>/<?php echo $pending_package_count > 0 ? 'employee/team-evaluation-packages.php' : 'manager/pending-approvals.php'; ?>" class="btn btn-sm btn-link text-decoration-none small">
-                        View Center <i class="fas fa-external-link-alt ms-1" style="font-size: 0.7rem;"></i>
+                </h5>
+                <div class="d-flex align-items-center gap-2">
+                    <a href="<?php echo BASE_URL; ?>/<?php echo $pending_package_count > 0 ? 'employee/team-evaluation-packages.php' : 'manager/pending-approvals.php'; ?>" class="queue-view-all">
+                        View All <i class="fas fa-arrow-right ms-1"></i>
                     </a>
                 </div>
             </div>
@@ -861,62 +890,45 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
     </div>
 </div>
 
-<!-- PERFORMANCE DISTRIBUTION TABLE ROW -->
-<div class="row g-4 mb-4" id="performanceDistributionDirectorySection">
-    <div class="col-12">
-        <div class="chart-card">
-            <div class="cc-header d-flex justify-content-between align-items-center py-3">
-                <h5 class="mb-0"><i class="fas fa-th-list me-2 text-success"></i>Performance Distribution Directory</h5>
-                <div class="d-flex gap-2 filter-group">
-                    <button class="perf-filter-btn outstanding active" onclick="filterDistribution('Outstanding', this)">Outstanding</button>
-                    <button class="perf-filter-btn exceeds" onclick="filterDistribution('Exceeds Expectations', this)">Exceeds</button>
-                    <button class="perf-filter-btn meets" onclick="filterDistribution('Meets Expectations', this)">Meets</button>
-                    <button class="perf-filter-btn needs" onclick="filterDistribution('Needs Improvement', this)">Needs Imp.</button>
-                </div>
-            </div>
-            <div class="cc-body p-0">
-                <div class="table-responsive" style="max-height: 400px;">
-                    <table class="table table-hover align-middle mb-0">
-                        <thead class="bg-light sticky-top">
-                            <tr>
-                                <th style="font-size: 0.75rem; font-weight: 700;">EMPLOYEE</th>
-                                <th style="font-size: 0.75rem; font-weight: 700;">BRANCH</th>
-                                <th style="font-size: 0.75rem; font-weight: 700;">SCORE</th>
-                                <th style="font-size: 0.75rem; font-weight: 700;">DATE APPROVED</th>
-                            </tr>
-                        </thead>
-                        <tbody id="distributionTableBody">
-                            <!-- AJAX Content -->
-                            <tr><td colspan="4" class="text-center py-5"><div class="spinner-border spinner-border-sm text-primary"></div> Loading...</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
 <!-- Branch Distribution Insights (Professional Section) -->
 <div class="row g-4 mb-4 branch-insights-section">
     <div class="col-lg-4">
         <div class="chart-card allow-overflow h-100">
             <div class="cc-header">
-                <h5><i class="fas fa-map-marker-alt me-2"></i>Select Branch</h5>
+                <h5><i class="fas fa-search me-2"></i>Quick Search</h5>
             </div>
             <div class="cc-body">
-                <p class="text-muted small mb-3">Choose a location to view detailed workforce distribution.</p>
+                <form action="employees.php" method="get" class="dashboard-quick-search mb-4">
+                    <label class="small text-muted mb-2" for="dashboardEmployeeSearch">Find an employee</label>
+                    <div class="input-group mb-2">
+                        <span class="input-group-text bg-white"><i class="fas fa-search text-muted"></i></span>
+                        <input type="search" class="form-control" name="search" id="dashboardEmployeeSearch" placeholder="Name, position, or department">
+                    </div>
+                    <div class="d-flex gap-2">
+                        <select class="form-select" name="department" aria-label="Filter by department">
+                            <option value="">All Departments</option>
+                            <?php foreach ($departments_dashboard as $department): ?>
+                                <option value="<?php echo e($department['department_name']); ?>"><?php echo e($department['department_name']); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <button class="btn btn-outline-primary" type="submit" aria-label="Search employees"><i class="fas fa-arrow-right"></i></button>
+                    </div>
+                </form>
+                <div class="border-top pt-3">
+                    <h6 class="small fw-bold mb-2"><i class="fas fa-map-marker-alt me-2"></i>Branch Workforce</h6>
+                    <p class="text-muted small mb-3">Choose a location to view detailed workforce distribution.</p>
 
-                <div id="branchSelector">
-                    <div class="custom-select-wrapper">
-                        <div class="select-trigger" id="customSelectTrigger">
-                            <span class="selected-text text-muted">Pick a branch...</span>
-                            <i class="fas fa-chevron-down ms-2"></i>
-                        </div>
-                        <div class="select-dropdown" id="customSelectDropdown">
-                            <div class="search-container">
-                                <input type="text" placeholder="Search branches..." id="branchSearchInput">
+                    <div id="branchSelector">
+                        <div class="custom-select-wrapper">
+                            <div class="select-trigger" id="customSelectTrigger">
+                                <span class="selected-text text-muted">Pick a branch...</span>
+                                <i class="fas fa-chevron-down ms-2"></i>
                             </div>
-                            <div class="results-container" id="branchResultsList">
+                            <div class="select-dropdown" id="customSelectDropdown">
+                                <div class="search-container">
+                                    <input type="text" placeholder="Search branches..." id="branchSearchInput">
+                                </div>
+                                <div class="results-container" id="branchResultsList">
                                 <?php foreach ($branches_insights as $br): 
                                     // Resolve background image server-side — no JS probing needed
                                     $bg_dir   = __DIR__ . '/../assets/img/logo/branch_background_images/';
@@ -943,6 +955,7 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
                                         <div class="emp-badge"><?php echo $br['emp_count']; ?> Staff</div>
                                     </div>
                                 <?php endforeach; ?>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1115,7 +1128,7 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
 
 <!-- AGE DISTRIBUTION ROW -->
 <div class="row g-4 mb-4">
-    <div class="col-12">
+    <div class="col-lg-6">
         <div class="chart-card">
             <div class="cc-header d-flex justify-content-between align-items-center">
                 <h5><i class="fas fa-chart-pie me-2 text-danger"></i>Employee Age Distribution</h5>
@@ -1160,6 +1173,35 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
             </div>
         </div>
     </div>
+
+    <div class="col-lg-6">
+        <div class="chart-card h-100">
+            <div class="cc-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-clipboard-check me-2"></i>Recent Evaluations</h5>
+                <a href="evaluation-history.php" class="btn btn-sm btn-outline-secondary">View All</a>
+            </div>
+            <div class="cc-body p-0">
+                <?php if (empty($recent_evaluations)): ?>
+                    <div class="empty-state-card py-5"><i class="fas fa-file-alt"></i><p class="mb-0 small">No evaluations have been submitted yet.</p></div>
+                <?php else: ?>
+                    <div class="list-group list-group-flush">
+                        <?php foreach ($recent_evaluations as $recent): ?>
+                            <div class="list-group-item d-flex align-items-center justify-content-between gap-3 py-3">
+                                <div class="min-w-0">
+                                    <div class="fw-bold text-truncate"><?php echo e($recent['employee_name']); ?></div>
+                                    <small class="text-muted text-truncate d-block"><?php echo e($recent['department_name'] ?? ''); ?> &middot; <?php echo e($recent['evaluation_type'] ?? 'Evaluation'); ?></small>
+                                </div>
+                                <div class="text-end flex-shrink-0">
+                                    <span class="badge bg-light text-dark border"><?php echo e($recent['status']); ?></span>
+                                    <small class="text-muted d-block mt-1"><?php echo formatDate($recent['submitted_date']); ?></small>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
 </div>
 
 <div id="dashboardDeferredSections"></div>
@@ -1167,25 +1209,19 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
 <script>
     // User's assigned branch (from session), injected server-side
     const USER_ASSIGNED_BRANCH = <?php echo json_encode($user_branch_name); ?>;
-    const HAS_QUEUE_CONTENT = <?php echo json_encode($has_queue_content); ?>;
-    const HAS_DISTRIBUTION_CONTENT = <?php echo json_encode($has_distribution_content); ?>;
-
+    const HAS_DASHBOARD_QUEUE_ITEMS = <?php echo json_encode($dashboard_queue_count > 0); ?>;
     document.addEventListener('DOMContentLoaded', function () {
         const deferredSectionsHost = document.getElementById('dashboardDeferredSections');
+        const approvalQueueTop = document.getElementById('approvalQueueTop');
         const approvalQueueSection = document.getElementById('approvalQueueSection');
-        const performanceDistributionSection = document.getElementById('performanceDistributionDirectorySection');
 
-        if (deferredSectionsHost) {
-            if (!HAS_QUEUE_CONTENT) {
-                if (approvalQueueSection) {
-                    deferredSectionsHost.appendChild(approvalQueueSection);
-                }
-
-                if (performanceDistributionSection) {
-                    deferredSectionsHost.appendChild(performanceDistributionSection);
-                }
-            } else if (!HAS_DISTRIBUTION_CONTENT && performanceDistributionSection) {
-                deferredSectionsHost.appendChild(performanceDistributionSection);
+        if (approvalQueueSection) {
+            if (HAS_DASHBOARD_QUEUE_ITEMS && approvalQueueTop) {
+                // Active approvals should be visible immediately below the hub.
+                approvalQueueTop.appendChild(approvalQueueSection);
+            } else if (deferredSectionsHost) {
+                // Keep the empty state below analytics when there is nothing to action.
+                deferredSectionsHost.appendChild(approvalQueueSection);
             }
         }
 
@@ -1508,31 +1544,7 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
             }
         });
 
-        // Load initial distribution table
-        filterDistribution('Outstanding', document.querySelector('.perf-filter-btn.outstanding'));
     });
-
-    function filterDistribution(level, btn) {
-        // Update Buttons
-        document.querySelectorAll('.perf-filter-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-
-        const tbody = document.getElementById('distributionTableBody');
-        tbody.style.opacity = '0.4';
-
-        fetch(`ajax/get-distribution-list.php?level=${encodeURIComponent(level)}`)
-            .then(response => response.text())
-            .then(html => {
-                tbody.innerHTML = html;
-                tbody.style.opacity = '1';
-                applyZebraStriping('#performanceDistributionDirectorySection table');
-            })
-            .catch(err => {
-                console.error(err);
-                tbody.style.opacity = '1';
-                tbody.innerHTML = '<tr><td colspan="4" class="text-center text-danger">Failed to load data.</td></tr>';
-            });
-    }
 </script>
 
 <?php /* ── Non-Regular Personnel Watchlist ── */ ?>
@@ -1546,7 +1558,7 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
         box-shadow: 0 4px 20px rgba(4,61,7,.10);
     }
     .watchlist-header {
-        background: linear-gradient(135deg, #043d07 0%, #074604 100%);
+        background: #1b2e04;
         color: #fff;
         padding: 18px 24px;
         display: flex;

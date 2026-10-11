@@ -171,7 +171,7 @@ require_once '../includes/header.php';
     </section>
 
     <?php if ($is_probationary): ?>
-    <section class="card border-0 shadow-sm mb-4"><div class="card-body p-4">
+    <section class="probationary-decision-section card border-0 shadow-sm mb-4"><div class="card-body p-4">
         <h2 class="h5 fw-bold mb-3">Probationary decision and signatures</h2>
         <div class="row g-3">
             <div class="col-lg-7"><div class="border rounded p-3 h-100"><div class="small text-muted">Immediate head’s recommendation</div><strong><?php echo e($evaluation['recommendation'] ?? 'Not yet recorded'); ?></strong><?php if (!empty($evaluation['recommendation_reason'])): ?><p class="mb-0 mt-2"><?php echo nl2br(e($evaluation['recommendation_reason'])); ?></p><?php endif; ?></div></div>
@@ -182,6 +182,43 @@ require_once '../includes/header.php';
     <?php endif; ?>
 
     <style>
+    .probationary-decision-section .row.g-3 {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px !important;
+        margin: 0;
+    }
+    .probationary-decision-section .row.g-3 > [class*="col-"] {
+        width: 100%;
+        max-width: 100%;
+        padding: 0;
+    }
+    .probationary-decision-section .row.g-3 > [class*="col-"] > .border {
+        padding: 12px !important;
+        overflow-wrap: anywhere;
+    }
+    .probationary-decision-section img[alt$="signature"] {
+        max-width: min(100%, 180px) !important;
+        max-height: 55px !important;
+        object-fit: contain;
+        object-position: left center;
+    }
+    @media (max-width: 767.98px) {
+        .probationary-decision-section .row.g-3 {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .probationary-decision-section .row.g-3 > [class*="col-"]:first-child {
+            grid-column: 1 / -1;
+        }
+    }
+    @media (max-width: 479.98px) {
+        .probationary-decision-section .row.g-3 {
+            grid-template-columns: minmax(0, 1fr);
+        }
+        .probationary-decision-section .row.g-3 > [class*="col-"]:first-child {
+            grid-column: auto;
+        }
+    }
     /* Tabbed Layout for Member View Sections */
     .eval-tabs-wrapper {
         position: relative;
@@ -288,6 +325,11 @@ require_once '../includes/header.php';
                 <button type="button" class="eval-tab-btn" id="btn-tab-devplan" onclick="switchViewTab(event, 'tab-devplan')" role="tab" aria-selected="false" aria-controls="tab-devplan">
                     <i class="fas fa-seedling me-1"></i>Developmental Plan &amp; Recommendations <span class="eval-tab-badge ms-1"><?php echo $devplan_count; ?></span>
                 </button>
+                <?php if ($is_probationary): ?>
+                    <button type="button" class="eval-tab-btn" id="btn-tab-decision" onclick="switchViewTab(event, 'tab-decision')" role="tab" aria-selected="false" aria-controls="tab-decision">
+                        <i class="fas fa-file-signature me-1"></i>Decision &amp; Signatures
+                    </button>
+                <?php endif; ?>
             </div>
         </div>
 
@@ -452,6 +494,20 @@ require_once '../includes/header.php';
                     </div>
                 <?php endif; ?>
             </div>
+            <?php if ($is_probationary): ?>
+                <div id="tab-decision" class="eval-tab-content" role="tabpanel" aria-labelledby="btn-tab-decision">
+                    <script>
+                        (function () {
+                            const decisionSection = document.querySelector('.probationary-decision-section');
+                            const decisionTab = document.getElementById('tab-decision');
+                            if (decisionSection && decisionTab) {
+                                decisionTab.appendChild(decisionSection);
+                                decisionSection.classList.remove('mb-4');
+                            }
+                        })();
+                    </script>
+                </div>
+            <?php endif; ?>
         </div>
     </div>
 </main>

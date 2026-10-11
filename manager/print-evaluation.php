@@ -817,16 +817,17 @@ if ((float)($row['total_score'] ?? 0) > 0 && (empty($pl) || $pl === '0')) {
 
     <!-- Employee's Comments -->
     <div class="comment-box">
-      <div class="label">Employee's Comments:</div>
+      <div class="label"><?php echo in_array(($row['evaluation_type'] ?? ''), ['Initial', 'Final'], true) ? 'Probationary Employee:' : 'Employee:'; ?></div>
       <div class="content"><?php echo !empty($row['staff_comments']) ? nl2br(e($row['staff_comments'])) : '&nbsp;'; ?></div>
       <div style="text-align:center; padding-bottom:3px; margin-top:8px;">
-        <div style="font-weight:bold; font-size:11px;"><?php echo strtoupper(e($row['employee_name'] ?? '')); ?></div>
+        <div style="font-weight:bold; font-size:11px;"><?php echo strtoupper(e($row['employee_name'] ?? '')); ?><?php echo in_array(($row['evaluation_type'] ?? ''), ['Initial', 'Final'], true) ? ' (PROBATIONARY)' : ''; ?></div>
+        <?php if (!empty($row['job_title'])): ?><div style="font-size:9px; color:#555;"><?php echo e($row['job_title']); ?></div><?php endif; ?>
       </div>
     </div>
 
-    <!-- Immediate Supervisor / Package Consolidator Comments -->
+    <!-- Immediate Supervisor Comments -->
     <div class="comment-box">
-      <div class="label">Immediate Supervisor / Package Consolidator Comments:</div>
+      <div class="label">Immediate Supervisor:</div>
       <div class="content"><?php echo !empty($supervisor_comments) ? nl2br(e($supervisor_comments)) : '&nbsp;'; ?></div>
       <div style="text-align:center; padding-bottom:3px; margin-top:8px;">
         <div style="font-weight:bold; font-size:11px;"><?php echo strtoupper(e($supervisor_name)); ?></div>
@@ -837,7 +838,7 @@ if ((float)($row['total_score'] ?? 0) > 0 && (empty($pl) || $pl === '0')) {
     <!-- Department Manager's Comments -->
     <?php if (!empty($dept_manager_name) && strcasecmp(trim($dept_manager_name), trim($supervisor_name)) !== 0): ?>
     <div class="comment-box">
-      <div class="label">Department Manager's Comments:</div>
+      <div class="label">Department Manager:</div>
       <div class="content"><?php echo !empty($dept_manager_comments) ? nl2br(e($dept_manager_comments)) : '&nbsp;'; ?></div>
       <div style="text-align:center; padding-bottom:3px; margin-top:8px;">
         <div style="font-weight:bold; font-size:11px;"><?php echo strtoupper(e($dept_manager_name)); ?></div>
@@ -845,16 +846,6 @@ if ((float)($row['total_score'] ?? 0) > 0 && (empty($pl) || $pl === '0')) {
       </div>
     </div>
     <?php endif; ?>
-
-    <!-- HR Manager's Comments -->
-    <div class="comment-box">
-      <div class="label">HR Manager's Comments:</div>
-      <div class="content"><?php echo !empty($hr_manager_comments) ? nl2br(e($hr_manager_comments)) : '&nbsp;'; ?></div>
-      <div style="text-align:center; padding-bottom:3px; margin-top:8px;">
-        <div style="font-weight:bold; font-size:11px;"><?php echo strtoupper(e($hr_manager_name)); ?></div>
-        <div style="font-size:9px; color:#555;"><?php echo e($hr_manager_title); ?></div>
-      </div>
-    </div>
 
     <!-- Executives' Signature -->
     <div style="border:1px solid #000; padding:6px 12px 8px; margin-bottom:5px;">
