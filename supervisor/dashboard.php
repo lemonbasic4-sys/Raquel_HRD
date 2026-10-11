@@ -98,14 +98,18 @@ if ($user_id_pkg > 0) {
         JOIN evaluation_package_route_steps rs ON rs.package_id = ep.package_id
         JOIN departments d ON d.department_id = ep.department_id
         JOIN evaluation_templates et ON et.template_id = ep.template_id
-        WHERE $reviewer_match_pkg
+        WHERE ($reviewer_match_pkg
+              OR (rs.eligible_role = ? AND rs.claimed_at IS NULL))
           AND (
               (rs.step_order = 1 AND rs.action_status IN ('Pending', 'Waiting'))
               OR (rs.step_order > 1 AND rs.action_status = 'Pending')
           )
           AND ep.status <> 'Approved and Applied'
         ORDER BY ep.updated_at DESC");
-    $pkg_stmt->bind_param('ii', $user_id_pkg, $user_id_pkg);
+    // The queue also allows an eligible HR role to pick up an unclaimed step.
+    // Include those same role-assigned steps here so the dashboard list agrees
+    // with the sidebar badge and the Performance Evaluation page.
+    $pkg_stmt->bind_param('iis', $user_id_pkg, $user_id_pkg, $_SESSION['role']);
     $pkg_stmt->execute();
     $pending_packages = $pkg_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $pkg_stmt->close();
@@ -202,6 +206,128 @@ $pending_pkg_count = count($pending_packages);
         font-size: 0.75rem;
         font-weight: 600;
         padding: 6px 18px;
+    }
+
+    .supervisor-dashboard .dashboard-package-card {
+        display: grid;
+        grid-template-columns: minmax(240px, 1fr) minmax(230px, .8fr) auto;
+        align-items: center;
+        gap: 18px;
+        padding: 12px 16px;
+        margin-bottom: 12px;
+        background: #fff;
+        border: 1px solid #e8ece8;
+        border-left: 4px solid #174b1b;
+        border-radius: 12px;
+        box-shadow: 0 3px 12px rgba(18, 49, 20, .08);
+        transition: box-shadow .2s ease, transform .2s ease;
+    }
+
+    .supervisor-dashboard .dashboard-package-card:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 6px 18px rgba(18, 49, 20, .12);
+    }
+
+    .supervisor-dashboard .dashboard-package-main {
+        display: flex;
+        align-items: center;
+        gap: 13px;
+        min-width: 0;
+    }
+
+    .supervisor-dashboard .dashboard-package-icon {
+        display: grid;
+        place-items: center;
+        width: 42px;
+        height: 42px;
+        flex: 0 0 42px;
+        border-radius: 11px;
+        background: #eef3ef;
+        color: #174b1b;
+    }
+
+    .supervisor-dashboard .dashboard-package-title {
+        margin: 0 0 4px;
+        overflow: hidden;
+        color: #17221a;
+        font-size: .9rem;
+        font-weight: 750;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .supervisor-dashboard .dashboard-package-period {
+        color: #69746c;
+        font-size: .72rem;
+    }
+
+    .supervisor-dashboard .dashboard-package-status {
+        min-width: 0;
+        padding-left: 18px;
+        border-left: 1px solid #e3e8e3;
+    }
+
+    .supervisor-dashboard .dashboard-package-status-label {
+        display: block;
+        margin-bottom: 3px;
+        color: #68746a;
+        font-size: .66rem;
+        font-weight: 600;
+    }
+
+    .supervisor-dashboard .dashboard-package-status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        max-width: 100%;
+        padding: 5px 9px;
+        border-radius: 20px;
+        background: #e8f0ff;
+        color: #1455c0;
+        font-size: .68rem;
+        font-weight: 700;
+    }
+
+    .supervisor-dashboard .dashboard-package-step {
+        display: block;
+        margin-top: 3px;
+        overflow: hidden;
+        color: #748078;
+        font-size: .68rem;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .supervisor-dashboard .dashboard-package-action {
+        min-width: 92px;
+        border: 1px solid #dce3dc;
+        border-radius: 8px;
+        background: #fff;
+        color: #344237;
+        font-size: .75rem;
+        font-weight: 600;
+    }
+
+    .supervisor-dashboard .dashboard-package-action:hover {
+        border-color: #174b1b;
+        background: #f5f8f5;
+        color: #174b1b;
+    }
+
+    @media (max-width: 767.98px) {
+        .supervisor-dashboard .dashboard-package-card {
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 10px;
+        }
+
+        .supervisor-dashboard .dashboard-package-status {
+            grid-column: 1 / -1;
+            grid-row: 2;
+            margin-left: 55px;
+            padding: 8px 0 0;
+            border-top: 1px solid #e3e8e3;
+            border-left: 0;
+        }
     }
 
     .supervisor-dashboard .approval-group-wrap {
@@ -526,28 +652,25 @@ document.addEventListener('DOMContentLoaded', function () {
                         <?php foreach ($pending_packages as $pkg):
                             $is_waiting = ($pkg['action_status'] === 'Waiting');
                         ?>
-                            <div class="approval-item">
-                                <div class="emp-info">
-                                    <div class="avatar-circle bg-primary-subtle text-primary fw-bold d-flex align-items-center justify-content-center" style="width:42px;height:42px;border-radius:50%;">
+                            <div class="dashboard-package-card">
+                                <div class="dashboard-package-main">
+                                    <div class="dashboard-package-icon">
                                         <i class="fas fa-layer-group"></i>
                                     </div>
-                                    <div class="details">
-                                        <h6 class="mb-0 fw-bold"><?php echo e($pkg['department_name']); ?> Package</h6>
-                                        <span class="small text-muted"><?php echo e($pkg['template_name']); ?> &middot; Step: <?php echo e($pkg['step_label']); ?></span>
+                                    <div class="min-w-0">
+                                        <h6 class="dashboard-package-title"><?php echo e($pkg['department_name']); ?> &mdash; <?php echo e($pkg['template_name']); ?></h6>
+                                        <span class="dashboard-package-period"><i class="far fa-calendar-alt me-1"></i>Period: <?php echo formatDate($pkg['period_start']); ?> to <?php echo formatDate($pkg['period_end']); ?></span>
                                     </div>
                                 </div>
-                                <div class="status-meta d-none d-sm-block text-end">
-                                    <div class="fw-bold text-dark"><?php echo formatDate($pkg['created_at']); ?></div>
-                                    <?php if ($is_waiting): ?>
-                                        <div class="x-small text-secondary fw-bold"><i class="fas fa-user-clock me-1"></i>Waiting for Team Self-Ratings</div>
-                                    <?php else: ?>
-                                        <div class="x-small text-warning fw-bold"><i class="fas fa-clock me-1"></i><?php echo e($pkg['status']); ?></div>
-                                    <?php endif; ?>
+                                <div class="dashboard-package-status">
+                                    <span class="dashboard-package-status-label">Current Status</span>
+                                    <span class="dashboard-package-status-badge"><i class="fas <?php echo $is_waiting ? 'fa-hourglass-half' : 'fa-hourglass-start'; ?>"></i><?php echo $is_waiting ? 'Waiting for submissions' : 'Pending ' . e($_SESSION['role'] ?? 'Reviewer'); ?></span>
+                                    <span class="dashboard-package-step"><?php echo $is_waiting ? 'Team self-ratings are still in progress' : e($pkg['step_label']) . ' — you are the next reviewer'; ?></span>
                                 </div>
                                 <?php if ($is_waiting): ?>
-                                    <a href="<?php echo BASE_URL; ?>/employee/team-evaluation-packages.php" class="btn btn-outline-primary btn-sm px-3">View Progress</a>
+                                    <a href="<?php echo BASE_URL; ?>/employee/team-evaluation-packages.php" class="btn dashboard-package-action">View Progress <i class="fas fa-chevron-down ms-1"></i></a>
                                 <?php else: ?>
-                                    <a href="<?php echo BASE_URL; ?>/employee/team-evaluation-packages.php" class="btn btn-primary btn-sm btn-review px-3">Review Package</a>
+                                    <a href="<?php echo BASE_URL; ?>/employee/team-evaluation-packages.php" class="btn dashboard-package-action">Review <i class="fas fa-chevron-down ms-1"></i></a>
                                 <?php endif; ?>
                             </div>
                         <?php endforeach; ?>

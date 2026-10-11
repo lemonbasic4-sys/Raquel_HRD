@@ -78,6 +78,37 @@ $pending_groups = array_values($pending_groups);
 $queue_preview_groups = array_slice($pending_groups, 0, 5);
 $queue_employee_count = count($pending_groups);
 
+// Organization evaluation packages use routed approval steps, not the legacy
+// evaluations.status = 'Pending Manager' queue above. Include direct and
+// unclaimed HR Manager role assignments so the dashboard agrees with its badge.
+$pending_packages = [];
+if (ensureOrganizationEvaluationPackageSchema($conn)) {
+    syncPendingOrganizationPackageGovernanceApprovers($conn);
+    syncWaitingOrganizationPackages($conn);
+    $dashboard_user_id = (int)($_SESSION['user_id'] ?? 0);
+    if ($dashboard_user_id > 0) {
+        $dashboard_reviewer_match = organizationPackageReviewerMatchSql('rs');
+        $package_stmt = $conn->prepare("SELECT DISTINCT ep.*, d.department_name, et.template_name,
+                rs.step_label, rs.step_type, rs.action_status
+            FROM evaluation_packages ep
+            JOIN evaluation_package_route_steps rs ON rs.package_id = ep.package_id
+            JOIN departments d ON d.department_id = ep.department_id
+            JOIN evaluation_templates et ON et.template_id = ep.template_id
+            WHERE ($dashboard_reviewer_match OR (rs.eligible_role = ? AND rs.claimed_at IS NULL))
+              AND ((rs.step_order = 1 AND rs.action_status IN ('Pending', 'Waiting'))
+                   OR (rs.step_order > 1 AND rs.action_status = 'Pending'))
+              AND ep.status NOT IN ('Approved and Applied', 'Cancelled')
+            ORDER BY ep.updated_at DESC");
+        $dashboard_role = (string)($_SESSION['role'] ?? 'HR Manager');
+        $package_stmt->bind_param('iis', $dashboard_user_id, $dashboard_user_id, $dashboard_role);
+        $package_stmt->execute();
+        $pending_packages = $package_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $package_stmt->close();
+    }
+}
+$pending_package_count = count($pending_packages);
+$dashboard_queue_count = $queue_employee_count + $pending_package_count;
+
 // 1. Performance Distribution Data
 $perf_dist = $conn->query("SELECT performance_level, COUNT(*) as count FROM evaluations WHERE status = 'Approved' AND performance_level IS NOT NULL GROUP BY performance_level");
 $perf_data = ['Outstanding' => 0, 'Exceeds Expectations' => 0, 'Meets Expectations' => 0, 'Needs Improvement' => 0];
@@ -672,17 +703,17 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
                         <button class="nav-link active" id="eval-tab" data-bs-toggle="tab" data-bs-target="#evals"
                             type="button" role="tab">
                             Approval Queue
-                            <?php if ($pending_evals > 0): ?>
-                                <span class="badge bg-warning text-dark ms-1"><?php echo $pending_evals; ?></span>
+                            <?php if ($pending_evals + $pending_package_count > 0): ?>
+                                <span class="badge bg-warning text-dark ms-1"><?php echo $pending_evals + $pending_package_count; ?></span>
                             <?php endif; ?>
                         </button>
                     </li>
                 </ul>
                 <div class="d-flex align-items-center gap-2">
-                    <?php if ($queue_employee_count > 0): ?>
-                        <span class="badge bg-light text-muted border"><?php echo number_format($queue_employee_count); ?> employee<?php echo $queue_employee_count === 1 ? '' : 's'; ?></span>
+                    <?php if ($dashboard_queue_count > 0): ?>
+                        <span class="badge bg-light text-muted border"><?php echo number_format($dashboard_queue_count); ?> item<?php echo $dashboard_queue_count === 1 ? '' : 's'; ?></span>
                     <?php endif; ?>
-                    <a href="<?php echo BASE_URL; ?>/manager/pending-approvals.php" class="btn btn-sm btn-link text-decoration-none small">
+                    <a href="<?php echo BASE_URL; ?>/<?php echo $pending_package_count > 0 ? 'employee/team-evaluation-packages.php' : 'manager/pending-approvals.php'; ?>" class="btn btn-sm btn-link text-decoration-none small">
                         View Center <i class="fas fa-external-link-alt ms-1" style="font-size: 0.7rem;"></i>
                     </a>
                 </div>
@@ -691,12 +722,30 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
                 <div class="tab-content" id="pendingTabsContent">
                     <div class="tab-pane fade show active" id="evals" role="tabpanel">
                         <div class="approval-list">
-                            <?php if (empty($queue_preview_groups)): ?>
+                            <?php foreach ($pending_packages as $package):
+                                $package_waiting = ($package['action_status'] ?? '') === 'Waiting';
+                            ?>
+                                <div class="approval-item">
+                                    <div class="emp-info">
+                                        <div class="avatar-circle"><span class="avatar-initials"><i class="fas fa-layer-group"></i></span></div>
+                                        <div class="details">
+                                            <h6><?php echo e($package['department_name']); ?> &mdash; <?php echo e($package['template_name']); ?></h6>
+                                            <span><?php echo e($package['evaluation_type']); ?> &middot; <?php echo formatDate($package['period_start']); ?> to <?php echo formatDate($package['period_end']); ?></span>
+                                        </div>
+                                    </div>
+                                    <div class="status-meta d-none d-sm-block">
+                                        <div class="fw-bold text-dark"><?php echo $package_waiting ? 'Waiting for submissions' : 'Pending HR Manager'; ?></div>
+                                        <div class="x-small"><?php echo e($package['step_label']); ?> &middot; You are the next reviewer</div>
+                                    </div>
+                                    <a href="<?php echo BASE_URL; ?>/employee/team-evaluation-packages.php" class="btn btn-primary btn-review"><?php echo $package_waiting ? 'View Progress' : 'Review'; ?></a>
+                                </div>
+                            <?php endforeach; ?>
+                            <?php if (empty($queue_preview_groups) && empty($pending_packages)): ?>
                                 <div class="empty-state-card">
                                     <i class="fas fa-clipboard-check"></i>
                                     <p class="mb-0">All evaluations have been processed.</p>
                                 </div>
-                            <?php else: ?>
+                            <?php elseif (!empty($queue_preview_groups)): ?>
                                 <?php foreach ($queue_preview_groups as $group):
                                     $evaluations = $group['evaluations'];
                                     $evalCount = count($evaluations);

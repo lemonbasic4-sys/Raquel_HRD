@@ -57,9 +57,10 @@ if (!$is_cross_department_template_viewer && $viewer_department_id > 0) {
     $template_scope_sql = '1 = 0';
 }
 $viewer_rank_category_id = (int)($creator_context['rank_category_id'] ?? 0);
-$can_manage_department_peer_templates = $template_viewer_role === 'Employee'
-    && in_array($viewer_rank_category_id, [3, 4], true)
-    && $viewer_department_id > 0;
+$can_manage_department_peer_templates = (
+    ($template_viewer_role === 'Employee' && in_array($viewer_rank_category_id, [3, 4], true))
+    || in_array($template_viewer_role, ['HR Manager', 'HR Supervisor'], true)
+) && $viewer_department_id > 0;
 $manageable_template_scope_sql = $owned_template_scope_sql;
 if ($can_manage_department_peer_templates) {
     $manageable_template_scope_sql = "(et.created_by = $current_user_id OR et.created_by IN (
@@ -67,8 +68,8 @@ if ($can_manage_department_peer_templates) {
         FROM users peer_user
         JOIN employees peer_employee ON peer_employee.employee_id = peer_user.employee_id
         WHERE peer_employee.department_id = $viewer_department_id
-          AND peer_employee.rank_category_id IN (3, 4)
-          AND peer_user.role = 'Employee'
+          AND ((peer_employee.rank_category_id IN (3, 4) AND peer_user.role = 'Employee')
+               OR peer_user.role IN ('HR Manager', 'HR Supervisor'))
           AND peer_user.is_active = 1 AND COALESCE(peer_user.account_hold, 0) = 0 AND peer_user.deleted_at IS NULL
     ))";
 }
@@ -434,7 +435,7 @@ $used_template_count = (int) $conn->query("SELECT COUNT(DISTINCT template_id) as
                             <?php if ($is_template_owner): ?>
                                 <span class="badge bg-success-subtle text-success border ms-1">You own this</span>
                             <?php elseif ($is_template_manager): ?>
-                                <span class="badge bg-primary-subtle text-primary border ms-1">Department manager access</span>
+                                <span class="badge bg-primary-subtle text-primary border ms-1">Department management access</span>
                             <?php else: ?>
                                 <span class="badge bg-light text-muted border ms-1">Read only</span>
                             <?php endif; ?>

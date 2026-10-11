@@ -2844,7 +2844,7 @@ function isEvaluationTemplateOwner($conn, $template_id, $user_id)
     return $is_owner;
 }
 
-/** Allow department managers and supervisors to maintain one another's templates within their own department. */
+/** Allow department managers and HR managers/supervisors to maintain peer templates within their own department. */
 function canManageEvaluationTemplate($conn, $template_id, $user_id)
 {
     $stmt = $conn->prepare("SELECT et.created_by,
@@ -2869,8 +2869,11 @@ function canManageEvaluationTemplate($conn, $template_id, $user_id)
     $creator_rank = (int)($row['creator_rank'] ?? 0);
     $viewer_department = (int)($row['viewer_department_id'] ?? 0);
     $creator_department = (int)($row['creator_department_id'] ?? 0);
-    return $row['viewer_role'] === 'Employee' && $row['creator_role'] === 'Employee'
-        && in_array($viewer_rank, [3, 4], true) && in_array($creator_rank, [3, 4], true)
+    $viewer_can_manage_peers = ($row['viewer_role'] === 'Employee' && in_array($viewer_rank, [3, 4], true))
+        || in_array($row['viewer_role'], ['HR Manager', 'HR Supervisor'], true);
+    $creator_is_management_peer = ($row['creator_role'] === 'Employee' && in_array($creator_rank, [3, 4], true))
+        || in_array($row['creator_role'], ['HR Manager', 'HR Supervisor'], true);
+    return $viewer_can_manage_peers && $creator_is_management_peer
         && $viewer_department > 0 && $viewer_department === $creator_department;
 }
 
