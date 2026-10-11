@@ -24,15 +24,32 @@ $template_edit_url = !empty($creator_context['is_ceo'])
     ? BASE_URL . '/employee/edit-evaluation-template.php'
     : BASE_URL . '/manager/edit-template.php';
 $template_scope_sql = '1 = 1';
-$owned_template_scope_sql = 'et.created_by = ' . (int)($_SESSION['user_id'] ?? 0);
+$current_user_id = (int)($_SESSION['user_id'] ?? 0);
+$owned_template_scope_sql = 'et.created_by = ' . $current_user_id;
+$viewer_role = (string)($creator_context['role'] ?? '');
+$cross_department_viewer = !empty($creator_context['is_ceo'])
+    || in_array($viewer_role, ['HR Manager', 'HR Supervisor', 'HR Staff'], true);
+$viewer_department_id = (int)($creator_context['department_id'] ?? 0);
+if (!$cross_department_viewer && $viewer_department_id > 0) {
+    $department_stmt = $conn->prepare('SELECT department_name FROM departments WHERE department_id = ? LIMIT 1');
+    $department_stmt->bind_param('i', $viewer_department_id);
+    $department_stmt->execute();
+    $department_name = (string)($department_stmt->get_result()->fetch_assoc()['department_name'] ?? '');
+    $department_stmt->close();
+    $safe_department_name = $conn->real_escape_string($department_name);
+    $template_scope_sql = "((et.target_department_id IS NULL OR et.target_department_id = $viewer_department_id)
+        AND (et.target_department IS NULL OR et.target_department = '' OR et.target_department = 'All Departments' OR et.target_department = '$safe_department_name'))";
+} elseif (!$cross_department_viewer) {
+    $template_scope_sql = '1 = 0';
+}
 
 // Handle restore (reactivate)
 if (isset($_GET['activate']) && is_numeric($_GET['activate'])) {
     $tid = (int)$_GET['activate'];
-    if (!isEvaluationTemplateOwner($conn, $tid, (int)($_SESSION['user_id'] ?? 0))) {
-        redirectWith($template_archive_url, 'danger', 'Only the template creator can restore this template.');
+    if (!canManageEvaluationTemplate($conn, $tid, $current_user_id)) {
+        redirectWith($template_archive_url, 'danger', 'You can only restore templates you own or templates managed by a supervisor or manager in your department.');
     }
-    $conn->query("UPDATE evaluation_templates et SET status = 'Active' WHERE et.template_id = $tid AND $owned_template_scope_sql");
+    $conn->query("UPDATE evaluation_templates et SET status = 'Active' WHERE et.template_id = $tid AND $template_scope_sql");
     logAudit($conn, $_SESSION['user_id'], 'UPDATE', 'Template', $tid, 'Restored archived template to Active');
     redirectWith($template_archive_url, 'success', 'Template restored to active successfully.');
 }
@@ -40,17 +57,17 @@ if (isset($_GET['activate']) && is_numeric($_GET['activate'])) {
 // Handle permanent delete
 if (isset($_GET['delete']) && is_numeric($_GET['delete'])) {
     $tid = (int)$_GET['delete'];
-    if (!isEvaluationTemplateOwner($conn, $tid, (int)($_SESSION['user_id'] ?? 0))) {
-        redirectWith($template_archive_url, 'danger', 'Only the template creator can delete this template.');
+    if (!canManageEvaluationTemplate($conn, $tid, $current_user_id)) {
+        redirectWith($template_archive_url, 'danger', 'You can only delete templates you own or templates managed by a supervisor or manager in your department.');
     }
     // Delete related evaluation scores that reference this template's criteria
-    $conn->query("DELETE es FROM evaluation_scores es INNER JOIN evaluation_criteria ec ON es.criterion_id = ec.criterion_id INNER JOIN evaluation_templates et ON et.template_id = ec.template_id WHERE ec.template_id = $tid AND $owned_template_scope_sql");
+    $conn->query("DELETE es FROM evaluation_scores es INNER JOIN evaluation_criteria ec ON es.criterion_id = ec.criterion_id INNER JOIN evaluation_templates et ON et.template_id = ec.template_id WHERE ec.template_id = $tid AND $template_scope_sql");
     // Delete evaluations using this template
-    $conn->query("DELETE ev FROM evaluations ev INNER JOIN evaluation_templates et ON et.template_id = ev.template_id WHERE ev.template_id = $tid AND $owned_template_scope_sql");
+    $conn->query("DELETE ev FROM evaluations ev INNER JOIN evaluation_templates et ON et.template_id = ev.template_id WHERE ev.template_id = $tid AND $template_scope_sql");
     // Delete criteria
-    $conn->query("DELETE ec FROM evaluation_criteria ec INNER JOIN evaluation_templates et ON et.template_id = ec.template_id WHERE ec.template_id = $tid AND $owned_template_scope_sql");
+    $conn->query("DELETE ec FROM evaluation_criteria ec INNER JOIN evaluation_templates et ON et.template_id = ec.template_id WHERE ec.template_id = $tid AND $template_scope_sql");
     // Delete the template
-    $conn->query("DELETE et FROM evaluation_templates et WHERE et.template_id = $tid AND $owned_template_scope_sql");
+    $conn->query("DELETE et FROM evaluation_templates et WHERE et.template_id = $tid AND $template_scope_sql");
     logAudit($conn, $_SESSION['user_id'], 'DELETE', 'Template', $tid, 'Permanently deleted archived template');
     redirectWith($template_archive_url, 'success', 'Template deleted permanently.');
 }
@@ -116,7 +133,8 @@ $archive_count = $templates->num_rows;
             $tw = (float)($t['total_weight'] ?? 0);
             $wclass = abs($tw - 100) < 0.01 ? 'bg-success-subtle text-success border-success-subtle' : 'bg-warning-subtle text-warning border-warning-subtle';
             $archived_date = date('M d, Y', strtotime($t['updated_at']));
-                    $is_template_owner = (int)($t['created_by'] ?? 0) === (int)($_SESSION['user_id'] ?? 0);
+                    $is_template_owner = (int)($t['created_by'] ?? 0) === $current_user_id;
+                    $is_template_manager = $is_template_owner || canManageEvaluationTemplate($conn, (int)$t['template_id'], $current_user_id);
                 ?>
             <div class="col-md-6 col-lg-4">
                 <div class="content-card h-100 archive-card">
@@ -170,7 +188,7 @@ $archive_count = $templates->num_rows;
                             <a href="<?php echo BASE_URL . $view_template_path . (int)$t['template_id']; ?>" class="btn btn-outline-primary flex-fill">
                                 <i class="fas fa-eye me-1"></i>View
                             </a>
-                            <?php if ($is_template_owner): ?>
+                            <?php if ($is_template_manager): ?>
                             <button type="button" class="btn btn-outline-success flex-fill" title="Restore to Active"
                                     onclick="setRestoreTarget(<?php echo $t['template_id']; ?>, '<?php echo e(addslashes($t['template_name'])); ?>')"
                                     data-bs-toggle="modal" data-bs-target="#restoreModal">

@@ -77,7 +77,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $kra_total_cents = array_sum(array_map(static function ($weight) {
         return (int) round((float)$weight * 100);
     }, $kra_weights));
-    if (!empty($kra_names) && abs($kra_total_cents - 10000) > 1) {
+    if (!empty($kra_names) && $kra_total_cents !== 10000) {
         redirectWith($template_create_url, 'danger', 'KRA weights must total 100%. Current: ' . number_format($kra_total_cents / 100, 2) . '%');
     }
 
@@ -1136,8 +1136,8 @@ function validateStep(step) {
             if (missingName) {
                 errors.push('All KRA items must have a KRA Name specified.');
             }
-            if (Math.abs(kraSumCents - 10000) > 1) {
-                errors.push(`KRA item weights must sum to 100%. Current sum: <strong>${kraSum.toFixed(2)}%</strong>.`);
+            if (kraSumCents !== 10000) {
+                errors.push(`KRA item weights must sum to exactly 100.00%. Current sum: <strong>${kraSum.toFixed(2)}%</strong>.`);
             }
         }
     } else if (step === 4) {
@@ -1264,7 +1264,7 @@ function updateKRAWeight() {
     const badge = document.getElementById('kraWeightBadge');
     if (badge) {
         badge.textContent = 'Total: ' + total.toFixed(2) + '%';
-        badge.className = 'badge px-3 py-2 shadow-sm fs-6 ' + (Math.abs(totalCents - 10000) <= 1 ? 'bg-success' : 'bg-danger');
+        badge.className = 'badge px-3 py-2 shadow-sm fs-6 ' + (totalCents === 10000 ? 'bg-success' : 'bg-danger');
     }
 }
 

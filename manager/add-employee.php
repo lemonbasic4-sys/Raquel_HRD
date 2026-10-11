@@ -1,7 +1,7 @@
 <?php
 $page_title = 'Add Employee';
 require_once '../includes/session-check.php';
-checkRole(['HR Manager', 'HR Supervisor', 'HR Staff']);
+checkRole(['HR Manager', 'HR Supervisor']);
 require_once '../includes/functions.php';
 
 // The same protected creation workflow is available from each authorized portal.

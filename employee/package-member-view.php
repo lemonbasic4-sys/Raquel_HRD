@@ -4,6 +4,7 @@ require_once '../includes/session-check.php';
 require_once '../includes/functions.php';
 
 ensureOrganizationEvaluationPackageSchema($conn);
+ensureProbationaryEvaluationSchema($conn);
 $user_id = (int) ($_SESSION['user_id'] ?? 0);
 $package_id = (int) ($_GET['package_id'] ?? 0);
 $evaluation_id = (int) ($_GET['evaluation_id'] ?? 0);
@@ -34,12 +35,14 @@ if ($access_row['action_status'] === 'Waiting' && $access_row['package_status'] 
     redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'warning', 'This package is currently with prior evaluators and has not reached your review stage yet.');
 }
 
-$evaluation_stmt = $conn->prepare("SELECT ev.*, emp.first_name, emp.last_name, emp.job_title, et.template_name, ep.shared_behavior_score, ep.status AS package_status
+$evaluation_stmt = $conn->prepare("SELECT ev.*, emp.first_name, emp.last_name, emp.job_title, et.template_name, ep.shared_behavior_score, ep.status AS package_status,
+        per.recommendation, per.recommendation_reason, per.immediate_head_signature_data, per.immediate_head_signed_at
     FROM evaluations ev
     JOIN evaluation_package_members pm ON pm.evaluation_id = ev.evaluation_id
     JOIN evaluation_packages ep ON ep.package_id = pm.package_id
     JOIN employees emp ON emp.employee_id = ev.employee_id
     JOIN evaluation_templates et ON et.template_id = ev.template_id
+    LEFT JOIN probationary_evaluation_reviews per ON per.evaluation_id = ev.evaluation_id
     WHERE pm.package_id = ? AND ev.evaluation_id = ? AND ev.deleted_at IS NULL LIMIT 1");
 $evaluation_stmt->bind_param('ii', $package_id, $evaluation_id);
 $evaluation_stmt->execute();
@@ -119,13 +122,6 @@ require_once '../includes/header.php';
                     <strong><?php echo e($evaluation['job_title']); ?></strong> &bull; Template: <?php echo e($evaluation['template_name']); ?> &bull; Period: <?php echo e($evaluation['evaluation_period_start']); ?> to <?php echo e($evaluation['evaluation_period_end']); ?>
                 </p>
             </div>
-            <?php if (($access_row['action_status'] ?? '') === 'Pending' && !isOrganizationPackageLocked($conn, $package_id)): ?>
-                <div>
-                    <a class="btn btn-warning fw-bold px-3 py-2 shadow-sm" href="<?php echo BASE_URL; ?>/employee/package-member-review.php?package_id=<?php echo $package_id; ?>&evaluation_id=<?php echo $evaluation_id; ?>">
-                        <i class="fas fa-sliders-h me-1"></i>Adjust Ratings &amp; Developmental Plan
-                    </a>
-                </div>
-            <?php endif; ?>
         </div>
     </section>
 
@@ -133,16 +129,25 @@ require_once '../includes/header.php';
     <section class="package-card" aria-label="Score Summary Card">
         <div class="package-card__body">
             <div class="row g-3 mb-3">
-                <div class="col-sm-6">
+                <div class="col-sm-6 col-xl-4">
+                    <div class="package-stat h-100 d-flex flex-column justify-content-between" style="background:#FFF8EB;border:2px solid #FCD34D;border-radius:12px;padding:1.1rem 1.25rem;">
+                        <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+                            <strong class="tabular-nums text-warning-emphasis m-0" style="font-size:1.6rem;line-height:1;"><?php echo number_format($rev_kra_subtotal, 2); ?></strong>
+                            <span class="badge text-bg-warning px-2 py-1 small"><?php echo number_format($kra_w, 0); ?>%</span>
+                        </div>
+                        <div class="text-muted fw-semibold" style="font-size:0.85rem;">Individual KRA</div>
+                    </div>
+                </div>
+                <div class="col-sm-6 col-xl-4">
                     <div class="package-stat h-100 d-flex flex-column justify-content-between" style="background: #F4FBF7; border: 2px solid #86EFAC; border-radius: 12px; padding: 1.1rem 1.25rem;">
                         <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
                             <strong class="tabular-nums text-success m-0" style="font-size: 1.6rem; line-height: 1;"><?php echo $is_probationary ? number_format((float)$evaluation['behavior_average'], 2) : ($evaluation['shared_behavior_score'] !== null ? number_format((float) $evaluation['shared_behavior_score'], 2) : 'Pending'); ?></strong>
-                            <span class="badge bg-success-subtle text-success border border-success px-2 py-1 small"><?php echo $is_probationary ? 'Individual' : 'Department Shared'; ?></span>
+                            <span class="badge bg-success-subtle text-success border border-success px-2 py-1 small"><?php echo $is_probationary ? '20%' : 'Department Shared'; ?></span>
                         </div>
                         <div class="text-muted fw-semibold" style="font-size: 0.85rem;"><?php echo $is_probationary ? 'Individual Core Values' : 'Shared Department Behavior'; ?></div>
                     </div>
                 </div>
-                <div class="col-sm-6">
+                <div class="col-sm-6 col-xl-4">
                     <div class="package-stat h-100 d-flex flex-column justify-content-between" style="background: #FAF8F0; border: 2px solid var(--rp-primary-gold); border-radius: 12px; padding: 1.1rem 1.25rem;">
                         <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
                             <strong class="tabular-nums text-primary m-0" style="font-size: 1.6rem; line-height: 1;"><?php echo number_format((float) $evaluation['total_score'], 2); ?></strong>
@@ -164,6 +169,17 @@ require_once '../includes/header.php';
             </div>
         </div>
     </section>
+
+    <?php if ($is_probationary): ?>
+    <section class="card border-0 shadow-sm mb-4"><div class="card-body p-4">
+        <h2 class="h5 fw-bold mb-3">Probationary decision and signatures</h2>
+        <div class="row g-3">
+            <div class="col-lg-7"><div class="border rounded p-3 h-100"><div class="small text-muted">Immediate head’s recommendation</div><strong><?php echo e($evaluation['recommendation'] ?? 'Not yet recorded'); ?></strong><?php if (!empty($evaluation['recommendation_reason'])): ?><p class="mb-0 mt-2"><?php echo nl2br(e($evaluation['recommendation_reason'])); ?></p><?php endif; ?></div></div>
+            <div class="col-lg-5"><div class="border rounded p-3 h-100"><div class="small text-muted mb-2">Immediate head’s signature</div><?php if (!empty($evaluation['immediate_head_signature_data'])): ?><img src="<?php echo e($evaluation['immediate_head_signature_data']); ?>" alt="Immediate head signature" style="max-height:65px;max-width:260px;display:block;"><small class="text-muted">Signed <?php echo e($evaluation['immediate_head_signed_at'] ?? ''); ?></small><?php else: ?><span class="text-muted">Awaiting signature</span><?php endif; ?></div></div>
+            <div class="col-12"><div class="border rounded p-3"><div class="small text-muted mb-2">Employee’s self-rating signature</div><?php if (!empty($evaluation['employee_signature_data'])): ?><img src="<?php echo e($evaluation['employee_signature_data']); ?>" alt="Employee self-rating signature" style="max-height:65px;max-width:260px;display:block;"><small class="text-muted">Signed <?php echo e($evaluation['employee_signed_at'] ?? ''); ?></small><div class="small text-muted mt-2">Captured with the original self-rating; no second signature is required.</div><?php else: ?><span class="text-muted">No employee signature on file</span><?php endif; ?></div></div>
+        </div>
+    </div></section>
+    <?php endif; ?>
 
     <style>
     /* Tabbed Layout for Member View Sections */

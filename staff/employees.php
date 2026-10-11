@@ -174,9 +174,6 @@ $statuses = ['OJT','Probationary','Project Based','Regular','Separated','Trainee
     <div class="cc-header">
         <h5 class="d-none d-md-block"><i class="fas fa-users me-2"></i>All Employees</h5>
         <div class="d-flex align-items-center gap-2">
-            <a href="<?php echo BASE_URL; ?>/staff/add-employee.php" class="btn btn-warning btn-sm fw-semibold">
-                <i class="fas fa-user-plus me-1"></i>Add Employee
-            </a>
             <div class="search-box">
                 <i class="fas fa-search search-icon"></i>
                 <input type="search" class="form-control form-control-sm" id="customSearchEmp" placeholder="Search by name, employee ID, position, or department" aria-label="Search employees by name, employee ID, position, or department" title="Search by name, employee ID, position, or department">

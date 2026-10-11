@@ -3,13 +3,14 @@ $page_title = 'Review Team Member Evaluation';
 require_once '../includes/session-check.php';
 require_once '../includes/functions.php';
 ensureOrganizationEvaluationPackageSchema($conn);
+ensureProbationaryEvaluationSchema($conn);
 
 $user_id = (int) $_SESSION['user_id'];
 $package_id = (int) ($_GET['package_id'] ?? $_POST['package_id'] ?? 0);
 $evaluation_id = (int) ($_GET['evaluation_id'] ?? $_POST['evaluation_id'] ?? 0);
 
 $reviewer_match = organizationPackageReviewerMatchSql('rs');
-$access = $conn->prepare("SELECT rs.step_label, rs.step_type, ep.department_id, ep.status
+$access = $conn->prepare("SELECT rs.step_label, rs.step_type, rs.step_order, ep.department_id, ep.status, ep.evaluation_type
     FROM evaluation_package_route_steps rs
     JOIN evaluation_packages ep ON ep.package_id = rs.package_id
     JOIN evaluation_package_members pm ON pm.package_id = ep.package_id
@@ -21,6 +22,9 @@ $review_step = $access->get_result()->fetch_assoc();
 $access->close();
 
 $is_catchup_review = false;
+$is_probationary_head_review = $review_step
+    && in_array($review_step['evaluation_type'] ?? '', ['Initial', 'Final'], true)
+    && (int)($review_step['step_order'] ?? 0) === 1;
 if (!$review_step) {
     $catchup_check = $conn->prepare("SELECT pm.member_status, ep.consolidator_employee_id, ep.department_id, ep.status
         FROM evaluation_package_members pm
@@ -52,6 +56,11 @@ if (!$review_step) {
 
 if (!$review_step) {
     redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'This team-member evaluation is not currently assigned to you for review.');
+}
+$is_probationary_head_review = in_array($review_step['evaluation_type'] ?? '', ['Initial', 'Final'], true)
+    && (int)($review_step['step_order'] ?? 0) === 1;
+if (in_array($review_step['evaluation_type'] ?? '', ['Initial', 'Final'], true) && !$is_probationary_head_review) {
+    redirectWith(BASE_URL . '/employee/package-member-view.php?package_id=' . $package_id . '&evaluation_id=' . $evaluation_id, 'info', 'Only the immediate head may adjust ratings in a probationary evaluation.');
 }
 $eval_status_check = $conn->query("SELECT status FROM evaluations WHERE evaluation_id = $evaluation_id LIMIT 1")->fetch_assoc();
 if (($eval_status_check['status'] ?? '') === 'Approved') {
@@ -92,6 +101,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $changes[] = $score['criterion_name'] . ': ' . number_format($current, 2) . ' → ' . number_format($new_rating, 2);
     }
 
+    if ($is_probationary_head_review && $changes) {
+        $invalidate_head_signature = $conn->prepare("UPDATE probationary_evaluation_reviews
+            SET immediate_head_signature_data = NULL, immediate_head_user_id = NULL, immediate_head_signed_at = NULL
+            WHERE evaluation_id = ?");
+        $invalidate_head_signature->bind_param('i', $evaluation_id);
+        $invalidate_head_signature->execute();
+        $invalidate_head_signature->close();
+    }
+
     // Process Developmental Plan updates
     $dev_plans = $_POST['plans'] ?? [];
     $conn->query("DELETE FROM evaluation_dev_plans WHERE evaluation_id = $evaluation_id");
@@ -126,7 +144,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $audit->bind_param('iis', $package_id, $user_id, $remarks);
         $audit->execute();
         $audit->close();
-        redirectWith(BASE_URL . '/employee/package-member-review.php?package_id=' . $package_id . '&evaluation_id=' . $evaluation_id, 'success', 'Individual ratings and Developmental Plan were saved successfully.');
+        redirectWith(BASE_URL . '/employee/package-member-review.php?package_id=' . $package_id . '&evaluation_id=' . $evaluation_id, 'success', 'Individual ratings and Developmental Plan were saved successfully. Return to the package overview to record the immediate head recommendation and signature.');
     }
 
     if ($sort_idx > 0) {
@@ -141,12 +159,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 require_once '../includes/header.php';
-$evaluation_stmt = $conn->prepare("SELECT ev.*, emp.first_name, emp.last_name, emp.job_title, et.template_name, et.kra_weight, et.behavior_weight, ep.shared_behavior_score
+$evaluation_stmt = $conn->prepare("SELECT ev.*, emp.first_name, emp.last_name, emp.job_title, et.template_name, et.kra_weight, et.behavior_weight, ep.shared_behavior_score,
+        per.recommendation, per.recommendation_reason, per.immediate_head_signature_data, per.immediate_head_signed_at
     FROM evaluations ev
     JOIN evaluation_package_members pm ON pm.evaluation_id = ev.evaluation_id
     JOIN evaluation_packages ep ON ep.package_id = pm.package_id
     JOIN employees emp ON emp.employee_id = ev.employee_id
     JOIN evaluation_templates et ON et.template_id = ev.template_id
+    LEFT JOIN probationary_evaluation_reviews per ON per.evaluation_id = ev.evaluation_id
     WHERE ev.evaluation_id = ? AND ep.package_id = ?
     LIMIT 1");
 $evaluation_stmt->bind_param('ii', $evaluation_id, $package_id);

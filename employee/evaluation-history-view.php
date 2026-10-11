@@ -11,7 +11,10 @@ if ($evaluation_id <= 0) {
 }
 
 $evaluation_stmt = $conn->prepare("SELECT ev.*, et.template_name, et.kra_weight, et.behavior_weight,
-        ep.package_id, ep.status AS package_status, ep.shared_behavior_score, d.department_name,
+        ep.package_id, ep.status AS package_status, ep.shared_behavior_score, ep.current_step_order, d.department_name,
+        per.recommendation AS probationary_recommendation, per.recommendation_reason AS probationary_recommendation_reason,
+        per.immediate_head_signature_data, per.immediate_head_signed_at,
+        head_route.action_status AS probationary_head_step_status,
         CONCAT(emp.first_name, ' ', emp.last_name) AS employee_name
     FROM evaluations ev
     JOIN users u ON u.employee_id = ev.employee_id AND u.user_id = ?
@@ -20,6 +23,8 @@ $evaluation_stmt = $conn->prepare("SELECT ev.*, et.template_name, et.kra_weight,
     LEFT JOIN departments d ON d.department_id = emp.department_id
     LEFT JOIN evaluation_package_members pm ON pm.evaluation_id = ev.evaluation_id
     LEFT JOIN evaluation_packages ep ON ep.package_id = pm.package_id
+    LEFT JOIN probationary_evaluation_reviews per ON per.evaluation_id = ev.evaluation_id
+    LEFT JOIN evaluation_package_route_steps head_route ON head_route.package_id = ep.package_id AND head_route.step_order = 1
     WHERE ev.evaluation_id = ? AND ev.deleted_at IS NULL
     LIMIT 1");
 $evaluation_stmt->bind_param('ii', $user_id, $evaluation_id);
@@ -30,6 +35,7 @@ if (!$evaluation) {
     redirectWith(BASE_URL . '/employee/evaluation-history.php', 'danger', 'That evaluation is unavailable.');
 }
 
+$is_probationary_evaluation = in_array($evaluation['evaluation_type'] ?? '', ['Initial', 'Final'], true);
 $criteria_stmt = $conn->prepare("SELECT ec.section, ec.criterion_name, ec.description, ec.weight, es.score_value,
         es.dept_manager_override_score, es.supervisor_override_score, es.manager_override_score,
         COALESCE(es.supervisor_override_score, es.dept_manager_override_score, es.manager_override_score, es.score_value) AS reviewed_score
@@ -46,6 +52,9 @@ $kra_weight = (float)($evaluation['kra_weight'] ?? 80);
 $beh_weight = (float)($evaluation['behavior_weight'] ?? 20);
 
 $is_package_completed = ($evaluation['package_status'] === 'Approved and Applied' || $evaluation['status'] === 'Approved');
+$show_reviewed_scores = $is_package_completed || ($is_probationary_evaluation
+    && ($evaluation['probationary_head_step_status'] ?? '') === 'Approved'
+    && !empty($evaluation['immediate_head_signature_data']));
 
 // Calculate original self totals vs reviewed totals
 $orig_kra_subtotal = 0.0;
@@ -55,11 +64,11 @@ $has_any_adjustment = false;
 
 foreach ($criteria as &$c) {
     $val = (float)$c['score_value'];
-    if (!$is_package_completed) {
+    if (!$show_reviewed_scores) {
         $c['reviewed_score'] = $val;
     }
     $rev = (float)$c['reviewed_score'];
-    if ($is_package_completed && abs($rev - $val) > 0.001) {
+    if ($show_reviewed_scores && abs($rev - $val) > 0.001) {
         $has_any_adjustment = true;
     }
     if ($c['section'] === 'KRA') {
@@ -109,10 +118,10 @@ require_once '../includes/header.php';
             <div>
                 <h2 class="h5 mb-0 fw-bold">
                     <i class="fas fa-balance-scale me-2"></i>
-                    <?php echo $is_package_completed ? 'Original Self-Rating vs. Final / Reviewed Rating' : 'Submitted Self-Rating Summary'; ?>
+                    <?php echo $is_package_completed ? 'Original Self-Rating vs. Final / Reviewed Rating' : ($show_reviewed_scores ? 'Original Self-Rating vs. Immediate Head Review' : 'Submitted Self-Rating Summary'); ?>
                 </h2>
                 <div class="small text-muted mt-1">
-                    <?php echo $is_package_completed ? 'Audit comparison between your submitted rating and officer adjustments.' : 'Your submitted self-ratings are shown below while the evaluation package is in progress.'; ?>
+                    <?php echo $is_package_completed ? 'Audit comparison between your submitted rating and officer adjustments.' : ($show_reviewed_scores ? 'Compare your original ratings with the immediate head’s reviewed ratings.' : 'Your submitted self-ratings are shown below while the evaluation package is in progress.'); ?>
                 </div>
             </div>
             <div>
@@ -130,7 +139,11 @@ require_once '../includes/header.php';
                 <div class="alert alert-info d-flex align-items-center gap-2 p-3 mb-3 rounded-3">
                     <i class="fas fa-info-circle fa-lg text-primary"></i>
                     <div class="small">
-                        <strong>Consolidation &amp; Management Review in Progress:</strong> Your self-evaluation is currently undergoing departmental consolidation and governance routing. Official final scores, shared behavior metrics, and officer endorsements will be unlocked here once the Board of Directors approves the cycle.
+                        <?php if ($is_probationary_evaluation): ?>
+                            <strong>Probationary evaluation in progress:</strong> The evaluation is moving through its immediate-head and final approval steps. This is an individual review; it does not use a shared department behavior score.
+                        <?php else: ?>
+                            <strong>Consolidation &amp; Management Review in Progress:</strong> Your self-evaluation is currently undergoing departmental consolidation and governance routing. Official final scores, shared behavior metrics, and officer endorsements will be unlocked here once the Board of Directors approves the cycle.
+                        <?php endif; ?>
                     </div>
                 </div>
             <?php endif; ?>
@@ -138,8 +151,8 @@ require_once '../includes/header.php';
             <div class="row g-3">
                 <div class="col-sm-6">
                     <?php
-                    $ts_val = $is_package_completed && $evaluation['total_score'] !== null ? (float)$evaluation['total_score'] : (float)$orig_total_score;
-                    if ($is_package_completed && $ts_val !== null) {
+                    $ts_val = $show_reviewed_scores && $evaluation['total_score'] !== null ? (float)$evaluation['total_score'] : (float)$orig_total_score;
+                    if ($show_reviewed_scores && $ts_val !== null) {
                         if ($ts_val >= 3.60)     { $score_bg = 'linear-gradient(135deg,#146c43,#198754)'; $score_border = '#146c43'; }
                         elseif ($ts_val >= 2.60) { $score_bg = 'linear-gradient(135deg,#087990,#0dcaf0)'; $score_border = '#087990'; }
                         elseif ($ts_val >= 2.00) { $score_bg = 'linear-gradient(135deg,#cc8800,#ffc107)'; $score_border = '#cc8800'; }
@@ -157,30 +170,32 @@ require_once '../includes/header.php';
                     ?>
                     <div class="package-stat h-100 d-flex flex-column justify-content-between" style="<?php echo $score_card_style; ?>">
                         <span class="small text-uppercase fw-bold" style="<?php echo $score_label_style; ?>">
-                            <?php echo $is_package_completed ? 'Overall Score' : 'Submitted Self Total'; ?>
+                            <?php echo $is_package_completed ? 'Overall Score' : ($show_reviewed_scores ? 'Head-Reviewed Score' : 'Submitted Self Total'); ?>
                         </span>
                         <div class="d-flex align-items-baseline gap-2 mt-1">
                             <strong class="tabular-nums" style="<?php echo $score_value_style; ?>"><?php echo number_format($ts_val, 2); ?></strong>
-                            <?php if ($is_package_completed && abs($ts_val - $orig_total_score) > 0.001): ?>
+                            <?php if ($show_reviewed_scores && abs($ts_val - $orig_total_score) > 0.001): ?>
                                 <span class="badge bg-light text-dark border small" title="Original Self Total: <?php echo number_format($orig_total_score, 2); ?>">
                                     Orig: <?php echo number_format($orig_total_score, 2); ?>
                                 </span>
                             <?php endif; ?>
                         </div>
                         <div class="small mt-1" style="<?php echo $score_sub_style; ?>">
-                            Performance Level: <strong><?php echo e($is_package_completed ? ($evaluation['performance_level'] ?: getPerformanceLevel($ts_val)) : 'Pending Final Approval'); ?></strong>
+                            Performance Level: <strong><?php echo e($show_reviewed_scores ? ($evaluation['performance_level'] ?: getPerformanceLevel($ts_val)) : 'Pending Final Approval'); ?></strong>
                         </div>
                     </div>
                 </div>
 
                 <div class="col-sm-6">
                     <div class="package-stat h-100 d-flex flex-column justify-content-between" style="border:2px solid var(--bs-border-color,#dee2e6);border-radius:10px;padding:14px 18px;">
-                        <span class="text-muted small text-uppercase fw-bold">Shared Team Behavior</span>
+                        <span class="text-muted small text-uppercase fw-bold"><?php echo $is_probationary_evaluation ? 'Individual Core Values' : 'Shared Team Behavior'; ?></span>
                         <strong class="tabular-nums mt-1" style="color:var(--rp-primary-gold-dark);font-size:1.8rem;">
-                            <?php echo ($is_package_completed && $evaluation['shared_behavior_score'] !== null) ? number_format((float)$evaluation['shared_behavior_score'], 2) : 'Pending'; ?>
+                            <?php echo $is_probationary_evaluation
+                                ? number_format($show_reviewed_scores ? (float)$evaluation['behavior_average'] : $orig_beh_average, 2)
+                                : (($is_package_completed && $evaluation['shared_behavior_score'] !== null) ? number_format((float)$evaluation['shared_behavior_score'], 2) : 'Pending'); ?>
                         </strong>
                         <div class="small text-muted mt-1">
-                            <?php echo $is_package_completed ? 'Finalized department shared score' : 'Calculated and applied at final Board approval'; ?>
+                            <?php echo $is_probationary_evaluation ? 'Individual score (20%)' : ($is_package_completed ? 'Finalized department shared score' : 'Calculated and applied at final Board approval'); ?>
                         </div>
                     </div>
                 </div>
@@ -233,9 +248,9 @@ require_once '../includes/header.php';
                     <span class="eval-tab-badge"><?php echo count($hist_dev_plans); ?></span>
                 <?php endif; ?>
             </button>
-            <?php if (($is_package_completed && $remarks) || !empty($evaluation['employee_signature_data']) || !empty($evaluation['employee_consent_agreed'])): ?>
+            <?php if (($is_package_completed && $remarks) || !empty($evaluation['employee_signature_data']) || !empty($evaluation['employee_consent_agreed']) || !empty($evaluation['immediate_head_signature_data'])): ?>
             <button class="eval-tab-btn"        role="tab" aria-selected="false" onclick="switchHistoryTab(event,'tab-remarks')" id="htab-remarks">
-                <i class="fas fa-comments me-1"></i><?php echo $is_package_completed && $remarks ? 'Remarks & Signature' : 'Digital Signature'; ?>
+                <i class="fas fa-file-signature me-1"></i><?php echo $is_probationary_evaluation ? 'Digital Signature' : ($is_package_completed && $remarks ? 'Remarks & Signature' : 'Digital Signature'); ?>
             </button>
             <?php endif; ?>
         </nav>
@@ -247,12 +262,12 @@ require_once '../includes/header.php';
                 <table class="package-table table align-middle mb-0">
                     <thead>
                         <tr>
-                            <th style="<?php echo $is_package_completed ? 'width:40%;' : 'width:60%;'; ?>">Criterion</th>
-                            <th class="text-end" style="<?php echo $is_package_completed ? 'width:10%;' : 'width:20%;'; ?>">Weight</th>
-                            <th class="text-end" style="<?php echo $is_package_completed ? 'width:18%;' : 'width:20%;'; ?>">
-                                <?php echo $is_package_completed ? 'Original Self-Rating' : 'Submitted Rating'; ?>
+                            <th style="<?php echo $show_reviewed_scores ? 'width:40%;' : 'width:60%;'; ?>">Criterion</th>
+                            <th class="text-end" style="<?php echo $show_reviewed_scores ? 'width:10%;' : 'width:20%;'; ?>">Weight</th>
+                            <th class="text-end" style="<?php echo $show_reviewed_scores ? 'width:18%;' : 'width:20%;'; ?>">
+                                <?php echo $show_reviewed_scores ? 'Original Self-Rating' : 'Submitted Rating'; ?>
                             </th>
-                            <?php if ($is_package_completed): ?>
+                            <?php if ($show_reviewed_scores): ?>
                                 <th class="text-end" style="width:18%;">Reviewed / Adjusted</th>
                                 <th class="text-center" style="width:14%;">Variance</th>
                             <?php endif; ?>
@@ -275,7 +290,7 @@ require_once '../includes/header.php';
                             </td>
                             <td class="text-end tabular-nums fw-bold text-muted"><?php echo number_format((float)$criterion['weight'], 2); ?>%</td>
                             <td class="text-end tabular-nums fw-semibold" style="font-size:1.05rem;"><?php echo number_format($orig, 2); ?></td>
-                            <?php if ($is_package_completed): ?>
+                            <?php if ($show_reviewed_scores): ?>
                                 <td class="text-end tabular-nums fw-bold text-dark" style="font-size:1.1rem;"><?php echo number_format($rev, 2); ?></td>
                                 <td class="text-center">
                                     <?php if ($is_adj): ?>
@@ -295,8 +310,8 @@ require_once '../includes/header.php';
             <div class="d-flex justify-content-end align-items-center gap-3 mt-3 pt-3 border-top">
                 <span class="text-muted small text-uppercase fw-bold">Key Result Areas (KRA) Total:</span>
                 <span class="fw-bold tabular-nums" style="font-size:1.15rem;">
-                    <?php echo number_format($is_package_completed ? (float)$evaluation['kra_subtotal'] : $orig_kra_subtotal, 2); ?>
-                    <?php if ($is_package_completed && abs((float)$evaluation['kra_subtotal'] - $orig_kra_subtotal) > 0.001): ?>
+                    <?php echo number_format($show_reviewed_scores ? (float)$evaluation['kra_subtotal'] : $orig_kra_subtotal, 2); ?>
+                    <?php if ($show_reviewed_scores && abs((float)$evaluation['kra_subtotal'] - $orig_kra_subtotal) > 0.001): ?>
                         <span class="badge bg-warning text-dark ms-1" title="Original: <?php echo number_format($orig_kra_subtotal, 2); ?>">Self: <?php echo number_format($orig_kra_subtotal, 2); ?></span>
                     <?php endif; ?>
                 </span>
@@ -314,11 +329,11 @@ require_once '../includes/header.php';
                 <table class="package-table table align-middle mb-0">
                     <thead>
                         <tr>
-                            <th style="<?php echo $is_package_completed ? 'width:40%;' : 'width:70%;'; ?>">Criterion</th>
-                            <th class="text-end" style="<?php echo $is_package_completed ? 'width:20%;' : 'width:30%;'; ?>">
-                                <?php echo $is_package_completed ? 'Original Self-Rating' : 'Submitted Rating'; ?>
+                            <th style="<?php echo $show_reviewed_scores ? 'width:40%;' : 'width:70%;'; ?>">Criterion</th>
+                            <th class="text-end" style="<?php echo $show_reviewed_scores ? 'width:20%;' : 'width:30%;'; ?>">
+                                <?php echo $show_reviewed_scores ? 'Original Self-Rating' : 'Submitted Rating'; ?>
                             </th>
-                            <?php if ($is_package_completed): ?>
+                            <?php if ($show_reviewed_scores): ?>
                                 <th class="text-end" style="width:20%;">Reviewed / Adjusted</th>
                                 <th class="text-center" style="width:20%;">Variance</th>
                             <?php endif; ?>
@@ -340,7 +355,7 @@ require_once '../includes/header.php';
                                 <?php endif; ?>
                             </td>
                             <td class="text-end tabular-nums fw-semibold" style="font-size:1.05rem;"><?php echo number_format($orig, 2); ?></td>
-                            <?php if ($is_package_completed): ?>
+                            <?php if ($show_reviewed_scores): ?>
                                 <td class="text-end tabular-nums fw-bold text-dark" style="font-size:1.1rem;"><?php echo number_format($rev, 2); ?></td>
                                 <td class="text-center">
                                     <?php if ($is_adj): ?>
@@ -360,8 +375,8 @@ require_once '../includes/header.php';
             <div class="d-flex justify-content-end align-items-center gap-3 mt-3 pt-3 border-top">
                 <span class="text-muted small text-uppercase fw-bold">Core Behaviors &amp; Values Total:</span>
                 <span class="fw-bold tabular-nums" style="font-size:1.15rem;">
-                    <?php echo number_format($is_package_completed ? (float)$evaluation['behavior_average'] : $orig_beh_average, 2); ?>
-                    <?php if ($is_package_completed && abs((float)$evaluation['behavior_average'] - $orig_beh_average) > 0.001): ?>
+                    <?php echo number_format($show_reviewed_scores ? (float)$evaluation['behavior_average'] : $orig_beh_average, 2); ?>
+                    <?php if ($show_reviewed_scores && abs((float)$evaluation['behavior_average'] - $orig_beh_average) > 0.001): ?>
                         <span class="badge bg-warning text-dark ms-1" title="Original: <?php echo number_format($orig_beh_average, 2); ?>">Self: <?php echo number_format($orig_beh_average, 2); ?></span>
                     <?php endif; ?>
                 </span>
@@ -416,8 +431,42 @@ require_once '../includes/header.php';
         </div>
 
         <!-- Tab 4: Remarks & Signature -->
-        <?php if (($is_package_completed && $remarks) || !empty($evaluation['employee_signature_data']) || !empty($evaluation['employee_consent_agreed'])): ?>
+        <?php if (($is_package_completed && $remarks) || !empty($evaluation['employee_signature_data']) || !empty($evaluation['employee_consent_agreed']) || !empty($evaluation['immediate_head_signature_data'])): ?>
         <div class="eval-tab-content" id="tab-remarks" role="tabpanel">
+
+            <?php if ($is_probationary_evaluation && !empty($evaluation['immediate_head_signature_data'])): ?>
+            <section class="card border-primary-subtle mb-4">
+                <div class="card-body p-4">
+                    <h3 class="h5 fw-bold mb-3"><i class="fas fa-file-signature me-2 text-primary"></i>Probationary Decision &amp; Signatures</h3>
+                    <div class="row g-3 mb-4">
+                        <div class="col-lg-6">
+                            <div class="border rounded p-3 h-100">
+                                <div class="small text-muted">Immediate head recommendation</div>
+                                <strong><?php echo e($evaluation['probationary_recommendation'] ?? 'Not recorded'); ?></strong>
+                                <?php if (!empty($evaluation['probationary_recommendation_reason'])): ?><p class="mb-0 mt-2"><?php echo nl2br(e($evaluation['probationary_recommendation_reason'])); ?></p><?php endif; ?>
+                            </div>
+                        </div>
+                        <div class="col-lg-6">
+                            <div class="border rounded p-3 h-100">
+                                <div class="small text-muted mb-2">Immediate head’s signature</div>
+                                <?php if (!empty($evaluation['immediate_head_signature_data'])): ?>
+                                    <img src="<?php echo e($evaluation['immediate_head_signature_data']); ?>" alt="Immediate head signature" style="display:block;max-height:64px;max-width:260px;">
+                                    <small class="text-muted">Signed <?php echo e($evaluation['immediate_head_signed_at'] ?? ''); ?></small>
+                                <?php else: ?><span class="text-muted">Awaiting signature</span><?php endif; ?>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="border rounded p-3">
+                        <div class="small text-muted mb-2">Employee’s self-rating signature</div>
+                        <?php if (!empty($evaluation['employee_signature_data'])): ?>
+                            <img src="<?php echo e($evaluation['employee_signature_data']); ?>" alt="Employee self-rating signature" style="display:block;max-height:64px;max-width:260px;">
+                            <small class="text-muted">Signed <?php echo e($evaluation['employee_signed_at'] ?? ''); ?></small>
+                            <div class="small text-muted mt-2">This is the signature captured with your original self-rating. No second signature is required.</div>
+                        <?php else: ?><span class="text-muted">No employee signature on file</span><?php endif; ?>
+                    </div>
+                </div>
+            </section>
+            <?php endif; ?>
 
             <?php if ($is_package_completed && $remarks): ?>
             <h3 class="h6 fw-bold text-uppercase text-muted mb-3" style="letter-spacing:.5px;">
@@ -430,7 +479,7 @@ require_once '../includes/header.php';
             <?php endforeach; ?>
             <?php endif; ?>
 
-            <?php if (!empty($evaluation['employee_signature_data']) || !empty($evaluation['employee_consent_agreed'])): ?>
+            <?php if ((!$is_probationary_evaluation || empty($evaluation['immediate_head_signature_data'])) && (!empty($evaluation['employee_signature_data']) || !empty($evaluation['employee_consent_agreed']))): ?>
             <h3 class="h6 fw-bold text-uppercase text-muted mb-3 <?php echo $remarks ? 'mt-4' : ''; ?>" style="letter-spacing:.5px;">
                 <i class="fas fa-file-signature me-1"></i>Employee Declaration &amp; Digital Signature
             </h3>
@@ -474,6 +523,8 @@ require_once '../includes/header.php';
         }
         window.switchHistoryTab = switchHistoryTab;
     })();
+    document.addEventListener('DOMContentLoaded', function () {
+    });
     </script>
 
 </main>

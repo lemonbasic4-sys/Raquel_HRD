@@ -193,6 +193,50 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'This package is not currently assigned to you for action.');
     }
 
+    $is_probationary_step = in_array($step['evaluation_type'] ?? '', ['Initial', 'Final'], true);
+    $probationary_review = null;
+    $probationary_eval_id = 0;
+    $probationary_employee_id = 0;
+    if ($is_probationary_step) {
+        $review_data_stmt = $conn->prepare("SELECT ev.evaluation_id, ev.employee_id, ev.total_score, per.recommendation,
+                per.recommendation_reason, per.immediate_head_signature_data
+            FROM evaluation_package_members pm
+            JOIN evaluations ev ON ev.evaluation_id = pm.evaluation_id
+            LEFT JOIN probationary_evaluation_reviews per ON per.evaluation_id = ev.evaluation_id
+            WHERE pm.package_id = ? LIMIT 1");
+        $review_data_stmt->bind_param('i', $package_id);
+        $review_data_stmt->execute();
+        $probationary_review = $review_data_stmt->get_result()->fetch_assoc();
+        $review_data_stmt->close();
+        $probationary_eval_id = (int)($probationary_review['evaluation_id'] ?? 0);
+        $probationary_employee_id = (int)($probationary_review['employee_id'] ?? 0);
+    }
+
+    if ($action === 'save_probationary_decision') {
+        if (!$is_probationary_step || (int)($step['step_order'] ?? 0) !== 1 || $probationary_eval_id <= 0) {
+            redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'Only the immediate head can record the probationary recommendation.');
+        }
+        $recommendation = trim($_POST['recommendation'] ?? '');
+        $recommendation_reason = trim($_POST['recommendation_reason'] ?? '');
+        $head_signature = trim($_POST['immediate_head_signature_data'] ?? '');
+        if (!in_array($recommendation, ['Recommend regularization', 'Continue training'], true)
+            || $recommendation_reason === ''
+            || !preg_match('/^data:image\/png;base64,/', $head_signature)
+            || strlen($head_signature) > 100000) {
+            redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'Choose a recommendation, enter its reason, and sign before saving.');
+        }
+        $decision = $conn->prepare("INSERT INTO probationary_evaluation_reviews
+            (evaluation_id, recommendation, recommendation_reason, immediate_head_user_id, immediate_head_signature_data, immediate_head_signed_at)
+            VALUES (?, ?, ?, ?, ?, NOW())
+            ON DUPLICATE KEY UPDATE recommendation = VALUES(recommendation), recommendation_reason = VALUES(recommendation_reason),
+                immediate_head_user_id = VALUES(immediate_head_user_id), immediate_head_signature_data = VALUES(immediate_head_signature_data),
+                immediate_head_signed_at = NOW()");
+        $decision->bind_param('issis', $probationary_eval_id, $recommendation, $recommendation_reason, $user_id, $head_signature);
+        $decision->execute();
+        $decision->close();
+        redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'success', 'Immediate head recommendation and signature saved. You can now approve and forward the evaluation.');
+    }
+
     // F7 Action: Consolidator returns individual member self-rating back to employee
     if ($action === 'return_member') {
         $member_eval_id = (int) ($_POST['member_evaluation_id'] ?? 0);
@@ -319,6 +363,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif (!empty($previous['reviewer_user_id'])) {
             createNotification($conn, (int) $previous['reviewer_user_id'], 'Team evaluation returned for revision', 'A package was returned to you by ' . $step['step_label'] . '. Reason: ' . $comments, BASE_URL . '/employee/team-evaluation-packages.php');
         }
+        if ($is_probationary_step && $probationary_employee_id > 0) {
+            notifyUsersForEmployee($conn, $probationary_employee_id,
+                'Your probationary evaluation was returned for revision',
+                'The ' . $step['step_label'] . ' returned your probationary evaluation to the immediate head. Reason: ' . $comments,
+                BASE_URL . '/employee/evaluation-history.php');
+        }
 
         redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'success', 'Evaluation package returned to ' . $prev_name . ' (' . $previous['step_label'] . ') for revision.');
     }
@@ -327,6 +377,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Recalculate shared behavior score from whoever submitted before the consolidator acts.
         // Members who have not submitted will follow the late-joiner catch-up path automatically.
         recalculateOrganizationPackageBehaviorScore($conn, $package_id);
+    }
+
+    if ($action === 'approve' && $is_probationary_step) {
+        if ((int)$step['step_order'] === 1) {
+            if (empty($probationary_review['recommendation'])
+                || empty($probationary_review['recommendation_reason'])
+                || empty($probationary_review['immediate_head_signature_data'])) {
+                redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'The immediate head must record a recommendation, its reason, and a signature before forwarding the evaluation.');
+            }
+        }
     }
 
     // 🔒 Prevention: verify next consolidator/reviewer exists and is assigned before advancing
@@ -349,7 +409,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $is_probationary = in_array($step['evaluation_type'], ['Initial', 'Final'], true);
     $is_final_board = ($step['step_type'] === 'Governance') && (stripos($step['step_label'], 'Board') !== false);
-    $is_final_hr = $is_probationary && $step['eligible_role'] === 'HR Manager' && !$next;
+    $is_final_probationary = $is_probationary && !$next;
+    $is_final_hr = $is_final_probationary && isHumanResourcesPackageDepartment($conn, (int)$step['department_id']);
 
     if ($next && !$is_final_board) {
         $next_update = $conn->prepare("UPDATE evaluation_package_route_steps SET action_status = 'Pending' WHERE package_route_step_id = ? AND action_status IN ('Waiting', 'Returned')");
@@ -377,6 +438,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             notifyOrganizationPackageStepAssignees($conn, $package_id, $next_order, 'Team evaluation package awaiting your review', 'The ' . $step['department_name'] . ' evaluation package was approved by ' . $step['step_label'] . ' and forwarded for your review: ' . $next['step_label'] . '.');
         }
 
+        if (!$was_merged && $is_probationary && (int)$step['step_order'] === 1 && $probationary_employee_id > 0) {
+            $employee_users_stmt = $conn->prepare("SELECT user_id FROM users WHERE employee_id = ? AND role = 'Employee' AND is_active = 1");
+            $employee_users_stmt->bind_param('i', $probationary_employee_id);
+            $employee_users_stmt->execute();
+            $employee_users = $employee_users_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+            $employee_users_stmt->close();
+            foreach ($employee_users as $employee_user) {
+                createNotification($conn, (int)$employee_user['user_id'], 'Immediate head reviewed your probationary evaluation',
+                    'Your immediate head reviewed your ' . $step['evaluation_type'] . ' evaluation and forwarded it to ' . $next['step_label'] . '. Your original self-rating and signature remain on file; no additional signature is needed.',
+                    BASE_URL . '/employee/evaluation-history-view.php?evaluation_id=' . $probationary_eval_id);
+            }
+        }
+
         $audit = $conn->prepare("INSERT INTO evaluation_package_audit (package_id, user_id, action, remarks) VALUES (?, ?, 'APPROVED', ?)");
         $audit->bind_param('iis', $audit_pkg_id, $user_id, $comments);
         $audit->execute();
@@ -388,12 +462,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'success', 'Evaluation package successfully adjusted and forwarded to ' . $next_name . ' (' . $next['step_label'] . ').');
     } else {
         // Final governance step (Board of Directors) locks and applies.
-        if (!$is_final_board && !$is_final_hr) {
+        if (!$is_final_board && !$is_final_probationary) {
             redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'Final application requires Board of Directors approval. Assign a Board approver under Evaluation Governance.');
         }
 
         $conn->begin_transaction();
         $applied = applyOrganizationPackageResults($conn, $package_id);
+        if ($applied && $is_final_probationary && $probationary_eval_id > 0) {
+            $applied = applyProbationaryEvaluationOutcome($conn, $probationary_eval_id);
+        }
         if ($applied) {
             $package_update = $conn->prepare("UPDATE evaluation_packages SET status = 'Approved and Applied', current_step_order = NULL WHERE package_id = ?");
             $package_update->bind_param('i', $package_id);
@@ -401,7 +478,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $package_update->close();
 
             $lock_audit = $conn->prepare("INSERT INTO evaluation_package_audit (package_id, user_id, action, remarks) VALUES (?, ?, 'LOCKED_AND_APPLIED', ?)");
-            $lock_remark = $is_final_hr ? 'HR Manager approved and applied the individual probationary evaluation.' : 'Board approval locked and applied final package results to all team members.';
+            $lock_remark = $is_final_probationary
+                ? ($is_final_hr ? 'HR Manager approved and applied the HR probationary evaluation.' : 'Department Manager approved and applied the non-HR probationary evaluation; HR was notified for recordkeeping.')
+                : 'Board approval locked and applied final package results to all team members.';
             $lock_audit->bind_param('iis', $package_id, $user_id, $lock_remark);
             $lock_audit->execute();
             $lock_audit->close();
@@ -413,8 +492,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $members_stmt->execute();
             $member_users = $members_stmt->get_result();
             while ($member_user = $member_users->fetch_assoc()) {
-                $member_message = $is_final_hr
-                    ? 'Your probationary evaluation has completed HR Manager approval and its final score is available.'
+                $member_message = $is_final_probationary
+                    ? 'Your probationary evaluation has completed final approval. Final score: ' . number_format((float)($probationary_review['total_score'] ?? 0), 2) . '.'
                     : 'Your team evaluation package (' . $step['department_name'] . ') has completed final Board approval and all scores are locked and applied.';
                 createNotification($conn, (int) $member_user['user_id'], 'Evaluation Approved & Finalized', $member_message, BASE_URL . '/employee/evaluation-history.php');
             }
@@ -429,17 +508,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $rev_uid = (int)($r_row['reviewer_user_id'] ?? 0);
                 $rev_emp_id = (int)($r_row['reviewer_employee_id'] ?? 0);
                 if ($rev_uid > 0) {
-                    createNotification($conn, $rev_uid, 'Evaluation Approved & Finalized', $is_final_hr ? 'The probationary evaluation has received final HR Manager approval.' : 'The ' . $step['department_name'] . ' evaluation package has received Board approval and all scores are locked and applied.', BASE_URL . '/employee/team-evaluation-history.php');
+                    createNotification($conn, $rev_uid, 'Evaluation Approved & Finalized', $is_final_probationary ? 'The probationary evaluation received final approval from ' . $step['step_label'] . '.' : 'The ' . $step['department_name'] . ' evaluation package has received Board approval and all scores are locked and applied.', BASE_URL . '/employee/team-evaluation-history.php');
                 } elseif ($rev_emp_id > 0) {
-                    notifyUsersForEmployee($conn, $rev_emp_id, 'Evaluation Approved & Finalized', $is_final_hr ? 'The probationary evaluation has received final HR Manager approval.' : 'The ' . $step['department_name'] . ' evaluation package has received Board approval and all scores are locked and applied.', BASE_URL . '/employee/team-evaluation-history.php');
+                    notifyUsersForEmployee($conn, $rev_emp_id, 'Evaluation Approved & Finalized', $is_final_probationary ? 'The probationary evaluation received final approval from ' . $step['step_label'] . '.' : 'The ' . $step['department_name'] . ' evaluation package has received Board approval and all scores are locked and applied.', BASE_URL . '/employee/team-evaluation-history.php');
                 }
             }
             $reviewers_stmt->close();
 
-            // 3. Notify ALL HR Personnel (Admin, HR Manager, HR Supervisor, HR Staff)
-            notifyHRPersonnelPackageFinalized($conn, $package_id, $step['department_name'], $step['template_name'] ?? 'Evaluation');
+            // Non-HR probationary approvals are sent to HR leaders as an informational record only.
+            if ($is_final_probationary && !$is_final_hr && $probationary_eval_id > 0) {
+                notifyHRManagementOfProbationaryApproval($conn, $probationary_eval_id);
+            } elseif (!$is_probationary) {
+                notifyHRPersonnelPackageFinalized($conn, $package_id, $step['department_name'], $step['template_name'] ?? 'Evaluation');
+            }
 
-            redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'success', $is_final_hr ? 'Probationary evaluation approved and finalized by HR Manager.' : 'Evaluation package approved, locked, and applied to all team members. HR personnel and team members have been notified.');
+            redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'success', $is_final_probationary ? 'Probationary evaluation approved and finalized. The employee profile outcome was updated.' : 'Evaluation package approved, locked, and applied to all team members. HR personnel and team members have been notified.');
         } else {
             $conn->rollback();
             $restore = $conn->prepare("UPDATE evaluation_package_route_steps SET action_status = 'Pending', acted_at = NULL WHERE package_route_step_id = ? AND action_status = 'Approved'");
@@ -686,20 +769,32 @@ asort($package_department_options, SORT_NATURAL | SORT_FLAG_CASE);
         $group_reviewer_label = !empty($package['eligible_role'])
             ? $package['eligible_role']
             : ((int)($package['eligible_rank_category_id'] ?? 0) === 4 ? 'Department Supervisor' : 'Department Manager');
-        $can_adjust = !$is_unclaimed_group_step && !isOrganizationPackageLocked($conn, (int)$package['package_id']);
-        $is_board_step = ($package['step_type'] === 'Governance') && (stripos($package['step_label'], 'Board') !== false);
         $is_probationary_package = in_array($package['evaluation_type'], ['Initial', 'Final'], true);
-        $is_final_hr_step = $is_probationary_package && $package['eligible_role'] === 'HR Manager';
+        $can_adjust = !$is_unclaimed_group_step && !isOrganizationPackageLocked($conn, (int)$package['package_id'])
+            && (!$is_probationary_package || (int)$package['current_step_order'] === 1);
+        $is_board_step = ($package['step_type'] === 'Governance') && (stripos($package['step_label'], 'Board') !== false);
+        $route_count_stmt = $is_probationary_package ? $conn->prepare('SELECT COUNT(*) AS total FROM evaluation_package_route_steps WHERE package_id = ?') : null;
+        $route_count = 0;
+        if ($route_count_stmt) {
+            $route_count_stmt->bind_param('i', $package['package_id']);
+            $route_count_stmt->execute();
+            $route_count = (int)($route_count_stmt->get_result()->fetch_assoc()['total'] ?? 0);
+            $route_count_stmt->close();
+        }
+        $is_final_probationary_step = $is_probationary_package && (int)$package['current_step_order'] >= $route_count;
+        $is_final_hr_step = $is_final_probationary_step && isHumanResourcesPackageDepartment($conn, (int)$package['department_id']);
         $members_stmt = $conn->prepare("SELECT e.evaluation_id, emp.first_name, emp.last_name, emp.job_title,
                 e.kra_subtotal, e.behavior_average, e.total_score, e.status, pm.member_status,
                 (SELECT AVG(COALESCE(es.manager_override_score, es.supervisor_override_score,
                                      es.dept_manager_override_score, es.score_value))
                  FROM evaluation_scores es JOIN evaluation_criteria ec ON ec.criterion_id = es.criterion_id
                  WHERE es.evaluation_id = e.evaluation_id AND ec.section = 'Behavior') AS individual_behavior,
-                EXISTS(SELECT 1 FROM evaluation_scores es WHERE es.evaluation_id = e.evaluation_id AND (es.supervisor_override_score IS NOT NULL OR es.dept_manager_override_score IS NOT NULL OR es.manager_override_score IS NOT NULL)) AS has_adjustments
+                EXISTS(SELECT 1 FROM evaluation_scores es WHERE es.evaluation_id = e.evaluation_id AND (es.supervisor_override_score IS NOT NULL OR es.dept_manager_override_score IS NOT NULL OR es.manager_override_score IS NOT NULL)) AS has_adjustments,
+                per.recommendation, per.recommendation_reason, per.immediate_head_signature_data, per.immediate_head_signed_at
             FROM evaluation_package_members pm
             JOIN evaluations e ON e.evaluation_id = pm.evaluation_id
             JOIN employees emp ON emp.employee_id = e.employee_id
+            LEFT JOIN probationary_evaluation_reviews per ON per.evaluation_id = e.evaluation_id
             WHERE pm.package_id = ? AND e.status != 'Approved'
             ORDER BY emp.last_name, emp.first_name");
         $members_stmt->bind_param('i', $package['package_id']);
@@ -1015,9 +1110,9 @@ asort($package_department_options, SORT_NATURAL | SORT_FLAG_CASE);
                         <div class="alert alert-warning py-2 px-3 small mb-3">
                             <i class="fas fa-shield-alt me-1"></i><strong>Final Board Step:</strong> Approving will lock this evaluation package, apply shared Behavior scores to all <?php echo count($members); ?> members, and publish final appraisal results.
                         </div>
-                    <?php elseif ($is_final_hr_step): ?>
+                    <?php elseif ($is_final_probationary_step): ?>
                         <div class="alert alert-info py-2 px-3 small mb-3">
-                            <strong>Final HR approval:</strong> Approving applies this employee's individual KRA and Core Values scores and completes the probationary evaluation.
+                            <strong><?php echo $is_final_hr_step ? 'Final HR Manager approval:' : 'Final Department Manager approval:'; ?></strong> Approval records the individual KRA and Core Values score, applies the probationary outcome, and completes this evaluation. HR is notified for non-HR departments.
                         </div>
                     <?php elseif ($package['step_type'] === 'Governance'): ?>
                         <div class="alert alert-secondary py-2 px-3 small mb-3">
@@ -1025,11 +1120,54 @@ asort($package_department_options, SORT_NATURAL | SORT_FLAG_CASE);
                         </div>
                     <?php endif; ?>
 
-                    <div class="mb-3">
+                    <?php if ($is_probationary_package && (int)$package['current_step_order'] === 1 && !empty($members[0])): ?>
+                        <?php $probationary_member = $members[0]; ?>
+                        <section class="probationary-decision-panel mb-3 p-3 p-md-4 rounded-3 border" style="background:#f5f3ff;border-color:#c4b5fd!important;">
+                            <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+                                <div>
+                                    <h3 class="h5 fw-bold mb-1" style="color:#3730a3;">Immediate Head Decision &amp; Signature</h3>
+                                    <p class="small text-muted mb-0">For <?php echo e($probationary_member['first_name'] . ' ' . $probationary_member['last_name']); ?>. Review and adjust ratings above first, then record the recommendation here.</p>
+                                </div>
+                                <?php if (!empty($probationary_member['immediate_head_signed_at'])): ?>
+                                    <span class="badge text-bg-success"><i class="fas fa-check-circle me-1"></i>Signed <?php echo e(date('M j, Y g:i A', strtotime($probationary_member['immediate_head_signed_at']))); ?></span>
+                                <?php endif; ?>
+                            </div>
+                            <div class="row g-3">
+                                <div class="col-lg-5">
+                                    <label class="form-label fw-semibold" for="probationary-recommendation-<?php echo (int)$package['package_id']; ?>">Recommendation</label>
+                                    <select class="form-select" id="probationary-recommendation-<?php echo (int)$package['package_id']; ?>" name="recommendation" required>
+                                        <option value="">Select recommendation</option>
+                                        <option value="Recommend regularization" <?php echo ($probationary_member['recommendation'] ?? '') === 'Recommend regularization' ? 'selected' : ''; ?>>Recommend regularization</option>
+                                        <option value="Continue training" <?php echo ($probationary_member['recommendation'] ?? '') === 'Continue training' ? 'selected' : ''; ?>>Continue training</option>
+                                    </select>
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label fw-semibold" for="probationary-reason-<?php echo (int)$package['package_id']; ?>">Reason</label>
+                                    <textarea class="form-control" id="probationary-reason-<?php echo (int)$package['package_id']; ?>" name="recommendation_reason" rows="2" required placeholder="Explain the basis for this recommendation"><?php echo e($probationary_member['recommendation_reason'] ?? ''); ?></textarea>
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label fw-semibold" for="head-signature-canvas-<?php echo (int)$package['package_id']; ?>">Immediate head signature</label>
+                                    <div class="border rounded bg-white p-2" style="max-width:620px;">
+                                        <canvas class="probationary-head-signature-canvas" id="head-signature-canvas-<?php echo (int)$package['package_id']; ?>" width="560" height="120" style="display:block;width:100%;height:120px;touch-action:none;border:1px dashed #94a3b8;border-radius:6px;"></canvas>
+                                        <input type="hidden" name="immediate_head_signature_data" id="head-signature-data-<?php echo (int)$package['package_id']; ?>" value="<?php echo e($probationary_member['immediate_head_signature_data'] ?? ''); ?>">
+                                        <button class="btn btn-sm btn-outline-secondary mt-2 clear-probationary-signature" type="button" data-package-id="<?php echo (int)$package['package_id']; ?>">Clear signature</button>
+                                    </div>
+                                    <div class="small text-muted mt-1">Saving changed ratings in Adjust clears the previous immediate-head signature; the employee’s original self-rating signature remains on file.</div>
+                                </div>
+                                <div class="col-12">
+                                    <button class="btn btn-sm btn-outline-primary fw-semibold" type="submit" formnovalidate onclick="document.getElementById('actionInput-<?php echo (int)$package['package_id']; ?>').value='save_probationary_decision';">
+                                        <i class="fas fa-file-signature me-1"></i>Save Decision &amp; Signature
+                                    </button>
+                                </div>
+                            </div>
+                        </section>
+                    <?php endif; ?>
+
+                    <div class="mb-3 package-review-remarks">
                         <label class="form-label fw-bold" for="comments-<?php echo (int)$package['package_id']; ?>">
                             Review Remarks &amp; Feedback <span class="text-muted fw-normal">(Optional for approval, required for returns)</span>
                         </label>
-                        <textarea class="form-control" id="comments-<?php echo (int)$package['package_id']; ?>" name="comments" rows="3" placeholder="Enter endorsement remarks or return instructions…"></textarea>
+                        <textarea class="form-control form-control-sm" id="comments-<?php echo (int)$package['package_id']; ?>" name="comments" rows="2" style="min-height:76px;max-height:160px;resize:vertical;" placeholder="Enter endorsement remarks or return instructions…"></textarea>
                     </div>
 
                     <div class="d-flex flex-wrap gap-2 align-items-center">
@@ -1041,7 +1179,7 @@ asort($package_department_options, SORT_NATURAL | SORT_FLAG_CASE);
                         <?php else: ?>
                             <!-- F3: Trigger Pre-Submission Confirmation Modal -->
                             <button class="btn-action-primary btn" type="button" data-bs-toggle="modal" data-bs-target="#confirmApproveModal-<?php echo (int)$package['package_id']; ?>">
-                                <?php if ($is_board_step || $is_final_hr_step): ?>
+                                <?php if ($is_board_step || $is_final_probationary_step): ?>
                                     <i class="fas fa-lock me-1"></i>Approve, Lock, and Apply Results
                                 <?php else: ?>
                                     <i class="fas fa-check-circle me-1"></i>Approve &amp; Forward to Next Reviewer
@@ -1078,7 +1216,7 @@ asort($package_department_options, SORT_NATURAL | SORT_FLAG_CASE);
                                     <div class="alert alert-info py-2 px-3 small mb-3">
                                         <strong>Department:</strong> <?php echo e($package['department_name']); ?> &bull; 
                                         <strong>Cycle:</strong> <?php echo e($package['period_start']); ?> to <?php echo e($package['period_end']); ?><br>
-                                        <strong>Next Stage:</strong> <?php echo e($next_rev_info['step_label'] ?? (($is_board_step || $is_final_hr_step) ? 'Final Approval' : 'Next Reviewer')); ?> (<?php echo e($next_reviewer_name); ?>)
+                                        <strong>Next Stage:</strong> <?php echo e($next_rev_info['step_label'] ?? (($is_board_step || $is_final_probationary_step) ? 'Final Approval' : 'Next Reviewer')); ?> (<?php echo e($next_reviewer_name); ?>)
                                     </div>
 
                                     <h6 class="fw-bold mb-2 text-dark">Package Members Summary:</h6>
@@ -1207,6 +1345,50 @@ function submitPackageForm(packageId) {
         form.submit();
     }
 }
+
+document.querySelectorAll('.probationary-head-signature-canvas').forEach((canvas) => {
+    const packageId = canvas.id.replace('head-signature-canvas-', '');
+    const ctx = canvas.getContext('2d');
+    const signature = document.getElementById('head-signature-data-' + packageId);
+    let drawing = false;
+    let hasInk = Boolean(signature.value);
+    if (hasInk) {
+        const image = new Image();
+        image.onload = () => ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+        image.src = signature.value;
+    }
+    const point = (event) => {
+        const rect = canvas.getBoundingClientRect();
+        const source = event.touches ? event.touches[0] : event;
+        return { x: (source.clientX - rect.left) * canvas.width / rect.width, y: (source.clientY - rect.top) * canvas.height / rect.height };
+    };
+    const start = (event) => {
+        drawing = true;
+        const p = point(event);
+        ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.strokeStyle = '#111827'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+        event.preventDefault();
+    };
+    const move = (event) => {
+        if (!drawing) return;
+        const p = point(event); ctx.lineTo(p.x, p.y); ctx.stroke(); hasInk = true; event.preventDefault();
+    };
+    const stop = () => {
+        if (!drawing) return;
+        drawing = false;
+        if (hasInk) signature.value = canvas.toDataURL('image/png');
+    };
+    canvas.addEventListener('mousedown', start); canvas.addEventListener('mousemove', move); window.addEventListener('mouseup', stop);
+    canvas.addEventListener('touchstart', start, { passive: false }); canvas.addEventListener('touchmove', move, { passive: false }); window.addEventListener('touchend', stop);
+    document.querySelector('.clear-probationary-signature[data-package-id="' + packageId + '"]')?.addEventListener('click', () => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height); signature.value = ''; hasInk = false;
+    });
+    canvas.closest('form')?.addEventListener('submit', (event) => {
+        const action = document.getElementById('actionInput-' + packageId)?.value;
+        if (action === 'save_probationary_decision' && !signature.value) {
+            event.preventDefault(); alert('Please sign in the Immediate Head Decision section before saving.');
+        }
+    });
+});
 </script>
 
 <?php require_once '../includes/footer.php'; ?>

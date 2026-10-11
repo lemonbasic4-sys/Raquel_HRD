@@ -30,7 +30,8 @@ try {
     $conn->query('CREATE TABLE departments (department_id INT PRIMARY KEY, department_name VARCHAR(100))');
     $conn->query("CREATE TABLE evaluation_packages (package_id INT PRIMARY KEY, department_id INT, evaluation_type VARCHAR(20))");
     $conn->query("CREATE TABLE evaluation_package_route_steps (
-        package_id INT, step_order INT, step_label VARCHAR(160), step_type VARCHAR(30),
+        package_id INT, step_order INT, reviewer_employee_id INT NULL, reviewer_user_id INT NULL,
+        step_label VARCHAR(160), step_type VARCHAR(30),
         eligible_role VARCHAR(50) NULL, eligible_rank_category_id INT NULL, action_status VARCHAR(20),
         PRIMARY KEY(package_id, step_order))");
     $conn->query("INSERT INTO departments VALUES (7, 'Human Resources'), (1, 'Acquired Properties')");
@@ -44,8 +45,8 @@ try {
         $stmt->bind_param('i', $package_id); $stmt->execute();
         $routes[$package_id] = $stmt->get_result()->fetch_all(MYSQLI_ASSOC); $stmt->close();
     }
-    expect(array_column($routes[1], 'step_label') === ['HR Supervisor review', 'HR Manager final approval'], 'HR route should be HR Supervisor then HR Manager.');
-    expect(array_column($routes[2], 'step_label') === ['Department Supervisor review', 'Department Manager review', 'HR Supervisor review', 'HR Manager final approval'], 'Non-HR route should include department and HR reviewers in order.');
+    expect(array_column($routes[1], 'step_label') === ['HR Supervisor — Immediate Head Review', 'HR Manager — Final Approval'], 'HR route should be HR Supervisor then HR Manager.');
+    expect(array_column($routes[2], 'step_label') === ['Department Supervisor — Immediate Head Review', 'Department Manager — Final Approval'], 'Non-HR route should end at Department Manager; HR is notified afterward, not asked to approve.');
     expect((int)$routes[2][0]['eligible_rank_category_id'] === 4 && (int)$routes[2][1]['eligible_rank_category_id'] === 3, 'Non-HR route must map Supervisor before Manager.');
     expect(count(array_filter(array_merge($routes[1], $routes[2]), static fn($step) => $step['step_type'] === 'Governance')) === 0, 'Probationary routes must not append governance stages.');
     echo "PASS: HR and non-HR probationary routes are ordered and independent of governance configuration\n";

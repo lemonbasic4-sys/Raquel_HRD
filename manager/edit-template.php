@@ -32,8 +32,8 @@ $tmpl = $conn->query("SELECT * FROM evaluation_templates WHERE template_id = $te
 if (!$tmpl) {
     redirectWith($template_list_url, 'danger', 'Template not found.');
 }
-if ((int)($tmpl['created_by'] ?? 0) !== $current_user_id) {
-    redirectWith($template_list_url, 'danger', 'Only the original template creator can edit this template.');
+if (!canManageEvaluationTemplate($conn, $template_id, $current_user_id)) {
+    redirectWith($template_list_url, 'danger', 'You can only edit templates you own or templates managed by a supervisor or manager in your department.');
 }
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -87,9 +87,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirectWith($template_edit_url . "?id=$template_id", 'danger', 'Template name is required.');
     }
 
-    $kra_total_weight = array_sum(array_map('floatval', $kra_weights));
-    if (!empty($kra_names) && abs($kra_total_weight - 100) > 0.01) {
-        redirectWith($template_edit_url . "?id=$template_id", 'danger', 'KRA weights must total 100%. Current: ' . $kra_total_weight . '%');
+    $kra_total_cents = array_sum(array_map(static fn($weight) => (int)round((float)$weight * 100), $kra_weights));
+    if (!empty($kra_names) && $kra_total_cents !== 10000) {
+        redirectWith($template_edit_url . "?id=$template_id", 'danger', 'KRA weights must total exactly 100.00%. Current: ' . number_format($kra_total_cents / 100, 2) . '%');
     }
 
     if (abs(($kra_weight + $behavior_weight) - 100) > 0.01) {
@@ -111,10 +111,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         SET template_name=?, description=?, target_department=?, target_department_id=?, target_job_title_id=NULLIF(?, 0),
             behavior_framework_code=NULLIF(?, ''), behavior_framework_version=NULLIF(?, ''),
             evaluation_type=?, kra_weight=?, behavior_weight=?, form_code=?, revision_date=?, effective_date_form=?
-        WHERE template_id=? AND created_by=?");
-    $stmt->bind_param("sssiisssddsssii", $template_name, $description, $target_department, $target_department_id,
+        WHERE template_id=?");
+    $stmt->bind_param("sssiisssddsssi", $template_name, $description, $target_department, $target_department_id,
         $target_job_title_id, $behavior_framework_code, $behavior_framework_version, $evaluation_type,
-        $kra_weight, $behavior_weight, $form_code, $revision_date, $effective_date_form, $template_id, $current_user_id);
+        $kra_weight, $behavior_weight, $form_code, $revision_date, $effective_date_form, $template_id);
     $stmt->execute();
     $stmt->close();
     if (!saveEvaluationTemplateTargetPositionIds($conn, $template_id, $target_position_ids)) {
@@ -1091,19 +1091,19 @@ function validateStep(step) {
         if (rows.length === 0) {
             errors.push('At least one Key Result Area (KRA) item is required.');
         } else {
-            let kraSum = 0;
+            let kraSumCents = 0;
             let missingName = false;
             rows.forEach(r => {
                 const n = r.querySelector('input[name="kra_name[]"]')?.value?.trim();
                 const w = parseFloat(r.querySelector('input[name="kra_weight_item[]"]')?.value) || 0;
                 if (!n) missingName = true;
-                kraSum += w;
+                kraSumCents += Math.round(w * 100);
             });
             if (missingName) {
                 errors.push('All KRA items must have a KRA Name specified.');
             }
-            if (Math.abs(kraSum - 100) > 0.01) {
-                errors.push(`KRA item weights must sum to exactly 100%. Current sum: <strong>${kraSum.toFixed(1)}%</strong>.`);
+            if (kraSumCents !== 10000) {
+                errors.push(`KRA item weights must sum to exactly 100.00%. Current sum: <strong>${(kraSumCents / 100).toFixed(2)}%</strong>.`);
             }
         }
     } else if (step === 4) {

@@ -7,7 +7,7 @@ ensureHistoricalImportSchema($conn);
 $show_progressive_notice = hasOpenProgressiveEvaluationCohort($conn);
 require_once '../includes/header.php';
 
-// Fetch submitted evaluations, including records still moving through a review route.
+// History is reserved for completed evaluations. Active package members stay in Performance Evaluation.
 $history = $conn->query("SELECT ev.*, CONCAT(e.first_name, ' ', e.last_name) as employee_name, e.job_title, e.rank_category_id, e.profile_picture, d.department_name,
     u.full_name as submitted_by_name, u2.full_name as endorsed_by_name, u3.full_name as approved_by_name, et.template_name,
     ep.package_id, ep.status AS package_status, COALESCE(ep.evaluation_type, et.evaluation_type) AS package_evaluation_type,
@@ -43,12 +43,14 @@ $history = $conn->query("SELECT ev.*, CONCAT(e.first_name, ' ', e.last_name) as 
         AND last_route.step_order = last_done.last_step_order
     LEFT JOIN users last_reviewer ON last_reviewer.user_id = last_route.reviewer_user_id
     LEFT JOIN employees last_reviewer_emp ON last_reviewer_emp.employee_id = last_route.reviewer_employee_id
-    WHERE (ev.status IN ('Approved', 'Rejected', 'Returned') OR (ep.package_id IS NOT NULL AND ep.status NOT IN ('Cancelled')))
+    WHERE (
+        (ep.package_id IS NOT NULL AND ep.status = 'Approved and Applied')
+        OR (ep.package_id IS NULL AND ev.status IN ('Approved', 'Rejected', 'Returned'))
+    )
     AND ev.employee_id NOT IN (SELECT employee_id FROM users WHERE role = 'Admin' AND employee_id IS NOT NULL)
     ORDER BY ev.updated_at DESC");
 
 $total_c = 0;
-$pending_c = 0;
 $approved_c = 0;
 $rejected_c = 0;
 $returned_c = 0;
@@ -61,7 +63,7 @@ while ($row = $history->fetch_assoc()) {
     if ($history_status === 'Approved' || $history_status === 'Approved and Applied') $approved_c++;
     elseif ($history_status === 'Rejected') $rejected_c++;
     elseif ($history_status === 'Returned') $returned_c++;
-    else $pending_c++;
+    // Ongoing records are intentionally excluded by the query above.
 }
 
 // Extract only existing departments & templates present in the history records
@@ -84,7 +86,7 @@ ksort($existing_templates);
         <div>
             <div style="font-size:.72rem;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,.55);">HR Manager · Evaluations</div>
             <h4 class="text-white fw-bold mb-0 mt-1"><i class="fas fa-history me-2" style="color:#BD9414;"></i>Evaluation History</h4>
-            <p class="text-white-50 small mb-0 mt-2">Review completed and in-progress performance evaluations across employees, templates, and evaluation periods.</p>
+            <p class="text-white-50 small mb-0 mt-2">Review completed performance evaluations across employees, templates, and evaluation periods.</p>
         </div>
         <div class="d-flex align-items-center gap-2 flex-wrap">
             <span style="color:rgba(255,255,255,.6);font-size:.8rem;">
@@ -507,9 +509,6 @@ ksort($existing_templates);
     <div class="hist-status-pills">
         <button class="hist-status-pill active-all" onclick="histFilter('All', this)">
             <i class="fas fa-list me-1"></i>All <span class="ms-1 opacity-75" data-status-count="All">(<?php echo $total_c; ?>)</span>
-        </button>
-        <button class="hist-status-pill" onclick="histFilter('Pending', this)">
-            <i class="fas fa-hourglass-half me-1"></i>Pending <span class="ms-1 opacity-75" data-status-count="Pending">(<?php echo $pending_c; ?>)</span>
         </button>
         <button class="hist-status-pill" onclick="histFilter('Approved', this)">
             <i class="fas fa-check-circle me-1"></i>Approved <span class="ms-1 opacity-75" data-status-count="Approved">(<?php echo $approved_c; ?>)</span>

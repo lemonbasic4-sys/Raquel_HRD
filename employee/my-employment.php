@@ -3,6 +3,7 @@ $page_title = 'My Employment';
 require_once '../includes/session-check.php';
 checkRole(['Employee']);
 require_once '../includes/functions.php';
+ensureProbationaryEvaluationSchema($conn);
 
 $employee_id = (int) ($_SESSION['employee_id'] ?? 0);
 
@@ -108,6 +109,11 @@ require_once '../includes/header.php';
                         <?php echo formatDate($emp['hire_date'] ?? ''); ?></span>
                     <span class="badge bg-white text-dark py-1 px-2" style="font-size: 0.7rem;"><i
                             class="fas fa-user-check me-1 text-primary"></i><?php echo e($emp['employment_status'] ?? '—'); ?></span>
+                    <?php if (!empty($emp['probationary_regularization_eligible'])): ?>
+                    <span class="badge py-1 px-2" style="font-size:.7rem;background:#dcfce7;color:#166534;"><i class="fas fa-check-circle me-1"></i>Eligible for regularization</span>
+                    <?php elseif (!empty($emp['probationary_next_evaluation_type']) && !empty($emp['probationary_next_evaluation_due_date'])): ?>
+                    <span class="badge py-1 px-2" style="font-size:.7rem;background:#eef2ff;color:#3730a3;"><i class="fas fa-calendar-check me-1"></i>Next: <?php echo e($emp['probationary_next_evaluation_type']); ?> by <?php echo e(formatDate($emp['probationary_next_evaluation_due_date'])); ?></span>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>

@@ -17,7 +17,7 @@ $user_id = (int) ($_SESSION['user_id'] ?? 0);
 // for the active self-rating workflow (new, draft, returned, and edit modes).
 if (isset($_GET['view']) && is_numeric($_GET['view']) && (int)$_GET['view'] > 0) {
     redirectWith(
-        BASE_URL . '/employee/evaluation-history-view.php?id=' . (int)$_GET['view'],
+        BASE_URL . '/employee/evaluation-history-view.php?evaluation_id=' . (int)$_GET['view'],
         'info',
         'Evaluation details are now available in Evaluation History & Audit Trail.'
     );
@@ -392,7 +392,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $period_end = date('Y-m-d', strtotime('+3 months', strtotime($hire_date)));
             } elseif ($evaluation_type === 'Final') {
                 $period_start = $hire_date;
-                $period_end = date('Y-m-d', strtotime('+6 months', strtotime($hire_date)));
+                $period_end = date('Y-m-d', strtotime('+5 months', strtotime($hire_date)));
             } else {
                 $period_start = date('Y') . '-01-01';
                 $period_end = date('Y') . '-12-31';
@@ -2008,7 +2008,7 @@ require_once '../includes/header.php';
                                 $display_end = date('Y-m-d', strtotime('+3 months', strtotime($hire_date)));
                             } elseif ($eval_type === 'Final') {
                                 $display_start = $hire_date;
-                                $display_end = date('Y-m-d', strtotime('+6 months', strtotime($hire_date)));
+                                $display_end = date('Y-m-d', strtotime('+5 months', strtotime($hire_date)));
                             } else {
                                 $display_start = date('Y') . '-01-01';
                                 $display_end = date('Y') . '-12-31';

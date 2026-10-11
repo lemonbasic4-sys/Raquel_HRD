@@ -114,6 +114,11 @@ CREATE TABLE employees (
     branch_id INT NULL,
     reports_to INT NULL,
     employment_status ENUM('OJT', 'Probationary', 'Project Based', 'Regular', 'Separated', 'Trainee', 'AWOL', 'Retirement', 'Death', 'Permanent or Total Disability', 'Resignation', 'Failed in Training', 'Termination for Cause') DEFAULT 'Regular',
+    probationary_regularization_eligible TINYINT(1) NOT NULL DEFAULT 0,
+    probationary_eligible_evaluation_id INT NULL,
+    probationary_eligible_at DATETIME NULL,
+    probationary_next_evaluation_type VARCHAR(20) NULL,
+    probationary_next_evaluation_due_date DATE NULL,
     employment_type ENUM('Full-time', 'Part-time') DEFAULT 'Full-time',
     contract_start_date DATE NULL,
     contract_end_date DATE NULL,
@@ -515,6 +520,22 @@ CREATE TABLE evaluations (
     CONSTRAINT fk_eval_approver FOREIGN KEY (approved_by) REFERENCES users(user_id) ON DELETE SET NULL,
     INDEX idx_eval_status (status, deleted_at),
     INDEX idx_eval_date (approved_date, submitted_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE probationary_evaluation_reviews (
+    evaluation_id INT NOT NULL PRIMARY KEY,
+    recommendation VARCHAR(40) NULL,
+    recommendation_reason TEXT NULL,
+    immediate_head_user_id INT NULL,
+    immediate_head_signature_data LONGTEXT NULL,
+    immediate_head_signed_at DATETIME NULL,
+    employee_acknowledged_by INT NULL,
+    employee_ack_signature_data LONGTEXT NULL,
+    employee_acknowledged_at DATETIME NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_probationary_review_evaluation FOREIGN KEY (evaluation_id) REFERENCES evaluations(evaluation_id) ON DELETE CASCADE,
+    CONSTRAINT fk_probationary_review_head FOREIGN KEY (immediate_head_user_id) REFERENCES users(user_id) ON DELETE SET NULL,
+    CONSTRAINT fk_probationary_review_employee FOREIGN KEY (employee_acknowledged_by) REFERENCES users(user_id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ============================================

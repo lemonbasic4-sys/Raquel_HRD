@@ -40,6 +40,30 @@ $template_list_url = !empty($viewer_context['is_ceo'])
             ? BASE_URL . '/staff/templates.php'
             : BASE_URL . '/employee/dashboard.php'));
 
+$viewer_role = (string)($viewer_context['role'] ?? '');
+$can_view_all_departments = !empty($viewer_context['is_ceo'])
+    || in_array($viewer_role, ['HR Manager', 'HR Supervisor', 'HR Staff'], true);
+if (!$can_view_all_departments) {
+    $viewer_department_id = (int)($viewer_context['department_id'] ?? 0);
+    $viewer_department_name = '';
+    if ($viewer_department_id > 0) {
+        $viewer_department_stmt = $conn->prepare('SELECT department_name FROM departments WHERE department_id = ? LIMIT 1');
+        $viewer_department_stmt->bind_param('i', $viewer_department_id);
+        $viewer_department_stmt->execute();
+        $viewer_department_name = (string)($viewer_department_stmt->get_result()->fetch_assoc()['department_name'] ?? '');
+        $viewer_department_stmt->close();
+    }
+    $template_department_id = (int)($template['target_department_id'] ?? 0);
+    $template_department_name = trim((string)($template['target_department'] ?? ''));
+    $department_id_matches = $template_department_id === 0 || $template_department_id === $viewer_department_id;
+    $department_name_matches = $template_department_name === ''
+        || strcasecmp($template_department_name, 'All Departments') === 0
+        || ($viewer_department_name !== '' && strcasecmp($template_department_name, $viewer_department_name) === 0);
+    if ($viewer_department_id <= 0 || !$department_id_matches || !$department_name_matches) {
+        redirectWith($template_list_url, 'danger', 'This template is not available to your department.');
+    }
+}
+
 // Fetch criteria
 $criteria_stmt = $conn->prepare("SELECT * FROM evaluation_criteria WHERE template_id = ? ORDER BY sort_order");
 $criteria_stmt->bind_param("i", $tid);
