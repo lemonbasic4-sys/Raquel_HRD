@@ -3,446 +3,149 @@ $page_title = 'Notifications';
 require_once '../includes/session-check.php';
 checkRole(['HR Manager']);
 require_once '../includes/functions.php';
-
-// ── Filters & Pagination ──
-$filter = $_GET['filter'] ?? 'all';  // all | unread | read
-$search = trim($_GET['search'] ?? '');
-$page = max(1, (int)($_GET['page'] ?? 1));
+if (!ensureManagerNotificationSchema($conn)) {
+    http_response_code(500);
+    exit('Notification categories are unavailable.');
+}
+$user_id = (int) $_SESSION['user_id'];
+$categories = [
+    'all' => ['All Notifications', 'fas fa-inbox'],
+    'approvals' => ['Pending Approvals', 'fas fa-check-circle'],
+    'evaluations' => ['Evaluations', 'fas fa-clipboard-list'],
+    'employees' => ['Employee Records', 'fas fa-users'],
+    'probation' => ['Probation & Regularization', 'fas fa-user-clock'],
+    'career' => ['Career Movements', 'fas fa-exchange-alt'],
+    'accounts' => ['Accounts & Access', 'fas fa-user-shield'],
+    'system' => ['System & Announcements', 'fas fa-bullhorn'],
+];
+$category = (string) ($_GET['category'] ?? 'all');
+if (!isset($categories[$category])) $category = 'all';
+$filter = (string) ($_GET['filter'] ?? 'all');
+if (!in_array($filter, ['all', 'unread', 'read', 'action'], true)) $filter = 'all';
+$date_filter = (string) ($_GET['date'] ?? 'all');
+if (!in_array($date_filter, ['all', 'today', '7', '30'], true)) $date_filter = 'all';
+$search = mb_substr(trim((string) ($_GET['search'] ?? '')), 0, 120);
+$page = max(1, (int) ($_GET['page'] ?? 1));
+$selected_id = max(0, (int) ($_GET['id'] ?? 0));
 $per_page = 20;
-$offset = ($page - 1) * $per_page;
-$user_id = (int)$_SESSION['user_id'];
+$scope = "user_id = ? AND (link NOT LIKE '%/employee/%' OR link LIKE '%/employee/team-evaluation%' OR link LIKE '%/employee/package-member%' OR link IS NULL OR link = '')";
 
-// Build WHERE clause
-$where = "WHERE user_id = ? AND (link NOT LIKE '%/employee/%' OR link LIKE '%/employee/team-evaluation%' OR link LIKE '%/employee/package-member%' OR link IS NULL OR link = '')";
-$types = "i";
+$summary = $conn->prepare("SELECT category, COUNT(*) AS total, SUM(is_read = 0) AS unread FROM notifications WHERE $scope GROUP BY category");
+$summary->bind_param('i', $user_id);
+$summary->execute();
+$counts = [];
+$total_all = $total_unread = 0;
+$summary_result = $summary->get_result();
+while ($row = $summary_result->fetch_assoc()) {
+    $key = isset($categories[$row['category'] ?? '']) ? $row['category'] : 'system';
+    $counts[$key] = ($counts[$key] ?? 0) + (int) $row['unread'];
+    $total_all += (int) $row['total'];
+    $total_unread += (int) $row['unread'];
+}
+$summary->close();
+
+$where = $scope;
+$types = 'i';
 $params = [$user_id];
-
-if ($filter === 'unread') {
-    $where .= " AND is_read = 0";
-} elseif ($filter === 'read') {
-    $where .= " AND is_read = 1";
-}
-
-if ($search !== '') {
-    $where .= " AND (title LIKE ? OR message LIKE ?)";
-    $types .= "ss";
-    $search_param = "%$search%";
-    $params[] = $search_param;
-    $params[] = $search_param;
-}
-
-// Count totals
-$count_all_stmt = $conn->prepare("SELECT COUNT(*) as c FROM notifications WHERE user_id = ? AND (link NOT LIKE '%/employee/%' OR link LIKE '%/employee/team-evaluation%' OR link LIKE '%/employee/package-member%' OR link IS NULL OR link = '')");
-$count_all_stmt->bind_param("i", $user_id);
-$count_all_stmt->execute();
-$total_all = $count_all_stmt->get_result()->fetch_assoc()['c'];
-$count_all_stmt->close();
-
-$count_unread_stmt = $conn->prepare("SELECT COUNT(*) as c FROM notifications WHERE user_id = ? AND is_read = 0 AND (link NOT LIKE '%/employee/%' OR link LIKE '%/employee/team-evaluation%' OR link LIKE '%/employee/package-member%' OR link IS NULL OR link = '')");
-$count_unread_stmt->bind_param("i", $user_id);
-$count_unread_stmt->execute();
-$total_unread = $count_unread_stmt->get_result()->fetch_assoc()['c'];
-$count_unread_stmt->close();
-
-$total_read = $total_all - $total_unread;
-
-// Filtered count
-$count_q = "SELECT COUNT(*) as c FROM notifications $where";
-$count_stmt = $conn->prepare($count_q);
+if ($category !== 'all') { $where .= ' AND category = ?'; $types .= 's'; $params[] = $category; }
+if ($filter === 'unread') $where .= ' AND is_read = 0';
+if ($filter === 'read') $where .= ' AND is_read = 1';
+if ($filter === 'action') $where .= ' AND needs_action = 1 AND is_read = 0';
+if ($date_filter === 'today') $where .= ' AND created_at >= CURDATE()';
+if ($date_filter === '7' || $date_filter === '30') $where .= ' AND created_at >= DATE_SUB(NOW(), INTERVAL ' . (int) $date_filter . ' DAY)';
+if ($search !== '') { $where .= ' AND (title LIKE ? OR message LIKE ?)'; $types .= 'ss'; $params[] = '%' . $search . '%'; $params[] = '%' . $search . '%'; }
+$count_stmt = $conn->prepare("SELECT COUNT(*) AS total FROM notifications WHERE $where");
 $count_stmt->bind_param($types, ...$params);
 $count_stmt->execute();
-$total_filtered = $count_stmt->get_result()->fetch_assoc()['c'];
+$total_filtered = (int) $count_stmt->get_result()->fetch_assoc()['total'];
 $count_stmt->close();
-
-$total_pages = max(1, ceil($total_filtered / $per_page));
-if ($page > $total_pages) $page = $total_pages;
-
-// Fetch notifications
-$query = "SELECT * FROM notifications $where ORDER BY created_at DESC LIMIT ? OFFSET ?";
-$fetch_types = $types . "ii";
-$fetch_params = array_merge($params, [$per_page, $offset]);
-$stmt = $conn->prepare($query);
-$stmt->bind_param($fetch_types, ...$fetch_params);
+$total_pages = max(1, (int) ceil($total_filtered / $per_page));
+$page = min($page, $total_pages);
+$offset = ($page - 1) * $per_page;
+$stmt = $conn->prepare("SELECT notification_id, title, message, link, category, needs_action, is_read, created_at FROM notifications WHERE $where ORDER BY created_at DESC, notification_id DESC LIMIT ? OFFSET ?");
+$fetch_params = [...$params, $per_page, $offset];
+$stmt->bind_param($types . 'ii', ...$fetch_params);
 $stmt->execute();
-$result = $stmt->get_result();
-$notifications = [];
-while ($row = $result->fetch_assoc()) {
-    $notifications[] = $row;
-}
+$manager_notif_items = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
+$selected = null;
+foreach ($manager_notif_items as $item) if ((int) $item['notification_id'] === $selected_id) $selected = $item;
+if (!$selected && $selected_id > 0) {
+    $selected_stmt = $conn->prepare("SELECT notification_id, title, message, link, category, needs_action, is_read, created_at FROM notifications WHERE $scope AND notification_id = ? LIMIT 1");
+    $selected_stmt->bind_param('ii', $user_id, $selected_id);
+    $selected_stmt->execute();
+    $selected = $selected_stmt->get_result()->fetch_assoc() ?: null;
+    $selected_stmt->close();
+}
+if (!$selected) $selected = $manager_notif_items[0] ?? null;
+$selected_id = (int) ($selected['notification_id'] ?? 0);
 
+function managerNotifUrl(array $overrides = []): string {
+    $params = ['category' => $_GET['category'] ?? 'all', 'filter' => $_GET['filter'] ?? 'all', 'date' => $_GET['date'] ?? 'all', 'search' => $_GET['search'] ?? '', 'page' => $_GET['page'] ?? 1];
+    foreach ($overrides as $key => $value) $params[$key] = $value;
+    return BASE_URL . '/manager/notifications.php?' . http_build_query($params);
+}
+function managerNotifLink($link): ?string {
+    $link = trim((string) $link);
+    return str_starts_with($link, BASE_URL . '/') ? $link : null;
+}
 require_once '../includes/header.php';
-
-// Helper: pick icon class based on title keywords
-function getNotifIconClass($title) {
-    $t = strtolower($title);
-    if (str_contains($t, 'approved') || str_contains($t, 'approval')) return 'approve';
-    if (str_contains($t, 'rejected') || str_contains($t, 'reject')) return 'reject';
-    if (str_contains($t, 'returned') || str_contains($t, 'revision')) return 'return';
-    if (str_contains($t, 'evaluation') || str_contains($t, 'endorsed') || str_contains($t, 'validation')) return 'eval';
-    return 'system';
-}
-function getNotifFA($cls) {
-    switch ($cls) {
-        case 'approve': return 'fas fa-check-circle';
-        case 'reject':  return 'fas fa-times-circle';
-        case 'return':  return 'fas fa-undo-alt';
-        case 'eval':    return 'fas fa-file-alt';
-        default:        return 'fas fa-bell';
-    }
-}
-function timeAgo($datetime) {
-    $diff = time() - strtotime($datetime);
-    if ($diff < 60)       return 'Just now';
-    if ($diff < 3600)     return floor($diff / 60) . 'm ago';
-    if ($diff < 86400)    return floor($diff / 3600) . 'h ago';
-    if ($diff < 604800)   return floor($diff / 86400) . 'd ago';
-    return date('M d, Y', strtotime($datetime));
-}
-
-// Build base URL for filters
-$base_url = strtok($_SERVER['REQUEST_URI'], '?');
 ?>
-
-<style>
-    /* Mobile Optimization for Notification Center */
-    @media (max-width: 576px) {
-        .notif-stats-row {
-            gap: 8px;
-            margin-bottom: 15px;
-        }
-        .notif-stat-card {
-            padding: 10px 8px;
-            min-width: 0;
-            flex: 1;
-        }
-        .notif-stat-card .nsc-icon {
-            width: 30px;
-            height: 30px;
-            font-size: 0.85rem;
-            margin-right: 8px;
-        }
-        .notif-stat-card h4 {
-            font-size: 1.1rem;
-            margin-bottom: 0;
-        }
-        .notif-stat-card p {
-            font-size: 0.65rem;
-        }
-        .notif-toolbar {
-            background: #fff;
-            padding: 12px;
-            border-radius: 12px;
-            margin-bottom: 15px;
-        }
-        .notif-filters {
-            display: flex;
-            overflow-x: auto;
-            gap: 8px;
-            padding-bottom: 10px;
-            margin-bottom: 10px;
-            border-bottom: 1px solid #f0f0f0;
-            scrollbar-width: none;
-        }
-        .notif-filters::-webkit-scrollbar { display: none; }
-        .notif-filter-btn {
-            white-space: nowrap;
-            padding: 6px 12px;
-            font-size: 0.8rem;
-        }
-        .notif-search-box {
-            width: 100%;
-            margin-left: 0 !important;
-        }
-        .notif-actions {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 8px;
-            width: 100%;
-        }
-        .notif-action-btn {
-            justify-content: center;
-            font-size: 0.75rem;
-            padding: 8px;
-        }
-        .notif-card {
-            padding: 12px;
-            margin-bottom: 8px;
-            border-radius: 12px;
-        }
-        .notif-card-icon {
-            width: 38px;
-            height: 38px;
-            font-size: 0.9rem;
-        }
-        .notif-card-title {
-            font-size: 0.85rem;
-        }
-        .notif-card-message {
-            font-size: 0.78rem;
-            line-height: 1.4;
-        }
-        .notif-card-actions {
-            opacity: 1 !important;
-            flex-direction: column;
-            gap: 8px;
-        }
-    }
-</style>
-
-<!-- Page Header -->
-<div class="page-hero fadeup">
-    <div class="d-flex flex-wrap align-items-center justify-content-between mb-0 gap-3">
-        <div>
-            <div style="font-size:.72rem;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,.55);">Manager Portal · Inbox</div>
-            <h4 class="text-white fw-bold mb-0 mt-1"><i class="fas fa-bell me-2" style="color:var(--primary-light);"></i>Notification Center</h4>
-            <p class="text-white-50 small mb-0 mt-2 d-none d-sm-block">Manage all your alerts, approvals, and system messages in one place</p>
-        </div>
-        <a href="<?php echo BASE_URL; ?>/manager/dashboard.php" class="btn btn-outline-light btn-sm px-3" style="border-radius: 20px;">
-            <i class="fas fa-arrow-left me-2"></i>Dashboard
-        </a>
-    </div>
+<link rel="stylesheet" href="<?php echo BASE_URL; ?>/assets/css/manager-notifications.css">
+<div class="page-hero mn-hero">
+    <div><span class="mn-eyebrow">HR Manager · Inbox</span><h1><i class="fas fa-bell"></i> Notifications</h1><p>Stay updated with important activities, approvals, and system updates.</p></div>
+    <div class="mn-hero-count"><strong><?php echo $total_unread; ?></strong><span>unread</span></div>
 </div>
-
-<!-- Stats Row -->
-<div class="notif-stats-row fadeup-1">
-    <div class="notif-stat-card">
-        <div class="nsc-icon" style="background:rgba(41,67,6,0.1); color:var(--primary-blue);"><i class="fas fa-layer-group"></i></div>
-        <div class="nsc-info"><h4 id="statTotal"><?php echo $total_all; ?></h4><p>Total</p></div>
-    </div>
-    <div class="notif-stat-card">
-        <div class="nsc-icon" style="background:rgba(189,148,20,0.1); color:var(--primary-light);"><i class="fas fa-envelope"></i></div>
-        <div class="nsc-info"><h4 id="statUnread"><?php echo $total_unread; ?></h4><p>Unread</p></div>
-    </div>
-    <div class="notif-stat-card">
-        <div class="nsc-icon" style="background:rgba(220,25,32,0.1); color:var(--accent);"><i class="fas fa-trash-alt"></i></div>
-        <div class="nsc-info"><h4 id="statRead"><?php echo $total_read; ?></h4><p>Read</p></div>
-    </div>
-</div>
-
-<!-- Toolbar -->
-<div class="notif-toolbar">
-    <div class="notif-filters">
-        <a href="<?php echo $base_url; ?>?filter=all<?php echo $search ? '&search=' . urlencode($search) : ''; ?>"
-           class="notif-filter-btn <?php echo $filter === 'all' ? 'active' : ''; ?>">All</a>
-        <a href="<?php echo $base_url; ?>?filter=unread<?php echo $search ? '&search=' . urlencode($search) : ''; ?>"
-           class="notif-filter-btn <?php echo $filter === 'unread' ? 'active' : ''; ?>">
-            Unread <?php if ($total_unread > 0): ?><span style="background:rgba(220,53,69,0.15);color:#dc3545;padding:1px 7px;border-radius:10px;font-size:0.72rem;margin-left:3px;"><?php echo $total_unread; ?></span><?php endif; ?>
-        </a>
-        <a href="<?php echo $base_url; ?>?filter=read<?php echo $search ? '&search=' . urlencode($search) : ''; ?>"
-           class="notif-filter-btn <?php echo $filter === 'read' ? 'active' : ''; ?>">Read</a>
-
-        <form method="GET" action="" style="display:contents;">
-            <input type="hidden" name="filter" value="<?php echo e($filter); ?>">
-            <div class="notif-search-box">
-                <i class="fas fa-search search-icon"></i>
-                <input type="text" name="search" value="<?php echo e($search); ?>" placeholder="Search notifications...">
-            </div>
-        </form>
-    </div>
-
-    <div class="notif-actions">
-        <?php if ($total_unread > 0): ?>
-        <button class="notif-action-btn" onclick="bulkAction('mark_all_read')" id="btnMarkAllRead">
-            <i class="fas fa-check-double"></i> Mark All Read
-        </button>
-        <?php endif; ?>
-        <?php if ($total_read > 0): ?>
-        <button class="notif-action-btn danger" onclick="bulkAction('delete_all_read')" id="btnDeleteAllRead">
-            <i class="fas fa-trash-alt"></i> Clear Read
-        </button>
-        <?php endif; ?>
-    </div>
-</div>
-
-<!-- Notification List -->
-<?php if (empty($notifications)): ?>
-    <div class="notif-empty-state">
-        <div class="notif-empty-icon"><i class="fas fa-bell-slash"></i></div>
-        <h5>No notifications<?php echo $filter !== 'all' || $search !== '' ? ' matching your filter' : ''; ?></h5>
-        <p>
-            <?php if ($filter !== 'all' || $search !== ''): ?>
-                Try changing your filter or search terms.
-            <?php else: ?>
-                You're all caught up! New notifications will appear here when actions occur in the system.
-            <?php endif; ?>
-        </p>
-    </div>
-<?php else: ?>
-    <div class="notif-list" id="notifList">
-        <?php foreach ($notifications as $i => $notif):
-            $icon_info = getNotifIconInfo($notif['title']);
-            $is_unread = !$notif['is_read'];
-        ?>
-        <div class="notif-card <?php echo $is_unread ? 'unread' : ''; ?>"
-             id="notif-<?php echo $notif['notification_id']; ?>"
-             style="--i: <?php echo $i; ?>;"
-             data-id="<?php echo $notif['notification_id']; ?>"
-             data-read="<?php echo $notif['is_read']; ?>">
-            <div class="notif-card-icon <?php echo $icon_info['class']; ?>">
-                <i class="<?php echo $icon_info['icon']; ?>"></i>
-            </div>
-            <div class="notif-card-body" onclick="navigateNotif(<?php echo $notif['notification_id']; ?>, '<?php echo e($notif['link'] ?? ''); ?>', <?php echo $is_unread ? 'true' : 'false'; ?>)">
-                <div class="notif-card-header-row">
-                    <h5 class="notif-card-title"><?php echo e($notif['title']); ?></h5>
-                    <?php if ($is_unread): ?>
-                        <span class="badge rounded-pill bg-warning text-dark fw-bold px-2 py-1" style="font-size:0.7rem;">Unread</span>
-                    <?php else: ?>
-                        <span class="badge rounded-pill bg-secondary bg-opacity-25 text-secondary fw-medium px-2 py-1" style="font-size:0.7rem;">Read</span>
-                    <?php endif; ?>
-                </div>
-                <div class="notif-card-message"><?php echo e($notif['message']); ?></div>
-                <div class="notif-card-meta-row">
-                    <div class="notif-card-time"><i class="far fa-clock me-1"></i><?php echo timeAgoFormat($notif['created_at']); ?></div>
-                    <?php if ($notif['link']): ?>
-                        <span class="notif-action-link">View Details <i class="fas fa-arrow-right" style="font-size:0.7rem;"></i></span>
-                    <?php endif; ?>
-                </div>
-            </div>
-            <div class="notif-card-actions">
-                <?php if ($is_unread): ?>
-                    <button onclick="notifAction(<?php echo $notif['notification_id']; ?>, 'mark_read')" title="Mark as read">
-                        <i class="fas fa-envelope-open"></i>
-                    </button>
-                <?php else: ?>
-                    <button onclick="notifAction(<?php echo $notif['notification_id']; ?>, 'mark_unread')" title="Mark as unread">
-                        <i class="fas fa-envelope"></i>
-                    </button>
-                <?php endif; ?>
-                <button class="btn-delete" onclick="notifAction(<?php echo $notif['notification_id']; ?>, 'delete')" title="Delete">
-                    <i class="fas fa-trash-alt"></i>
-                </button>
-            </div>
-        </div>
+<div class="mn-layout">
+    <aside class="mn-categories" aria-label="Notification categories">
+        <h2>Categories</h2><nav>
+        <?php foreach ($categories as $key => $meta): $unread = $key === 'all' ? $total_unread : ($counts[$key] ?? 0); ?>
+            <a class="mn-category <?php echo $category === $key ? 'active' : ''; ?>" href="<?php echo e(managerNotifUrl(['category' => $key, 'page' => 1, 'id' => null])); ?>"><i class="<?php echo $meta[1]; ?>"></i><span><?php echo e($meta[0]); ?></span><b><?php echo (int) $unread; ?></b></a>
         <?php endforeach; ?>
-    </div>
-
-    <!-- Pagination -->
-    <?php if ($total_pages > 1): ?>
-    <div class="notif-pagination">
-        <?php if ($page > 1): ?>
-            <a href="<?php echo $base_url; ?>?filter=<?php echo $filter; ?>&search=<?php echo urlencode($search); ?>&page=<?php echo $page - 1; ?>">
-                <i class="fas fa-chevron-left"></i>
-            </a>
-        <?php else: ?>
-            <span class="disabled"><i class="fas fa-chevron-left"></i></span>
-        <?php endif; ?>
-
-        <?php
-        // Show max 7 page links
-        $start_page = max(1, $page - 3);
-        $end_page = min($total_pages, $start_page + 6);
-        if ($end_page - $start_page < 6) $start_page = max(1, $end_page - 6);
-
-        for ($p = $start_page; $p <= $end_page; $p++):
-        ?>
-            <?php if ($p === $page): ?>
-                <span class="current"><?php echo $p; ?></span>
-            <?php else: ?>
-                <a href="<?php echo $base_url; ?>?filter=<?php echo $filter; ?>&search=<?php echo urlencode($search); ?>&page=<?php echo $p; ?>">
-                    <?php echo $p; ?>
-                </a>
-            <?php endif; ?>
-        <?php endfor; ?>
-
-        <?php if ($page < $total_pages): ?>
-            <a href="<?php echo $base_url; ?>?filter=<?php echo $filter; ?>&search=<?php echo urlencode($search); ?>&page=<?php echo $page + 1; ?>">
-                <i class="fas fa-chevron-right"></i>
-            </a>
-        <?php else: ?>
-            <span class="disabled"><i class="fas fa-chevron-right"></i></span>
-        <?php endif; ?>
-    </div>
-    <?php endif; ?>
-<?php endif; ?>
-
+        </nav><p class="mn-count-note">Counts show unread notifications.</p>
+    </aside>
+    <section class="mn-list-panel" aria-label="Notification list">
+        <form class="mn-search-row" method="get" action="<?php echo BASE_URL; ?>/manager/notifications.php">
+            <input type="hidden" name="category" value="<?php echo e($category); ?>"><input type="hidden" name="filter" value="<?php echo e($filter); ?>">
+            <label class="mn-search"><i class="fas fa-search"></i><input name="search" value="<?php echo e($search); ?>" placeholder="Search notifications" aria-label="Search notifications"></label>
+            <select name="date" aria-label="Date range" onchange="this.form.submit()"><option value="all" <?php echo $date_filter === 'all' ? 'selected' : ''; ?>>All time</option><option value="today" <?php echo $date_filter === 'today' ? 'selected' : ''; ?>>Today</option><option value="7" <?php echo $date_filter === '7' ? 'selected' : ''; ?>>Last 7 days</option><option value="30" <?php echo $date_filter === '30' ? 'selected' : ''; ?>>Last 30 days</option></select>
+            <button type="submit" class="mn-search-submit" aria-label="Search"><i class="fas fa-arrow-right"></i></button>
+        </form>
+        <div class="mn-toolbar"><nav class="mn-tabs" aria-label="Read status">
+            <?php foreach (['all' => 'All', 'unread' => 'Unread', 'read' => 'Read', 'action' => 'Needs My Action'] as $key => $label): ?><a class="<?php echo $filter === $key ? 'active' : ''; ?>" href="<?php echo e(managerNotifUrl(['filter' => $key, 'page' => 1, 'id' => null])); ?>"><?php echo $label; ?></a><?php endforeach; ?>
+        </nav><?php if ($total_unread > 0): ?><button type="button" class="mn-mark-all" onclick="managerNotifAction('mark_all_read')"><i class="fas fa-check-double"></i> Mark all as read</button><?php endif; ?></div>
+        <?php if ($filter === 'action'): ?><p class="mn-action-note">Unread requests for your attention. <a href="<?php echo BASE_URL; ?>/manager/pending-approvals.php">Check the current approval queue</a> for open decisions.</p><?php endif; ?>
+        <div class="mn-results-label"><?php echo $total_filtered; ?> notification<?php echo $total_filtered === 1 ? '' : 's'; ?></div>
+        <?php if (!$manager_notif_items): ?><div class="mn-empty"><i class="far fa-bell-slash"></i><strong>No notifications found</strong><p>Try another category, date range, or search.</p></div>
+        <?php else: ?><div class="mn-list">
+            <?php foreach ($manager_notif_items as $item): $id = (int) $item['notification_id']; $meta = $categories[$item['category'] ?? 'system'] ?? $categories['system']; ?>
+            <a href="<?php echo e(managerNotifUrl(['id' => $id])); ?>" class="mn-item <?php echo $selected_id === $id ? 'selected' : ''; ?> <?php echo $item['is_read'] ? '' : 'unread'; ?>"><span class="mn-item-icon"><i class="<?php echo $meta[1]; ?>"></i></span><span class="mn-item-content"><strong><?php echo e($item['title']); ?></strong><small><?php echo e($meta[0]); ?></small><span><?php echo e($item['message']); ?></span></span><span class="mn-item-meta"><time><?php echo e(timeAgoFormat($item['created_at'])); ?></time><?php if (!$item['is_read']): ?><i class="mn-unread-dot" aria-label="Unread"></i><?php endif; ?></span></a>
+            <?php endforeach; ?>
+        </div><?php if ($total_pages > 1): ?><nav class="mn-pages" aria-label="Notification pages"><?php if ($page > 1): ?><a href="<?php echo e(managerNotifUrl(['page' => $page - 1, 'id' => null])); ?>">Previous</a><?php endif; ?><span>Page <?php echo $page; ?> of <?php echo $total_pages; ?></span><?php if ($page < $total_pages): ?><a href="<?php echo e(managerNotifUrl(['page' => $page + 1, 'id' => null])); ?>">Next</a><?php endif; ?></nav><?php endif; ?><?php endif; ?>
+    </section>
+    <aside class="mn-detail" aria-label="Selected notification">
+        <?php if ($selected): $meta = $categories[$selected['category'] ?? 'system'] ?? $categories['system']; $target = managerNotifLink($selected['link']); ?>
+        <div class="mn-detail-head"><span class="mn-detail-icon"><i class="<?php echo $meta[1]; ?>"></i></span><div><h2><?php echo e($selected['title']); ?></h2><time><?php echo e(date('M j, Y · g:i A', strtotime($selected['created_at']))); ?></time></div><button type="button" class="mn-close" onclick="managerNotifAction('delete', <?php echo $selected_id; ?>)" title="Delete notification" aria-label="Delete notification">&times;</button></div>
+        <div class="mn-detail-labels"><span><?php echo e($meta[0]); ?></span><span class="<?php echo $selected['is_read'] ? 'read' : 'unread'; ?>"><?php echo $selected['is_read'] ? 'Read' : 'Unread'; ?></span></div>
+        <div class="mn-detail-message"><?php echo nl2br(e($selected['message'])); ?></div>
+        <?php if ($target): ?><a class="mn-primary-action" href="<?php echo e($target); ?>"><i class="fas fa-external-link-alt"></i> Open related page</a><?php endif; ?>
+        <button type="button" class="mn-secondary-action" onclick="managerNotifAction('<?php echo $selected['is_read'] ? 'mark_unread' : 'mark_read'; ?>', <?php echo $selected_id; ?>)"><i class="fas fa-<?php echo $selected['is_read'] ? 'envelope' : 'check'; ?>"></i> Mark as <?php echo $selected['is_read'] ? 'unread' : 'read'; ?></button>
+        <?php else: ?><div class="mn-detail-empty"><i class="far fa-envelope-open"></i><strong>Select a notification</strong><p>Its full message and related action will appear here.</p></div><?php endif; ?>
+    </aside>
+</div>
 <script>
-const AJAX_URL = '<?php echo BASE_URL; ?>/includes/ajax/notification-action.php';
-const NOTIF_CONTEXT = 'hr';
-
-function notifAction(id, action) {
+async function managerNotifAction(action, id = 0) {
     if (action === 'delete' && !confirm('Delete this notification?')) return;
-    const fd = new FormData(); 
-    fd.append('notification_id', id); 
-    fd.append('action', action);
-    fd.append('context', NOTIF_CONTEXT);
-
-    fetch(AJAX_URL, { method: 'POST', body: fd }).then(r => r.json()).then(data => {
-        if (!data.success) return alert('Error: ' + (data.error || 'Unknown'));
-        const card = document.getElementById('notif-' + id); if (!card) return;
-        if (action === 'delete') {
-            card.classList.add('removing');
-            setTimeout(() => { card.remove(); updateStats(); if (!document.querySelectorAll('.notif-card').length) location.reload(); }, 380);
-        } else if (action === 'mark_read') {
-            card.classList.remove('unread'); card.classList.add('just-read'); card.dataset.read = '1';
-            const dot = card.querySelector('.notif-unread-dot'); if (dot) dot.remove();
-            const btn = card.querySelector('.notif-card-actions button:first-child');
-            btn.setAttribute('onclick', `notifAction(${id}, 'mark_unread')`); btn.title = 'Mark as unread'; btn.innerHTML = '<i class="fas fa-envelope"></i>';
-            updateStats();
-        } else if (action === 'mark_unread') {
-            card.classList.add('unread'); card.dataset.read = '0';
-            if (!card.querySelector('.notif-unread-dot')) { const d = document.createElement('div'); d.className = 'notif-unread-dot'; d.title = 'Unread'; card.querySelector('.notif-card-actions').before(d); }
-            const btn = card.querySelector('.notif-card-actions button:first-child');
-            btn.setAttribute('onclick', `notifAction(${id}, 'mark_read')`); btn.title = 'Mark as read'; btn.innerHTML = '<i class="fas fa-envelope-open"></i>';
-            updateStats();
-        }
-    });
-}
-function navigateNotif(id, link, isUnread) { 
-    if (isUnread) { 
-        const fd = new FormData(); 
-        fd.append('notification_id', id); 
-        fd.append('action', 'mark_read'); 
-        fd.append('context', NOTIF_CONTEXT);
-        fetch(AJAX_URL, { method: 'POST', body: fd }); 
-    } 
-    if (link) window.location.href = link; 
-}
-function bulkAction(action) { 
-    if (action === 'delete_all_read' && !confirm('Delete all read notifications?')) return; 
-    if (action === 'mark_all_read' && !confirm('Mark all as read?')) return; 
-    
-    if (action === 'mark_all_read') {
-        markAllRead(); // Global
-        return;
-    }
-
-    const fd = new FormData(); 
-    fd.append('action', action); 
-    fd.append('context', NOTIF_CONTEXT);
-    fetch(AJAX_URL, { method: 'POST', body: fd }).then(r => r.json()).then(d => { if (d.success) location.reload(); }); 
-}
-function updateStats() {
-    const cards = document.querySelectorAll('.notif-card'); 
-    let u = 0;
-    cards.forEach(c => { if (c.dataset.read === '0') u++; });
-    
-    if (document.getElementById('statTotal')) document.getElementById('statTotal').textContent = cards.length;
-    if (document.getElementById('statUnread')) document.getElementById('statUnread').textContent = u;
-    if (document.getElementById('statRead')) document.getElementById('statRead').textContent = cards.length - u;
-    
-    // Update the tab badge for unread filter
-    const unreadTab = document.querySelector('a[href*="filter=unread"]');
-    if (unreadTab) {
-        let span = unreadTab.querySelector('span');
-        if (u > 0) {
-            if (!span) {
-                span = document.createElement('span');
-                span.style = "background:rgba(220,53,69,0.15);color:#dc3545;padding:1px 7px;border-radius:10px;font-size:0.72rem;margin-left:3px;";
-                unreadTab.appendChild(span);
-            }
-            span.textContent = u;
-        } else if (span) {
-            span.remove();
-        }
-    }
-
-    const badge = document.querySelector('.notification-badge');
-    if (badge) { 
-        badge.textContent = u > 9 ? '9+' : u; 
-        badge.style.display = u === 0 ? 'none' : ''; 
-    }
+    if (action === 'mark_all_read' && !confirm('Mark all notifications as read?')) return;
+    const data = new FormData();
+    data.append('action', action); data.append('notification_id', id); data.append('context', 'hr');
+    data.append('csrf_token', document.querySelector('meta[name="csrf-token"]').content);
+    try {
+        const response = await fetch('<?php echo BASE_URL; ?>/includes/ajax/notification-action.php', {method: 'POST', body: data});
+        const result = await response.json();
+        if (!result.success) throw new Error(result.error || 'Action failed');
+        location.href = <?php echo json_encode(managerNotifUrl(['id' => null]), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+    } catch (error) { alert(error.message); }
 }
 </script>
-
 <?php require_once '../includes/footer.php'; ?>

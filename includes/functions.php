@@ -267,17 +267,89 @@ function getEmployeeDisplayId($employee)
 
  */
 
-function createNotification($conn, $user_id, $title, $message, $link = null)
+function createNotification($conn, $user_id, $title, $message, $link = null, $category = null, $needs_action = null)
 {
-
-    $stmt = $conn->prepare("INSERT INTO notifications (user_id, title, message, link) VALUES (?, ?, ?, ?)");
-
-    $stmt->bind_param("isss", $user_id, $title, $message, $link);
+    // Other portals keep their existing notification behavior. Manager metadata is
+    // persisted when the optional columns have been installed.
+    $has_manager_fields = managerNotificationSchemaAvailable($conn);
+    if ($has_manager_fields) {
+        $role_stmt = $conn->prepare('SELECT role FROM users WHERE user_id = ? LIMIT 1');
+        $role_stmt->bind_param('i', $user_id);
+        $role_stmt->execute();
+        $recipient = $role_stmt->get_result()->fetch_assoc();
+        $role_stmt->close();
+        if (($recipient['role'] ?? '') === 'HR Manager') {
+            $category = $category ?? managerNotificationCategory($title, $message, $link);
+            $needs_action = $needs_action ?? (int) managerNotificationNeedsAction($title, $message, $link);
+        }
+        $stmt = $conn->prepare('INSERT INTO notifications (user_id, title, message, link, category, needs_action) VALUES (?, ?, ?, ?, ?, ?)');
+        $needs_action = (int) ($needs_action ?? 0);
+        $stmt->bind_param('issssi', $user_id, $title, $message, $link, $category, $needs_action);
+    } else {
+        $stmt = $conn->prepare('INSERT INTO notifications (user_id, title, message, link) VALUES (?, ?, ?, ?)');
+        $stmt->bind_param('isss', $user_id, $title, $message, $link);
+    }
 
     $stmt->execute();
 
     $stmt->close();
 
+}
+
+function managerNotificationSchemaAvailable($conn): bool
+{
+    static $available = null;
+    if ($available === null) {
+        $result = $conn->query("SHOW COLUMNS FROM notifications WHERE Field IN ('category', 'needs_action')");
+        $available = $result && $result->num_rows === 2;
+    }
+    return $available;
+}
+
+function ensureManagerNotificationSchema($conn): bool
+{
+    $columns = [];
+    $result = $conn->query('SHOW COLUMNS FROM notifications');
+    if (!$result) return false;
+    while ($row = $result->fetch_assoc()) $columns[$row['Field']] = true;
+    if (!isset($columns['category']) && !$conn->query('ALTER TABLE notifications ADD COLUMN category VARCHAR(32) NULL AFTER link')) return false;
+    if (!isset($columns['needs_action']) && !$conn->query('ALTER TABLE notifications ADD COLUMN needs_action TINYINT(1) NOT NULL DEFAULT 0 AFTER category')) return false;
+
+    // Classify only legacy HR Manager records. Other roles retain their own inboxes.
+    $legacy = $conn->query("SELECT n.notification_id, n.title, n.message, n.link FROM notifications n JOIN users u ON u.user_id = n.user_id WHERE u.role = 'HR Manager' AND n.category IS NULL");
+    if (!$legacy) return false;
+    $update = $conn->prepare('UPDATE notifications SET category = ?, needs_action = ? WHERE notification_id = ?');
+    while ($row = $legacy->fetch_assoc()) {
+        $category = managerNotificationCategory($row['title'], $row['message'], $row['link']);
+        $needs_action = (int) managerNotificationNeedsAction($row['title'], $row['message'], $row['link']);
+        $id = (int) $row['notification_id'];
+        $update->bind_param('sii', $category, $needs_action, $id);
+        $update->execute();
+    }
+    $update->close();
+    return true;
+}
+
+function managerNotificationCategory($title, $message = '', $link = ''): string
+{
+    $text = strtolower((string) $title . ' ' . (string) $message);
+    $url = strtolower((string) $link);
+    if (str_contains($text, 'probation') || str_contains($text, 'regulariz')) return 'probation';
+    if (str_contains($text, 'career movement') || str_contains($text, 'transfer') || str_contains($text, 'promotion') || str_contains($url, 'career-movements')) return 'career';
+    if (str_contains($text, 'account') || str_contains($text, 'access') || str_contains($text, 'credential') || str_contains($url, 'employee-accounts')) return 'accounts';
+    if (str_contains($text, 'pds') || str_contains($text, 'employee profile') || str_contains($text, 'employee record') || str_contains($url, 'review-pds')) return 'employees';
+    if (str_contains($text, 'approval') || str_contains($text, 'review required') || str_contains($text, 'pending approval') || str_contains($url, 'pending-approvals')) return 'approvals';
+    if (str_contains($text, 'evaluation') || str_contains($text, 'rating') || str_contains($text, 'template') || str_contains($text, 'package') || str_contains($url, 'evaluation-')) return 'evaluations';
+    return 'system';
+}
+
+function managerNotificationNeedsAction($title, $message = '', $link = ''): bool
+{
+    $text = strtolower((string) $title . ' ' . (string) $message);
+    if (str_contains($text, 'no further hr approval is required')) return false;
+    return str_contains($text, 'review required') || str_contains($text, 'waiting for your review')
+        || str_contains($text, 'pending your approval') || str_contains($text, 'please review')
+        || str_contains($text, 'approval required') || str_contains((string) $link, '/manager/pending-approvals');
 }
 
 /**

@@ -41,6 +41,7 @@ function markAllRead() {
     const fd = new FormData();
     fd.append('action', 'mark_all_read');
     fd.append('context', context);
+    fd.append('csrf_token', document.querySelector('meta[name="csrf-token"]')?.content || '');
 
     fetch(baseUrl + '/includes/ajax/notification-action.php', {
         method: 'POST',
@@ -382,7 +383,9 @@ function updateNotificationDOM(unreadCount, recentNotifications) {
         } else {
             recentNotifications.forEach(notif => {
                 const itemEl = document.createElement('a');
-                itemEl.href = notif.link || '#';
+                itemEl.href = window.IS_HR_MANAGER
+                    ? `${window.APP_BASE_URL}/manager/notifications.php?id=${encodeURIComponent(notif.id)}`
+                    : (notif.link || '#');
                 itemEl.className = `notification-item ${notif.is_read ? '' : 'unread'}`;
                 
                 const iconInfo = getNotifIconInfoJS(notif.title);
@@ -494,7 +497,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // ── Auto mark-all-read when notification bell dropdown is opened ──────────
     const bellBtn = document.getElementById('notificationBtn');
-    if (bellBtn) {
+    if (bellBtn && !window.IS_HR_MANAGER) {
         bellBtn.addEventListener('show.bs.dropdown', function () {
             const badge = bellBtn.querySelector('.notification-badge');
             // Only fire if there are unread notifications (badge is visible)

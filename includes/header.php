@@ -497,6 +497,7 @@ switch ($effective_role) {
         window.APP_BASE_URL = <?php echo json_encode(BASE_URL); ?>;
         window.BASE_URL = window.APP_BASE_URL;
         window.NOTIF_CONTEXT = <?php echo json_encode($notif_context === 'employee' ? 'employee' : 'hr'); ?>;
+        window.IS_HR_MANAGER = <?php echo $effective_role === 'HR Manager' ? 'true' : 'false'; ?>;
     </script>
 </head>
 
@@ -727,7 +728,7 @@ switch ($effective_role) {
                             <?php foreach ($notifications as $notif): 
                                 $icon_info = getNotifIconInfo($notif['title']);
                             ?>
-                                <a href="<?php echo e($notif['link'] ?? '#'); ?>"
+                                <a href="<?php echo $effective_role === 'HR Manager' ? e(BASE_URL . '/manager/notifications.php?id=' . (int) $notif['notification_id']) : e($notif['link'] ?? '#'); ?>"
                                     class="notification-item <?php echo $notif['is_read'] ? '' : 'unread'; ?>">
                                     <div class="notif-avatar <?php echo $icon_info['class']; ?>">
                                         <i class="<?php echo $icon_info['icon']; ?>"></i>

@@ -612,6 +612,8 @@ CREATE TABLE notifications (
     title VARCHAR(200) NOT NULL,
     message TEXT NOT NULL,
     link VARCHAR(255) NULL,
+    category VARCHAR(32) NULL,
+    needs_action TINYINT(1) NOT NULL DEFAULT 0,
     is_read TINYINT(1) DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_notif_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
