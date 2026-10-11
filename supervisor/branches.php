@@ -208,6 +208,7 @@ $branch_user_total = (int) $conn->query("SELECT COUNT(*) as cnt FROM users WHERE
 </style>
 
 
+<div class="branch-management-page">
 <div class="page-hero fadeup">
     <div class="d-flex flex-wrap align-items-center justify-content-between mb-4 gap-3">
         <div>
@@ -412,6 +413,7 @@ $branch_user_total = (int) $conn->query("SELECT COUNT(*) as cnt FROM users WHERE
     </div>
 </div>
 
+</div>
 <?php require_once '../includes/footer.php'; ?>
 <!-- ─── Import Branch Modal ─────────────────────────────────── -->
 <div class="modal fade" id="importBranchModal" tabindex="-1">

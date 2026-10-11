@@ -157,6 +157,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['movement_action'])) {
 
 // ── Fetch display data ────────────────────────────────────────────────────────
 require_once '../includes/header.php';
+?>
+<div class="staff-career-movements-page">
+<?php
 
 $movements = [];
 $counts    = ['Pending'=>0,'Approved'=>0,'Rejected'=>0,'Applied'=>0];
@@ -512,4 +515,5 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 </script>
 
+</div>
 <?php require_once '../includes/footer.php'; ?>

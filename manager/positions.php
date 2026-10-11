@@ -201,7 +201,7 @@ $employeesWithManagedPositions = (int) $conn->query("SELECT COUNT(*) AS cnt FROM
     .btn-xs { padding: 2px 8px; font-size: 0.75rem; }
     .position-toolbar { align-items: center; display: flex; flex-wrap: wrap; gap: 10px; }
     .position-toolbar .form-select { min-width: 210px; }
-    @media (max-width: 768px) {
+    @media (max-width: 991.98px) {
         .position-toolbar,
         .position-toolbar form,
         .position-toolbar .search-box,
@@ -210,6 +210,7 @@ $employeesWithManagedPositions = (int) $conn->query("SELECT COUNT(*) AS cnt FROM
     }
 </style>
 
+<div class="position-management-page">
 <div class="page-hero fadeup">
     <div class="d-flex flex-wrap align-items-center justify-content-between mb-4 gap-3">
         <div>
@@ -306,7 +307,7 @@ $employeesWithManagedPositions = (int) $conn->query("SELECT COUNT(*) AS cnt FROM
         </div>
         <div class="cc-body p-0">
             <!-- Desktop Table (hidden on mobile) -->
-            <div class="table-responsive d-none d-md-block">
+            <div class="table-responsive d-none d-lg-block">
                 <table class="table table-hover responsive-position-table" id="positionTable">
                     <thead>
                         <tr>
@@ -393,7 +394,7 @@ $employeesWithManagedPositions = (int) $conn->query("SELECT COUNT(*) AS cnt FROM
             </div>
 
             <!-- Mobile Card List (visible only on mobile) -->
-            <div class="mobile-list-view d-block d-md-none p-3">
+            <div class="mobile-list-view d-block d-lg-none p-3">
                 <div class="student-list">
                     <?php 
                     if ($positionCount === 0): ?>
@@ -755,5 +756,7 @@ $employeesWithManagedPositions = (int) $conn->query("SELECT COUNT(*) AS cnt FROM
         }
     });
 </script>
+
+</div>
 
 <?php require_once '../includes/footer.php'; ?>

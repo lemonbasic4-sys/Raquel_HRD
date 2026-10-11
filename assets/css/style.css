@@ -5529,6 +5529,33 @@ body.has-wizard-footer {
 .employee-create-page .wizard-footer-hint { color: #7d897d; font-size: .7rem; }
 .employee-create-page .wizard-footer-hint b { color: #b42318; }
 
+@media (min-width: 768px) and (max-width: 991.98px) {
+    .employee-create-page,
+    .employee-create-page .employee-create-card,
+    .employee-create-page .step-content { min-width: 0; }
+    .employee-create-page .employee-create-hero { padding: 24px; }
+    .employee-create-page .employee-create-card-body { padding: 20px 20px 0; }
+    .employee-create-page .step-content .row > [class*="col-md-"] {
+        flex: 0 0 auto;
+        width: 50%;
+        max-width: 50%;
+    }
+    .employee-create-page .step-content .row > .col-md-12 {
+        width: 100%;
+        max-width: 100%;
+    }
+    .employee-create-page .step-content .form-control,
+    .employee-create-page .step-content .form-select { min-width: 0; }
+    .employee-create-page .wizard-footer {
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-left: -20px !important;
+        margin-right: -20px !important;
+        padding-left: 20px;
+        padding-right: 20px;
+    }
+}
+
 @media (max-width: 768px) {
     .employee-create-page .employee-create-hero { border-radius: 16px; padding: 22px 20px; }
     .employee-create-hero-actions { align-items: flex-start; flex-direction: row; flex-wrap: wrap; }
@@ -7005,6 +7032,72 @@ body.has-wizard-footer {
         margin-right: auto;
     }
 
+    /* Employee Portal routes use the full workspace instead of the admin cap. */
+    body.role-employee .main-content > div,
+    body.role-employee .main-content > main,
+    body.role-employee .main-content > .container-fluid {
+        max-width: none;
+        width: 100%;
+        margin-right: 0;
+    }
+
+    /* Keep these data-entry and directory screens fitted to the full workspace. */
+    .main-content > .employee-directory-page,
+    .main-content > .supervisor-employee-page,
+    .main-content > .supervisor-dashboard,
+    .main-content > .employee-create-page,
+    .main-content > .employee-profile-page,
+    .main-content > .employee-edit-page,
+    .main-content > .branch-management-page,
+    .main-content > .department-management-page,
+    .main-content > .position-management-page,
+    .main-content > .staff-branches-page,
+    .main-content > .staff-package-tracker-page,
+    .main-content > .staff-template-page,
+    .main-content > .staff-dashboard,
+    .main-content > .staff-career-movements-page,
+    .main-content > .template-archive-page,
+    .main-content > .template-create-page,
+    .main-content > .template-view-page,
+    .main-content > .template-edit-page,
+    .main-content > .template-library-page,
+    .main-content > .pending-endorsements,
+    .main-content > .career-progression-page,
+    .main-content > .supervisor-analytics,
+    .main-content > .notification-center-page,
+    .main-content > .pending-approvals-page,
+    .main-content > .evaluation-history-page,
+    .main-content > .historical-import-page,
+    .main-content > .evaluation-packages,
+    .main-content > .analytics-page,
+    .main-content > .career-movements-page,
+    .main-content > .audit-trail-page,
+    .main-content > .profile-settings-page,
+    .main-content > .admin-dashboard,
+    .main-content > .user-management,
+    .main-content > .admin-members-page,
+    .main-content > .admin-employee-accounts-page,
+    .main-content > .admin-portal-user-page,
+    .main-content > .admin-edit-user-page,
+    .main-content > .admin-audit-trail-page,
+    .main-content > .backup-module,
+    .main-content > .config-module,
+    .main-content > .admin-notifications-page {
+        max-width: none;
+        width: 100%;
+    }
+
+    .template-view-page { max-width: none; margin: 0; }
+
+    .template-archive-page > .row > [class*="col-"] {
+        flex: 0 0 25%;
+        max-width: 25%;
+    }
+    .template-library-page .row.g-4 > [class*="col-"] {
+        flex: 0 0 25%;
+        max-width: 25%;
+    }
+
     .page-hero {
         padding: 2.25rem 2.5rem !important;
         border-radius: 18px !important;
@@ -7017,6 +7110,375 @@ body.has-wizard-footer {
     .employee-bottom-nav,
     .hr-bottom-nav {
         display: none !important;
+    }
+}
+
+@media (max-width: 991.98px) {
+    .supervisor-dashboard,
+    .supervisor-employee-page,
+    .staff-dashboard,
+    .staff-employee-directory-page,
+    .staff-branches-page,
+    .staff-package-tracker-page,
+    .staff-template-page,
+    .staff-evaluation-history-page,
+    .staff-career-movements-page,
+    .employee-profile-page,
+    .employee-edit-page,
+    .employee-create-page { min-width: 0; }
+
+    .supervisor-employee-page .page-hero > .row > [class*="col-"] {
+        min-width: 0;
+    }
+
+    .staff-branches-page .row > [class*="col-"],
+    .staff-package-tracker-page .row > [class*="col-"],
+    .staff-evaluation-history-page .row > [class*="col-"] { min-width: 0; }
+    .staff-package-tracker-page .table-responsive,
+    .staff-evaluation-history-page .history-table-wrap,
+    .staff-career-movements-page .table-responsive { max-width: 100%; overflow-x: auto; }
+    .staff-evaluation-history-page .table-responsive { max-width: 100%; }
+    .staff-career-movements-page .table-responsive table,
+    .staff-package-tracker-page .table-responsive table { min-width: 760px; }
+    .staff-template-page .row > [class*="col-"] { min-width: 0; }
+    .branch-management-page,
+    .department-management-page,
+    .position-management-page { min-width: 0; }
+
+    .branch-management-page .page-hero > .row > [class*="col-"],
+    .department-management-page .page-hero > .row > [class*="col-"],
+    .position-management-page .page-hero > .row > [class*="col-"] {
+        flex: 0 0 50%;
+        max-width: 50%;
+    }
+
+    .branch-management-page .cc-header,
+    .department-management-page .cc-header,
+    .position-management-page .cc-header {
+        align-items: flex-start;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    .branch-management-page .cc-header .search-box,
+    .department-management-page .cc-header .search-box,
+    .position-management-page .cc-header .search-box {
+        flex: 1 1 100%;
+        max-width: none;
+        width: 100%;
+    }
+
+    .template-create-page,
+    .template-archive-page,
+    .template-view-page,
+    .template-edit-page,
+    .template-library-page { min-width: 0; }
+
+    .template-create-page .page-hero > .row > [class*="col-"] {
+        flex: 0 0 50%;
+        max-width: 50%;
+    }
+    .template-create-page .wizard-nav-wrapper { padding: 18px 12px; }
+    .template-create-page .wizard-step-label { font-size: .72rem; }
+    .template-create-page .wizard-step-sublabel { display: none; }
+    .template-create-page .wizard-pane .row > [class*="col-md-"] {
+        flex: 0 0 auto;
+        width: 50%;
+        max-width: 50%;
+    }
+    .template-create-page .wizard-pane .row > .col-md-12 {
+        width: 100%;
+        max-width: 100%;
+    }
+
+    .template-edit-page .page-hero > .row > [class*="col-"] {
+        flex: 0 0 50%;
+        max-width: 50%;
+    }
+    .template-edit-page .wizard-nav-wrapper { padding: 18px 12px; }
+    .template-edit-page .wizard-step-label { font-size: .72rem; }
+    .template-edit-page .wizard-step-sublabel { display: none; }
+    .template-edit-page .wizard-pane .row > [class*="col-md-"] {
+        flex: 0 0 auto;
+        width: 50%;
+        max-width: 50%;
+    }
+    .template-edit-page .wizard-pane .row > .col-md-12 {
+        width: 100%;
+        max-width: 100%;
+    }
+
+    .template-library-page .page-hero > .row > [class*="col-"] {
+        flex: 0 0 50%;
+        max-width: 50%;
+    }
+    .template-library-page > .row.g-4 > [class*="col-"],
+    .template-library-page .row.g-4 > [class*="col-"] {
+        flex: 0 0 50%;
+        max-width: 50%;
+    }
+    .template-library-page .content-card .card-footer .d-flex { flex-wrap: wrap; }
+
+    .template-archive-page > .row > [class*="col-"] {
+        flex: 0 0 50%;
+        max-width: 50%;
+    }
+
+    .template-view-page > .row > .col-lg-4,
+    .template-view-page > .row > .col-lg-8 {
+        flex: 0 0 100%;
+        max-width: 100%;
+    }
+
+    .pending-approvals-page,
+    .evaluation-history-page,
+    .historical-import-page,
+    .evaluation-packages,
+    .analytics-page,
+    .career-movements-page,
+    .audit-trail-page,
+    .profile-settings-page,
+    .pending-endorsements,
+    .career-progression-page,
+    .supervisor-analytics,
+    .notification-center-page,
+    .supervisor-evaluation-history-page,
+    .admin-dashboard,
+    .user-management,
+    .admin-members-page,
+    .admin-employee-accounts-page,
+    .admin-portal-user-page,
+    .admin-edit-user-page,
+    .admin-audit-trail-page,
+    .backup-module,
+    .config-module,
+    .admin-notifications-page { min-width: 0; }
+
+    .admin-notifications-page .notif-toolbar,
+    .admin-notifications-page .notif-filters,
+    .admin-notifications-page .notif-search-box { min-width: 0; }
+    .admin-notifications-page .notif-card,
+    .admin-notifications-page .notif-card-body { overflow-wrap: anywhere; }
+
+    .admin-members-page .page-hero,
+    .admin-employee-accounts-page .page-hero,
+    .admin-portal-user-page .page-hero,
+    .user-management .page-hero { min-width: 0; }
+
+    .admin-members-page .admin-member-toolbar,
+    .admin-members-page .admin-member-toolbar form,
+    .admin-employee-accounts-page .account-toolbar,
+    .user-management .user-toolbar { min-width: 0; }
+
+    .admin-edit-user-page form .row > [class*="col-"] { min-width: 0; }
+    .admin-audit-trail-page .audit-filter .row > [class*="col-"] { min-width: 0; }
+
+    .career-movements-page .page-hero > .row > [class*="col-"] {
+        min-width: 0;
+    }
+    .career-movements-page .cc-header-tabs {
+        flex-wrap: wrap;
+        gap: 4px;
+    }
+    .career-movements-page .search-box {
+        flex: 1 1 100%;
+        min-width: 0 !important;
+        width: 100%;
+    }
+
+    .pending-endorsements,
+    .supervisor-evaluation-history-page,
+    .career-progression-page,
+    .supervisor-analytics,
+    .notification-center-page { min-width: 0; }
+    .pending-endorsements .table-responsive,
+    .supervisor-evaluation-history-page .history-table-wrap,
+    .career-progression-page .table-responsive,
+    .supervisor-analytics .table-responsive { max-width: 100%; overflow-x: auto; }
+    .supervisor-evaluation-history-page .supervisor-history-filters,
+    .supervisor-evaluation-history-page .history-review-tabs { min-width: 0; }
+    .career-progression-page .cp-filter-bar { min-width: 0; }
+    .career-progression-page .cp-filter-bar select,
+    .career-progression-page .cp-filter-bar input { max-width: 100%; }
+    .notification-center-page .notif-toolbar,
+    .notification-center-page .notif-filters,
+    .notification-center-page .notif-search-box { min-width: 0; }
+    .notification-center-page .notif-card,
+    .notification-center-page .notif-card-body { overflow-wrap: anywhere; }
+
+    .audit-trail-page .audit-filter .row > [class*="col-"] {
+        min-width: 0;
+    }
+    .audit-trail-page .audit-event summary {
+        min-width: 0;
+        overflow-wrap: anywhere;
+    }
+    .audit-trail-page .audit-details {
+        overflow-wrap: anywhere;
+    }
+
+    .profile-settings-page .row > .col-lg-4,
+    .profile-settings-page .row > .col-lg-5,
+    .profile-settings-page .row > .col-lg-6,
+    .profile-settings-page .row > .col-lg-7,
+    .profile-settings-page .row > .col-lg-8 {
+        min-width: 0;
+    }
+    .profile-settings-page .nav-tabs {
+        flex-wrap: wrap;
+    }
+
+    .pending-approvals-page .page-hero > .row > [class*="col-"],
+    .evaluation-history-page .page-hero > .row > [class*="col-"],
+    .historical-import-page .page-hero > .row > [class*="col-"] {
+        flex: 0 0 50%;
+        max-width: 50%;
+    }
+
+    .historical-import-page > .row.g-4 > .col-lg-7,
+    .historical-import-page > .row.g-4 > .col-lg-5 {
+        flex: 0 0 100%;
+        max-width: 100%;
+    }
+
+    .pending-approvals-page .ecr-card-header {
+        flex-wrap: wrap;
+    }
+    .pending-approvals-page .ecr-submitted-by {
+        margin-left: auto;
+    }
+
+    .evaluation-history-page .hist-filter-bar,
+    .evaluation-history-page .hist-status-pills { min-width: 0; }
+    .evaluation-history-page .history-table-wrap { max-width: 100%; overflow-x: auto; }
+}
+
+@media (max-width: 575.98px) {
+    .branch-management-page .page-hero,
+    .department-management-page .page-hero,
+    .position-management-page .page-hero { padding: 20px 16px; }
+
+    .branch-management-page .page-hero > .row,
+    .department-management-page .page-hero > .row,
+    .position-management-page .page-hero > .row {
+        --bs-gutter-x: .75rem;
+        --bs-gutter-y: .75rem;
+    }
+
+    .template-create-page .page-hero,
+    .template-archive-page > .content-card { min-width: 0; }
+    .template-archive-page > .row > [class*="col-"] {
+        flex: 0 0 100%;
+        max-width: 100%;
+    }
+    .template-create-page .page-hero > .row > [class*="col-"] {
+        flex: 0 0 50%;
+        max-width: 50%;
+    }
+    .template-edit-page .page-hero > .row > [class*="col-"] {
+        flex: 0 0 50%;
+        max-width: 50%;
+    }
+    .template-library-page .page-hero > .row > [class*="col-"] {
+        flex: 0 0 50%;
+        max-width: 50%;
+    }
+    .template-library-page > .row.g-4 > [class*="col-"],
+    .template-library-page .row.g-4 > [class*="col-"] {
+        flex: 0 0 100%;
+        max-width: 100%;
+    }
+
+    .pending-approvals-page .page-hero,
+    .evaluation-history-page .page-hero,
+    .historical-import-page .page-hero,
+    .career-movements-page .page-hero,
+    .analytics-page .page-hero,
+    .profile-settings-page .page-hero,
+    .admin-members-page .page-hero,
+    .admin-employee-accounts-page .page-hero,
+    .admin-portal-user-page .page-hero,
+    .admin-dashboard .page-hero,
+    .user-management .page-hero,
+    .config-module .page-hero,
+    .backup-module .page-hero { padding: 20px 16px; }
+    .staff-dashboard .page-hero,
+    .staff-branches-page .page-hero,
+    .staff-package-tracker-page .page-hero,
+    .staff-template-page .page-hero,
+    .staff-evaluation-history-page .page-hero,
+    .staff-career-movements-page .page-hero { padding: 20px 16px; }
+
+    .supervisor-evaluation-history-page .history-review-tabs { flex-wrap: wrap; }
+    .supervisor-evaluation-history-page .history-review-tab { flex: 1 1 100%; }
+    .career-progression-page .cp-filter-bar { align-items: stretch; }
+    .career-progression-page .cp-filter-bar > * { flex: 1 1 100%; }
+    .pending-endorsements .page-hero,
+    .historical-import-page .page-hero,
+    .career-progression-page .page-hero,
+    .supervisor-analytics .page-hero,
+    .notification-center-page .page-hero { padding: 20px 16px; }
+    .pending-approvals-page .page-hero > .row,
+    .evaluation-history-page .page-hero > .row,
+    .historical-import-page .page-hero > .row {
+        --bs-gutter-x: .75rem;
+        --bs-gutter-y: .75rem;
+    }
+    .pending-approvals-page .ecr-card-header { padding: 14px; }
+    .pending-approvals-page .ecr-submitted-by { flex: 1 1 100%; margin-left: 58px; text-align: left; }
+
+    .career-movements-page .cc-header { padding: 12px !important; }
+    .career-movements-page .cc-header-tabs .nav-link { padding: 8px 10px !important; }
+    .audit-trail-page .audit-hero { padding: 20px 16px; }
+    .audit-trail-page .audit-filter { padding: 12px; }
+    .audit-trail-page .audit-event summary { gap: 9px; padding: 13px; }
+    .audit-trail-page .audit-details { padding: 14px; }
+    .profile-settings-page .card-body { padding: 16px !important; }
+    .admin-members-page .admin-member-toolbar { align-items: stretch; }
+    .admin-employee-accounts-page .table-responsive { max-width: 100%; }
+    .admin-portal-user-page .epu-profile-card,
+    .admin-edit-user-page .card { min-width: 0; }
+    .admin-edit-user-page .form-actions,
+    .config-module .form-actions { flex-wrap: wrap; }
+    .admin-notifications-page .page-hero { padding: 20px 16px; }
+    .admin-notifications-page .notif-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .admin-notifications-page .notif-card-actions { flex-direction: row; flex-wrap: wrap; }
+    .notification-center-page .notif-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .notification-center-page .notif-card-actions { flex-direction: row; flex-wrap: wrap; }
+}
+
+@media (min-width: 768px) and (max-width: 991.98px) {
+    .employee-edit-page,
+    .employee-edit-page .content-card,
+    .employee-edit-page .step-content { min-width: 0; }
+    .employee-edit-page .card-body { padding: 18px 16px; }
+    .employee-edit-page .step-content .row > [class*="col-md-"] {
+        flex: 0 0 auto;
+        width: 50%;
+        max-width: 50%;
+    }
+    .employee-edit-page .step-content .row > .col-md-12 {
+        width: 100%;
+        max-width: 100%;
+    }
+    .employee-edit-page .portal-tabs {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+    }
+    .employee-edit-page .wizard-footer { flex-wrap: wrap; gap: 10px; }
+}
+
+@media (max-width: 1100px) {
+    .employee-profile-page > .row > .col-lg-8,
+    .employee-profile-page > .row > .col-lg-4 {
+        flex: 0 0 100%;
+        max-width: 100%;
+    }
+    .employee-profile-page .profile-sticky-col {
+        position: static;
+        max-height: none;
+        overflow: visible;
     }
 }
 
@@ -7091,4 +7553,26 @@ label {
 
 .sidebar-tooltip .tooltip-arrow::before {
     border-right-color: var(--primary-dark);
+}
+
+/* Employee Portal narrow-screen containment. */
+@media (max-width: 991.98px) {
+    body.role-employee .main-content,
+    body.role-employee .main-content > *,
+    body.role-employee .main-content .row > [class*="col-"] {
+        min-width: 0;
+    }
+
+    body.role-employee .main-content > * { max-width: 100%; }
+
+    body.role-employee .main-content .table-responsive {
+        max-width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    body.role-employee .main-content img,
+    body.role-employee .main-content canvas,
+    body.role-employee .main-content .form-control,
+    body.role-employee .main-content .form-select { max-width: 100%; }
 }

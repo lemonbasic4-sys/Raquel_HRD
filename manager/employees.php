@@ -355,18 +355,22 @@ $selected_branch = $_GET['branch'] ?? $user_assigned_branch_name;
         }
     }
 
-    @media (max-width: 768px) {
-        /* Hide the multi-dropdown filter toolbar on mobile */
+    @media (max-width: 991.98px) {
+        /* Use the compact filter sheet and card list through tablet widths. */
         .filter-toolbar {
             display: none !important;
         }
-        /* Hide filter chips row on mobile (handled by filter sheet) */
+        /* Hide filter chips row (handled by the filter sheet). */
         .filter-summary {
             display: none !important;
         }
-        /* Hide desktop search box on mobile (replaced by hr-mobile-search-bar) */
+        /* Use the compact search bar instead of the desktop search field. */
         .cc-header .search-box {
             display: none !important;
+        }
+        .page-hero > .row > [class*="col-"] {
+            flex: 0 0 50%;
+            max-width: 50%;
         }
         #paginationWrapper {
             flex-direction: column;
@@ -374,9 +378,17 @@ $selected_branch = $_GET['branch'] ?? $user_assigned_branch_name;
             text-align: center;
         }
     }
+
+    @media (max-width: 575.98px) {
+        .page-hero { padding: 20px 16px; }
+        .page-hero > .row { --bs-gutter-x: .75rem; --bs-gutter-y: .75rem; }
+        .page-hero .stat-card { min-height: 86px; padding: 12px; }
+        .page-hero .stat-label { font-size: .68rem; }
+    }
 </style>
 
 
+<div class="employee-directory-page">
 <div class="page-hero fadeup mb-4">
     <div class="d-flex flex-wrap align-items-center justify-content-between mb-4 gap-3">
         <div>
@@ -439,7 +451,7 @@ $selected_branch = $_GET['branch'] ?? $user_assigned_branch_name;
 
 <div class="chart-card fadeup">
     <!-- Mobile-only: compact search + filter sheet trigger -->
-    <div class="hr-mobile-search-bar d-md-none px-3 pt-3 pb-1">
+    <div class="hr-mobile-search-bar d-lg-none px-3 pt-3 pb-1">
         <div class="hr-search-input-wrap">
             <i class="fas fa-search hr-search-icon"></i>
             <input type="search" class="hr-search-input" id="mobileSearchEmp" placeholder="Search by name, employee ID, position, or department" aria-label="Search employees by name, employee ID, position, or department" title="Search by name, employee ID, position, or department">
@@ -451,7 +463,7 @@ $selected_branch = $_GET['branch'] ?? $user_assigned_branch_name;
     </div>
 
     <div class="cc-header">
-        <h5 class="d-none d-md-block"><i class="fas fa-users me-2"></i>All Employees</h5>
+        <h5 class="d-none d-lg-block"><i class="fas fa-users me-2"></i>All Employees</h5>
         <div class="search-box">
             <i class="fas fa-search search-icon"></i>
             <input type="search" class="form-control form-control-sm" id="customSearchEmp"
@@ -525,7 +537,7 @@ $selected_branch = $_GET['branch'] ?? $user_assigned_branch_name;
     </div>
     <div class="cc-body p-0">
         <!-- Desktop Table (hidden on mobile) -->
-        <div class="table-responsive d-none d-md-block">
+        <div class="table-responsive d-none d-lg-block">
             <table class="table table-hover" id="empTable">
                 <thead>
                     <tr>
@@ -638,7 +650,7 @@ $selected_branch = $_GET['branch'] ?? $user_assigned_branch_name;
         </div>
 
         <!-- Mobile Card List (visible only on mobile) -->
-        <div class="mobile-list-view d-block d-md-none p-3">
+        <div class="mobile-list-view d-block d-lg-none p-3">
             <div class="student-list">
                 <?php
                 $employees->data_seek(0);
@@ -754,6 +766,8 @@ $selected_branch = $_GET['branch'] ?? $user_assigned_branch_name;
             </ul>
         </div>
     </div>
+</div>
+
 </div>
 
 <?php require_once '../includes/footer.php'; ?>
@@ -1228,8 +1242,8 @@ $selected_branch = $_GET['branch'] ?? $user_assigned_branch_name;
         const allRows = Array.from(tbody.querySelectorAll("tr:not(.no-results-row)"));
         const filterInput = document.getElementById('customSearchEmp').value.toLowerCase().trim();
 
-        // Detect mobile by checking if the mobile card list is actually visible in CSS
-        // (same breakpoint as Bootstrap d-block d-md-none — avoids window.innerWidth discrepancies on Android)
+        // Detect the compact card layout from its actual visibility so filtering
+        // stays in sync at the tablet breakpoint as well as on phones.
         const mobileView = document.querySelector('.mobile-list-view');
         const isMobile   = mobileView
             ? window.getComputedStyle(mobileView).display !== 'none'

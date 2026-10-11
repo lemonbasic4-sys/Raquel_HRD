@@ -559,6 +559,7 @@ require_once '../includes/header.php';
 </style>
 
 <!-- Standard Page Hero Header -->
+<div class="historical-import-page">
 <div class="page-hero fadeup">
     <div class="d-flex flex-wrap align-items-center justify-content-between mb-3 gap-3">
         <div>
@@ -1008,4 +1009,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }, false);
 });
 </script>
+
+</div>
 

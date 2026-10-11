@@ -1465,6 +1465,7 @@ foreach ($completionSections as $k => $done) {
 ?>
 
 
+<div class="employee-profile-page">
 <div class="d-flex justify-content-between align-items-end flex-wrap gap-3 mb-3">
     <div>
         <div class="small text-muted mb-1"><a href="<?php echo htmlspecialchars($return_to, ENT_QUOTES, 'UTF-8'); ?>" class="text-decoration-none text-muted"><i class="fas fa-users me-1"></i>Employees</a> <span class="mx-1">&rsaquo;</span> Employee Profile</div>
@@ -2947,4 +2948,5 @@ function scrollToSection(id) {
 
 </script>
 
+</div>
 <?php require_once '../includes/footer.php'; ?>

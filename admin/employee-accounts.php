@@ -220,6 +220,7 @@ document.addEventListener('DOMContentLoaded', () => new bootstrap.Modal(document
 </script>
 <?php endif; ?>
 
+<div class="admin-employee-accounts-page">
 <div class="page-hero fadeup">
     <div class="d-flex flex-wrap align-items-center justify-content-between mb-3 gap-3">
         <div>
@@ -641,4 +642,5 @@ function filterTable(inputId, tableId) {
 })();
 </script>
 
+</div>
 <?php require_once '../includes/footer.php'; ?>

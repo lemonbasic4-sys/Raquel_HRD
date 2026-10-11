@@ -172,6 +172,8 @@ if ($linked_employee && !empty($linked_employee['profile_picture'])) {
 require_once __DIR__ . '/header.php';
 ?>
 
+<div class="profile-settings-page">
+
 <?php if ($success_msg): ?>
     <?php renderFlashPopup('success', $success_msg); ?>
 <?php endif; ?>
@@ -593,4 +595,5 @@ document.addEventListener('DOMContentLoaded', function() {
 .password-strength { margin-top: 4px; }
 </style>
 
+</div>
 <?php require_once __DIR__ . '/footer.php'; ?>

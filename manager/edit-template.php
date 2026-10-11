@@ -412,6 +412,7 @@ require_once '../includes/header.php';
     }
 </style>
 
+<div class="template-edit-page">
 <div class="page-hero fadeup">
     <div class="d-flex flex-wrap align-items-center justify-content-between mb-4 gap-3">
         <div>
@@ -861,6 +862,8 @@ require_once '../includes/header.php';
 </div>
 
 </form>
+
+</div>
 
 <!-- ============================================================ -->
 <!-- STAGE 5 POP-UP MODAL: WHOLE DETAILS OF THE TEMPLATE STATUS -->

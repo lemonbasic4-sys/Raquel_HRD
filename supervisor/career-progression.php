@@ -164,6 +164,7 @@ require_once '../includes/header.php';
 .cp-empty i { display:block; font-size:3rem; margin-bottom:14px; opacity:.2; }
 </style>
 
+<div class="career-progression-page">
 <div class="page-hero fadeup">
     <div class="d-flex flex-wrap align-items-center justify-content-between mb-4 gap-3">
         <div>
@@ -456,4 +457,5 @@ document.querySelectorAll('[data-bs-toggle="collapse"]').forEach(btn => {
 });
 </script>
 
+</div>
 <?php require_once '../includes/footer.php'; ?>

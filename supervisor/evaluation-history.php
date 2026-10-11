@@ -53,6 +53,7 @@ ksort($existing_departments);
 ksort($existing_templates);
 ?>
 
+<div class="evaluation-history-page supervisor-evaluation-history-page">
 <div class="page-hero fadeup supervisor-history-hero">
     <div class="d-flex flex-wrap align-items-center justify-content-between mb-4 gap-3">
         <div>
@@ -1021,4 +1022,5 @@ document.addEventListener('DOMContentLoaded', function () {
 }
 </style>
 
+</div>
 <?php require_once '../includes/footer.php'; ?>

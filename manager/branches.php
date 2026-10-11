@@ -306,16 +306,21 @@ $branch_user_total = (int) $conn->query("SELECT COUNT(*) as cnt FROM users WHERE
         border-color: #d2ad35;
         color: #17310d;
     }
-    @media (max-width: 768px) {
+    @media (max-width: 991.98px) {
         #paginationWrapper {
             flex-direction: column;
             gap: 15px;
             text-align: center;
         }
     }
+    @media (max-width: 575.98px) {
+        .branch-management-page .page-hero { padding: 20px 16px; }
+        .branch-management-page .page-hero > .row { --bs-gutter-x: .75rem; --bs-gutter-y: .75rem; }
+    }
 </style>
 
 
+<div class="branch-management-page">
 <div class="page-hero fadeup">
     <div class="d-flex flex-wrap align-items-center justify-content-between mb-4 gap-3">
         <div>
@@ -391,7 +396,7 @@ $branch_user_total = (int) $conn->query("SELECT COUNT(*) as cnt FROM users WHERE
     </div>
     <div class="cc-body p-0">
         <!-- Desktop Table (hidden on mobile) -->
-        <div class="table-responsive d-none d-md-block">
+        <div class="table-responsive d-none d-lg-block">
             <table class="table table-hover" id="branchTable">
                 <thead>
                     <tr>
@@ -465,7 +470,7 @@ $branch_user_total = (int) $conn->query("SELECT COUNT(*) as cnt FROM users WHERE
         </div>
 
         <!-- Mobile Card List (visible only on mobile) -->
-        <div class="mobile-list-view d-block d-md-none p-3">
+        <div class="mobile-list-view d-block d-lg-none p-3">
             <div class="student-list">
                 <?php 
                 if ($branch_count === 0): ?>
@@ -538,6 +543,8 @@ $branch_user_total = (int) $conn->query("SELECT COUNT(*) as cnt FROM users WHERE
             </ul>
         </div>
     </div>
+</div>
+
 </div>
 
 <?php require_once '../includes/footer.php'; ?>

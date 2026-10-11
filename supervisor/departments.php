@@ -104,6 +104,7 @@ $department_employee_total = (int) $conn->query("SELECT COUNT(*) as cnt FROM emp
     .btn-xs { padding: 2px 8px; font-size: 0.75rem; }
 </style>
 
+<div class="department-management-page">
 <div class="page-hero fadeup">
     <div class="d-flex flex-wrap align-items-center justify-content-between mb-4 gap-3">
         <div>
@@ -444,4 +445,5 @@ $department_employee_total = (int) $conn->query("SELECT COUNT(*) as cnt FROM emp
     });
 </script>
 
+</div>
 <?php require_once '../includes/footer.php'; ?>

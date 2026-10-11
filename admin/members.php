@@ -120,6 +120,7 @@ $employees = $conn->query("
     }
 </style>
 
+<div class="admin-members-page">
 <div class="page-hero fadeup">
     <div class="d-flex flex-wrap align-items-center justify-content-between mb-3 gap-3">
         <div>
@@ -306,4 +307,5 @@ $employees = $conn->query("
     <?php endif; ?>
 </div>
 
+</div>
 <?php require_once '../includes/footer.php'; ?>

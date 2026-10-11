@@ -792,6 +792,7 @@ $stepLabels = [
 ];
 ?>
 
+<div class="employee-edit-page">
 <div class="d-flex justify-content-between align-items-center mb-4">
     <p class="text-muted mb-0">Edit employee information</p>
     <a href="<?php echo e($return_to); ?>" class="btn btn-secondary">
@@ -892,4 +893,5 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
+</div>
 <?php require_once '../includes/footer.php'; ?>

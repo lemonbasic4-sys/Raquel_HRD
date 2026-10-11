@@ -548,8 +548,99 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
         margin-bottom: 15px;
         display: block;
     }
+
+    /* HR Manager dashboard: constrain cards and let columns reflow with the
+       available content width (the sidebar reduces the usable viewport). */
+    .hr-manager-dashboard,
+    .hr-manager-dashboard .row > *,
+    .hr-manager-dashboard .chart-card,
+    .hr-manager-dashboard .card,
+    .hr-manager-dashboard .insight-card {
+        min-width: 0;
+        max-width: 100%;
+    }
+    .hr-manager-dashboard .row { min-width: 0; }
+    .hr-manager-dashboard { width: 100%; }
+    @media (min-width: 1600px) {
+        /* The global ultra-wide rule caps direct main-content children at
+           1650px. Let this dashboard use the full workspace instead. */
+        .main-content > .hr-manager-dashboard { max-width: none; margin-right: 0; width: 100%; }
+    }
+    .hr-manager-dashboard canvas { max-width: 100%; }
+    .hr-manager-dashboard .chart-container,
+    .hr-manager-dashboard .dashboard-chart-wrap { min-width: 0; position: relative; width: 100%; }
+    .hr-manager-dashboard .chart-card .cc-header,
+    .hr-manager-dashboard .watchlist-header { flex-wrap: wrap; }
+    .hr-manager-dashboard .approval-item .details h6 { white-space: normal; overflow-wrap: anywhere; }
+    .hr-manager-dashboard .approval-item .details,
+    .hr-manager-dashboard .approval-item .status-meta { min-width: 0; overflow-wrap: anywhere; }
+    .hr-manager-dashboard .dashboard-quick-search .form-select { min-width: 0; }
+    .hr-manager-dashboard .custom-select-wrapper,
+    .hr-manager-dashboard .select-trigger { max-width: 100%; min-width: 0; }
+    .hr-manager-dashboard .hub-quick-links {
+        display: grid !important;
+        gap: 16px;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr));
+        margin: 0 !important;
+        padding-top: 8px !important;
+    }
+    .hr-manager-dashboard .hub-quick-links > [class*="col-"] {
+        max-width: none;
+        padding: 0;
+        width: 100%;
+    }
+
+    @media (max-width: 1199.98px) {
+        .hr-manager-dashboard .chart-container { height: clamp(220px, 30vw, 280px) !important; }
+        .hr-manager-dashboard .dashboard-chart-wrap { height: clamp(220px, 30vw, 280px) !important; }
+        .hr-manager-dashboard #topPerformerContainer { height: clamp(240px, 34vw, 320px) !important; }
+        .hr-manager-dashboard .watchlist-header { align-items: flex-start; }
+        .hr-manager-dashboard .wl-row { flex-wrap: wrap; }
+    }
+    @media (max-width: 767.98px) {
+        .hr-manager-dashboard .page-hero { border-radius: 12px; padding: 20px 16px 16px; }
+        .hr-manager-dashboard .page-hero > .d-flex { align-items: flex-start !important; margin-bottom: 14px !important; }
+        .hr-manager-dashboard .page-hero .stat-card { height: 100%; min-height: 82px; padding: 12px; }
+        .hr-manager-dashboard .page-hero .stat-value { font-size: clamp(1.15rem, 5vw, 1.6rem); }
+        .hr-manager-dashboard .page-hero .stat-label { font-size: .66rem; line-height: 1.3; }
+        .hr-manager-dashboard .page-hero .stat-icon { font-size: 1.2rem; }
+        .hr-manager-dashboard .card-body { padding: 16px !important; }
+        .hr-manager-dashboard .approval-queue-heading { padding: 12px 14px !important; }
+        .hr-manager-dashboard #approvalQueueSection .approval-list { padding: 10px; }
+        .hr-manager-dashboard .approval-item,
+        .hr-manager-dashboard .approval-group-header { gap: 10px; padding: 12px; }
+        .hr-manager-dashboard .approval-item .emp-info { align-items: flex-start; }
+        .hr-manager-dashboard .approval-item .btn-review,
+        .hr-manager-dashboard .approval-group-header .btn-review { align-self: flex-start; width: auto; }
+        .hr-manager-dashboard .chart-card .cc-header { align-items: flex-start !important; gap: 8px; padding: 14px; }
+        .hr-manager-dashboard .chart-card .cc-header h5 { font-size: .95rem; line-height: 1.35; }
+        .hr-manager-dashboard #topPerformerBranchFilter { max-width: 100%; width: 100% !important; }
+        .hr-manager-dashboard .chart-container,
+        .hr-manager-dashboard .dashboard-chart-wrap { height: 230px !important; }
+        .hr-manager-dashboard #topPerformerContainer { height: 290px !important; }
+        .hr-manager-dashboard .insight-card { min-height: 280px; padding: 20px 16px; }
+        .hr-manager-dashboard .watchlist-header { padding: 14px 16px; }
+        .hr-manager-dashboard .watchlist-header-left { flex: 1 1 100%; }
+        .hr-manager-dashboard .watchlist-view-btn { margin-left: auto; }
+        .hr-manager-dashboard #watchlist_pagination { align-items: flex-start !important; flex-direction: column; gap: 10px; padding: 14px 16px !important; }
+        .hr-manager-dashboard #watchlist_pagination > .d-flex { width: 100%; }
+        .hr-manager-dashboard #watchlist_pagination button { flex: 1; }
+        .hr-manager-dashboard .list-group-item { min-width: 0; }
+    }
+    @media (max-width: 420px) {
+        .hr-manager-dashboard .page-hero { padding-left: 12px; padding-right: 12px; }
+        .hr-manager-dashboard .page-hero .row { --bs-gutter-x: .6rem; --bs-gutter-y: .6rem; }
+        .hr-manager-dashboard .hub-card-body { padding: 14px !important; }
+        .hr-manager-dashboard .hub-link-card { min-height: 112px; padding: 10px 7px !important; }
+        .hr-manager-dashboard .hub-link-card i { font-size: 1.35rem; }
+        .hr-manager-dashboard .hub-link-card .hub-link-title { font-size: .7rem; line-height: 1.25; }
+        .hr-manager-dashboard .hub-link-card .hub-link-subtitle { font-size: .61rem !important; line-height: 1.25; }
+        .hr-manager-dashboard .approval-item .avatar-circle { height: 36px; width: 36px; }
+        .hr-manager-dashboard .watchlist-body { padding: 10px; }
+    }
 </style>
 
+<div class="hr-manager-dashboard">
 <!-- Dashboard Hero -->
 <div class="page-hero fadeup">
     <div class="d-flex flex-wrap align-items-center justify-content-between mb-4 gap-3">
@@ -563,7 +654,7 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
         </div>
     </div>
     <div class="row g-3">
-    <div class="col-6 col-md-3">
+    <div class="col-6 col-xl-3">
         <div class="stat-card">
             <div class="d-flex justify-content-between align-items-start">
                 <div>
@@ -574,7 +665,7 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
             </div>
         </div>
     </div>
-    <div class="col-6 col-md-3">
+    <div class="col-6 col-xl-3">
         <div class="stat-card">
             <div class="d-flex justify-content-between align-items-start">
                 <div>
@@ -585,7 +676,7 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
             </div>
         </div>
     </div>
-    <div class="col-6 col-md-3">
+    <div class="col-6 col-xl-3">
         <div class="stat-card">
             <div class="d-flex justify-content-between align-items-start">
                 <div>
@@ -596,7 +687,7 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
             </div>
         </div>
     </div>
-    <div class="col-6 col-md-3">
+    <div class="col-6 col-xl-3">
         <a href="branches.php" class="text-decoration-none">
             <div class="stat-card">
                 <div class="d-flex justify-content-between align-items-start">
@@ -610,7 +701,7 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
         </a>
     </div>
 
-    <div class="col-6 col-md-3">
+    <div class="col-6 col-xl-3">
         <div class="stat-card">
             <div class="d-flex justify-content-between align-items-start">
                 <div>
@@ -621,7 +712,7 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
             </div>
         </div>
     </div>
-    <div class="col-6 col-md-3">
+    <div class="col-6 col-xl-3">
         <div class="stat-card">
             <div class="d-flex justify-content-between align-items-start">
                 <div>
@@ -632,7 +723,7 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
             </div>
         </div>
     </div>
-    <div class="col-6 col-md-3">
+    <div class="col-6 col-xl-3">
         <div class="stat-card">
             <div class="d-flex justify-content-between align-items-start">
                 <div>
@@ -643,7 +734,7 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
             </div>
         </div>
     </div>
-    <div class="col-6 col-md-3">
+    <div class="col-6 col-xl-3">
         <div class="stat-card">
             <div class="d-flex justify-content-between align-items-start">
                 <div>
@@ -661,7 +752,7 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
 <div class="row mb-4">
     <div class="col-12">
         <div class="card border-0 shadow-sm rounded-4 overflow-hidden" style="background: linear-gradient(135deg, #1b2e04 0%, #294306 100%);">
-            <div class="card-body p-4 text-white">
+            <div class="card-body p-4 text-white hub-card-body">
                 <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-3">
                     <div>
                         <div class="badge bg-warning text-dark px-3 py-1 mb-2 fw-bold text-uppercase" style="letter-spacing: 0.08em; font-size: 0.72rem;">Centralized HR Management Hub</div>
@@ -669,58 +760,58 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
                         <p class="text-white-50 small mb-0">Access all core employee records, analytics dashboards, succession planning, and digital evaluation forms in one central platform.</p>
                     </div>
                 </div>
-                <div class="row g-3 pt-2">
-                    <div class="col-6 col-md-4 col-lg-2">
+                <div class="row g-3 pt-2 hub-quick-links">
+                    <div class="col-6 col-md-4 col-xl-3 col-xxl-2">
                         <a href="employees.php" class="text-decoration-none">
-                            <div class="p-3 rounded-3 text-center bg-white bg-opacity-10 border border-white border-opacity-10 text-white hover-zoom" style="transition: all 0.2s;">
+                            <div class="p-3 rounded-3 text-center bg-white bg-opacity-10 border border-white border-opacity-10 text-white hover-zoom hub-link-card" style="transition: all 0.2s;">
                                 <i class="fas fa-users fa-2x mb-2 text-warning"></i>
-                                <div class="fw-bold small">Employees</div>
-                                <div class="text-white-50" style="font-size:0.68rem;">Directory & PDS</div>
+                                <div class="fw-bold small hub-link-title">Employees</div>
+                                <div class="text-white-50 hub-link-subtitle" style="font-size:0.68rem;">Directory &amp; PDS</div>
                             </div>
                         </a>
                     </div>
-                    <div class="col-6 col-md-4 col-lg-2">
+                    <div class="col-6 col-md-4 col-xl-3 col-xxl-2">
                         <a href="succession-planning.php" class="text-decoration-none">
-                            <div class="p-3 rounded-3 text-center bg-white bg-opacity-10 border border-white border-opacity-10 text-white hover-zoom" style="transition: all 0.2s;">
+                            <div class="p-3 rounded-3 text-center bg-white bg-opacity-10 border border-white border-opacity-10 text-white hover-zoom hub-link-card" style="transition: all 0.2s;">
                                 <i class="fas fa-user-tie fa-2x mb-2" style="color:#9de0ec;"></i>
-                                <div class="fw-bold small">Succession</div>
-                                <div class="text-white-50" style="font-size:0.68rem;">Top 10 Candidates</div>
+                                <div class="fw-bold small hub-link-title">Succession</div>
+                                <div class="text-white-50 hub-link-subtitle" style="font-size:0.68rem;">Top 10 Candidates</div>
                             </div>
                         </a>
                     </div>
-                    <div class="col-6 col-md-4 col-lg-2">
+                    <div class="col-6 col-md-4 col-xl-3 col-xxl-2">
                         <a href="career-movements.php" class="text-decoration-none">
-                            <div class="p-3 rounded-3 text-center bg-white bg-opacity-10 border border-white border-opacity-10 text-white hover-zoom" style="transition: all 0.2s;">
+                            <div class="p-3 rounded-3 text-center bg-white bg-opacity-10 border border-white border-opacity-10 text-white hover-zoom hub-link-card" style="transition: all 0.2s;">
                                 <i class="fas fa-route fa-2x mb-2 text-info"></i>
-                                <div class="fw-bold small">Movements</div>
-                                <div class="text-white-50" style="font-size:0.68rem;">Promotions & Transfers</div>
+                                <div class="fw-bold small hub-link-title">Movements</div>
+                                <div class="text-white-50 hub-link-subtitle" style="font-size:0.68rem;">Promotions &amp; Transfers</div>
                             </div>
                         </a>
                     </div>
-                    <div class="col-6 col-md-4 col-lg-2">
+                    <div class="col-6 col-md-4 col-xl-3 col-xxl-2">
                         <a href="analytics.php" class="text-decoration-none">
-                            <div class="p-3 rounded-3 text-center bg-white bg-opacity-10 border border-white border-opacity-10 text-white hover-zoom" style="transition: all 0.2s;">
+                            <div class="p-3 rounded-3 text-center bg-white bg-opacity-10 border border-white border-opacity-10 text-white hover-zoom hub-link-card" style="transition: all 0.2s;">
                                 <i class="fas fa-chart-bar fa-2x mb-2 text-success"></i>
-                                <div class="fw-bold small">Analytics</div>
-                                <div class="text-white-50" style="font-size:0.68rem;">Performance & Trends</div>
+                                <div class="fw-bold small hub-link-title">Analytics</div>
+                                <div class="text-white-50 hub-link-subtitle" style="font-size:0.68rem;">Performance &amp; Trends</div>
                             </div>
                         </a>
                     </div>
-                    <div class="col-6 col-md-4 col-lg-2">
+                    <div class="col-6 col-md-4 col-xl-3 col-xxl-2">
                         <a href="templates.php" class="text-decoration-none">
-                            <div class="p-3 rounded-3 text-center bg-white bg-opacity-10 border border-white border-opacity-10 text-white hover-zoom" style="transition: all 0.2s;">
+                            <div class="p-3 rounded-3 text-center bg-white bg-opacity-10 border border-white border-opacity-10 text-white hover-zoom hub-link-card" style="transition: all 0.2s;">
                                 <i class="fas fa-file-alt fa-2x mb-2 text-light"></i>
-                                <div class="fw-bold small">Evaluations</div>
-                                <div class="text-white-50" style="font-size:0.68rem;">Templates & History</div>
+                                <div class="fw-bold small hub-link-title">Evaluations</div>
+                                <div class="text-white-50 hub-link-subtitle" style="font-size:0.68rem;">Templates &amp; History</div>
                             </div>
                         </a>
                     </div>
-                    <div class="col-6 col-md-4 col-lg-2">
+                    <div class="col-6 col-md-4 col-xl-3 col-xxl-2">
                         <a href="<?php echo BASE_URL; ?>/employee/team-evaluation-packages.php" class="text-decoration-none">
-                            <div class="p-3 rounded-3 text-center bg-white bg-opacity-10 border border-white border-opacity-10 text-white hover-zoom" style="transition: all 0.2s;">
+                            <div class="p-3 rounded-3 text-center bg-white bg-opacity-10 border border-white border-opacity-10 text-white hover-zoom hub-link-card" style="transition: all 0.2s;">
                                 <i class="fas fa-layer-group fa-2x mb-2" style="color:#f5a3ab;"></i>
-                                <div class="fw-bold small">Performance Evaluation</div>
-                                <div class="text-white-50" style="font-size:0.68rem;">Consolidation Flow</div>
+                                <div class="fw-bold small hub-link-title">Performance Evaluation</div>
+                                <div class="text-white-50 hub-link-subtitle" style="font-size:0.68rem;">Consolidation Flow</div>
                             </div>
                         </a>
                     </div>
@@ -892,7 +983,7 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
 
 <!-- Branch Distribution Insights (Professional Section) -->
 <div class="row g-4 mb-4 branch-insights-section">
-    <div class="col-lg-4">
+    <div class="col-12 col-xl-4">
         <div class="chart-card allow-overflow h-100">
             <div class="cc-header">
                 <h5><i class="fas fa-search me-2"></i>Quick Search</h5>
@@ -964,7 +1055,7 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
         </div>
     </div>
 
-    <div class="col-lg-8">
+    <div class="col-12 col-xl-8">
         <div class="insight-card" id="branchInsightCard">
             <i class="fas fa-building card-bg-icon"></i>
             <span class="insight-label">Workforce Insight</span>
@@ -1012,7 +1103,7 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
 
 <div class="row g-4 mb-4">
     <!-- Performance Distribution -->
-    <div class="col-lg-4">
+    <div class="col-12 col-xl-6 col-xxl-4">
         <div class="chart-card h-100">
             <div class="cc-header">
                 <h5><i class="fas fa-chart-pie me-2"></i>Performance Distribution</h5>
@@ -1026,7 +1117,7 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
     </div>
 
     <!-- Top Performers -->
-    <div class="col-lg-4">
+    <div class="col-12 col-xl-6 col-xxl-4">
         <div class="chart-card h-100">
             <div class="cc-header d-flex justify-content-between align-items-center">
                 <h5 class="mb-0"><i class="fas fa-trophy text-warning me-2"></i>Top Performers</h5>
@@ -1082,7 +1173,7 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
     </div>
 
     <!-- Evaluation Status -->
-    <div class="col-lg-4">
+    <div class="col-12 col-xl-6 col-xxl-4">
         <div class="chart-card h-100">
             <div class="cc-header">
                 <h5><i class="fas fa-tasks me-2"></i>Status Overview</h5>
@@ -1098,27 +1189,27 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
 
 <!-- COMPREHENSIVE GRAPHS ROW -->
 <div class="row g-4 mb-4">
-    <div class="col-lg-7">
+    <div class="col-12 col-xxl-7">
         <div class="chart-card h-100">
             <div class="cc-header d-flex justify-content-between align-items-center">
                 <h5><i class="fas fa-chart-line me-2 text-primary"></i>Performance Trends</h5>
                 <span class="badge bg-light text-dark fw-normal" style="font-size: 0.7rem;">Average Score (Last 6 Months)</span>
             </div>
             <div class="cc-body">
-                <div style="height: 300px;">
+                <div class="dashboard-chart-wrap" style="height: 300px;">
                     <canvas id="trendLineChart"></canvas>
                 </div>
             </div>
         </div>
     </div>
-    <div class="col-lg-5">
+    <div class="col-12 col-xxl-5">
         <div class="chart-card h-100">
             <div class="cc-header">
                 <h5><i class="fas fa-chart-bar me-2 text-info"></i>Branch Comparison</h5>
             </div>
             <div class="cc-body">
                 <span class="chart-label-premium">Top 10 Performing Branches (Avg Score)</span>
-                <div style="height: 270px;">
+                <div class="dashboard-chart-wrap" style="height: 270px;">
                     <canvas id="branchComparisonChart"></canvas>
                 </div>
             </div>
@@ -1128,7 +1219,7 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
 
 <!-- AGE DISTRIBUTION ROW -->
 <div class="row g-4 mb-4">
-    <div class="col-lg-6">
+    <div class="col-12 col-xxl-6">
         <div class="chart-card">
             <div class="cc-header d-flex justify-content-between align-items-center">
                 <h5><i class="fas fa-chart-pie me-2 text-danger"></i>Employee Age Distribution</h5>
@@ -1136,12 +1227,12 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
             </div>
             <div class="cc-body">
                 <div class="row align-items-center g-4">
-                    <div class="col-lg-7 col-md-12">
-                        <div style="height: 320px; position: relative;">
+                    <div class="col-12 col-xxl-7">
+                        <div class="dashboard-chart-wrap" style="height: 320px; position: relative;">
                             <canvas id="ageDistChart"></canvas>
                         </div>
                     </div>
-                    <div class="col-lg-5 col-md-12">
+                    <div class="col-12 col-xxl-5">
                         <div class="p-3 bg-light rounded-3 border">
                             <div class="d-flex justify-content-between align-items-center mb-3">
                                 <span class="text-muted small fw-semibold text-uppercase" style="letter-spacing: 0.5px;">Active Headcount</span>
@@ -1174,7 +1265,7 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
         </div>
     </div>
 
-    <div class="col-lg-6">
+    <div class="col-12 col-xxl-6">
         <div class="chart-card h-100">
             <div class="cc-header d-flex justify-content-between align-items-center">
                 <h5 class="mb-0"><i class="fas fa-clipboard-check me-2"></i>Recent Evaluations</h5>
@@ -2000,5 +2091,7 @@ document.addEventListener('DOMContentLoaded', function () {
     updateWatchlistPagination();
 });
 </script>
+
+</div><!-- /.hr-manager-dashboard -->
 
 <?php require_once '../includes/footer.php'; ?>

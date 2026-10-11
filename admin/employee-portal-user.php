@@ -222,6 +222,7 @@ document.addEventListener('DOMContentLoaded', () => new bootstrap.Modal(document
 <!-- ═══════════════════════════════════════════
      Profile Hero Card
 ═══════════════════════════════════════════ -->
+<div class="admin-portal-user-page">
 <div class="page-hero fadeup">
     <div class="d-flex align-items-center gap-4 flex-wrap">
         <div class="epu-avatar-wrap">
@@ -409,4 +410,5 @@ function generatePassword() {
 }
 </script>
 
+</div>
 <?php require_once '../includes/footer.php'; ?>

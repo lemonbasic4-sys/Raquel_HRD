@@ -38,7 +38,7 @@ $total_headcount = (int)($conn->query("SELECT COUNT(*) as c FROM employees e WHE
 require_once '../includes/header.php';
 ?>
 
-<div class="staff-branches container-fluid py-4">
+<div class="staff-branches staff-branches-page container-fluid py-4">
     <div class="page-hero fadeup mb-4" style="background: linear-gradient(135deg, #1b2e04 0%, #294306 100%); border-radius: 16px; padding: 24px; color: #fff;">
         <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
             <div>

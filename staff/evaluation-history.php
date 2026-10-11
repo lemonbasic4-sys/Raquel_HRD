@@ -60,6 +60,7 @@ ksort($existing_departments);
 ksort($existing_templates);
 ?>
 
+<div class="evaluation-history-page staff-evaluation-history-page">
 <div class="page-hero fadeup">
     <div class="d-flex flex-wrap align-items-center justify-content-between mb-4 gap-3">
         <div>
@@ -598,4 +599,5 @@ function applyStaffFilters() {
 }
 </script>
 
+</div>
 <?php require_once '../includes/footer.php'; ?>

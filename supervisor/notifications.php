@@ -55,6 +55,9 @@ while ($row = $result->fetch_assoc()) { $notifications[] = $row; }
 $stmt->close();
 
 require_once '../includes/header.php';
+?>
+<div class="notification-center-page">
+<?php
 
 function getNotifIconClass($title) {
     $t = strtolower($title);
@@ -343,4 +346,5 @@ function updateStats() {
     }
 }
 </script>
+</div>
 <?php require_once '../includes/footer.php'; ?>

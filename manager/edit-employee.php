@@ -804,6 +804,7 @@ $stepLabels = [
 ];
 ?>
 
+<div class="employee-edit-page">
 <div class="d-flex justify-content-between align-items-center mb-4">
     <p class="text-muted mb-0">Edit employee information</p>
     <a href="<?php echo e($return_to); ?>" class="btn btn-secondary">
@@ -890,6 +891,8 @@ $stepLabels = [
             </div>
         </form>
     </div>
+</div>
+
 </div>
 
 <script src="<?php echo BASE_URL; ?>/assets/js/employee-form.js?v=<?php echo time(); ?>"></script>

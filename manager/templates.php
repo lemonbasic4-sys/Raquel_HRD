@@ -270,6 +270,7 @@ $archived_template_count = (int) $conn->query("SELECT COUNT(*) as cnt FROM evalu
 $used_template_count = (int) $conn->query("SELECT COUNT(DISTINCT template_id) as cnt FROM evaluations WHERE template_id IS NOT NULL AND deleted_at IS NULL")->fetch_assoc()['cnt'];
 ?>
 
+<div class="template-library-page">
 <div class="page-hero fadeup">
     <div class="d-flex flex-wrap align-items-center justify-content-between mb-4 gap-3">
         <div>
@@ -513,6 +514,8 @@ $used_template_count = (int) $conn->query("SELECT COUNT(DISTINCT template_id) as
     </div>
     <?php if ($can_create_templates): ?></form><?php endif; ?>
 <?php endif; ?>
+
+</div>
 
 <!-- Broadcast Modal -->
 <div class="modal fade" id="broadcastModal" tabindex="-1">

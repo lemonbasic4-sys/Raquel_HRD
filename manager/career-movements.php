@@ -171,6 +171,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['movement_action'])) {
 
 // ── Fetch data ────────────────────────────────────────────────────────────────
 require_once '../includes/header.php';
+?>
+
+<div class="career-movements-page">
+<?php
 
 $movements = [];
 $counts    = ['total' => 0, 'Pending' => 0, 'Approved' => 0, 'Rejected' => 0, 'Applied' => 0];
@@ -805,6 +809,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (pendingTabBtn) bootstrap.Tab.getOrCreateInstance(pendingTabBtn).show();
     }
 });
-</script>
+    </script>
 
+</div>
 <?php require_once '../includes/footer.php'; ?>

@@ -103,6 +103,7 @@ function timeAgo($datetime) {
 $base_url = strtok($_SERVER['REQUEST_URI'], '?');
 ?>
 
+<div class="admin-notifications-page">
 <style>
     /* Mobile Optimization for Notification Center */
     @media (max-width: 576px) {
@@ -402,4 +403,5 @@ function updateStats() {
     }
 }
 </script>
+</div>
 <?php require_once '../includes/footer.php'; ?>

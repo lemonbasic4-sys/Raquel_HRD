@@ -52,6 +52,7 @@ foreach ($packages as $package) {
 require_once '../includes/header.php';
 ?>
 
+<div class="staff-package-tracker-page">
 <div class="page-hero fadeup mb-4">
     <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
         <div>
@@ -218,4 +219,5 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 </script>
 
+</div>
 <?php require_once '../includes/footer.php'; ?>

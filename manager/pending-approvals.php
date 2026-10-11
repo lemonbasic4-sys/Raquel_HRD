@@ -455,6 +455,7 @@ if ($ecr_pending) { while ($r = $ecr_pending->fetch_assoc()) $ecr_all_pending[] 
 // ── End change request fetch ─────────────────────────────────────────────────
 ?>
 
+<div class="pending-approvals-page">
 <div class="page-hero fadeup">
     <div class="d-flex flex-wrap align-items-center justify-content-between mb-4 gap-3">
         <div>
@@ -2275,5 +2276,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 </script>
+
+</div>
 
 <?php require_once '../includes/footer.php'; ?>

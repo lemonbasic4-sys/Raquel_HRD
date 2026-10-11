@@ -85,6 +85,7 @@ $templates = $conn->query("SELECT et.*, u.full_name as created_by_name, u.role A
 $archive_count = $templates->num_rows;
 ?>
 
+<div class="template-archive-page">
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
         <p class="text-muted mb-0"><i class="fas fa-archive me-1"></i> Review and manage archived evaluation templates</p>
@@ -212,6 +213,8 @@ $archive_count = $templates->num_rows;
         <?php endwhile; ?>
     </div>
 <?php endif; ?>
+
+</div>
 
 <?php require_once '../includes/footer.php'; ?>
 

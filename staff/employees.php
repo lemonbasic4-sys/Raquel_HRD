@@ -104,6 +104,7 @@ $statuses = ['OJT','Probationary','Project Based','Regular','Separated','Trainee
     }
 </style>
 
+<div class="employee-directory-page staff-employee-directory-page">
 <div class="page-hero fadeup mb-4">
     <div class="d-flex flex-wrap align-items-center justify-content-between mb-4 gap-3">
         <div>
@@ -574,4 +575,5 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 </script>
 
+</div>
 <?php require_once '../includes/footer.php'; ?>

@@ -104,6 +104,7 @@ $department_employee_total = (int) $conn->query("SELECT COUNT(*) as cnt FROM emp
     .btn-xs { padding: 2px 8px; font-size: 0.75rem; }
 </style>
 
+<div class="department-management-page">
 <div class="page-hero fadeup">
     <div class="d-flex flex-wrap align-items-center justify-content-between mb-4 gap-3">
         <div>
@@ -174,7 +175,7 @@ $department_employee_total = (int) $conn->query("SELECT COUNT(*) as cnt FROM emp
     </div>
     <div class="cc-body p-0">
         <!-- Desktop Table (hidden on mobile) -->
-        <div class="table-responsive d-none d-md-block">
+        <div class="table-responsive d-none d-lg-block">
             <table class="table table-hover" id="deptTable">
                 <thead>
                     <tr>
@@ -252,7 +253,7 @@ $department_employee_total = (int) $conn->query("SELECT COUNT(*) as cnt FROM emp
         </div>
 
         <!-- Mobile Card List (visible only on mobile) -->
-        <div class="mobile-list-view d-block d-md-none p-3">
+        <div class="mobile-list-view d-block d-lg-none p-3">
             <div class="student-list">
                 <?php 
                 if ($department_count === 0): ?>
@@ -443,5 +444,7 @@ $department_employee_total = (int) $conn->query("SELECT COUNT(*) as cnt FROM emp
         });
     });
 </script>
+
+</div>
 
 <?php require_once '../includes/footer.php'; ?>

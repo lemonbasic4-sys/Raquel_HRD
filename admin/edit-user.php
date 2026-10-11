@@ -150,6 +150,7 @@ require_once '../includes/header.php';
 $branches = $conn->query("SELECT * FROM branches ORDER BY branch_name");
 ?>
 
+<div class="admin-edit-user-page">
 <div class="d-flex justify-content-between align-items-center mb-4">
     <p class="text-muted mb-0">Edit user account details</p>
     <a href="<?php echo BASE_URL; ?>/admin/users.php" class="btn btn-secondary">
@@ -290,4 +291,5 @@ $branches = $conn->query("SELECT * FROM branches ORDER BY branch_name");
     </div>
 </div>
 
+</div>
 <?php require_once '../includes/footer.php'; ?>

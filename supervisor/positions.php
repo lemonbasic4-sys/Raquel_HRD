@@ -210,6 +210,7 @@ $employeesWithManagedPositions = (int) $conn->query("SELECT COUNT(*) AS cnt FROM
     }
 </style>
 
+<div class="position-management-page">
 <div class="page-hero fadeup">
     <div class="d-flex flex-wrap align-items-center justify-content-between mb-4 gap-3">
         <div>
@@ -756,4 +757,5 @@ $employeesWithManagedPositions = (int) $conn->query("SELECT COUNT(*) AS cnt FROM
     });
 </script>
 
+</div>
 <?php require_once '../includes/footer.php'; ?>
