@@ -127,7 +127,7 @@ require_once '../includes/header.php';
     </div>
 
     <div class="row g-4">
-        <aside class="col-lg-4">
+        <aside class="col-lg-4 order-2">
             <section class="content-card template-panel mb-4">
                 <div class="template-panel-header"><h2><i class="fas fa-circle-info"></i>Template overview</h2></div>
                 <div class="card-body">
@@ -165,7 +165,7 @@ require_once '../includes/header.php';
             </section>
         </aside>
 
-        <section class="col-lg-8">
+        <section class="col-lg-8 order-1">
             <div class="content-card template-panel">
                 <div class="template-panel-header criteria-heading"><div><h2><i class="fas fa-list-check"></i>Evaluation criteria</h2><p>Switch between the KRA and behavior sections to review their criteria.</p></div><span class="template-count"><?php echo count($criteria); ?> total</span></div>
                 <div class="criteria-tabs-wrap">
@@ -184,22 +184,25 @@ require_once '../includes/header.php';
                     <div class="tab-content criteria-tab-content">
                         <div class="tab-pane fade <?php echo $kra_count > 0 || $behavior_count === 0 ? 'show active' : ''; ?>" id="kra-panel" role="tabpanel" aria-labelledby="kra-tab" tabindex="0">
                             <?php if ($kra_criteria): ?>
-                                <div class="criteria-list">
+                                <div class="criteria-table-wrap">
+                                    <table class="table criteria-table align-middle mb-0">
+                                        <thead><tr><th scope="col">#</th><th scope="col">Criteria</th><th scope="col">Description</th><th scope="col">Method</th><th scope="col" class="text-end">Weight</th></tr></thead>
+                                        <tbody>
                                     <?php foreach ($kra_criteria as $i => $c):
                                         $method = (string)($c['scoring_method'] ?? '');
                                         $method_labels = ['Scale_1_4' => 'Scale 1–4', 'Scale_1_5' => 'Scale 1–5', 'Scale_1_10' => 'Scale 1–10', 'Percentage' => 'Percentage'];
                                         $method_label = $method_labels[$method] ?? ($method !== '' ? str_replace('_', ' ', $method) : 'Not specified');
                                     ?>
-                                        <article class="criteria-item">
-                                            <span class="criteria-index"><?php echo str_pad((string)($i + 1), 2, '0', STR_PAD_LEFT); ?></span>
-                                            <div class="criteria-content">
-                                                <div class="criteria-item-top"><span class="section-pill kra"><i class="fas fa-bullseye"></i>Key result area</span><span class="criteria-weight"><?php echo number_format((float)$c['weight'], 2); ?>%<small>of KRA section</small></span></div>
-                                                <h3><?php echo e($c['criterion_name']); ?></h3>
-                                                <?php if (!empty($c['description'])): ?><p><?php echo nl2br(e($c['description'])); ?></p><?php endif; ?>
-                                                <div class="criteria-method"><i class="fas fa-sliders-h"></i>Scoring method <strong><?php echo e($method_label); ?></strong></div>
-                                            </div>
-                                        </article>
+                                        <tr>
+                                            <td data-label="#"><span class="criteria-index"><?php echo str_pad((string)($i + 1), 2, '0', STR_PAD_LEFT); ?></span></td>
+                                            <td class="criteria-name" data-label="Criteria"><?php echo e($c['criterion_name']); ?></td>
+                                            <td class="criteria-description" data-label="Description"><?php echo !empty($c['description']) ? nl2br(e($c['description'])) : '<span class="text-muted">—</span>'; ?></td>
+                                            <td data-label="Method"><span class="criteria-method"><i class="fas fa-sliders-h"></i><?php echo e($method_label); ?></span></td>
+                                            <td class="criteria-weight text-end" data-label="Weight"><?php echo number_format((float)$c['weight'], 2); ?>%</td>
+                                        </tr>
                                     <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
                                 </div>
                             <?php else: ?>
                                 <div class="criteria-empty"><i class="fas fa-bullseye"></i><strong>No KRA criteria</strong><span>This template does not define any Key Result Areas.</span></div>
@@ -207,7 +210,10 @@ require_once '../includes/header.php';
                         </div>
                         <div class="tab-pane fade <?php echo $kra_count === 0 && $behavior_count > 0 ? 'show active' : ''; ?>" id="behavior-panel" role="tabpanel" aria-labelledby="behavior-tab" tabindex="0">
                             <?php if ($behavior_criteria): ?>
-                                <div class="criteria-list">
+                                <div class="criteria-table-wrap">
+                                    <table class="table criteria-table align-middle mb-0">
+                                        <thead><tr><th scope="col">#</th><th scope="col">Criteria</th><th scope="col">Description</th><th scope="col">Method</th><th scope="col" class="text-end">Weight</th></tr></thead>
+                                        <tbody>
                                     <?php foreach ($behavior_criteria as $i => $c):
                                         $method = (string)($c['scoring_method'] ?? '');
                                         $method_labels = ['Scale_1_4' => 'Scale 1–4', 'Scale_1_5' => 'Scale 1–5', 'Scale_1_10' => 'Scale 1–10', 'Percentage' => 'Percentage'];
@@ -215,16 +221,16 @@ require_once '../includes/header.php';
                                         $criterion_detail = $c['kpi_description'] ?? '';
                                         if ($criterion_detail === '') $criterion_detail = $c['description'] ?? '';
                                     ?>
-                                        <article class="criteria-item">
-                                            <span class="criteria-index"><?php echo str_pad((string)($i + 1), 2, '0', STR_PAD_LEFT); ?></span>
-                                            <div class="criteria-content">
-                                                <div class="criteria-item-top"><span class="section-pill behavior"><i class="fas fa-heart"></i>Core behavior</span><span class="criteria-weight">Equal<small>behavior contribution</small></span></div>
-                                                <h3><?php echo e($c['criterion_name']); ?></h3>
-                                                <?php if ($criterion_detail !== ''): ?><p><?php echo nl2br(e($criterion_detail)); ?></p><?php endif; ?>
-                                                <div class="criteria-method"><i class="fas fa-sliders-h"></i>Scoring method <strong><?php echo e($method_label); ?></strong></div>
-                                            </div>
-                                        </article>
+                                        <tr>
+                                            <td data-label="#"><span class="criteria-index"><?php echo str_pad((string)($i + 1), 2, '0', STR_PAD_LEFT); ?></span></td>
+                                            <td class="criteria-name" data-label="Criteria"><?php echo e($c['criterion_name']); ?></td>
+                                            <td class="criteria-description" data-label="Description"><?php echo $criterion_detail !== '' ? nl2br(e($criterion_detail)) : '<span class="text-muted">—</span>'; ?></td>
+                                            <td data-label="Method"><span class="criteria-method"><i class="fas fa-sliders-h"></i><?php echo e($method_label); ?></span></td>
+                                            <td class="criteria-weight text-end" data-label="Weight">Equal</td>
+                                        </tr>
                                     <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
                                 </div>
                             <?php else: ?>
                                 <div class="criteria-empty"><i class="fas fa-heart"></i><strong>No behavior criteria</strong><span>This template does not define any Behavior &amp; Values criteria.</span></div>
@@ -239,33 +245,35 @@ require_once '../includes/header.php';
 
 <style>
 .template-view-page { --template-green: #082e06; --template-green-mid: #0f6b2e; --template-gold: #bd9414; --template-ink: #1c271b; --template-muted: #687466; --template-line: #e6ebe3; max-width: 1440px; margin: 0 auto; }
-.template-view-hero { background: linear-gradient(125deg, var(--template-green) 0%, #0b481c 72%, #17632b 100%); border: 1px solid rgba(255,255,255,.12); border-radius: 16px; color: #fff; padding: 24px 28px 22px; box-shadow: 0 12px 28px rgba(8,46,6,.12); }
-.template-breadcrumb { align-items: center; color: rgba(255,255,255,.64); display: flex; font-size: .76rem; gap: 10px; margin-bottom: 23px; }
+.template-view-hero { background: linear-gradient(135deg, var(--hero-from) 0%, var(--hero-mid) 50%, var(--hero-to) 100%); border: 1px solid rgba(255,255,255,.12); border-left: 4px solid var(--template-gold); border-radius: 12px; color: #fff; overflow: hidden; padding: 18px 22px 16px; position: relative; box-shadow: 0 8px 20px rgba(8,46,6,.1); }
+.template-view-hero::before { background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E"); content: ''; inset: 0; pointer-events: none; position: absolute; }
+.template-view-hero > * { position: relative; z-index: 1; }
+.template-breadcrumb { align-items: center; color: rgba(255,255,255,.68); display: flex; font-size: .72rem; gap: 9px; margin-bottom: 15px; }
 .template-breadcrumb a { color: #fff; font-weight: 600; text-decoration: none; }
 .template-breadcrumb a:hover { text-decoration: underline; }
 .template-breadcrumb i { font-size: .62rem; }
-.template-eyebrow { color: #d5e5cc; font-size: .72rem; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; }
-.template-title { color: #fff; font-size: clamp(1.55rem, 3vw, 2.25rem); font-weight: 750; line-height: 1.16; margin: 9px 0 9px; overflow-wrap: anywhere; }
-.template-description { color: rgba(255,255,255,.78); max-width: 760px; font-size: .91rem; line-height: 1.6; }
-.template-hero-actions { align-items: flex-end; display: flex; flex-direction: column; gap: 12px; }
-.template-readonly { background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.22); border-radius: 999px; color: #fff; font-size: .75rem; font-weight: 700; padding: 7px 11px; white-space: nowrap; }
-.template-back-link { border: 0; border-radius: 8px; color: var(--template-green); font-weight: 700; white-space: nowrap; }
-.template-meta-row { border-top: 1px solid rgba(255,255,255,.18); color: rgba(255,255,255,.94); display: flex; flex-wrap: wrap; gap: 12px 28px; margin-top: 22px; padding-top: 16px; font-size: .82rem; }
+.template-eyebrow { color: #f0d775; font-size: .68rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.template-title { color: #fff; font-size: clamp(1.35rem, 2.25vw, 1.8rem); font-weight: 750; line-height: 1.2; margin: 6px 0 7px; overflow-wrap: anywhere; }
+.template-description { color: rgba(255,255,255,.8); max-width: 760px; font-size: .84rem; line-height: 1.5; }
+.template-hero-actions { align-items: center; display: flex; flex-direction: row; flex-wrap: wrap; gap: 8px; }
+.template-readonly { background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.24); border-radius: 999px; color: #fff; font-size: .7rem; font-weight: 700; padding: 6px 10px; white-space: nowrap; }
+.template-back-link { border: 1px solid rgba(255,255,255,.25); border-radius: 7px; color: var(--template-green); font-size: .78rem; font-weight: 700; padding: 7px 10px; white-space: nowrap; }
+.template-meta-row { border-top: 1px solid rgba(255,255,255,.18); color: rgba(255,255,255,.94); display: flex; flex-wrap: wrap; gap: 9px 22px; margin-top: 15px; padding-top: 12px; font-size: .77rem; }
 .template-meta-row span { align-items: center; display: inline-flex; gap: 7px; }
 .template-meta-row span > i { color: #e3bf51; }
 .template-meta-row strong { color: rgba(255,255,255,.64); font-size: .72rem; font-weight: 500; margin-right: 2px; }
-.template-stat-grid { display: grid; gap: 14px; grid-template-columns: repeat(4, minmax(0, 1fr)); }
-.template-stat { align-items: center; background: #fff; border: 1px solid var(--template-line); border-radius: 12px; display: flex; gap: 12px; min-height: 82px; padding: 14px 16px; }
-.template-stat strong { color: var(--template-ink); display: block; font-size: 1.25rem; line-height: 1; }
-.template-stat small { color: var(--template-muted); display: block; font-size: .72rem; margin-top: 5px; }
-.template-stat-icon { align-items: center; border-radius: 10px; display: inline-flex; flex: 0 0 38px; height: 38px; justify-content: center; width: 38px; }
+.template-stat-grid { display: grid; gap: 10px; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.template-stat { align-items: center; background: #fff; border: 1px solid var(--template-line); border-radius: 10px; display: flex; gap: 10px; min-height: 68px; padding: 10px 12px; }
+.template-stat strong { color: var(--template-ink); display: block; font-size: 1.08rem; line-height: 1; }
+.template-stat small { color: var(--template-muted); display: block; font-size: .68rem; margin-top: 4px; }
+.template-stat-icon { align-items: center; border-radius: 9px; display: inline-flex; flex: 0 0 34px; height: 34px; justify-content: center; width: 34px; }
 .template-stat-icon.green { background: #e8f3e8; color: var(--template-green-mid); }.template-stat-icon.gold { background: #faf2d9; color: #8c6c0b; }
 .template-panel { background: #fff; border: 1px solid var(--template-line); border-radius: 12px; box-shadow: 0 4px 16px rgba(20,35,10,.045); overflow: hidden; }
-.template-panel-header { align-items: center; background: #fff; border-bottom: 1px solid var(--template-line); display: flex; justify-content: space-between; padding: 17px 20px; }
+.template-panel-header { align-items: center; background: #fff; border-bottom: 1px solid var(--template-line); display: flex; justify-content: space-between; padding: 14px 16px; }
 .template-panel-header h2 { align-items: center; color: var(--template-ink); display: flex; font-size: .98rem; font-weight: 700; gap: 9px; margin: 0; }
 .template-panel-header h2 i { color: var(--template-green-mid); }
 .template-panel-header p { color: var(--template-muted); font-size: .8rem; margin: 6px 0 0; }
-.template-count { background: #edf4eb; border-radius: 999px; color: var(--template-green); font-size: .72rem; font-weight: 700; padding: 5px 10px; white-space: nowrap; }
+.template-count { background: #edf4eb; border-radius: 999px; color: var(--template-green); font-size: .68rem; font-weight: 700; padding: 4px 9px; white-space: nowrap; }
 .criteria-tabs-wrap { padding: 0 20px; }
 .criteria-tabs { border-bottom: 1px solid var(--template-line); display: flex; gap: 8px; margin: 0; }
 .criteria-tabs .nav-link { align-items: center; background: transparent; border: 0; border-bottom: 3px solid transparent; border-radius: 0; color: var(--template-muted); display: inline-flex; font-size: .84rem; font-weight: 650; gap: 2px; margin-bottom: -1px; padding: 15px 12px 12px; }
@@ -300,6 +308,22 @@ require_once '../includes/header.php';
 .framework-detail > i { color: var(--template-gold); margin-top: 3px; }
 .framework-detail strong { color: var(--template-ink); display: block; font-size: .78rem; margin-top: 3px; }
 .criteria-heading { align-items: flex-start; }
+.criteria-table-wrap { max-width: 100%; overflow-x: hidden; padding: 0 12px 8px; }
+.criteria-table { --bs-table-bg: transparent; min-width: 0; table-layout: fixed; width: 100%; }
+.criteria-table thead th { background: #f4f7f2; border-bottom: 1px solid #e5ebe1; color: var(--template-muted); font-size: .7rem; font-weight: 700; letter-spacing: .025em; padding: 11px 10px; white-space: nowrap; }
+.criteria-table tbody td { border-color: #edf0eb; color: var(--template-ink); font-size: .78rem; padding: 10px; }
+.criteria-table tbody tr:last-child td { border-bottom: 0; }
+.criteria-table th:nth-child(1), .criteria-table td:nth-child(1) { width: 8%; }
+.criteria-table th:nth-child(2), .criteria-table td:nth-child(2) { width: 25%; }
+.criteria-table th:nth-child(3), .criteria-table td:nth-child(3) { width: 37%; }
+.criteria-table th:nth-child(4), .criteria-table td:nth-child(4) { width: 17%; }
+.criteria-table th:nth-child(5), .criteria-table td:nth-child(5) { width: 13%; }
+.criteria-name { font-weight: 700; overflow-wrap: anywhere; }
+.criteria-description { color: #596457 !important; line-height: 1.45; overflow-wrap: anywhere; }
+.criteria-table .criteria-index { background: #e9f4e7; border: 0; border-radius: 999px; flex-basis: 36px; height: 30px; width: 36px; }
+.criteria-table .criteria-method { color: var(--template-muted); font-size: .74rem; white-space: normal; overflow-wrap: anywhere; }
+.criteria-table .criteria-method i { margin-right: 7px; }
+.criteria-table .criteria-weight { color: var(--template-ink); font-size: .78rem; font-weight: 750; white-space: normal; overflow-wrap: anywhere; }
 .criteria-list { padding: 0 20px; }
 .criteria-item { align-items: flex-start; border-bottom: 1px solid #edf0eb; display: flex; gap: 14px; padding: 20px 0; }
 .criteria-item:last-child { border-bottom: 0; }
@@ -314,7 +338,7 @@ require_once '../includes/header.php';
 .criteria-content p { color: #596457; font-size: .82rem; line-height: 1.55; margin: 0 0 11px; }
 .criteria-method { align-items: center; color: var(--template-muted); display: flex; flex-wrap: wrap; font-size: .73rem; gap: 6px; }
 .criteria-method i { color: var(--template-green-mid); }.criteria-method strong { color: var(--template-ink); font-weight: 600; }
-@media (max-width: 767.98px) { .template-view-hero { border-radius: 12px; padding: 21px 18px; } .template-hero-actions { align-items: flex-start; flex-direction: row; flex-wrap: wrap; } .template-stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .template-panel-header { gap: 10px; padding: 15px 16px; } .criteria-list { padding: 0 16px; } .criteria-tabs-wrap { padding: 0 12px; } .criteria-tabs .nav-link { font-size: .75rem; padding-left: 6px; padding-right: 6px; } .template-meta-row { gap: 12px 18px; } }
+@media (max-width: 767.98px) { .template-view-hero { border-radius: 12px; padding: 21px 18px; } .template-hero-actions { align-items: flex-start; flex-direction: row; flex-wrap: wrap; } .template-stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .template-panel-header { gap: 10px; padding: 15px 16px; } .criteria-list { padding: 0 16px; } .criteria-tabs-wrap { padding: 0 12px; } .criteria-tabs .nav-link { font-size: .75rem; padding-left: 6px; padding-right: 6px; } .template-meta-row { gap: 12px 18px; } .criteria-table-wrap { padding: 0 10px 10px; } .criteria-table, .criteria-table tbody, .criteria-table tr, .criteria-table td { display: block; width: 100% !important; } .criteria-table thead { display: none; } .criteria-table tr { background: #fff; border: 1px solid #e8ede5; border-radius: 9px; margin: 10px 0; padding: 8px 12px; } .criteria-table tbody td { align-items: baseline; border: 0; display: grid; font-size: .76rem; gap: 8px; grid-template-columns: 92px minmax(0, 1fr); padding: 5px 0; text-align: left !important; } .criteria-table tbody td::before { color: var(--template-muted); content: attr(data-label); font-size: .68rem; font-weight: 700; } .criteria-table tbody td:first-child { display: none; } .criteria-table .criteria-name { font-size: .82rem; } .criteria-table .criteria-description { line-height: 1.4; } .criteria-table .criteria-weight { font-size: .76rem; } }
 @media (max-width: 420px) { .template-stat { gap: 9px; padding: 12px 10px; } .template-stat-icon { flex-basis: 32px; height: 32px; width: 32px; } .template-stat strong { font-size: 1.05rem; } .criteria-item { gap: 10px; } .criteria-index { flex-basis: 32px; height: 32px; } }
 </style>
 
