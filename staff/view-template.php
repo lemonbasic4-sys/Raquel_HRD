@@ -31,6 +31,11 @@ $stmt->close();
 if (!$template) {
     redirectWith(BASE_URL . '/staff/templates.php', 'danger', 'Template not found or is no longer active.');
 }
+$hris_template_role = (string)($viewer_context['role'] ?? '');
+if (in_array($hris_template_role, ['HR Manager', 'HR Supervisor'], true)
+    && (int)($template['created_by'] ?? 0) !== (int)($_SESSION['user_id'] ?? 0)) {
+    redirectWith(BASE_URL . '/manager/templates.php', 'danger', 'This template is not in your template library.');
+}
 $portal_dir = basename(dirname($_SERVER['SCRIPT_NAME']));
 $template_list_url = !empty($viewer_context['is_ceo'])
     ? BASE_URL . '/employee/evaluation-templates.php'
