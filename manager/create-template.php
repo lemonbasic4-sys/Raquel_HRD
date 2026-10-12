@@ -55,12 +55,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $department_stmt->execute();
     $target_department_id = (int)($department_stmt->get_result()->fetch_assoc()['department_id'] ?? 0);
     $department_stmt->close();
-    $target_positions = $is_probationary_template ? [] : getEvaluationTemplateTargetPositions($conn, $creator_context, $target_department_id);
+    $target_positions = $is_probationary_template
+        ? getProbationaryTemplateTargetPositions($conn, $creator_context, $target_department_id)
+        : getEvaluationTemplateTargetPositions($conn, $creator_context, $target_department_id);
     $target_position_ids = array_map(static function ($position) {
         return (int)$position['job_title_id'];
     }, $target_positions);
     $target_job_title_id = (int)($target_position_ids[0] ?? 0);
-    if (!$target_department_id || (!$is_probationary_template && !$target_position_ids)) {
+    if (!$target_department_id || !$target_position_ids) {
         redirectWith($template_create_url, 'danger', 'No active target positions are configured for your role in this department.');
     }
 

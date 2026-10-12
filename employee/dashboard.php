@@ -77,6 +77,7 @@ $pending_template_count = 0;
 $employee_dept = $emp['department_name'] ?? '';
 $allowed_eval_types = getAllowedEvaluationTypesForEmploymentStatus($emp['employment_status'] ?? 'Regular');
 $allowed_eval_type_sql = "'" . implode("','", $allowed_eval_types) . "'";
+$legacy_probationary_rank_et = probationaryTemplateLegacyRankSql('et', $emp['rank_category_id'] ?? 0);
 $pending_templates_stmt = $conn->prepare("
     SELECT COUNT(*) AS total
     FROM evaluation_templates et
@@ -86,7 +87,8 @@ $pending_templates_stmt = $conn->prepare("
       AND ((EXISTS (SELECT 1 FROM evaluation_template_positions etp WHERE etp.template_id = et.template_id)
             AND EXISTS (SELECT 1 FROM evaluation_template_positions etp WHERE etp.template_id = et.template_id AND etp.job_title_id = ?))
         OR (NOT EXISTS (SELECT 1 FROM evaluation_template_positions etp WHERE etp.template_id = et.template_id)
-            AND (et.target_job_title_id IS NULL OR et.target_job_title_id = ?)))
+            AND (et.target_job_title_id IS NULL OR et.target_job_title_id = ?)
+            AND $legacy_probationary_rank_et))
       AND et.evaluation_type IN ($allowed_eval_type_sql)
       AND NOT EXISTS (
           SELECT 1

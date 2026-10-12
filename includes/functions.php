@@ -3388,6 +3388,43 @@ function getEvaluationTemplateTargetPositions($conn, $context, $department_id = 
     return $positions;
 }
 
+/** Probationary forms target the creator's intended employee level, not the whole department. */
+function getProbationaryTemplateTargetPositions($conn, $context, $department_id = 0)
+{
+    if (!$context || empty($context['can_create_templates'])) return [];
+    $department_id = (int)$department_id;
+    if (empty($context['is_ceo']) && $department_id !== (int)($context['department_id'] ?? 0)) return [];
+    $role = (string)($context['role'] ?? '');
+    $creator_rank = (int)($context['rank_category_id'] ?? 0);
+    $target_rank = $role === 'HR Supervisor' || $creator_rank === 4 ? 5
+        : ($role === 'HR Manager' || !empty($context['is_ceo']) ? 3 : ($creator_rank === 3 ? 4 : 0));
+    if ($target_rank === 0) return [];
+    $stmt = $conn->prepare('SELECT job_title_id, job_title, department_id FROM job_titles WHERE department_id = ? AND rank_category_id = ? AND is_active = 1 ORDER BY job_title');
+    $stmt->bind_param('ii', $department_id, $target_rank);
+    $stmt->execute();
+    $positions = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+    return $positions;
+}
+
+/** Legacy probationary forms without positions must still match the creator's intended rank. */
+function probationaryTemplateLegacyRankSql($alias, $employee_rank_id)
+{
+    $alias = in_array($alias, ['et', 'evaluation_templates'], true) ? $alias : 'et';
+    $employee_rank_id = (int)$employee_rank_id;
+    return "($alias.evaluation_type NOT IN ('Initial', 'Final') OR EXISTS (
+        SELECT 1 FROM users template_creator
+        LEFT JOIN employees creator_employee ON creator_employee.employee_id = template_creator.employee_id
+        WHERE template_creator.user_id = $alias.created_by
+          AND CASE
+              WHEN template_creator.role = 'HR Supervisor' THEN 5
+              WHEN template_creator.role IN ('HR Manager', 'President and CEO') THEN 3
+              WHEN creator_employee.rank_category_id = 4 THEN 5
+              WHEN creator_employee.rank_category_id = 3 THEN 4
+              ELSE 0 END = $employee_rank_id
+    ))";
+}
+
 function getEvaluationTemplateTargetPositionIds($conn, $template_id)
 {
     if (!ensureHierarchicalEvaluationSchema($conn)) return [];

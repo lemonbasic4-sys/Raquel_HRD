@@ -68,7 +68,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $department_stmt->close();
     $target_positions = [];
     if ($is_probationary_template) {
-        $target_position_ids = [];
+        $target_position_ids = getEvaluationTemplateTargetPositionIds($conn, $template_id);
+        if (!$target_position_ids || $target_department_id !== (int)($tmpl['target_department_id'] ?? 0)) {
+            $template_creator_context = getEvaluationTemplateCreatorContext($conn, (int)($tmpl['created_by'] ?? 0));
+            $target_positions = getProbationaryTemplateTargetPositions($conn, $template_creator_context ?: $creator_context, $target_department_id);
+            $target_position_ids = array_map(static function ($position) { return (int)$position['job_title_id']; }, $target_positions);
+        }
     } elseif (!empty($creator_context['can_create_templates'])) {
         $target_positions = getEvaluationTemplateTargetPositions($conn, $creator_context, $target_department_id);
         $target_position_ids = array_map(static function ($position) {
@@ -79,7 +84,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($target_department_id !== (int)($tmpl['target_department_id'] ?? 0)) $target_position_ids = [];
     }
     $target_job_title_id = (int)($target_position_ids[0] ?? 0);
-    if (!$target_department_id || (!$is_probationary_template && !$target_position_ids)) {
+    if (!$target_department_id || !$target_position_ids) {
         redirectWith($template_edit_url . "?id=$template_id", 'danger', 'No active target positions are configured for your role in this department.');
     }
 

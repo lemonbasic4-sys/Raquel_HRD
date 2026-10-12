@@ -82,6 +82,8 @@ if (!$employee) {
 }
 $allowed_eval_types = getAllowedEvaluationTypesForEmploymentStatus($employee['employment_status'] ?? 'Regular');
 $in_clause = "'" . implode("','", $allowed_eval_types) . "'";
+$legacy_probationary_rank_et = probationaryTemplateLegacyRankSql('et', $employee['rank_category_id'] ?? 0);
+$legacy_probationary_rank_full = probationaryTemplateLegacyRankSql('evaluation_templates', $employee['rank_category_id'] ?? 0);
 
 $edit_eval = null;
 $view_eval = null;
@@ -193,7 +195,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         : "((EXISTS (SELECT 1 FROM evaluation_template_positions etp WHERE etp.template_id = evaluation_templates.template_id)
                 AND EXISTS (SELECT 1 FROM evaluation_template_positions etp WHERE etp.template_id = evaluation_templates.template_id AND etp.job_title_id = $employee_position_id))
             OR (NOT EXISTS (SELECT 1 FROM evaluation_template_positions etp WHERE etp.template_id = evaluation_templates.template_id)
-                AND (target_job_title_id IS NULL OR target_job_title_id = $employee_position_id)))";
+                AND (target_job_title_id IS NULL OR target_job_title_id = $employee_position_id)
+                AND $legacy_probationary_rank_full))";
     $department_eligibility = $is_valid_existing_edit
         ? '1 = 1'
         : "(target_department_id IS NULL OR target_department_id = " . (int)$employee['department_id'] . ")";
@@ -610,7 +613,8 @@ $templates_stmt = $conn->prepare("
       AND ((EXISTS (SELECT 1 FROM evaluation_template_positions etp WHERE etp.template_id = et.template_id)
             AND EXISTS (SELECT 1 FROM evaluation_template_positions etp WHERE etp.template_id = et.template_id AND etp.job_title_id = ?))
         OR (NOT EXISTS (SELECT 1 FROM evaluation_template_positions etp WHERE etp.template_id = et.template_id)
-            AND (et.target_job_title_id IS NULL OR et.target_job_title_id = ?)))
+            AND (et.target_job_title_id IS NULL OR et.target_job_title_id = ?)
+            AND $legacy_probationary_rank_et))
       AND et.evaluation_type IN ($in_clause)
       AND NOT EXISTS (
           SELECT 1
@@ -648,7 +652,8 @@ if ($selected_template_id > 0) {
               AND ((EXISTS (SELECT 1 FROM evaluation_template_positions etp WHERE etp.template_id = evaluation_templates.template_id)
                       AND EXISTS (SELECT 1 FROM evaluation_template_positions etp WHERE etp.template_id = evaluation_templates.template_id AND etp.job_title_id = ?))
                   OR (NOT EXISTS (SELECT 1 FROM evaluation_template_positions etp WHERE etp.template_id = evaluation_templates.template_id)
-                      AND (target_job_title_id IS NULL OR target_job_title_id = ?)))
+                      AND (target_job_title_id IS NULL OR target_job_title_id = ?)
+                      AND $legacy_probationary_rank_full))
               AND evaluation_type IN ($in_clause)
             LIMIT 1
         ");
