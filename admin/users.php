@@ -9,8 +9,13 @@ ensureUserAccountSecuritySchema($conn);
 if (isset($_GET['toggle']) && is_numeric($_GET['toggle'])) {
     $uid = (int) $_GET['toggle'];
     if ($uid !== (int) $_SESSION['user_id']) {
+        $before = $conn->query("SELECT is_active FROM users WHERE user_id = $uid LIMIT 1")->fetch_assoc();
         $conn->query("UPDATE users SET is_active = NOT is_active WHERE user_id = $uid");
-        logAudit($conn, $_SESSION['user_id'], 'UPDATE', 'User', $uid, 'Toggled user active status');
+        if ($before && $conn->affected_rows > 0) {
+            $new_status = (int) $before['is_active'] === 1 ? 'Inactive' : 'Active';
+            logAudit($conn, $_SESSION['user_id'], 'UPDATE', 'User', $uid, 'Changed user account status to ' . $new_status . '.',
+                ['previous_value' => (int) $before['is_active'] === 1 ? 'Active' : 'Inactive', 'new_value' => $new_status]);
+        }
         redirectWith(BASE_URL . '/admin/users.php', 'success', 'User status updated successfully.');
     }
 }
@@ -20,7 +25,7 @@ if (isset($_GET['delete']) && is_numeric($_GET['delete'])) {
     $uid = (int) $_GET['delete'];
     if ($uid !== (int) $_SESSION['user_id']) {
         $conn->query("DELETE FROM users WHERE user_id = $uid");
-        logAudit($conn, $_SESSION['user_id'], 'DELETE', 'User', $uid, 'Deleted user account');
+        if ($conn->affected_rows > 0) logAudit($conn, $_SESSION['user_id'], 'DELETE', 'User', $uid, 'Deleted user account');
         redirectWith(BASE_URL . '/admin/users.php', 'success', 'User deleted successfully.');
     } else {
         redirectWith(BASE_URL . '/admin/users.php', 'danger', 'You cannot delete your own account.');

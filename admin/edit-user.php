@@ -132,6 +132,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
         logAudit($conn, $_SESSION['user_id'], 'UPDATE', 'User', $uid, "Updated user: $username ($role)");
+        if ($user['role'] !== $role) {
+            logAudit($conn, $_SESSION['user_id'], 'ROLE_CHANGE', 'User', $uid,
+                'Administrator changed the account role.',
+                ['previous_value' => $user['role'], 'new_value' => $role]);
+        }
+        if ($new_pass !== '') logAudit($conn, $_SESSION['user_id'], 'CHANGE_PASSWORD', 'User', $uid, 'Administrator reset an account password.');
+        if ($release_hold && (int) ($user['account_hold'] ?? 0) === 1) {
+            logAudit($conn, $_SESSION['user_id'], 'ACCOUNT_HOLD_RELEASED', 'User', $uid, 'Administrator released an account hold.');
+        }
         notifyOtherAdmins($conn, (int) $_SESSION['user_id'], 'User Account Updated',
             "An administrator updated the {$role} account {$username}.", BASE_URL . '/admin/edit-user.php?id=' . $uid, 'accounts');
         redirectWith(BASE_URL . '/admin/users.php', 'success', "User '$username' updated successfully.");

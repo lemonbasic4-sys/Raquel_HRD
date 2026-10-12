@@ -146,6 +146,8 @@ function ab_run_due_backup($conn) {
             'msg' => "Scheduled {$result['label']} auto-backup completed: <strong>{$result['filename']}</strong>",
         ];
     } else {
+        logAudit($conn, $_SESSION['user_id'], 'BACKUP_FAILED', 'AutoBackup', 0,
+            'Scheduled database backup failed.', ['module' => 'System Administration', 'status' => 'Failed']);
         notifyOtherAdmins($conn, 0, 'Backup failed',
             'A scheduled backup failed. Check backup settings and run a manual backup if needed.', BASE_URL . '/admin/backup.php', 'backups');
         $_SESSION['auto_backup_toast'] = [

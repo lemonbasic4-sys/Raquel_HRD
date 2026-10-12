@@ -1,5 +1,5 @@
 <?php
-$page_title = 'System Activity Monitor';
+$page_title = 'Admin Audit Trail';
 require_once '../includes/session-check.php';
 checkRole(['Admin']);
 require_once '../includes/functions.php';

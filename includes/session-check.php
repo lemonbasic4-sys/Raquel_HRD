@@ -40,6 +40,11 @@ if (isset($_SESSION['user_id'])) {
             || !empty($row['emp_deleted_at'])
             || (strcasecmp($row['employment_status'] ?? '', 'Inactive') === 0));
         if (!$row || !(int)$row['user_active'] || (int)($row['account_hold'] ?? 0) === 1 || !empty($row['user_deleted_at']) || $is_emp_inactive) {
+            if ($row) {
+                logAudit($conn, $uid, 'SESSION_REVOKED', 'Authentication', $uid,
+                    'Active session ended because the account or linked employee is no longer eligible.',
+                    ['module' => 'Authentication & Access']);
+            }
             session_unset();
             session_destroy();
             if (strpos($_SERVER['REQUEST_URI'], '/employee/') !== false) {
@@ -63,6 +68,10 @@ function checkRole($allowed_roles)
     $current_role = $_SESSION['role'] ?? '';
 
     if (!in_array($current_role, $allowed_roles, true)) {
+        $path = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?: 'unknown page';
+        logAudit($GLOBALS['conn'], (int) ($_SESSION['user_id'] ?? 0), 'ACCESS_DENIED', 'Authentication',
+            (int) ($_SESSION['user_id'] ?? 0), 'Role denied access to ' . $path . '.',
+            ['module' => 'Authentication & Access', 'status' => 'Failed']);
         if (in_array('Employee', $allowed_roles, true)) {
             header("Location: " . BASE_URL . "/employee/index.php");
         } else {

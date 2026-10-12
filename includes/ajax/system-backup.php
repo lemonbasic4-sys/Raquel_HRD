@@ -16,6 +16,8 @@ if ($result['success']) {
     notifyOtherAdmins($conn, $_SESSION['user_id'], 'Manual backup created',
         "A {$result['label']} backup was created: {$result['filename']}.", BASE_URL . '/admin/backup.php', 'backups');
 } else {
+    logAudit($conn, $_SESSION['user_id'], 'BACKUP_FAILED', 'Backup', 0,
+        'Manual database backup failed.', ['module' => 'System Administration', 'status' => 'Failed']);
     createNotification($conn, (int) $_SESSION['user_id'], 'Backup failed',
         'A manual backup failed. Check the backup page and try again.', BASE_URL . '/admin/backup.php', 'backups', 1);
 }

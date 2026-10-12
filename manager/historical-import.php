@@ -400,6 +400,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 }
 
                                 $conn->commit();
+                                logAudit($conn, (int) $_SESSION['user_id'], 'IMPORT', 'Evaluation', $batch_id,
+                                    'Historical evaluation import completed: ' . count($valid_rows) . ' imported, ' . count($invalid_rows) . ' rejected.',
+                                    ['module' => 'Performance & Evaluation']);
                                 $message = 'Historical import succeeded. ' . count($valid_rows) . ' validation row(s) were recorded as historical evaluations.';
                                 $message_type = 'success';
                                 $import_summary = [
@@ -410,6 +413,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 ];
                             } catch (Exception $e) {
                                 $conn->rollback();
+                                logAudit($conn, (int) $_SESSION['user_id'], 'IMPORT', 'Evaluation', null,
+                                    'Historical evaluation import failed and was rolled back.',
+                                    ['module' => 'Performance & Evaluation', 'status' => 'Failed']);
                                 $message = 'Import failed and was rolled back: ' . $e->getMessage();
                                 $message_type = 'danger';
                             }

@@ -984,11 +984,12 @@ function logLoginAudit($conn, $identifier, $portal, $status, $reason = '', $user
 function auditModuleForEntity($entity_type): string
 {
     $entity = strtolower($entity_type);
+    if (str_contains($entity, 'authentication')) return 'Authentication & Access';
     if (str_contains($entity, 'evaluation')) return 'Performance & Evaluation';
     if (str_contains($entity, 'career') || str_contains($entity, 'movement')) return 'Career Progression';
     if (str_contains($entity, 'user') || str_contains($entity, 'permission') || str_contains($entity, 'role')) return 'User & Access Management';
     if (str_contains($entity, 'employee') || str_contains($entity, 'pds')) return 'Employee Management';
-    if (str_contains($entity, 'branch') || str_contains($entity, 'department') || str_contains($entity, 'setting') || str_contains($entity, 'config')) return 'System Administration';
+    if (str_contains($entity, 'branch') || str_contains($entity, 'department') || str_contains($entity, 'position') || str_contains($entity, 'organization') || str_contains($entity, 'backup') || str_contains($entity, 'setting') || str_contains($entity, 'config')) return 'System Administration';
     return 'System Activity';
 }
 

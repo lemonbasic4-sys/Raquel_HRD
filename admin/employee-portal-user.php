@@ -121,6 +121,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($upd->execute()) {
         logAudit($conn, $_SESSION['user_id'], 'UPDATE', 'User', $user_id, "Updated Employee Portal account: {$user['username']} → {$new_username}");
+        if ($new_password !== '') logAudit($conn, $_SESSION['user_id'], 'CHANGE_PASSWORD', 'User', $user_id, 'Administrator reset an Employee Portal password.');
+        if ((int) ($user['is_active'] ?? 0) !== $is_active) {
+            logAudit($conn, $_SESSION['user_id'], 'UPDATE', 'User', $user_id, 'Changed Employee Portal account status.',
+                ['previous_value' => (int) $user['is_active'] ? 'Active' : 'Inactive', 'new_value' => $is_active ? 'Active' : 'Inactive']);
+        }
         notifyOtherAdmins($conn, (int) $_SESSION['user_id'], 'Employee Portal Account Updated',
             "An administrator updated Employee Portal account {$new_username}.", BASE_URL . '/admin/employee-portal-user.php?user_id=' . $user_id, 'portal');
         if ($new_password !== '') {

@@ -234,6 +234,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $decision->bind_param('issis', $probationary_eval_id, $recommendation, $recommendation_reason, $user_id, $head_signature);
         $decision->execute();
         $decision->close();
+        logAudit($conn, $user_id, 'SIGN', 'Evaluation', $probationary_eval_id,
+            'Immediate head saved a probationary recommendation and digital signature.',
+            ['module' => 'Performance & Evaluation', 'target_employee_id' => $probationary_employee_id,
+                'new_value' => $recommendation]);
         redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'success', 'Immediate head recommendation and signature saved. You can now approve and forward the evaluation.');
     }
 
@@ -279,6 +283,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $audit->bind_param('iis', $package_id, $user_id, $audit_remark);
         $audit->execute();
         $audit->close();
+        logAudit($conn, $user_id, 'RETURN', 'Evaluation', $member_eval_id,
+            'Immediate head returned a member evaluation for revision from package #' . $package_id . '.',
+            ['module' => 'Performance & Evaluation']);
 
         $emp_user = $conn->query("SELECT u.user_id, e.first_name, e.last_name FROM evaluations ev JOIN employees e ON e.employee_id = ev.employee_id JOIN users u ON u.employee_id = ev.employee_id WHERE ev.evaluation_id = $member_eval_id LIMIT 1")->fetch_assoc();
         if ($emp_user) {
@@ -358,6 +365,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $audit->close();
 
         $prev_name = getOrganizationPackageReviewerDisplayName($conn, (int)($previous['reviewer_user_id'] ?? 0), (int)($previous['reviewer_employee_id'] ?? 0));
+        logAudit($conn, $user_id, 'RETURN', 'EvaluationPackage', $package_id,
+            'Reviewer returned the evaluation package to the preceding review step.',
+            ['module' => 'Performance & Evaluation']);
         notifyHrStaffOfPackageProgress($conn, $package_id, (string) $step['department_name'], (string) $previous['step_label'], true);
         if (!empty($previous['reviewer_employee_id'])) {
             notifyUsersForEmployee($conn, (int)$previous['reviewer_employee_id'], 'Team evaluation returned for revision', 'A package was returned to you by ' . $step['step_label'] . '. Reason: ' . $comments, BASE_URL . '/employee/team-evaluation-packages.php');
@@ -456,6 +466,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $audit->bind_param('iis', $audit_pkg_id, $user_id, $comments);
         $audit->execute();
         $audit->close();
+        logAudit($conn, $user_id, 'APPROVE', 'EvaluationPackage', $package_id,
+            'Reviewer approved and forwarded evaluation package at ' . $step['step_label'] . '.',
+            ['module' => 'Performance & Evaluation']);
 
         if ($was_merged) {
             redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'success', 'Evaluation approved. This member\'s evaluation has been merged into the main ' . $step['department_name'] . ' team package (Package #' . $merged_into . ') for review at the same approval stage.');
@@ -487,6 +500,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $lock_audit->execute();
             $lock_audit->close();
             $conn->commit();
+            logAudit($conn, $user_id, 'FINALIZE', 'EvaluationPackage', $package_id,
+                'Final approval locked and applied the evaluation package.',
+                ['module' => 'Performance & Evaluation', 'target_employee_id' => $is_final_probationary ? $probationary_employee_id : null]);
 
             // 1. Notify all package team members
             $members_stmt = $conn->prepare('SELECT DISTINCT u.user_id FROM evaluation_package_members pm JOIN evaluations e ON e.evaluation_id = pm.evaluation_id JOIN users u ON u.employee_id = e.employee_id AND u.is_active = 1 WHERE pm.package_id = ?');
