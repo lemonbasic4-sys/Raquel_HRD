@@ -68,7 +68,7 @@ if (($eval_status_check['status'] ?? '') === 'Approved') {
 }
 
 if (!$is_catchup_review && (($review_step['status'] ?? '') === 'Approved and Applied' || isOrganizationPackageLocked($conn, $package_id))) {
-    redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'This package is locked after Board approval. Ratings can no longer be adjusted.');
+    redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'This evaluation review is locked after Board approval. Ratings can no longer be adjusted.');
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -144,7 +144,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $audit->bind_param('iis', $package_id, $user_id, $remarks);
         $audit->execute();
         $audit->close();
-        redirectWith(BASE_URL . '/employee/package-member-review.php?package_id=' . $package_id . '&evaluation_id=' . $evaluation_id, 'success', 'Individual ratings and Developmental Plan were saved successfully. Return to the package overview to record the immediate head recommendation and signature.');
+        redirectWith(BASE_URL . '/employee/package-member-review.php?package_id=' . $package_id . '&evaluation_id=' . $evaluation_id, 'success', 'Individual ratings and Developmental Plan were saved successfully. Return to the evaluation review to record the immediate head recommendation and signature.');
     }
 
     if ($sort_idx > 0) {
@@ -238,7 +238,7 @@ $devplan_count = count($existing_dev_plans);
 <main class="evaluation-packages container-fluid py-4">
     <section class="package-hero">
         <a class="history-back-link" href="<?php echo BASE_URL; ?>/employee/team-evaluation-packages.php">
-            <i class="fas fa-arrow-left"></i> Back to evaluation package
+            <i class="fas fa-arrow-left"></i> Back to evaluation review
         </a>
         <p class="mb-1 text-uppercase fw-bold" style="letter-spacing:1px; color:var(--rp-primary-gold-light); font-size:0.85rem;">
             <?php echo e($review_step['step_label']); ?>
@@ -629,7 +629,7 @@ $devplan_count = count($existing_dev_plans);
                     <i class="fas fa-save me-1"></i>Save Adjustments &amp; Developmental Plan
                 </button>
                 <a class="btn btn-outline-secondary px-4 py-2 fw-semibold" href="<?php echo BASE_URL; ?>/employee/team-evaluation-packages.php" style="min-height:46px; border-radius:8px;">
-                    Back to Package Overview
+                    Back to Evaluation Review
                 </a>
             </div>
         </div>

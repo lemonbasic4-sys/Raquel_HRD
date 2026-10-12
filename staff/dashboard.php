@@ -267,7 +267,7 @@ $recent = $conn->query("
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
                         <div class="stat-value"><?php echo $active_packages; ?></div>
-                        <div class="stat-label">Active Packages</div>
+                        <div class="stat-label">Active Evaluation Reviews</div>
                     </div>
                     <i class="fas fa-layer-group stat-icon" style="color:#BD9414;"></i>
                 </div>
@@ -306,10 +306,10 @@ $recent = $conn->query("
                 <div class="attention-item">
                     <span class="attention-icon"><i class="fas fa-layer-group"></i></span>
                     <div class="attention-copy">
-                        <strong>Evaluation packages</strong>
-                        <small><?php echo $active_packages; ?> package<?php echo $active_packages === 1 ? '' : 's'; ?> still in progress.</small>
+                        <strong>Evaluation reviews</strong>
+                        <small><?php echo $active_packages; ?> evaluation review<?php echo $active_packages === 1 ? '' : 's'; ?> still in progress.</small>
                     </div>
-                    <a href="<?php echo BASE_URL; ?>/staff/package-tracker.php" class="btn btn-sm btn-outline-primary" title="View evaluation packages"><i class="fas fa-arrow-up-right-from-square"></i></a>
+                    <a href="<?php echo BASE_URL; ?>/staff/package-tracker.php" class="btn btn-sm btn-outline-primary" title="View evaluation reviews"><i class="fas fa-arrow-up-right-from-square"></i></a>
                 </div>
                 <div class="attention-item">
                     <span class="attention-icon"><i class="fas fa-bell"></i></span>

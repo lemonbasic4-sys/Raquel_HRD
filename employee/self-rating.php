@@ -561,7 +561,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $package_id = syncEvaluationToOrganizationPackage($conn, $eval_id);
             if (!$package_id) {
-                throw new RuntimeException('The submitted evaluation could not be added to a Team Evaluation Package.');
+                throw new RuntimeException('The submitted evaluation could not be added to the team evaluation review.');
             }
             $conn->commit();
             $submission_transaction_open = false;

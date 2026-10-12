@@ -550,7 +550,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 </div>
                 <?php if ($pending_pkg_count > 0): ?>
                 <div class="mt-2" style="font-size:.72rem;color:rgba(255,255,255,.55);">
-                    <i class="fas fa-layer-group me-1"></i><?php echo $pending_pkg_count; ?> package<?php echo $pending_pkg_count === 1 ? '' : 's'; ?> awaiting review
+                    <i class="fas fa-layer-group me-1"></i><?php echo $pending_pkg_count; ?> evaluation review<?php echo $pending_pkg_count === 1 ? '' : 's'; ?> awaiting review
                 </div>
                 <?php elseif ($queue_employee_count > 0): ?>
                 <div class="mt-2" style="font-size:.72rem;color:rgba(255,255,255,.55);">
@@ -639,7 +639,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 <h5 class="mb-0"><i class="fas fa-layer-group me-2"></i>Performance Evaluation</h5>
                 <div class="d-flex align-items-center gap-2">
                     <?php if ($pending_pkg_count > 0): ?>
-                        <span class="badge bg-light text-muted border"><?php echo number_format($pending_pkg_count); ?> package<?php echo $pending_pkg_count === 1 ? '' : 's'; ?></span>
+                        <span class="badge bg-light text-muted border"><?php echo number_format($pending_pkg_count); ?> evaluation review<?php echo $pending_pkg_count === 1 ? '' : 's'; ?></span>
                     <?php elseif ($queue_employee_count > 0): ?>
                         <span class="badge bg-light text-muted border"><?php echo number_format($queue_employee_count); ?> employee<?php echo $queue_employee_count === 1 ? '' : 's'; ?></span>
                     <?php endif; ?>
@@ -677,7 +677,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     <?php elseif (empty($queue_preview_groups)): ?>
                         <div class="empty-state-card">
                             <i class="fas fa-layer-group"></i>
-                            <p class="mb-0">All team evaluation packages have been processed.</p>
+                            <p class="mb-0">All team evaluation reviews have been processed.</p>
                         </div>
                     <?php else: ?>
                         <?php foreach ($queue_preview_groups as $group):

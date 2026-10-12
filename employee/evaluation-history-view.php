@@ -121,7 +121,7 @@ require_once '../includes/header.php';
                     <?php echo $is_package_completed ? 'Original Self-Rating vs. Final / Reviewed Rating' : ($show_reviewed_scores ? 'Original Self-Rating vs. Immediate Head Review' : 'Submitted Self-Rating Summary'); ?>
                 </h2>
                 <div class="small text-muted mt-1">
-                    <?php echo $is_package_completed ? 'Audit comparison between your submitted rating and officer adjustments.' : ($show_reviewed_scores ? 'Compare your original ratings with the immediate head’s reviewed ratings.' : 'Your submitted self-ratings are shown below while the evaluation package is in progress.'); ?>
+                    <?php echo $is_package_completed ? 'Audit comparison between your submitted rating and officer adjustments.' : ($show_reviewed_scores ? 'Compare your original ratings with the immediate head’s reviewed ratings.' : 'Your submitted self-ratings are shown below while the evaluation review is in progress.'); ?>
                 </div>
             </div>
             <div>

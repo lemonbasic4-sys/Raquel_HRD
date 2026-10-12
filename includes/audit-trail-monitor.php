@@ -123,7 +123,7 @@ if ($is_admin) {
         $source_queries[] = "SELECT 1000000000 + pa.package_audit_id AS log_id, pa.user_id, pa.action AS action_type,
             'EvaluationPackageHistory' AS entity_type, 'Performance & Evaluation' AS module_name,
             pa.package_id AS entity_id, NULL AS target_employee_id,
-            CONCAT('Package #', pa.package_id, ' lifecycle event: ', REPLACE(pa.action, '_', ' '), '.') AS details,
+            CONCAT('Evaluation review #', pa.package_id, ' lifecycle event: ', REPLACE(pa.action, '_', ' '), '.') AS details,
             NULL AS previous_value, NULL AS new_value, NULL AS branch_id, NULL AS department_id,
             NULL AS ip_address, NULL AS user_agent,
             CASE WHEN pa.action LIKE '%CANCEL%' THEN 'Cancelled' ELSE 'Successful' END AS action_status,
@@ -366,9 +366,9 @@ if (defined('AUDIT_TRAIL_EXPORT_ONLY')) {
                             $target = trim(($log['employee_code'] ? $log['employee_code'] . ' - ' : '') . trim(($log['first_name'] ?? '') . ' ' . ($log['last_name'] ?? '')));
                             $is_package_history = $log['entity_type'] === 'EvaluationPackageHistory';
                             $is_employee_history = $log['entity_type'] === 'EmployeeEditHistory';
-                            $record_label = $is_package_history ? 'Evaluation package #' . $log['entity_id']
+                            $record_label = $is_package_history ? 'Evaluation review #' . $log['entity_id']
                                 : ($is_employee_history ? ($target ?: 'Employee record') : ($target ?: (($log['entity_type'] ?? 'Record') . (!empty($log['entity_id']) ? ' #' . $log['entity_id'] : ''))));
-                            $event_title = $is_package_history ? 'Package ' . ucwords(strtolower(str_replace('_', ' ', $log['action_type'])))
+                            $event_title = $is_package_history ? 'Evaluation review ' . ucwords(strtolower(str_replace('_', ' ', $log['action_type'])))
                                 : ($is_employee_history ? 'Employee record edited' : ($log['action_type'] === 'LOGIN' ? 'Login activity' : ucwords(strtolower(str_replace('_', ' ', $log['action_type']))) . ' ' . ($log['entity_type'] ?? 'record')));
                             $audit_reference = $is_package_history ? 'PKG-' . ((int) $log['log_id'] - 1000000000)
                                 : ($is_employee_history ? 'EDIT-' . ((int) $log['log_id'] - 2000000000)

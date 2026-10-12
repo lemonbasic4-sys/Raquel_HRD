@@ -66,7 +66,7 @@ require_once '../includes/header.php';
 
 <div class="row g-3 mb-4">
     <?php foreach ([
-        ['All Packages', $counts['total'], 'fa-boxes-stacked', 'text-primary'],
+        ['All Evaluation Reviews', $counts['total'], 'fa-boxes-stacked', 'text-primary'],
         ['In Progress', $counts['active'], 'fa-hourglass-half', 'text-warning'],
         ['Returned', $counts['returned'], 'fa-rotate-left', 'text-danger'],
         ['Completed', $counts['completed'], 'fa-circle-check', 'text-success'],
@@ -83,12 +83,12 @@ require_once '../includes/header.php';
 <section class="content-card">
     <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-3">
         <div>
-            <h2 class="h5 fw-bold mb-1"><i class="fas fa-list-check me-2 text-primary"></i>Packages</h2>
-            <span class="small text-muted"><?php echo count($packages); ?> package<?php echo count($packages) === 1 ? '' : 's'; ?> found</span>
+            <h2 class="h5 fw-bold mb-1"><i class="fas fa-list-check me-2 text-primary"></i>Evaluation Reviews</h2>
+            <span class="small text-muted"><?php echo count($packages); ?> evaluation review<?php echo count($packages) === 1 ? '' : 's'; ?> found</span>
         </div>
         <div class="d-flex flex-wrap gap-2 ms-auto">
-            <input type="search" class="form-control form-control-sm" id="packageSearch" placeholder="Search department, template, or ID" aria-label="Search packages" style="min-width:230px;">
-            <select class="form-select form-select-sm" id="packageStatusFilter" aria-label="Filter by package status" style="min-width:150px;">
+            <input type="search" class="form-control form-control-sm" id="packageSearch" placeholder="Search department, template, or ID" aria-label="Search evaluation reviews" style="min-width:230px;">
+            <select class="form-select form-select-sm" id="packageStatusFilter" aria-label="Filter by evaluation review status" style="min-width:150px;">
                 <option value="">All statuses</option>
                 <option value="active">In progress</option>
                 <option value="Returned">Returned</option>
@@ -105,10 +105,10 @@ require_once '../includes/header.php';
     </div>
     <div class="table-responsive">
         <table class="table align-middle mb-0">
-            <thead><tr><th>Package</th><th>Department / Template</th><th>Period</th><th>Team</th><th>Status / Stage</th><th class="text-end">Route</th></tr></thead>
+            <thead><tr><th>Review</th><th>Department / Template</th><th>Period</th><th>Team</th><th>Status / Stage</th><th class="text-end">Route</th></tr></thead>
             <tbody>
             <?php if (!$packages): ?>
-                <tr><td colspan="6" class="text-center py-5 text-muted"><i class="fas fa-folder-open fa-2x d-block mb-2 opacity-50"></i>No evaluation packages have been created yet.</td></tr>
+                <tr><td colspan="6" class="text-center py-5 text-muted"><i class="fas fa-folder-open fa-2x d-block mb-2 opacity-50"></i>No evaluation reviews have been created yet.</td></tr>
             <?php else: ?>
                 <?php foreach ($packages as $package):
                     $id = (int)$package['package_id'];
@@ -152,7 +152,7 @@ require_once '../includes/header.php';
                     <tr class="package-route-row">
                         <td colspan="6" class="p-0 border-0"><div class="collapse" id="<?php echo e($collapse_id); ?>"><div class="p-3 p-md-4 bg-light border-top">
                             <?php if (!$steps): ?>
-                                <div class="alert alert-warning mb-0"><i class="fas fa-triangle-exclamation me-2"></i>No route steps are configured for this package.</div>
+                                <div class="alert alert-warning mb-0"><i class="fas fa-triangle-exclamation me-2"></i>No route steps are configured for this evaluation review.</div>
                             <?php else: ?>
                                 <div class="d-flex justify-content-between small text-muted mb-2"><strong class="text-uppercase">Approval route</strong><span><?php echo $progress; ?>% completed</span></div>
                                 <div class="progress mb-3" role="progressbar" aria-label="Approval route progress" aria-valuenow="<?php echo $progress; ?>" aria-valuemin="0" aria-valuemax="100" style="height:6px;"><div class="progress-bar bg-success" style="width:<?php echo $progress; ?>%;"></div></div>
@@ -173,7 +173,7 @@ require_once '../includes/header.php';
                         </div></div></td>
                     </tr>
                 <?php endforeach; ?>
-                <tr id="noPackageMatches" style="display:none;"><td colspan="6" class="text-center py-4 text-muted">No packages match these filters.</td></tr>
+                <tr id="noPackageMatches" style="display:none;"><td colspan="6" class="text-center py-4 text-muted">No evaluation reviews match these filters.</td></tr>
             <?php endif; ?>
             </tbody>
         </table>

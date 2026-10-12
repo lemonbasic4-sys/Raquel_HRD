@@ -38,7 +38,7 @@ $employee_id = (int)$eval['employee_id'];
 $employee_name = $eval['employee_name'];
 
 if (isEvaluationInLockedOrganizationPackage($conn, $evaluation_id)) {
-    echo json_encode(['success' => false, 'message' => 'This evaluation belongs to a locked organization package and can no longer be edited.']);
+    echo json_encode(['success' => false, 'message' => 'This evaluation belongs to a locked evaluation review and can no longer be edited.']);
     exit;
 }
 

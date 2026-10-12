@@ -858,40 +858,12 @@ require_once '../includes/header.php';
 <!-- ============================================================ -->
 <!-- STAGE 5 POP-UP MODAL: WHOLE DETAILS OF THE TEMPLATE STATUS -->
 <!-- ============================================================ -->
-<style>
-    #templateStatusModal .template-status-modal-dialog {
-        max-width: 960px;
-    }
-
-    #templateStatusModal .modal-body {
-        max-height: 68vh !important;
-    }
-
-    @media (max-width: 767.98px) {
-        #templateStatusModal .template-status-modal-dialog {
-            margin: .5rem;
-            max-width: none;
-        }
-
-        #templateStatusModal .modal-header,
-        #templateStatusModal .modal-footer {
-            padding: 1rem !important;
-        }
-
-        #templateStatusModal .modal-title {
-            font-size: 1rem;
-        }
-
-        #templateStatusModal .modal-header .fa-2x {
-            font-size: 1.25em;
-        }
-    }
-</style>
+<link rel="stylesheet" href="<?php echo BASE_URL; ?>/assets/css/template-status-modal.css?v=<?php echo filemtime(__DIR__ . '/../assets/css/template-status-modal.css'); ?>">
 <div class="modal fade" id="templateStatusModal" tabindex="-1" aria-labelledby="templateStatusModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered template-status-modal-dialog">
         <div class="modal-content border-0 shadow-lg" style="border-radius:20px; overflow:hidden;">
             <!-- Modal Header -->
-            <div class="modal-header border-0 p-4 text-white" style="background: linear-gradient(135deg, #102a43, #243b53);">
+            <div class="modal-header border-0 p-4 text-white" style="background: linear-gradient(135deg, var(--hero-from) 0%, var(--hero-mid) 50%, var(--hero-to) 100%);">
                 <div class="d-flex align-items-center gap-3">
                     <div style="width:52px;height:52px;border-radius:16px;background:rgba(255,255,255,0.15);display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);">
                         <i class="fas fa-clipboard-check fa-2x text-warning"></i>
@@ -1414,7 +1386,7 @@ function openTemplateStatusModal() {
     const formCode = document.querySelector('[name="form_code"]')?.value || '—';
     const revDate = document.querySelector('[name="revision_date"]')?.value || '—';
     const effDate = document.querySelector('[name="effective_date_form"]')?.value || '—';
-    const desc = document.querySelector('[name="description"]')?.value || 'No description provided.';
+    const desc = document.getElementById('inputDescription')?.value?.trim() || 'No description provided.';
 
     document.getElementById('modalTemplateInfo').innerHTML = `
         <div class="col-12 col-md-6">
@@ -1474,7 +1446,7 @@ function openTemplateStatusModal() {
                 <div class="text-muted small text-uppercase fw-semibold mb-1" style="font-size:0.72rem; letter-spacing:0.04em;">
                     <i class="fas fa-align-left me-1 text-secondary"></i>Description & Scope
                 </div>
-                <div class="text-secondary small" style="line-height:1.5;">${escAttr(desc)}</div>
+                <div class="text-secondary small" style="line-height:1.5; white-space:pre-line;">${escAttr(desc)}</div>
             </div>
         </div>
     `;
@@ -1635,7 +1607,7 @@ function collectDraft() {
     return {
         step: currentStep,
         template_name: document.querySelector('[name="template_name"]')?.value || '',
-        description: document.querySelector('[name="description"]')?.value || '',
+        description: document.getElementById('inputDescription')?.value || '',
         target_department: document.querySelector('[name="target_department"]')?.value || '',
         behavior_framework_code: document.querySelector('[name="behavior_framework_code"]')?.value || '',
         behavior_framework_version: document.querySelector('[name="behavior_framework_version"]')?.value || '',
@@ -1673,7 +1645,7 @@ function saveDraft() {
 function restoreDraft(draft) {
     const setVal = (sel, val) => { const el = document.querySelector(sel); if (el && val !== undefined) el.value = val; };
     setVal('[name="template_name"]', draft.template_name);
-    setVal('[name="description"]', draft.description);
+    setVal('#inputDescription', draft.description);
     setVal('[name="target_department"]', draft.target_department);
     setVal('[name="behavior_framework_code"]', draft.behavior_framework_code);
     setVal('[name="behavior_framework_version"]', draft.behavior_framework_version);
@@ -1733,7 +1705,7 @@ function discardDraft() {
     kraCount = 0; behaviorCount = 0;
     
     document.querySelector('[name="template_name"]').value = '';
-    document.querySelector('[name="description"]').value = '';
+    document.getElementById('inputDescription').value = '';
     document.querySelector('[name="form_code"]').value = '';
     document.querySelector('[name="revision_date"]').value = '';
     document.querySelector('[name="effective_date_form"]').value = '';

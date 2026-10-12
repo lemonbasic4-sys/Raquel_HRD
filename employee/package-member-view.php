@@ -110,7 +110,7 @@ require_once '../includes/header.php';
 <main class="evaluation-packages container-fluid py-4">
     <section class="package-hero">
         <a class="history-back-link" href="<?php echo BASE_URL; ?>/employee/team-evaluation-packages.php">
-            <i class="fas fa-arrow-left"></i> Back to packages
+            <i class="fas fa-arrow-left"></i> Back to evaluation reviews
         </a>
         <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
             <div>

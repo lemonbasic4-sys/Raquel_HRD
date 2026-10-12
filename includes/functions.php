@@ -568,8 +568,8 @@ function notifyHrStaffOfPackageProgress($conn, $package_id, $department, $stage,
 {
     $package_id = (int) $package_id;
     if ($package_id <= 0) return;
-    $title = $returned ? 'Evaluation Package Returned' : 'Evaluation Package Advanced';
-    $message = "The {$department} evaluation package #{$package_id} was "
+    $title = $returned ? 'Evaluation Review Returned' : 'Evaluation Review Advanced';
+    $message = "The {$department} evaluation review #{$package_id} was "
         . ($returned ? 'returned for revision.' : "forwarded to {$stage}.");
     $link = BASE_URL . '/staff/package-tracker.php';
     $recipients = $conn->query("SELECT user_id FROM users WHERE role = 'HR Staff' AND is_active = 1 AND deleted_at IS NULL");
@@ -3902,7 +3902,7 @@ function checkNextPackageStepIsAssigned($conn, $package_id, $current_step_order)
     $package_id = (int) $package_id;
     $current_step_order = (int) $current_step_order;
     if ($package_id <= 0 || $current_step_order <= 0) {
-        return ['ok' => false, 'message' => 'Invalid package or step identifier.'];
+        return ['ok' => false, 'message' => 'Invalid evaluation review or step identifier.'];
     }
 
     // 1. Sync & ensure governance steps are appended/updated
@@ -3919,7 +3919,7 @@ function checkNextPackageStepIsAssigned($conn, $package_id, $current_step_order)
     $pkg_stmt->close();
 
     if (!$pkg) {
-        return ['ok' => false, 'message' => 'Evaluation package not found.'];
+        return ['ok' => false, 'message' => 'Evaluation review not found.'];
     }
 
     $dept_name = $pkg['department_name'] ?? 'Department';
@@ -3935,7 +3935,7 @@ function checkNextPackageStepIsAssigned($conn, $package_id, $current_step_order)
     $curr_stmt->close();
 
     if (!$current_step) {
-        return ['ok' => false, 'message' => 'Current package step could not be found.'];
+        return ['ok' => false, 'message' => 'Current evaluation review step could not be found.'];
     }
 
     // If current step is the Board of Directors, it's the final lock step — no next step needed.
@@ -4018,29 +4018,29 @@ function checkNextPackageStepIsAssigned($conn, $package_id, $current_step_order)
             if (stripos($label, 'Division VP') !== false) {
                 return [
                     'ok' => false,
-                    'message' => "Cannot forward package: The next consolidator (<strong>Division VP</strong> for <strong>" . htmlspecialchars($dept_name) . "</strong>) is not assigned or has no active account. Please contact an administrator."
+                    'message' => "Cannot forward evaluation review: The next consolidator (<strong>Division VP</strong> for <strong>" . htmlspecialchars($dept_name) . "</strong>) is not assigned or has no active account. Please contact an administrator."
                 ];
             } elseif (stripos($label, 'President') !== false) {
                 return [
                     'ok' => false,
-                    'message' => "Cannot forward package: The next consolidator (<strong>President &amp; CEO</strong>) is not assigned or has no active account. Please contact an administrator."
+                    'message' => "Cannot forward evaluation review: The next consolidator (<strong>President &amp; CEO</strong>) is not assigned or has no active account. Please contact an administrator."
                 ];
             } elseif (stripos($label, 'Audit') !== false) {
                 return [
                     'ok' => false,
-                    'message' => "Cannot forward package: The next consolidator (<strong>Audit Committee</strong>) is not assigned or has no active account. Please contact an administrator."
+                    'message' => "Cannot forward evaluation review: The next consolidator (<strong>Audit Committee</strong>) is not assigned or has no active account. Please contact an administrator."
                 ];
             } elseif (stripos($label, 'Board') !== false) {
                 return [
                     'ok' => false,
-                    'message' => "Cannot forward package: The next consolidator (<strong>Board of Directors</strong>) is not assigned or has no active account. Please contact an administrator."
+                    'message' => "Cannot forward evaluation review: The next consolidator (<strong>Board of Directors</strong>) is not assigned or has no active account. Please contact an administrator."
                 ];
             }
         }
 
         return [
             'ok' => false,
-            'message' => "Cannot forward package: The next reviewer for <strong>" . htmlspecialchars($label) . "</strong> is not assigned or does not have an active user account."
+            'message' => "Cannot forward evaluation review: The next reviewer for <strong>" . htmlspecialchars($label) . "</strong> is not assigned or does not have an active user account."
         ];
     }
 
@@ -4073,27 +4073,27 @@ function checkNextPackageStepIsAssigned($conn, $package_id, $current_step_order)
     if (!$has_vp_step && $dept_has_vp_position && !$div_vp_official) {
         return [
             'ok' => false,
-            'message' => "Cannot forward package: The next consolidator (<strong>Division VP</strong> for <strong>" . htmlspecialchars($dept_name) . "</strong>) has not been assigned yet. Please contact an administrator."
+            'message' => "Cannot forward evaluation review: The next consolidator (<strong>Division VP</strong> for <strong>" . htmlspecialchars($dept_name) . "</strong>) has not been assigned yet. Please contact an administrator."
         ];
     }
 
     if (!$has_pres_step && !$pres_official) {
         return [
             'ok' => false,
-            'message' => "Cannot forward package: The next consolidator (<strong>President &amp; CEO</strong>) has not been assigned yet. Please contact an administrator."
+            'message' => "Cannot forward evaluation review: The next consolidator (<strong>President &amp; CEO</strong>) has not been assigned yet. Please contact an administrator."
         ];
     }
 
     if (!$has_board_step && !$board_official) {
         return [
             'ok' => false,
-            'message' => "Cannot forward package: The final sign-off authority (<strong>Board of Directors</strong>) has not been assigned yet. Please contact an administrator."
+            'message' => "Cannot forward evaluation review: The final sign-off authority (<strong>Board of Directors</strong>) has not been assigned yet. Please contact an administrator."
         ];
     }
 
     return [
         'ok' => false,
-        'message' => "Cannot forward package: The next review stage has not been configured yet. Please contact an administrator."
+        'message' => "Cannot forward evaluation review: The next review stage has not been configured yet. Please contact an administrator."
     ];
 }
 
@@ -4364,9 +4364,9 @@ function renderOrganizationPackageAuditTrail($conn, $package_id)
     if (empty($audits)) {
         return '<div class="package-audit-section mt-4 pt-3 border-top">
             <h3 class="h6 fw-bold text-uppercase text-muted mb-2" style="letter-spacing:0.5px;">
-                <i class="fas fa-history text-primary me-1"></i> Package Audit Trail &amp; Revision Log
+                <i class="fas fa-history text-primary me-1"></i> Evaluation Review Audit Trail &amp; Revision Log
             </h3>
-            <p class="text-muted small mb-0"><i class="fas fa-info-circle me-1"></i>No audit records or score modifications logged for this package yet.</p>
+            <p class="text-muted small mb-0"><i class="fas fa-info-circle me-1"></i>No audit records or score modifications logged for this evaluation review yet.</p>
         </div>';
     }
 
@@ -4374,7 +4374,7 @@ function renderOrganizationPackageAuditTrail($conn, $package_id)
     $html = '<div class="package-audit-section mt-4 pt-3 border-top">
         <div class="d-flex align-items-center justify-content-between mb-3">
             <h3 class="h6 fw-bold text-uppercase text-muted mb-0" style="letter-spacing:0.5px;">
-                <i class="fas fa-history text-primary me-1"></i> Package Audit Trail &amp; Revision History
+                <i class="fas fa-history text-primary me-1"></i> Evaluation Review Audit Trail &amp; Revision History
             </h3>
             <span class="badge bg-light text-secondary border">
                 ' . $count_label . '
@@ -4418,10 +4418,10 @@ function renderOrganizationPackageAuditTrail($conn, $package_id)
                 $action_badge = '<span class="badge" style="background:#DBEAFE; color:#1E40AF; border:1px solid #93C5FD;"><i class="fas fa-lock me-1"></i>Board Approved &amp; Locked</span>';
                 break;
             case 'CANCELLED':
-                $action_badge = '<span class="badge bg-secondary"><i class="fas fa-ban me-1"></i>Package Dropped</span>';
+                $action_badge = '<span class="badge bg-secondary"><i class="fas fa-ban me-1"></i>Review Removed</span>';
                 break;
             case 'CREATED':
-                $action_badge = '<span class="badge bg-light text-muted border"><i class="fas fa-plus-circle me-1"></i>Package Created</span>';
+                $action_badge = '<span class="badge bg-light text-muted border"><i class="fas fa-plus-circle me-1"></i>Review Created</span>';
                 break;
             default:
                 $action_badge = '<span class="badge bg-light text-dark border">' . e($a['action']) . '</span>';
@@ -4906,10 +4906,10 @@ function mergeOrganizationPackageAtPendingStage($conn, $package_id, $just_approv
     // ── Audit trail ──
     $conn->query("INSERT INTO evaluation_package_audit (package_id, action, remarks)
         VALUES ($package_id, 'MERGED',
-            'Package merged into Package #$main_id at the same pending approval stage. Original membership and review history retained.')");
+            'Evaluation review merged into Review #$main_id at the same pending approval stage. Original membership and review history retained.')");
     $conn->query("INSERT INTO evaluation_package_audit (package_id, action, remarks)
         VALUES ($main_id, 'MEMBER_ADDED',
-            'Members joined from Package #$package_id at the same pending approval stage. Prior reviews remain in the source package history.')");
+            'Members joined from Review #$package_id at the same pending approval stage. Prior reviews remain in the source evaluation review history.')");
 
     // Notify the active reviewer on the receiving package.
     $pending_step = $conn->query("SELECT reviewer_user_id, reviewer_employee_id, step_label
@@ -4919,11 +4919,11 @@ function mergeOrganizationPackageAtPendingStage($conn, $package_id, $just_approv
     if ($pending_step) {
         $rev_uid    = (int) ($pending_step['reviewer_user_id']    ?? 0);
         $rev_emp_id = (int) ($pending_step['reviewer_employee_id'] ?? 0);
-        $msg = 'Additional team members reached this approval stage and joined this package. Please review the complete team before approving.';
+        $msg = 'Additional team members reached this approval stage and joined this evaluation review. Please review the complete team before approving.';
         if ($rev_uid > 0) {
-            createNotification($conn, $rev_uid, 'Team Package Updated — Late Member Joined', $msg, BASE_URL . '/employee/team-evaluation-packages.php');
+            createNotification($conn, $rev_uid, 'Team Evaluation Review Updated — Late Member Joined', $msg, BASE_URL . '/employee/team-evaluation-packages.php');
         } elseif ($rev_emp_id > 0) {
-            notifyUsersForEmployee($conn, $rev_emp_id, 'Team Package Updated — Late Member Joined', $msg, BASE_URL . '/employee/team-evaluation-packages.php');
+            notifyUsersForEmployee($conn, $rev_emp_id, 'Team Evaluation Review Updated — Late Member Joined', $msg, BASE_URL . '/employee/team-evaluation-packages.php');
         }
     }
 
@@ -5048,7 +5048,7 @@ function syncEvaluationToOrganizationPackage($conn, $evaluation_id)
             if ($step_count === 0 && ($consolidator_id > 0 || $is_group_routed_package)) {
                 createOrganizationPackageRoute($conn, $package_id, $consolidator_id, in_array($type, ['Initial', 'Final'], true) ? $evaluation_id : 0);
             }
-            $audit = $conn->prepare("INSERT INTO evaluation_package_audit (package_id, action, remarks) VALUES (?, 'REACTIVATED', 'Package reactivated after cancellation — new self-rating submission received.')");
+            $audit = $conn->prepare("INSERT INTO evaluation_package_audit (package_id, action, remarks) VALUES (?, 'REACTIVATED', 'Evaluation review reactivated after cancellation — new self-rating submission received.')");
             $audit->bind_param('i', $package_id); $audit->execute(); $audit->close();
         } else {
             // No package at all — create a fresh one
@@ -5115,18 +5115,18 @@ function syncEvaluationToOrganizationPackage($conn, $evaluation_id)
         $conn->query("UPDATE evaluation_packages SET status = 'Pending Consolidation', current_step_order = 1 WHERE package_id = $new_package_id AND status = 'Pending Self-Ratings'");
         recalculateOrganizationPackageBehaviorScore($conn, $new_package_id);
         $audit_new = $conn->prepare("INSERT INTO evaluation_package_audit (package_id, action, remarks) VALUES (?, 'CREATED', ?)");
-        $audit_remark_new = "Late submission by $emp_fullname — standalone package created because the original package had already passed Step 1 consolidation.";
+        $audit_remark_new = "Late submission by $emp_fullname — standalone evaluation review created because the original review had already passed Step 1 consolidation.";
         $audit_new->bind_param('is', $new_package_id, $audit_remark_new); $audit_new->execute(); $audit_new->close();
         // Notify the consolidator
         if ($new_consolidator_id > 0) {
             notifyUsersForEmployee($conn, $new_consolidator_id,
-                'Late Member Self-Rating — New Package Created',
-                "$emp_fullname submitted their self-rating for $tmpl_name ($dept_name). A new consolidation package has been created for your review (the original package is still progressing through approvals).",
+                'Late Member Self-Rating — New Evaluation Review Created',
+                "$emp_fullname submitted their self-rating for $tmpl_name ($dept_name). A new consolidation review has been created for you (the original evaluation review is still progressing through approvals).",
                 BASE_URL . '/employee/team-evaluation-packages.php');
         } elseif ($is_group_routed_package) {
             notifyOrganizationPackageStepAssignees($conn, $new_package_id, 1,
-                'Late Member Self-Rating — New Package Created',
-                "$emp_fullname submitted their self-rating for $tmpl_name ($dept_name). An eligible department reviewer can accept the package and begin consolidation.");
+                'Late Member Self-Rating — New Evaluation Review Created',
+                "$emp_fullname submitted their self-rating for $tmpl_name ($dept_name). An eligible department reviewer can claim the evaluation review and begin consolidation.");
         }
         return $new_package_id;
     }
@@ -5160,14 +5160,14 @@ function syncEvaluationToOrganizationPackage($conn, $evaluation_id)
         $conn->query("UPDATE evaluation_packages SET status = 'Pending Consolidation', current_step_order = 1 WHERE package_id = $package_id");
 
         $audit = $conn->prepare("INSERT INTO evaluation_package_audit (package_id, action, remarks) VALUES (?, 'LATE_MEMBER_REJOINED', ?)");
-        $remark = "Late member $emp_fullname submitted self-rating while package was $pkg_status. Package re-opened to consolidation (Step 1) for supervisor review.";
+        $remark = "Late member $emp_fullname submitted self-rating while the evaluation review was $pkg_status. Review re-opened to consolidation (Step 1) for supervisor review.";
         $audit->bind_param('is', $package_id, $remark); $audit->execute(); $audit->close();
 
         // Notify the consolidator that the package was re-opened for a late member.
-        $notif_title = 'Package Re-Opened — Late Member Submitted Self-Rating';
+        $notif_title = 'Evaluation Review Re-Opened — Late Member Submitted Self-Rating';
         $notif_body  = $emp_fullname . ($emp_job_title ? ' (' . $emp_job_title . ')' : '') .
-            ' submitted their self-evaluation for ' . $tmpl_name . ' after the package had already advanced. ' .
-            'The package has been returned to Step 1 (Consolidation) for your review. Please adjust scores as needed and re-endorse.';
+            ' submitted their self-evaluation for ' . $tmpl_name . ' after the evaluation review had already advanced. ' .
+            'The review has been returned to Step 1 (Consolidation). Please adjust scores as needed and re-endorse.';
         if ($consolidator_id > 0) {
             notifyUsersForEmployee($conn, $consolidator_id, $notif_title, $notif_body, BASE_URL . '/employee/team-evaluation-packages.php');
         }
@@ -5175,8 +5175,8 @@ function syncEvaluationToOrganizationPackage($conn, $evaluation_id)
             notifyOrganizationPackageStepAssignees($conn, $package_id, 1, $notif_title, $notif_body);
         }
         notifyOrganizationPackageStepAssignees($conn, $package_id, 1,
-            'Package Re-Opened for Late Member — Review Required',
-            "$emp_fullname ($dept_name) submitted their self-rating for $tmpl_name. The package has been re-opened to Step 1 for your review. Please include this member and re-endorse."
+            'Evaluation Review Re-Opened for Late Member',
+            "$emp_fullname ($dept_name) submitted their self-rating for $tmpl_name. The evaluation review has been re-opened to Step 1. Please include this member and re-endorse."
         );
     } else {
         // Trigger notification bell to the package consolidator upon member self-rating completion.
@@ -5202,7 +5202,7 @@ function syncEvaluationToOrganizationPackage($conn, $evaluation_id)
             } else {
                 notifyOrganizationPackageStepAssignees($conn, $package_id, 1,
                     'Performance Evaluation Ready for Review',
-                    "$emp_fullname ($dept_name) submitted their self-rating for $tmpl_name. The package is ready for $step1_label in the Performance Evaluation workflow."
+                    "$emp_fullname ($dept_name) submitted their self-rating for $tmpl_name. The evaluation review is ready for $step1_label in the Performance Evaluation workflow."
                 );
             }
         } else {
@@ -5487,7 +5487,7 @@ function reassignTransferredEmployeePackageReviews($conn, array $assignments, $e
         if (!$replacement) {
             $audit = $conn->prepare("INSERT INTO evaluation_package_audit (package_id, user_id, action, remarks)
                 VALUES (?, NULL, 'REVIEWER_REASSIGNMENT_REQUIRED', ?)");
-            $remarks = "No active reviewer was found in the package department after employee {$employee_id} transferred; this step needs an authorized reviewer assignment to continue.";
+            $remarks = "No active reviewer was found in the evaluation review's department after employee {$employee_id} transferred; this step needs an authorized reviewer assignment to continue.";
             $audit->bind_param('is', $package_id, $remarks);
             $audit->execute();
             $audit->close();
@@ -5599,11 +5599,11 @@ function refreshSharedBehaviorAfterEmployeeDeletion($conn, array $cohorts, $acto
             if ($cancelled) {
                 if ((int) $actor_user_id > 0) {
                     $audit = $conn->prepare("INSERT INTO evaluation_package_audit (package_id, user_id, action, remarks)
-                        VALUES (?, ?, 'EMPTY_PACKAGE_CANCELLED', 'Package cancelled because permanent employee deletion removed its final evaluation member.')");
+                        VALUES (?, ?, 'EMPTY_PACKAGE_CANCELLED', 'Evaluation review cancelled because permanent employee deletion removed its final evaluation member.')");
                     $audit->bind_param('ii', $empty_package_id, $actor_user_id);
                 } else {
                     $audit = $conn->prepare("INSERT INTO evaluation_package_audit (package_id, user_id, action, remarks)
-                        VALUES (?, NULL, 'EMPTY_PACKAGE_CANCELLED', 'Package cancelled because permanent employee deletion removed its final evaluation member.')");
+                        VALUES (?, NULL, 'EMPTY_PACKAGE_CANCELLED', 'Evaluation review cancelled because permanent employee deletion removed its final evaluation member.')");
                     $audit->bind_param('i', $empty_package_id);
                 }
                 $audit->execute();
@@ -5826,7 +5826,7 @@ function endorseLatePackageMember($conn, $package_id, $evaluation_id, $endorser_
         while ($hr = $hr_mgrs->fetch_assoc()) {
             createNotification($conn, (int)$hr['user_id'],
                 'Late Member Catch-Up — HR Review Required',
-                "$member_name submitted their evaluation for $tmpl_name ($dept_name). The Supervisor has endorsed them. Please review and endorse to allow them to join the active evaluation package.",
+                "$member_name submitted their evaluation for $tmpl_name ($dept_name). The Supervisor has endorsed them. Please review and endorse to allow them to join the active evaluation review.",
                 BASE_URL . '/employee/team-evaluation-packages.php');
         }
         // Log audit
@@ -5851,8 +5851,8 @@ function endorseLatePackageMember($conn, $package_id, $evaluation_id, $endorser_
         $active_step = $current_step_stmt ? $current_step_stmt->fetch_assoc() : null;
 
         if ($active_step) {
-            $endorser_label = $endorser_role === 'package_reviewer' ? 'Package Reviewer' : 'HR Manager';
-            $notif_msg = "$member_name has completed Supervisor and $endorser_label catch-up review for $tmpl_name ($dept_name). They have been added to your active evaluation package. The shared Behavior score has been updated.";
+            $endorser_label = $endorser_role === 'package_reviewer' ? 'Evaluation Reviewer' : 'HR Manager';
+            $notif_msg = "$member_name has completed Supervisor and $endorser_label catch-up review for $tmpl_name ($dept_name). They have been added to your active evaluation review. The shared Behavior score has been updated.";
             if (!empty($active_step['reviewer_employee_id'])) {
                 notifyUsersForEmployee($conn, (int)$active_step['reviewer_employee_id'],
                     'Late Member Added — Verified', $notif_msg, BASE_URL . '/employee/team-evaluation-packages.php');
@@ -5868,10 +5868,10 @@ function endorseLatePackageMember($conn, $package_id, $evaluation_id, $endorser_
         }
 
         $audit = $conn->prepare("INSERT INTO evaluation_package_audit (package_id, action, remarks) VALUES (?, 'CATCHUP_HR_ENDORSED', ?)");
-        $who = $endorser_role === 'package_reviewer' ? 'Package Reviewer (Active Holder)' : 'HR Manager';
-        $remark = "$who endorsed late member $member_name. Member is now part of the active evaluation package.";
+        $who = $endorser_role === 'package_reviewer' ? 'Evaluation Reviewer (Active Holder)' : 'HR Manager';
+        $remark = "$who endorsed late member $member_name. Member is now part of the active evaluation review.";
         $audit->bind_param('is', $package_id, $remark); $audit->execute(); $audit->close();
-        return ['ok' => true, 'message' => "$member_name has been endorsed and added to the active package."];
+        return ['ok' => true, 'message' => "$member_name has been endorsed and added to the active evaluation review."];
     }
 
     return ['ok' => false, 'message' => "Cannot endorse: member status '$current_status' is not valid for this endorser role."];
@@ -6068,7 +6068,7 @@ function applyOrganizationPackageResults($conn, $package_id)
               AND status = 'Approved and Applied' AND evaluation_type NOT IN ('Initial', 'Final') AND package_id <> $package_id");
         $audit_prior = $conn->prepare("INSERT INTO evaluation_package_audit (package_id, action, remarks)
             VALUES (?, 'PROGRESSIVE_SHARED_SCORE_UPDATED', ?)");
-        $audit_remark = "A later cohort package finalized. Progressive shared behavior score updated to $score and applied to this package's finalized evaluations.";
+        $audit_remark = "A later cohort evaluation review finalized. Progressive shared behavior score updated to $score and applied to this review's finalized evaluations.";
         while ($prior_package = $prior_packages->fetch_assoc()) {
             $prior_package_id = (int) $prior_package['package_id'];
             $audit_prior->bind_param('is', $prior_package_id, $audit_remark);
@@ -6119,10 +6119,10 @@ function notifyHRPersonnelPackageFinalized($conn, $package_id, $department_name 
     $is_probationary = in_array($type_row['evaluation_type'] ?? '', ['Initial', 'Final'], true);
     $members_text = $m_count > 0 ? " ($m_count team members)" : "";
 
-    $notif_title = $is_probationary ? 'Probationary Evaluation Finalized' : 'Evaluation Package Finalized & In Effect';
+    $notif_title = $is_probationary ? 'Probationary Evaluation Finalized' : 'Evaluation Review Finalized & In Effect';
     $notif_body = $is_probationary
         ? "The $dept_label ($tmpl_label) probationary evaluation has completed HR Manager approval. Its individual KRA and Core Values results are now final."
-        : "The $dept_label ($tmpl_label) evaluation package has completed Board approval and is now locked and applied.$members_text Final appraisals and shared behavior scores are now active across the system.";
+        : "The $dept_label ($tmpl_label) evaluation review has completed Board approval and is now locked and applied.$members_text Final appraisals and shared behavior scores are now active across the system.";
 
     $notified_count = 0;
     // Fetch all active HR Personnel & Admin users
@@ -6302,17 +6302,17 @@ function syncPendingOrganizationPackageGovernanceApprovers($conn)
         'Board of Directors' => [
             'label_match' => 'Board of Directors approval',
             'notify_title' => 'Board approval assignment updated',
-            'notify_body'  => 'You are now the Board of Directors approver for a team evaluation package.',
+            'notify_body'  => 'You are now the Board of Directors approver for a team evaluation review.',
         ],
         'Audit Committee' => [
             'label_match' => 'Audit Committee approval',
             'notify_title' => 'Audit approval assignment updated',
-            'notify_body'  => 'You are now the Audit Committee approver for a team evaluation package.',
+            'notify_body'  => 'You are now the Audit Committee approver for a team evaluation review.',
         ],
         'President' => [
             'label_match' => 'Executive Approval — President & CEO',
             'notify_title' => 'Executive approval assignment updated',
-            'notify_body'  => 'You are now the President & CEO approver for a team evaluation package.',
+            'notify_body'  => 'You are now the President & CEO approver for a team evaluation review.',
         ],
     ];
 
@@ -6399,7 +6399,7 @@ function syncPendingOrganizationPackageGovernanceApprovers($conn)
                 $update->execute();
                 if ($update->affected_rows > 0) {
                     $updated++;
-                    createNotification($conn, $user_id, 'Division VP approval assignment updated', 'You are now the Division VP approver for a department evaluation package.', BASE_URL . '/employee/team-evaluation-packages.php');
+                    createNotification($conn, $user_id, 'Division VP approval assignment updated', 'You are now the Division VP approver for a department evaluation review.', BASE_URL . '/employee/team-evaluation-packages.php');
                 }
             }
             $update->close();

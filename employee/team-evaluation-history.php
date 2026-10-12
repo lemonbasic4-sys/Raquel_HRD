@@ -51,7 +51,7 @@ require_once '../includes/header.php';
 <div class="evaluation-packages">
     <section class="package-hero">
         <a class="history-back-link" href="<?php echo BASE_URL; ?>/employee/team-evaluation-packages.php">
-            <i class="fas fa-arrow-left"></i> Back to assigned packages
+            <i class="fas fa-arrow-left"></i> Back to assigned reviews
         </a>
         <p class="mb-1 text-uppercase fw-bold" style="letter-spacing:1px; color:var(--rp-primary-gold-light); font-size:0.85rem;">
             Organization-Driven Performance History
@@ -66,9 +66,9 @@ require_once '../includes/header.php';
     <?php if (!$packages): ?>
         <section class="package-empty">
             <i class="fas fa-folder-open fa-3x text-muted mb-3" style="opacity:0.4;"></i>
-            <h2 class="h5 fw-bold">No evaluation packages in your history yet</h2>
+            <h2 class="h5 fw-bold">No evaluation reviews in your history yet</h2>
             <p class="mb-0 text-muted">
-                Packages will appear here once you act on them or when they reach your stage in the sequential approval pipeline.
+                Evaluation reviews will appear here once you act on them or when they reach your stage in the sequential approval pipeline.
             </p>
         </section>
     <?php endif; ?>
@@ -94,7 +94,7 @@ require_once '../includes/header.php';
         $members_stmt->close();
         $is_probationary_package = in_array($package['evaluation_type'], ['Initial', 'Final'], true);
         ?>
-        <section class="package-card" role="region" aria-label="<?php echo e($package['department_name']); ?> Evaluation Package">
+        <section class="package-card" role="region" aria-label="<?php echo e($package['department_name']); ?> Evaluation Review">
             <header class="package-card__header">
                 <div>
                     <h2 class="h5 mb-1 fw-bold">
@@ -106,7 +106,7 @@ require_once '../includes/header.php';
                 </div>
                 <div class="d-flex align-items-center gap-2">
                     <?php echo renderOrganizationPipelineBadge($conn, $package_id); ?>
-                    <button class="btn btn-sm btn-package-collapse" type="button" data-bs-toggle="collapse" data-bs-target="#pkgHistBody-<?php echo $package_id; ?>" aria-expanded="true" aria-controls="pkgHistBody-<?php echo $package_id; ?>" title="Minimize / Expand Package">
+                    <button class="btn btn-sm btn-package-collapse" type="button" data-bs-toggle="collapse" data-bs-target="#pkgHistBody-<?php echo $package_id; ?>" aria-expanded="true" aria-controls="pkgHistBody-<?php echo $package_id; ?>" title="Minimize / Expand Review">
                         <i class="fas fa-chevron-up collapse-icon"></i> <span class="d-none d-sm-inline">Minimize</span>
                     </button>
                 </div>
@@ -120,7 +120,7 @@ require_once '../includes/header.php';
                             <strong><?php echo $is_probationary_package ? number_format((float)($members[0]['individual_behavior'] ?? $members[0]['behavior_average'] ?? 0), 2) : ($package['shared_behavior_score'] !== null ? number_format((float) $package['shared_behavior_score'], 2) : 'Pending Consolidation'); ?></strong>
                         </div>
                         <div class="small text-muted">
-                            <?php echo $is_probationary_package ? 'Finalized upon HR Manager approval.' : 'Applied across all ' . count($members) . ' package members upon Board approval.'; ?>
+                            <?php echo $is_probationary_package ? 'Finalized upon HR Manager approval.' : 'Applied across all ' . count($members) . ' review members upon Board approval.'; ?>
                         </div>
                     </div>
 

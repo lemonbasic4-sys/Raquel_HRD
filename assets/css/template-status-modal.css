@@ -1,0 +1,72 @@
+/* Shared create/edit template review dialog. */
+#templateStatusModal .template-status-modal-dialog {
+    width: min(960px, calc(100vw - 24px));
+    max-width: none;
+    min-height: calc(100dvh - 24px);
+    margin: 12px auto;
+}
+
+#templateStatusModal .modal-content {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    max-height: calc(100dvh - 24px);
+}
+
+#templateStatusModal .modal-header,
+#templateStatusModal .modal-footer {
+    flex: 0 0 auto;
+}
+
+#templateStatusModal .modal-header > .d-flex,
+#templateStatusModal .modal-header > .d-flex > div:last-child {
+    min-width: 0;
+}
+
+#templateStatusModal .modal-title {
+    font-size: clamp(1rem, 2vw, 1.4rem);
+    line-height: 1.25;
+}
+
+#templateStatusModal .modal-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: none !important;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+#templateStatusModal .modal-body .row > [class*="col-"] {
+    min-width: 0;
+}
+
+#templateStatusModal .modal-footer {
+    gap: 10px;
+}
+
+@media (max-width: 767.98px), (max-height: 650px) {
+    #templateStatusModal .modal-header,
+    #templateStatusModal .modal-footer { padding: 14px 16px !important; }
+    #templateStatusModal .modal-body { padding: 16px !important; }
+    #templateStatusModal .modal-header .fa-2x { font-size: 1.3em; }
+    #templateStatusModal .modal-header > .d-flex { gap: 10px !important; }
+    #templateStatusModal .modal-header > .d-flex > div:first-child {
+        width: 40px !important;
+        height: 40px !important;
+        flex: 0 0 40px;
+        border-radius: 11px !important;
+    }
+}
+
+@media (max-width: 575.98px) {
+    #templateStatusModal .template-status-modal-dialog {
+        width: calc(100vw - 16px);
+        min-height: calc(100dvh - 16px);
+        margin: 8px auto;
+    }
+    #templateStatusModal .modal-content { max-height: calc(100dvh - 16px); border-radius: 14px !important; }
+    #templateStatusModal .modal-header .text-white-50 { font-size: .72rem; }
+    #templateStatusModal .modal-footer { flex-direction: column-reverse; align-items: stretch !important; }
+    #templateStatusModal .modal-footer .btn { width: 100%; margin: 0; padding: 9px 12px !important; font-size: .88rem; white-space: normal; }
+}
