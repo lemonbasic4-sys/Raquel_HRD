@@ -13,7 +13,7 @@ LEFT JOIN users u ON u.employee_id = e.employee_id
 WHERE e.department_id = 7
   AND e.employee_code IN (
       'HRD-001', 'HRD-002', 'HRD-003',
-      'EVAL-HR-S01', 'EVAL-HR-S02', 'EVAL-HR-V01', 'EVAL-HR-V02', 'EVAL-HR-M01', 'EVAL-HR-M02'
+      'HRD-111', 'HRD-222', 'HRD-333', 'HRD-444', 'HRD-555', 'HRD-777'
   )
 GROUP BY e.employee_id, e.employee_code, e.first_name, e.last_name,
          jt.job_title, e.employment_status
@@ -24,7 +24,7 @@ FROM employees e
 WHERE e.department_id = 7
   AND e.employee_code IN (
       'HRD-001', 'HRD-002', 'HRD-003',
-      'EVAL-HR-S01', 'EVAL-HR-S02', 'EVAL-HR-V01', 'EVAL-HR-V02', 'EVAL-HR-M01', 'EVAL-HR-M02'
+      'HRD-111', 'HRD-222', 'HRD-333', 'HRD-444', 'HRD-555', 'HRD-777'
   )
 GROUP BY e.employment_status, e.rank_category_id
 ORDER BY e.employment_status, e.rank_category_id DESC;

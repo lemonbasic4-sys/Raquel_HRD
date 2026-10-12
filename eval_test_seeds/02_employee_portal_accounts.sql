@@ -11,7 +11,7 @@ SELECT e.employee_id, e.employee_code, LOWER(CONCAT(e.employee_code, '@test.loca
        TRIM(CONCAT_WS(' ', e.first_name, e.middle_name, e.last_name)),
        'Employee', e.branch_id, 1, 1
 FROM employees e
-WHERE e.employee_code IN ('EVAL-HR-S01', 'EVAL-HR-S02', 'EVAL-HR-V01', 'EVAL-HR-V02', 'EVAL-HR-M01', 'EVAL-HR-M02')
+WHERE e.employee_code IN ('HRD-111', 'HRD-222', 'HRD-333', 'HRD-444', 'HRD-555', 'HRD-777')
   AND NOT EXISTS (
       SELECT 1 FROM users u
       WHERE u.employee_id = e.employee_id
