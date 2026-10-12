@@ -541,6 +541,16 @@ ksort($existing_templates);
                 <?php endforeach; ?>
             </select>
         </div>
+        <div class="d-flex align-items-center gap-1">
+            <span class="text-muted small fw-semibold"><i class="fas fa-clipboard-check me-1"></i>Eval Type:</span>
+            <select class="form-select form-select-sm" id="histEvalTypeFilter" style="min-width:150px; max-width:190px;">
+                <option value="All">All Types</option>
+                <option value="Annual">Annual</option>
+                <option value="Quarterly">Quarterly</option>
+                <option value="Initial">Initial</option>
+                <option value="Final">Final</option>
+            </select>
+        </div>
         <div class="input-group input-group-sm" style="min-width:200px;">
             <span class="input-group-text bg-white border-end-0 text-muted"><i class="fas fa-search"></i></span>
             <input type="search" class="form-control border-start-0 ps-0" id="histSearchInput" placeholder="Search employee, position...">
@@ -594,6 +604,7 @@ ksort($existing_templates);
         <tr class="history-row" data-type="<?php echo $is_probationary_history ? 'probationary' : 'regular'; ?>" data-status="<?php echo e($status_filter_key); ?>"
              data-department="<?php echo e($row['department_name'] ?? ''); ?>"
              data-template="<?php echo e($row['template_name'] ?? ''); ?>"
+             data-evaluation-type="<?php echo e($row['package_evaluation_type'] ?? 'Annual'); ?>"
              data-search="<?php echo strtolower(e($row['employee_name']) . ' ' . e($row['department_name'] ?? '') . ' ' . e($row['template_name']) . ' ' . e($row['job_title']) . ' ' . e($row['form_code'] ?? '')); ?>">
             <td><div class="employee-cell"><div class="hist-card-avatar">
                 <img src="<?php echo e($avatar_h); ?>?v=<?php echo time(); ?>" alt="<?php echo e($row['employee_name']); ?>">
@@ -681,6 +692,7 @@ function applyHistFilters() {
     const q = (document.getElementById('histSearchInput')?.value || '').toLowerCase().trim();
     const selDept = document.getElementById('histDeptFilter')?.value || 'All';
     const selTmpl = document.getElementById('histTemplateFilter')?.value || 'All';
+    const selEvalType = (document.getElementById('histEvalTypeFilter')?.value || 'All');
     const rows = document.querySelectorAll('#histTableBody .history-row');
     let visible = 0;
     let typeCount = 0;
@@ -695,8 +707,9 @@ function applyHistFilters() {
         const statusMatch = histActiveStatus === 'All' || row.dataset.status === histActiveStatus;
         const deptMatch = selDept === 'All' || (row.dataset.department || '') === selDept;
         const tmplMatch = selTmpl === 'All' || (row.dataset.template || '') === selTmpl;
+        const evalTypeMatch = selEvalType === 'All' || (row.dataset.evaluationType || '') === selEvalType;
         const searchMatch = !q || (row.dataset.search || '').includes(q);
-        const show = typeMatch && statusMatch && deptMatch && tmplMatch && searchMatch;
+        const show = typeMatch && statusMatch && deptMatch && tmplMatch && evalTypeMatch && searchMatch;
         row.style.display = show ? '' : 'none';
         if (show) visible++;
     });
@@ -718,6 +731,7 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('histSearchInput')?.addEventListener('input', applyHistFilters);
     document.getElementById('histDeptFilter')?.addEventListener('change', applyHistFilters);
     document.getElementById('histTemplateFilter')?.addEventListener('change', applyHistFilters);
+    document.getElementById('histEvalTypeFilter')?.addEventListener('change', applyHistFilters);
     applyHistFilters();
 });
 </script>

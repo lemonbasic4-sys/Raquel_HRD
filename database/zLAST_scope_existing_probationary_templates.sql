@@ -11,8 +11,9 @@ JOIN departments d ON d.department_id = et.target_department_id
     OR (et.target_department_id IS NULL AND d.department_name = et.target_department)
 JOIN job_titles jt ON jt.department_id = d.department_id
     AND jt.rank_category_id = CASE
+        WHEN creator.role = 'President and CEO' THEN 3
+        WHEN creator.role = 'HR Manager' THEN 4
         WHEN creator.role = 'HR Supervisor' THEN 5
-        WHEN creator.role IN ('HR Manager', 'President and CEO') THEN 3
         WHEN creator_employee.rank_category_id = 4 THEN 5
         WHEN creator_employee.rank_category_id = 3 THEN 4
         ELSE 0

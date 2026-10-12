@@ -238,10 +238,10 @@ $pending_pkg_count = count($pending_packages);
     .supervisor-dashboard .dashboard-package-icon {
         display: grid;
         place-items: center;
-        width: 42px;
-        height: 42px;
-        flex: 0 0 42px;
-        border-radius: 11px;
+        width: 38px;
+        height: 38px;
+        flex: 0 0 38px;
+        border-radius: 10px;
         background: #eef3ef;
         color: #174b1b;
     }
@@ -250,7 +250,7 @@ $pending_pkg_count = count($pending_packages);
         margin: 0 0 4px;
         overflow: hidden;
         color: #17221a;
-        font-size: .9rem;
+        font-size: .88rem;
         font-weight: 750;
         text-overflow: ellipsis;
         white-space: nowrap;
@@ -258,7 +258,7 @@ $pending_pkg_count = count($pending_packages);
 
     .supervisor-dashboard .dashboard-package-period {
         color: #69746c;
-        font-size: .72rem;
+        font-size: .7rem;
     }
 
     .supervisor-dashboard .dashboard-package-status {
@@ -271,7 +271,7 @@ $pending_pkg_count = count($pending_packages);
         display: block;
         margin-bottom: 3px;
         color: #68746a;
-        font-size: .66rem;
+        font-size: .64rem;
         font-weight: 600;
     }
 
@@ -284,7 +284,7 @@ $pending_pkg_count = count($pending_packages);
         border-radius: 20px;
         background: #e8f0ff;
         color: #1455c0;
-        font-size: .68rem;
+        font-size: .66rem;
         font-weight: 700;
     }
 
@@ -301,17 +301,136 @@ $pending_pkg_count = count($pending_packages);
     .supervisor-dashboard .dashboard-package-action {
         min-width: 92px;
         border: 1px solid #dce3dc;
-        border-radius: 8px;
+        border-radius: 999px;
         background: #fff;
         color: #344237;
         font-size: .75rem;
         font-weight: 600;
+        padding: 8px 14px;
     }
 
     .supervisor-dashboard .dashboard-package-action:hover {
         border-color: #174b1b;
         background: #f5f8f5;
         color: #174b1b;
+    }
+
+    .supervisor-dashboard .page-hero {
+        padding: 18px 20px 14px;
+        margin-bottom: 18px;
+        border-radius: 16px;
+    }
+
+    .supervisor-dashboard .page-hero .stat-card {
+        min-height: 112px;
+        padding: 14px 16px;
+        border-radius: 12px;
+    }
+
+    .supervisor-dashboard .page-hero .stat-card .stat-value {
+        font-size: clamp(1.7rem, 1.9vw, 2.3rem);
+    }
+
+    .supervisor-dashboard .page-hero .stat-card .stat-label {
+        font-size: 0.62rem;
+        letter-spacing: 0.08em;
+    }
+
+    .supervisor-dashboard .page-hero .stat-card .stat-icon {
+        font-size: 1.35rem;
+    }
+
+    .supervisor-dashboard .chart-card {
+        background: #f5f5f3;
+        border: 1px solid #dfe2df;
+        border-radius: 18px;
+        box-shadow: 0 1px 0 rgba(14, 20, 14, 0.04);
+        overflow: hidden;
+    }
+
+    .supervisor-dashboard .cc-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 14px 16px 12px;
+        background: #f8f8f7;
+        border-bottom: 1px solid #ebeeeb;
+    }
+
+    .supervisor-dashboard .cc-header h5 {
+        margin: 0;
+        color: #1e2a21;
+        font-size: clamp(1.05rem, 1.7vw, 1.35rem);
+        font-weight: 800;
+        line-height: 1.2;
+    }
+
+    .supervisor-dashboard .cc-header h5 i {
+        color: #1b3d22;
+        font-size: 1rem;
+    }
+
+    .supervisor-dashboard .cc-body {
+        padding: 12px 14px 14px;
+    }
+
+    .supervisor-dashboard .dashboard-package-card {
+        grid-template-columns: minmax(0, 1.55fr) minmax(180px, .8fr) auto;
+        background: #fff;
+        border: 1px solid #e8ebea;
+        border-radius: 14px;
+        box-shadow: 0 2px 8px rgba(15, 32, 18, 0.04);
+        padding: 12px 14px;
+    }
+
+    .supervisor-dashboard .dashboard-package-status {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        padding-left: 18px;
+        border-left: 1px solid #edf0ee;
+    }
+
+    .supervisor-dashboard .dashboard-package-status-label {
+        color: #748078;
+        font-size: .64rem;
+        font-weight: 700;
+        letter-spacing: .04em;
+        text-transform: uppercase;
+    }
+
+    .supervisor-dashboard .dashboard-package-status-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        align-self: flex-start;
+        gap: 6px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: #ebf8ee;
+        border: 1px solid #cae7d2;
+        color: #1e7b45;
+        font-size: .7rem;
+        font-weight: 700;
+    }
+
+    .supervisor-dashboard .dashboard-package-step {
+        margin-top: 4px;
+        color: #6b766f;
+        font-size: .72rem;
+        line-height: 1.5;
+        white-space: normal;
+    }
+
+    .supervisor-dashboard .dashboard-package-action {
+        min-width: 112px;
+        border-radius: 999px;
+        padding: 9px 16px;
+        border-color: #d7ddd7;
+        background: #fff;
+        color: #2d3a2e;
+        font-weight: 700;
     }
 
     @media (max-width: 767.98px) {
@@ -610,26 +729,6 @@ document.addEventListener('DOMContentLoaded', function () {
         </div>
     </div>
 
-    <!-- Urgency / Progress Bar -->
-    <?php
-    $total_action_items = $pending_validations + $validated_month;
-    $progress_pct = $total_action_items > 0 ? min(100, round(($validated_month / $total_action_items) * 100)) : 100;
-    $progress_color = $progress_pct >= 80 ? '#28a745' : ($progress_pct >= 40 ? '#ffc107' : '#dc3545');
-    ?>
-    <div style="background:rgba(255,255,255,.08);border-radius:8px;padding:10px 14px;display:flex;align-items:center;gap:14px;">
-        <div style="flex:1;min-width:0;">
-            <div style="font-size:.72rem;color:rgba(255,255,255,.55);font-weight:700;letter-spacing:.4px;text-transform:uppercase;margin-bottom:5px;">
-                Monthly Completion Rate &mdash; <?php echo date('F Y'); ?>
-            </div>
-            <div style="height:6px;background:rgba(255,255,255,.12);border-radius:99px;overflow:hidden;">
-                <div style="height:100%;width:<?php echo $progress_pct; ?>%;background:<?php echo $progress_color; ?>;border-radius:99px;transition:width .6s ease;"></div>
-            </div>
-        </div>
-        <div style="text-align:right;flex-shrink:0;">
-            <div style="font-size:1.1rem;font-weight:800;color:#fff;"><?php echo $progress_pct; ?>%</div>
-            <div style="font-size:.68rem;color:rgba(255,255,255,.5);"><?php echo $validated_month; ?> of <?php echo $total_action_items; ?> processed</div>
-        </div>
-    </div>
 </div>
 
 <div class="row g-4 mb-4">

@@ -196,6 +196,16 @@ ksort($existing_templates);
                     <?php endforeach; ?>
                 </select>
             </div>
+            <div class="d-flex align-items-center gap-1">
+                <span class="text-muted small fw-semibold"><i class="fas fa-clipboard-check me-1"></i>Eval Type:</span>
+                <select class="form-select form-select-sm" id="staffEvalTypeFilter" style="min-width:150px; max-width:200px;">
+                    <option value="All">All Types</option>
+                    <option value="Annual">Annual</option>
+                    <option value="Quarterly">Quarterly</option>
+                    <option value="Initial">Initial</option>
+                    <option value="Final">Final</option>
+                </select>
+            </div>
             <div class="search-box">
                 <div class="input-group input-group-sm">
                     <span class="input-group-text bg-transparent border-end-0"><i class="fas fa-search text-muted"></i></span>
@@ -245,8 +255,8 @@ ksort($existing_templates);
                                 data-status="<?php echo e($row['status']); ?>"
                                 data-department="<?php echo e($row['department_name'] ?? ''); ?>"
                                 data-template="<?php echo e($row['template_name'] ?? ''); ?>"
-                                data-search="<?php echo strtolower(e($row['employee_name']) . ' ' . e($row['department_name'] ?? '') . ' ' . e($row['template_name']) . ' ' . e($row['job_title']) . ' ' . e($row['form_code'] ?? '')); ?>">
-                                <td>
+                                data-evaluation-type="<?php echo e($row['package_evaluation_type'] ?? 'Annual'); ?>"
+                                data-search="<?php echo strtolower(e($row['employee_name']) . ' ' . e($row['department_name'] ?? '') . ' ' . e($row['template_name']) . ' ' . e($row['job_title']) . ' ' . e($row['form_code'] ?? '')); ?>">                                <td>
                                     <div class="d-flex align-items-center">
                                         <div class="avatar-circle-sm me-3" style="width:40px; height:40px; border-radius:10px; background:rgba(41, 67, 6, 0.06); color:var(--primary-blue); display:flex; align-items:center; justify-content:center; font-weight:700;">
                                             <?php echo $initials; ?>
@@ -569,10 +579,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const searchInput = document.getElementById('historySearch');
     const deptFilter = document.getElementById('staffDeptFilter');
     const templateFilter = document.getElementById('staffTemplateFilter');
+    const evalTypeFilter = document.getElementById('staffEvalTypeFilter');
 
     searchInput?.addEventListener('input', applyStaffFilters);
     deptFilter?.addEventListener('change', applyStaffFilters);
     templateFilter?.addEventListener('change', applyStaffFilters);
+    evalTypeFilter?.addEventListener('change', applyStaffFilters);
 
     applyStaffFilters();
 });
@@ -591,6 +603,7 @@ function applyStaffFilters() {
     const q = normalizeFilterValue(document.getElementById('historySearch')?.value);
     const selDept = normalizeFilterValue(document.getElementById('staffDeptFilter')?.value || 'All');
     const selTmpl = normalizeFilterValue(document.getElementById('staffTemplateFilter')?.value || 'All');
+    const selEvalType = normalizeFilterValue(document.getElementById('staffEvalTypeFilter')?.value || 'All');
     const rows = document.querySelectorAll('#historyTable tbody tr.history-row');
     let visible = 0;
 
@@ -598,14 +611,16 @@ function applyStaffFilters() {
         const rowStatus = normalizeFilterValue(row.dataset.status);
         const rowDept = normalizeFilterValue(row.dataset.department);
         const rowTmpl = normalizeFilterValue(row.dataset.template);
+        const rowEvalType = normalizeFilterValue(row.dataset.evaluationType || '');
         const rowSearch = normalizeFilterValue(row.dataset.search);
         const typeMatch = row.dataset.type === staffActiveType;
 
         const statusMatch = staffActiveStatus === 'All' || rowStatus === normalizeFilterValue(staffActiveStatus);
         const deptMatch = selDept === 'all' || rowDept === selDept;
         const tmplMatch = selTmpl === 'all' || rowTmpl === selTmpl;
+        const evalTypeMatch = selEvalType === 'all' || rowEvalType === selEvalType;
         const searchMatch = !q || rowSearch.includes(q);
-        const show = typeMatch && statusMatch && deptMatch && tmplMatch && searchMatch;
+        const show = typeMatch && statusMatch && deptMatch && tmplMatch && evalTypeMatch && searchMatch;
 
         row.style.display = show ? '' : 'none';
         if (show) visible++;

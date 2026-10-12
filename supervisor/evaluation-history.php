@@ -163,6 +163,7 @@ ksort($existing_templates);
     <div class="d-flex align-items-center gap-2 flex-wrap">
         <div class="d-flex align-items-center gap-1"><span class="text-muted small fw-semibold"><i class="fas fa-building me-1"></i>Dept:</span><select class="form-select form-select-sm" id="supervisorDeptFilter" style="min-width:160px;max-width:200px;"><option value="All">All Departments</option><?php foreach ($existing_departments as $dept_name): ?><option value="<?php echo e($dept_name); ?>"><?php echo e($dept_name); ?></option><?php endforeach; ?></select></div>
         <div class="d-flex align-items-center gap-1"><span class="text-muted small fw-semibold"><i class="fas fa-file-alt me-1"></i>Template:</span><select class="form-select form-select-sm" id="supervisorTemplateFilter" style="min-width:180px;max-width:260px;"><option value="All">All Templates</option><?php foreach ($existing_templates as $tmpl_name): ?><option value="<?php echo e($tmpl_name); ?>"><?php echo e($tmpl_name); ?></option><?php endforeach; ?></select></div>
+        <div class="d-flex align-items-center gap-1"><span class="text-muted small fw-semibold"><i class="fas fa-clipboard-check me-1"></i>Eval Type:</span><select class="form-select form-select-sm" id="supervisorEvalTypeFilter" style="min-width:150px;max-width:190px;"><option value="All">All Types</option><option value="Annual">Annual</option><option value="Quarterly">Quarterly</option><option value="Initial">Initial</option><option value="Final">Final</option></select></div>
         <div class="input-group input-group-sm" style="min-width:200px;max-width:360px;"><span class="input-group-text bg-white border-end-0 text-muted"><i class="fas fa-search"></i></span><input type="search" class="form-control border-start-0 ps-0" id="customSearchEval" placeholder="Search employee, position..."></div>
     </div>
 </div>
@@ -189,6 +190,7 @@ ksort($existing_templates);
                                 data-status="<?php echo e($row['status']); ?>"
                                 data-department="<?php echo e($row['department_name'] ?? ''); ?>"
                                 data-template="<?php echo e($row['template_name'] ?? ''); ?>"
+                                data-evaluation-type="<?php echo e($row['package_evaluation_type'] ?? 'Annual'); ?>"
                                 data-search="<?php echo strtolower(e($row['employee_name']) . ' ' . e($row['department_name'] ?? '') . ' ' . e($row['template_name']) . ' ' . e($row['job_title']) . ' ' . e($row['form_code'] ?? '')); ?>">
                                 <td><div class="employee-cell">
                                     <div class="hist-card-avatar"><img src="<?php echo e(getEmployeeAvatar($row['profile_picture'] ?? '')); ?>?v=<?php echo time(); ?>" alt="<?php echo e($row['employee_name']); ?>"></div>
@@ -871,6 +873,7 @@ function applySupervisorFilters() {
     const q = (document.getElementById('customSearchEval')?.value || '').toLowerCase().trim();
     const selDept = document.getElementById('supervisorDeptFilter')?.value || 'All';
     const selTmpl = document.getElementById('supervisorTemplateFilter')?.value || 'All';
+    const selEvalType = document.getElementById('supervisorEvalTypeFilter')?.value || 'All';
     const rows = document.querySelectorAll('#evalTable tbody tr.eval-row');
     let visible = 0;
     let typeCount = 0;
@@ -886,8 +889,9 @@ function applySupervisorFilters() {
         const statusMatch = supervisorActiveStatus === 'All' || row.dataset.status === supervisorActiveStatus;
         const deptMatch = selDept === 'All' || (row.dataset.department || '') === selDept;
         const tmplMatch = selTmpl === 'All' || (row.dataset.template || '') === selTmpl;
+        const evalTypeMatch = selEvalType === 'All' || (row.dataset.evaluationType || '') === selEvalType;
         const searchMatch = !q || (row.dataset.search || '').includes(q);
-        const show = typeMatch && statusMatch && deptMatch && tmplMatch && searchMatch;
+        const show = typeMatch && statusMatch && deptMatch && tmplMatch && evalTypeMatch && searchMatch;
         row.style.display = show ? '' : 'none';
         if (show) visible++;
     });
@@ -913,6 +917,7 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('customSearchEval')?.addEventListener('input', applySupervisorFilters);
     document.getElementById('supervisorDeptFilter')?.addEventListener('change', applySupervisorFilters);
     document.getElementById('supervisorTemplateFilter')?.addEventListener('change', applySupervisorFilters);
+    document.getElementById('supervisorEvalTypeFilter')?.addEventListener('change', applySupervisorFilters);
     applySupervisorFilters();
 });
 </script>

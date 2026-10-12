@@ -1,7 +1,8 @@
 -- Narrow test seed: create only the Initial probationary templates needed by
 -- the HRD-P01/P02 and AP-P01/P02 evaluation-flow test employees.
 -- Does not replace/delete templates or criteria; aligns the two sample-template creators.
--- Import after HR Manager + AP-T02 portal accounts and 04_test_probationary_employees.sql.
+-- HR Supervisor creates the HR Staff form; AP-T02 creates the AP Staff form.
+-- Import after HR Supervisor + AP-T02 accounts and 04_test_probationary_employees.sql.
 USE raquel_hris;
 
 INSERT INTO evaluation_templates (
@@ -21,7 +22,7 @@ FROM (
     SELECT 'Human Resources Initial Probationary Evaluation' AS template_name,
            'Early employment review of role understanding, onboarding progress, and initial performance in people operations, recruitment, employee relations, learning, compensation, records, and policy support.' AS description,
            'Human Resources' AS department_name, 711 AS job_title_id, 'HR-INI-2026' AS form_code,
-           101 AS creator_employee_id, 'HR Manager' AS creator_role
+           301 AS creator_employee_id, 'HR Supervisor' AS creator_role
     UNION ALL
     SELECT 'Acquired Properties Initial Probationary Evaluation',
            'Early employment review of role understanding, onboarding progress, and initial performance in acquired asset disposition, appraisal, documentation, inventory, custody, and preservation.',
@@ -39,7 +40,7 @@ WHERE NOT EXISTS (
 -- their creator attribution as well as assigning it on first insert.
 UPDATE evaluation_templates et
 JOIN (
-    SELECT 'HR-INI-2026' AS form_code, 101 AS employee_id, 'HR Manager' AS creator_role
+    SELECT 'HR-INI-2026' AS form_code, 301 AS employee_id, 'HR Supervisor' AS creator_role
     UNION ALL SELECT 'AP-INI-2026', 90102, 'Employee'
 ) AS seed ON seed.form_code = et.form_code AND et.evaluation_type = 'Initial'
 JOIN users creator ON creator.employee_id = seed.employee_id
@@ -48,6 +49,19 @@ JOIN users creator ON creator.employee_id = seed.employee_id
     AND COALESCE(creator.account_hold, 0) = 0
 SET et.created_by = creator.user_id
 WHERE et.deleted_at IS NULL;
+
+-- All HR Staff levels, including staff hired after the template was created,
+-- can use the probationary HR form. Manager and Supervisor levels cannot.
+INSERT IGNORE INTO evaluation_template_positions (template_id, job_title_id)
+SELECT et.template_id, jt.job_title_id
+FROM evaluation_templates et
+JOIN departments d ON d.department_id = et.target_department_id
+JOIN job_titles jt ON jt.department_id = d.department_id
+    AND jt.rank_category_id = 5 AND jt.is_active = 1
+WHERE et.form_code = 'HR-INI-2026'
+  AND et.evaluation_type = 'Initial'
+  AND et.deleted_at IS NULL
+  AND d.department_name = 'Human Resources';
 
 INSERT INTO evaluation_criteria (
     template_id, section, criterion_name, description, kpi_description,
