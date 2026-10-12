@@ -20,8 +20,6 @@ cd C:\xampp\htdocs\raquel_hrd
 #& "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source database/data/seed_templates.sql;"
 & "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source sample_db_seeds/02_test_hrd_portal_accounts.sql;"
 & "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source sample_db_seeds/04_test_probationary_employees.sql;"
-& "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source sample_db_seeds/05_test_probationary_initial_templates.sql;"
-& "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source sample_db_seeds/03_test_governance_approvers.sql;"
 & "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source database/zLAST_performance_indexes.sql;"
 
 # Run the isolated route/scoring regression test (creates and drops only a uniquely named test DB)
