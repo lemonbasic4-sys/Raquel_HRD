@@ -12,6 +12,7 @@ if (($_SESSION['role'] ?? '') !== 'Admin') {
 }
 
 require_once __DIR__ . '/backup-engine.php';
+require_once __DIR__ . '/functions.php';
 
 function ab_get_setting($conn, $key, $default = '') {
     $stmt = $conn->prepare("SELECT setting_value FROM system_settings WHERE setting_key = ?");
@@ -137,12 +138,16 @@ function ab_run_due_backup($conn) {
         backup_cleanup_old_files($keep);
         logAudit($conn, $_SESSION['user_id'], 'CREATE', 'AutoBackup', 0,
             "Scheduled auto-backup ({$result['label']}): {$result['filename']}");
+        notifyOtherAdmins($conn, 0, 'Scheduled backup completed',
+            "Scheduled {$result['label']} backup completed: {$result['filename']}.", BASE_URL . '/admin/backup.php', 'backups');
 
         $_SESSION['auto_backup_toast'] = [
             'type' => 'success',
             'msg' => "Scheduled {$result['label']} auto-backup completed: <strong>{$result['filename']}</strong>",
         ];
     } else {
+        notifyOtherAdmins($conn, 0, 'Backup failed',
+            'A scheduled backup failed. Check backup settings and run a manual backup if needed.', BASE_URL . '/admin/backup.php', 'backups');
         $_SESSION['auto_backup_toast'] = [
             'type' => 'danger',
             'msg' => e($result['error'] ?? 'Scheduled auto-backup failed.'),

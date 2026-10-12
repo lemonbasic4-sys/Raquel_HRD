@@ -135,6 +135,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($stmt->execute()) {
         $new_id = $stmt->insert_id;
         logAudit($conn, $_SESSION['user_id'], 'CREATE', 'User', $new_id, "Created user: $username ($role)");
+        notifyOtherAdmins($conn, (int) $_SESSION['user_id'], 'User Account Created',
+            "An administrator created the {$role} account {$username}.", BASE_URL . '/admin/users.php',
+            $role === 'Employee' ? 'portal' : 'accounts');
         redirectWith(BASE_URL . '/admin/' . $redirect, 'success', "User '$username' created successfully.");
     } else {
         // Cleanup uploaded file if DB fails

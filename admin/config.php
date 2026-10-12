@@ -69,6 +69,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_settings'])) {
         }
         $conn->commit();
         logAudit($conn, $_SESSION['user_id'], 'UPDATE', 'Settings', 0, 'Updated global system settings');
+        notifyOtherAdmins($conn, (int) $_SESSION['user_id'], 'System Settings Updated',
+            'An administrator changed global system settings. Review the configuration and audit trail if needed.',
+            BASE_URL . '/admin/config.php', 'settings');
         redirectWith(BASE_URL . '/admin/config.php', 'success', 'System settings updated successfully.');
     } catch (Exception $e) {
         $conn->rollback();

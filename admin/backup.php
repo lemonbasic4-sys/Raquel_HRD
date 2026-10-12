@@ -34,6 +34,8 @@ if (isset($_GET['delete'])) {
     if (file_exists($path)) {
         unlink($path);
         logAudit($conn, $_SESSION['user_id'], 'DELETE', 'Backup', 0, 'Deleted backup file: ' . $file);
+        notifyOtherAdmins($conn, (int) $_SESSION['user_id'], 'Backup Deleted',
+            "An administrator deleted backup {$file}.", BASE_URL . '/admin/backup.php', 'backups');
         redirectWith(BASE_URL . '/admin/backup.php', 'success', 'Backup deleted successfully.');
     }
 }

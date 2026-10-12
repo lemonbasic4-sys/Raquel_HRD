@@ -4,11 +4,12 @@ require_once '../includes/session-check.php';
 $notification_center_role = $notification_center_role ?? 'HR Manager';
 checkRole($notification_center_role === 'Employee' ? ['Employee', 'President and CEO'] : [$notification_center_role]);
 require_once '../includes/functions.php';
-$notification_center_portal = ['HR Manager' => 'manager', 'HR Supervisor' => 'supervisor', 'HR Staff' => 'staff', 'Employee' => 'employee'][$notification_center_role] ?? 'manager';
+$notification_center_portal = ['HR Manager' => 'manager', 'HR Supervisor' => 'supervisor', 'HR Staff' => 'staff', 'Employee' => 'employee', 'Admin' => 'admin'][$notification_center_role] ?? 'manager';
 $schema_ready = match ($notification_center_role) {
     'HR Supervisor' => ensureSupervisorNotificationSchema($conn),
     'HR Staff' => ensureStaffNotificationSchema($conn),
     'Employee' => ensureEmployeeNotificationSchema($conn),
+    'Admin' => ensureAdminNotificationSchema($conn),
     default => ensureManagerNotificationSchema($conn),
 };
 if (!$schema_ready) {
@@ -16,7 +17,19 @@ if (!$schema_ready) {
     exit('Notification categories are unavailable.');
 }
 $user_id = (int) $_SESSION['user_id'];
-$categories = $notification_center_role === 'Employee' ? [
+$categories = $notification_center_role === 'Admin' ? [
+    'all' => ['All Notifications', 'fas fa-inbox'],
+    'security' => ['Security & Account Holds', 'fas fa-shield-alt'],
+    'accounts' => ['Users & Access', 'fas fa-user-shield'],
+    'portal' => ['Employee Portal Accounts', 'fas fa-id-card'],
+    'employees' => ['Employee Records', 'fas fa-users'],
+    'evaluations' => ['Evaluations & Governance', 'fas fa-clipboard-list'],
+    'career' => ['Career Movements', 'fas fa-exchange-alt'],
+    'backups' => ['Backups & Recovery', 'fas fa-database'],
+    'settings' => ['System Settings', 'fas fa-cogs'],
+    'audit' => ['Audit & Compliance', 'fas fa-history'],
+    'system' => ['System & Announcements', 'fas fa-bullhorn'],
+] : ($notification_center_role === 'Employee' ? [
     'all' => ['All Notifications', 'fas fa-inbox'],
     'probation' => ['Probationary Evaluation', 'fas fa-user-clock'],
     'approvals' => ['Reviews & Approvals', 'fas fa-clipboard-check'],
@@ -49,7 +62,7 @@ $categories = $notification_center_role === 'Employee' ? [
     'career' => ['Career Movements', 'fas fa-exchange-alt'],
     'accounts' => ['Accounts & Access', 'fas fa-user-shield'],
     'system' => ['System & Announcements', 'fas fa-bullhorn'],
-]));
+])));
 $category = (string) ($_GET['category'] ?? 'all');
 if (!isset($categories[$category])) $category = 'all';
 $filter = (string) ($_GET['filter'] ?? 'all');
@@ -148,7 +161,7 @@ require_once '../includes/header.php';
         <div class="mn-toolbar"><nav class="mn-tabs" aria-label="Read status">
             <?php foreach (['all' => 'All', 'unread' => 'Unread', 'read' => 'Read', 'action' => in_array($notification_center_role, ['HR Staff', 'Employee'], true) ? 'My Follow-Ups' : 'Needs My Action'] as $key => $label): ?><a class="<?php echo $filter === $key ? 'active' : ''; ?>" href="<?php echo e(managerNotifUrl(['filter' => $key, 'page' => 1, 'id' => null])); ?>"><?php echo $label; ?></a><?php endforeach; ?>
         </nav><?php if ($total_unread > 0): ?><button type="button" class="mn-mark-all" onclick="managerNotifAction('mark_all_read')"><i class="fas fa-check-double"></i> Mark all as read</button><?php endif; ?></div>
-        <?php if ($filter === 'action'): ?><p class="mn-action-note"><?php if ($notification_center_role === 'Employee'): ?>Unread self-rating reminders and returned evaluations needing your attention.<?php elseif ($notification_center_role === 'HR Staff'): ?>Unread returned work and approaching deadlines assigned to you. Open an item for its related page.<?php else: ?>Unread requests for your attention. <a href="<?php echo BASE_URL . '/' . $notification_center_portal . '/' . ($notification_center_role === 'HR Supervisor' ? 'pending-endorsements.php' : 'pending-approvals.php'); ?>">Check the current review queue</a> for open decisions.<?php endif; ?></p><?php endif; ?>
+        <?php if ($filter === 'action'): ?><p class="mn-action-note"><?php if ($notification_center_role === 'Admin'): ?>Unread security and access notices requiring administrative review. <a href="<?php echo BASE_URL; ?>/admin/employee-accounts.php">Review employee accounts</a>.<?php elseif ($notification_center_role === 'Employee'): ?>Unread self-rating reminders and returned evaluations needing your attention.<?php elseif ($notification_center_role === 'HR Staff'): ?>Unread returned work and approaching deadlines assigned to you. Open an item for its related page.<?php else: ?>Unread requests for your attention. <a href="<?php echo BASE_URL . '/' . $notification_center_portal . '/' . ($notification_center_role === 'HR Supervisor' ? 'pending-endorsements.php' : 'pending-approvals.php'); ?>">Check the current review queue</a> for open decisions.<?php endif; ?></p><?php endif; ?>
         <div class="mn-results-label"><?php echo $total_filtered; ?> notification<?php echo $total_filtered === 1 ? '' : 's'; ?></div>
         <?php if (!$manager_notif_items): ?><div class="mn-empty"><i class="far fa-bell-slash"></i><strong>No notifications found</strong><p>Try another category, date range, or search.</p></div>
         <?php else: ?><div class="mn-list">

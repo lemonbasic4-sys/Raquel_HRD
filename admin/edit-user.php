@@ -132,6 +132,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
         logAudit($conn, $_SESSION['user_id'], 'UPDATE', 'User', $uid, "Updated user: $username ($role)");
+        notifyOtherAdmins($conn, (int) $_SESSION['user_id'], 'User Account Updated',
+            "An administrator updated the {$role} account {$username}.", BASE_URL . '/admin/edit-user.php?id=' . $uid, 'accounts');
         redirectWith(BASE_URL . '/admin/users.php', 'success', "User '$username' updated successfully.");
     } else {
         // Cleanup newly uploaded file if DB fails

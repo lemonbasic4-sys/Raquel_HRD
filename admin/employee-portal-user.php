@@ -71,6 +71,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'delet
     if ($del->execute()) {
         $del->close();
         logAudit($conn, $_SESSION['user_id'], 'DELETE', 'User', $user_id, "Deleted Employee Portal account: {$user['username']}");
+        notifyOtherAdmins($conn, (int) $_SESSION['user_id'], 'Employee Portal Account Deleted',
+            "An administrator deleted Employee Portal account {$user['username']}.", BASE_URL . '/admin/employee-accounts.php', 'portal');
         redirectWith(BASE_URL . '/admin/employee-accounts.php?page=' . $page . ($dept > 0 ? '&department=' . $dept : ''), 'success', "Employee Portal account '{$user['username']}' deleted successfully.");
     }
 
@@ -119,6 +121,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($upd->execute()) {
         logAudit($conn, $_SESSION['user_id'], 'UPDATE', 'User', $user_id, "Updated Employee Portal account: {$user['username']} → {$new_username}");
+        notifyOtherAdmins($conn, (int) $_SESSION['user_id'], 'Employee Portal Account Updated',
+            "An administrator updated Employee Portal account {$new_username}.", BASE_URL . '/admin/employee-portal-user.php?user_id=' . $user_id, 'portal');
         if ($new_password !== '') {
             $_SESSION['new_employee_credentials'] = [
                 'username'  => $new_username,

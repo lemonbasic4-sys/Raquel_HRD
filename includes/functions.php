@@ -289,6 +289,9 @@ function createNotification($conn, $user_id, $title, $message, $link = null, $ca
         } elseif (in_array(($recipient['role'] ?? ''), ['Employee', 'President and CEO'], true)) {
             $category = $category ?? employeeNotificationCategory($title, $message, $link);
             $needs_action = $needs_action ?? (int) employeeNotificationNeedsAction($title, $message, $link);
+        } elseif (($recipient['role'] ?? '') === 'Admin') {
+            $category = $category ?? adminNotificationCategory($title, $message, $link);
+            $needs_action = $needs_action ?? (int) adminNotificationNeedsAction($title, $message, $link);
         }
         $stmt = $conn->prepare('INSERT INTO notifications (user_id, title, message, link, category, needs_action) VALUES (?, ?, ?, ?, ?, ?)');
         $needs_action = (int) ($needs_action ?? 0);
@@ -478,6 +481,63 @@ function ensureEmployeeNotificationSchema($conn): bool
     }
     $update->close();
     return true;
+}
+
+function adminNotificationCategory($title, $message = '', $link = ''): string
+{
+    $text = strtolower((string) $title . ' ' . (string) $message);
+    $url = strtolower((string) $link);
+    if (str_contains($text, 'account hold') || str_contains($text, 'security') || str_contains($text, 'suspicious') || str_contains($text, 'lockout')) return 'security';
+    if (str_contains($url, '/admin/employee-accounts') || str_contains($url, '/admin/employee-portal-user') || str_contains($text, 'portal account') || str_contains($text, 'employee account')) return 'portal';
+    if (str_contains($url, '/admin/backup') || str_contains($text, 'backup') || str_contains($text, 'restore')) return 'backups';
+    if (str_contains($url, '/admin/config') || str_contains($text, 'system setting') || str_contains($text, 'configuration')) return 'settings';
+    if (str_contains($text, 'career movement') || str_contains($text, 'promotion') || str_contains($text, 'transfer')) return 'career';
+    if (str_contains($text, 'evaluation') || str_contains($text, 'appraisal') || str_contains($text, 'package finalized')) return 'evaluations';
+    if (str_contains($text, 'audit') || str_contains($text, 'compliance') || str_contains($url, '/admin/audit-trail')) return 'audit';
+    if (str_contains($text, 'employee record') || str_contains($text, 'employee profile') || str_contains($url, '/admin/members')) return 'employees';
+    if (str_contains($text, 'user') || str_contains($text, 'credential') || str_contains($text, 'account') || str_contains($url, '/admin/users')) return 'accounts';
+    return 'system';
+}
+
+function adminNotificationNeedsAction($title, $message = '', $link = ''): bool
+{
+    $text = strtolower((string) $title . ' ' . (string) $message);
+    return str_contains($text, 'review required') || str_contains($text, 'requires your action')
+        || str_contains($text, 'account hold') || str_contains($text, 'security alert')
+        || str_contains($text, 'backup failed');
+}
+
+function ensureAdminNotificationSchema($conn): bool
+{
+    if (!ensureManagerNotificationSchema($conn)) return false;
+    $legacy = $conn->query("SELECT n.notification_id, n.title, n.message, n.link, n.category, n.needs_action FROM notifications n JOIN users u ON u.user_id = n.user_id WHERE u.role = 'Admin'");
+    if (!$legacy) return false;
+    $update = $conn->prepare('UPDATE notifications SET category = ?, needs_action = ? WHERE notification_id = ?');
+    if (!$update) return false;
+    $valid_categories = ['security', 'accounts', 'portal', 'employees', 'evaluations', 'career', 'backups', 'settings', 'audit'];
+    while ($row = $legacy->fetch_assoc()) {
+        $category = in_array($row['category'], $valid_categories, true)
+            ? $row['category'] : adminNotificationCategory($row['title'], $row['message'], $row['link']);
+        $needs_action = max((int) $row['needs_action'], (int) adminNotificationNeedsAction($row['title'], $row['message'], $row['link']));
+        if ($row['category'] === $category && (int) $row['needs_action'] === $needs_action) continue;
+        $id = (int) $row['notification_id'];
+        $update->bind_param('sii', $category, $needs_action, $id);
+        $update->execute();
+    }
+    $update->close();
+    return true;
+}
+
+/** Tell other active admins about an audited administrative action. */
+function notifyOtherAdmins($conn, $actor_user_id, $title, $message, $link, $category): void
+{
+    $actor_user_id = (int) $actor_user_id;
+    $recipients = $conn->query("SELECT user_id FROM users WHERE role = 'Admin' AND is_active = 1 AND deleted_at IS NULL");
+    if (!$recipients) return;
+    while ($recipient = $recipients->fetch_assoc()) {
+        $recipient_id = (int) $recipient['user_id'];
+        if ($recipient_id !== $actor_user_id) createNotification($conn, $recipient_id, $title, $message, $link, $category, 0);
+    }
 }
 
 /** Notify active HR Staff of a template lifecycle event visible in their library. */
@@ -6076,6 +6136,7 @@ function notifyHRPersonnelPackageFinalized($conn, $package_id, $department_name 
                 'HR Manager'    => BASE_URL . '/manager/evaluation-history.php',
                 'HR Supervisor' => BASE_URL . '/supervisor/evaluation-history.php',
                 'HR Staff'      => BASE_URL . '/staff/evaluation-history.php',
+                'Admin'         => BASE_URL . '/admin/audit-trail.php',
                 default         => BASE_URL . '/employee/team-evaluation-history.php'
             };
 

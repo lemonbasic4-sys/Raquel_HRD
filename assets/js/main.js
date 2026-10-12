@@ -383,8 +383,8 @@ function updateNotificationDOM(unreadCount, recentNotifications) {
         } else {
             recentNotifications.forEach(notif => {
                 const itemEl = document.createElement('a');
-                itemEl.href = (window.IS_HR_MANAGER || window.IS_HR_SUPERVISOR || window.IS_HR_STAFF || window.IS_EMPLOYEE_CENTER)
-                    ? `${window.APP_BASE_URL}/${window.IS_HR_MANAGER ? 'manager' : (window.IS_HR_SUPERVISOR ? 'supervisor' : (window.IS_HR_STAFF ? 'staff' : 'employee'))}/notifications.php?id=${encodeURIComponent(notif.id)}`
+                itemEl.href = (window.IS_HR_MANAGER || window.IS_HR_SUPERVISOR || window.IS_HR_STAFF || window.IS_EMPLOYEE_CENTER || window.IS_ADMIN_CENTER)
+                    ? `${window.APP_BASE_URL}/${window.IS_HR_MANAGER ? 'manager' : (window.IS_HR_SUPERVISOR ? 'supervisor' : (window.IS_HR_STAFF ? 'staff' : (window.IS_ADMIN_CENTER ? 'admin' : 'employee')))}/notifications.php?id=${encodeURIComponent(notif.id)}`
                     : (notif.link || '#');
                 itemEl.className = `notification-item ${notif.is_read ? '' : 'unread'}`;
                 
@@ -497,7 +497,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // ── Auto mark-all-read when notification bell dropdown is opened ──────────
     const bellBtn = document.getElementById('notificationBtn');
-    if (bellBtn && !window.IS_HR_MANAGER && !window.IS_HR_SUPERVISOR && !window.IS_HR_STAFF && !window.IS_EMPLOYEE_CENTER) {
+    if (bellBtn && !window.IS_HR_MANAGER && !window.IS_HR_SUPERVISOR && !window.IS_HR_STAFF && !window.IS_EMPLOYEE_CENTER && !window.IS_ADMIN_CENTER) {
         bellBtn.addEventListener('show.bs.dropdown', function () {
             const badge = bellBtn.querySelector('.notification-badge');
             // Only fire if there are unread notifications (badge is visible)
