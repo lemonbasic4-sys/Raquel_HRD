@@ -400,6 +400,11 @@ $devplan_count = count($existing_dev_plans);
                 <button type="button" class="eval-tab-btn" id="btn-tab-devplan" onclick="switchReviewTab(event, 'tab-devplan')" role="tab" aria-selected="false" aria-controls="tab-devplan">
                     <i class="fas fa-seedling me-1"></i>Developmental Plan &amp; Recommendations <span class="eval-tab-badge ms-1" id="badge-devplan-count"><?php echo $devplan_count > 0 ? $devplan_count : 1; ?></span>
                 </button>
+                <?php if ($is_probationary_head_review): ?>
+                <button type="button" class="eval-tab-btn" id="btn-tab-decision" onclick="switchReviewTab(event, 'tab-decision')" role="tab" aria-selected="false" aria-controls="tab-decision">
+                    <i class="fas fa-file-signature me-1"></i>Decision &amp; Signature
+                </button>
+                <?php endif; ?>
             </div>
         </div>
 
@@ -623,6 +628,22 @@ $devplan_count = count($existing_dev_plans);
                 </button>
             </div>
 
+            <?php if ($is_probationary_head_review): ?>
+            <div id="tab-decision" class="eval-tab-content" role="tabpanel" aria-labelledby="btn-tab-decision">
+                <div class="eval-section-title"><span><i class="fas fa-file-signature me-2"></i>Immediate Head Decision &amp; Signature</span></div>
+                <p class="text-muted small mb-3">For <?php echo e($evaluation['first_name'] . ' ' . $evaluation['last_name']); ?>. Save any rating adjustments first, then record the recommendation and signature.</p>
+                <?php if (!empty($evaluation['immediate_head_signed_at'])): ?>
+                <span class="badge text-bg-success mb-3"><i class="fas fa-check-circle me-1"></i>Signed <?php echo e(date('M j, Y g:i A', strtotime($evaluation['immediate_head_signed_at']))); ?></span>
+                <?php endif; ?>
+                <div class="row g-3">
+                    <div class="col-md-5"><label class="form-label fw-semibold" for="headRecommendation">Recommendation</label><select class="form-select" id="headRecommendation" name="recommendation"><option value="">Select recommendation</option><option value="Recommend regularization" <?php echo ($evaluation['recommendation'] ?? '') === 'Recommend regularization' ? 'selected' : ''; ?>>Recommend regularization</option><option value="Continue training" <?php echo ($evaluation['recommendation'] ?? '') === 'Continue training' ? 'selected' : ''; ?>>Continue training</option></select></div>
+                    <div class="col-12"><label class="form-label fw-semibold" for="headRecommendationReason">Reason</label><textarea class="form-control" id="headRecommendationReason" name="recommendation_reason" rows="3" placeholder="Explain the basis for this recommendation"><?php echo e($evaluation['recommendation_reason'] ?? ''); ?></textarea></div>
+                    <div class="col-12"><label class="form-label fw-semibold" for="headSignatureCanvas">Immediate head signature</label><div class="border rounded bg-white p-2" style="max-width:620px;"><canvas id="headSignatureCanvas" width="560" height="120" style="display:block;width:100%;height:120px;touch-action:none;border:1px dashed #94a3b8;border-radius:6px;"></canvas><input type="hidden" name="immediate_head_signature_data" id="headSignatureData" value="<?php echo e($evaluation['immediate_head_signature_data'] ?? ''); ?>"><button class="btn btn-sm btn-outline-secondary mt-2" type="button" id="clearHeadSignature">Clear signature</button></div><div class="small text-muted mt-1">Saving changed ratings clears the previous immediate-head signature. The employee’s original self-rating signature remains on file.</div></div>
+                    <div class="col-12"><button class="btn btn-success fw-semibold" type="submit" name="package_action" value="save_probationary_decision" formaction="<?php echo BASE_URL; ?>/employee/team-evaluation-packages.php" formnovalidate><i class="fas fa-file-signature me-1"></i>Save Decision &amp; Signature</button></div>
+                </div>
+            </div>
+            <?php endif; ?>
+
             <!-- Form Action Buttons -->
             <div class="d-flex flex-wrap gap-3 mt-4 pt-3 border-top align-items-center">
                 <button class="btn-action-primary btn" type="submit">
@@ -652,13 +673,74 @@ function switchReviewTab(event, tabId) {
 
     const activeContent = document.getElementById(tabId);
     if (activeContent) activeContent.classList.add('active');
-    if (event && event.currentTarget) {
-        event.currentTarget.classList.add('active');
-        event.currentTarget.setAttribute('aria-selected', 'true');
+    const activeButton = document.querySelector('.eval-tab-btn[aria-controls="' + tabId + '"]');
+    if (activeButton) {
+        activeButton.classList.add('active');
+        activeButton.setAttribute('aria-selected', 'true');
     }
 }
 
 document.addEventListener('DOMContentLoaded', function () {
+    const signatureCanvas = document.getElementById('headSignatureCanvas');
+    const signatureData = document.getElementById('headSignatureData');
+    if (signatureCanvas && signatureData) {
+        const context = signatureCanvas.getContext('2d');
+        let drawing = false;
+        let hasInk = Boolean(signatureData.value);
+        if (hasInk) {
+            const savedSignature = new Image();
+            savedSignature.onload = () => context.drawImage(savedSignature, 0, 0, signatureCanvas.width, signatureCanvas.height);
+            savedSignature.src = signatureData.value;
+        }
+        const point = (event) => {
+            const rect = signatureCanvas.getBoundingClientRect();
+            return { x: (event.clientX - rect.left) * signatureCanvas.width / rect.width,
+                y: (event.clientY - rect.top) * signatureCanvas.height / rect.height };
+        };
+        signatureCanvas.addEventListener('pointerdown', (event) => {
+            drawing = true;
+            signatureCanvas.setPointerCapture(event.pointerId);
+            const start = point(event);
+            context.beginPath();
+            context.moveTo(start.x, start.y);
+            context.strokeStyle = '#111827';
+            context.lineWidth = 2.5;
+            context.lineCap = 'round';
+            event.preventDefault();
+        });
+        signatureCanvas.addEventListener('pointermove', (event) => {
+            if (!drawing) return;
+            const next = point(event);
+            context.lineTo(next.x, next.y);
+            context.stroke();
+            hasInk = true;
+            event.preventDefault();
+        });
+        const finishSignature = () => {
+            if (!drawing) return;
+            drawing = false;
+            if (hasInk) signatureData.value = signatureCanvas.toDataURL('image/png');
+        };
+        signatureCanvas.addEventListener('pointerup', finishSignature);
+        signatureCanvas.addEventListener('pointercancel', finishSignature);
+        document.getElementById('clearHeadSignature').addEventListener('click', () => {
+            context.clearRect(0, 0, signatureCanvas.width, signatureCanvas.height);
+            signatureData.value = '';
+            hasInk = false;
+        });
+        document.getElementById('reviewForm').addEventListener('submit', (event) => {
+            if (event.submitter?.value !== 'save_probationary_decision') return;
+            const recommendation = document.getElementById('headRecommendation');
+            const reason = document.getElementById('headRecommendationReason');
+            if (!recommendation.value || !reason.value.trim() || !signatureData.value) {
+                event.preventDefault();
+                switchReviewTab(null, 'tab-decision');
+                alert('Choose a recommendation, enter its reason, and sign before saving.');
+                (recommendation.value ? (reason.value.trim() ? signatureCanvas : reason) : recommendation).focus();
+            }
+        });
+        if (window.location.hash === '#tab-decision') switchReviewTab(null, 'tab-decision');
+    }
     const kraWeightPct = <?php echo $kra_w; ?>;
     const behWeightPct = <?php echo $beh_w; ?>;
     const sharedBehVal = <?php echo $shared_beh; ?>;

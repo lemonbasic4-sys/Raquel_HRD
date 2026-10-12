@@ -979,22 +979,13 @@ asort($package_department_options, SORT_NATURAL | SORT_FLAG_CASE);
                                             </td>
                                             <td class="col-action text-end">
                                                 <?php if ($can_adjust): ?>
-                                                    <a class="btn-action-adjust btn btn-sm" href="<?php echo BASE_URL; ?>/employee/package-member-review.php?package_id=<?php echo (int)$package['package_id']; ?>&evaluation_id=<?php echo (int)$member['evaluation_id']; ?>" title="View ratings and make supervisor adjustments">
-                                                        <i class="fas fa-sliders-h me-1"></i>Adjust
+                                                    <a class="btn-action-adjust btn btn-sm" href="<?php echo BASE_URL; ?>/employee/package-member-review.php?package_id=<?php echo (int)$package['package_id']; ?>&evaluation_id=<?php echo (int)$member['evaluation_id']; ?>" title="Review ratings<?php echo $is_probationary_package && (int)$package['current_step_order'] === 1 ? ' and record the immediate head decision' : ' and make adjustments'; ?>">
+                                                        <i class="fas fa-sliders-h me-1"></i><?php echo $is_probationary_package && (int)$package['current_step_order'] === 1 ? 'Review &amp; Decide' : 'Adjust'; ?>
                                                     </a>
-                                                    <?php if ($package['step_type'] === 'Consolidation' || ($is_probationary_package && (int)$package['current_step_order'] === 1)): ?>
-                                                        <form method="post" class="d-inline" onsubmit="return confirm('Return self-rating for <?php echo e($member['first_name'] . ' ' . $member['last_name']); ?> back to employee for revision?');">
-                                                            <input type="hidden" name="package_id" value="<?php echo (int)$package['package_id']; ?>">
-                                                            <input type="hidden" name="member_evaluation_id" value="<?php echo (int)$member['evaluation_id']; ?>">
-                                                            <input type="hidden" name="package_action" value="return_member">
-                                                            <?php echo csrfField(); ?>
-                                                            <?php if ($is_probationary_package): ?>
-                                                                <input type="text" name="comments" class="form-control form-control-sm d-inline-block w-auto" required placeholder="Return reason" aria-label="Return reason">
-                                                            <?php endif; ?>
-                                                            <button type="submit" class="btn btn-sm btn-outline-warning ms-1" title="Return this member evaluation to employee for revision">
-                                                                <i class="fas fa-undo me-1"></i>Return
-                                                            </button>
-                                                        </form>
+                                                    <?php if ($package['step_type'] === 'Consolidation' && !$is_probationary_package): ?>
+                                                        <button type="button" class="btn btn-sm btn-outline-warning ms-1" data-return-toggle="return-member-<?php echo (int)$package['package_id']; ?>-<?php echo (int)$member['evaluation_id']; ?>" aria-expanded="false" aria-controls="return-member-<?php echo (int)$package['package_id']; ?>-<?php echo (int)$member['evaluation_id']; ?>" title="Return this employee evaluation for revision">
+                                                            <i class="fas fa-undo me-1"></i>Return
+                                                        </button>
                                                     <?php endif; ?>
                                                 <?php else: ?>
                                                     <a class="btn-action-view btn btn-sm" href="<?php echo BASE_URL; ?>/employee/package-member-view.php?package_id=<?php echo (int)$package['package_id']; ?>&evaluation_id=<?php echo (int)$member['evaluation_id']; ?>" title="View read-only evaluation">
@@ -1003,6 +994,22 @@ asort($package_department_options, SORT_NATURAL | SORT_FLAG_CASE);
                                                 <?php endif; ?>
                                             </td>
                                         </tr>
+                                        <?php if ($can_adjust && $package['step_type'] === 'Consolidation' && !$is_probationary_package): ?>
+                                        <tr id="return-member-<?php echo (int)$package['package_id']; ?>-<?php echo (int)$member['evaluation_id']; ?>" class="package-return-row d-none">
+                                            <td colspan="8">
+                                                <form method="post" class="package-return-form" onsubmit="return confirm('Return self-rating for <?php echo e($member['first_name'] . ' ' . $member['last_name']); ?> back to employee for revision?');">
+                                                    <input type="hidden" name="package_id" value="<?php echo (int)$package['package_id']; ?>">
+                                                    <input type="hidden" name="member_evaluation_id" value="<?php echo (int)$member['evaluation_id']; ?>">
+                                                    <input type="hidden" name="package_action" value="return_member">
+                                                    <?php echo csrfField(); ?>
+                                                    <div class="package-return-form__copy"><strong>Return <?php echo e($member['first_name'] . ' ' . $member['last_name']); ?> for revision</strong><span>Tell the employee what needs to be corrected.</span></div>
+                                                    <label class="visually-hidden" for="return-reason-<?php echo (int)$member['evaluation_id']; ?>">Return reason</label>
+                                                    <input type="text" id="return-reason-<?php echo (int)$member['evaluation_id']; ?>" name="comments" class="form-control form-control-sm" <?php echo $is_probationary_package ? 'required' : ''; ?> placeholder="Return reason<?php echo $is_probationary_package ? ' (required)' : ' (optional)'; ?>">
+                                                    <button type="submit" class="btn btn-sm btn-outline-warning">Confirm Return</button>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                        <?php endif; ?>
                                     <?php endforeach; ?>
                                 </tbody>
                             </table>
@@ -1104,6 +1111,9 @@ asort($package_department_options, SORT_NATURAL | SORT_FLAG_CASE);
                 <form method="post" class="package-action-panel" id="pkgForm-<?php echo (int)$package['package_id']; ?>">
                     <input type="hidden" name="package_id" value="<?php echo (int)$package['package_id']; ?>">
                     <input type="hidden" name="package_action" id="actionInput-<?php echo (int)$package['package_id']; ?>" value="<?php echo $is_unclaimed_group_step ? 'claim' : 'approve'; ?>">
+                    <?php if ($is_probationary_package && (int)$package['current_step_order'] === 1 && count($members) === 1): ?>
+                        <input type="hidden" name="member_evaluation_id" value="<?php echo (int)$members[0]['evaluation_id']; ?>">
+                    <?php endif; ?>
                     <?php echo csrfField(); ?>
 
                     <?php if ($is_unclaimed_group_step): ?>
@@ -1138,49 +1148,6 @@ asort($package_department_options, SORT_NATURAL | SORT_FLAG_CASE);
                         </div>
                     <?php endif; ?>
 
-                    <?php if ($is_probationary_package && (int)$package['current_step_order'] === 1 && !empty($members[0])): ?>
-                        <?php $probationary_member = $members[0]; ?>
-                        <section class="probationary-decision-panel mb-3 p-3 p-md-4 rounded-3 border" style="background:#f5f3ff;border-color:#c4b5fd!important;">
-                            <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
-                                <div>
-                                    <h3 class="h5 fw-bold mb-1" style="color:#3730a3;">Immediate Head Decision &amp; Signature</h3>
-                                    <p class="small text-muted mb-0">For <?php echo e($probationary_member['first_name'] . ' ' . $probationary_member['last_name']); ?>. Review and adjust ratings above first, then record the recommendation here.</p>
-                                </div>
-                                <?php if (!empty($probationary_member['immediate_head_signed_at'])): ?>
-                                    <span class="badge text-bg-success"><i class="fas fa-check-circle me-1"></i>Signed <?php echo e(date('M j, Y g:i A', strtotime($probationary_member['immediate_head_signed_at']))); ?></span>
-                                <?php endif; ?>
-                            </div>
-                            <div class="row g-3">
-                                <div class="col-lg-5">
-                                    <label class="form-label fw-semibold" for="probationary-recommendation-<?php echo (int)$package['package_id']; ?>">Recommendation</label>
-                                    <select class="form-select" id="probationary-recommendation-<?php echo (int)$package['package_id']; ?>" name="recommendation" required>
-                                        <option value="">Select recommendation</option>
-                                        <option value="Recommend regularization" <?php echo ($probationary_member['recommendation'] ?? '') === 'Recommend regularization' ? 'selected' : ''; ?>>Recommend regularization</option>
-                                        <option value="Continue training" <?php echo ($probationary_member['recommendation'] ?? '') === 'Continue training' ? 'selected' : ''; ?>>Continue training</option>
-                                    </select>
-                                </div>
-                                <div class="col-12">
-                                    <label class="form-label fw-semibold" for="probationary-reason-<?php echo (int)$package['package_id']; ?>">Reason</label>
-                                    <textarea class="form-control" id="probationary-reason-<?php echo (int)$package['package_id']; ?>" name="recommendation_reason" rows="2" required placeholder="Explain the basis for this recommendation"><?php echo e($probationary_member['recommendation_reason'] ?? ''); ?></textarea>
-                                </div>
-                                <div class="col-12">
-                                    <label class="form-label fw-semibold" for="head-signature-canvas-<?php echo (int)$package['package_id']; ?>">Immediate head signature</label>
-                                    <div class="border rounded bg-white p-2" style="max-width:620px;">
-                                        <canvas class="probationary-head-signature-canvas" id="head-signature-canvas-<?php echo (int)$package['package_id']; ?>" width="560" height="120" style="display:block;width:100%;height:120px;touch-action:none;border:1px dashed #94a3b8;border-radius:6px;"></canvas>
-                                        <input type="hidden" name="immediate_head_signature_data" id="head-signature-data-<?php echo (int)$package['package_id']; ?>" value="<?php echo e($probationary_member['immediate_head_signature_data'] ?? ''); ?>">
-                                        <button class="btn btn-sm btn-outline-secondary mt-2 clear-probationary-signature" type="button" data-package-id="<?php echo (int)$package['package_id']; ?>">Clear signature</button>
-                                    </div>
-                                    <div class="small text-muted mt-1">Saving changed ratings in Adjust clears the previous immediate-head signature; the employee’s original self-rating signature remains on file.</div>
-                                </div>
-                                <div class="col-12">
-                                    <button class="btn btn-sm btn-outline-primary fw-semibold" type="submit" formnovalidate onclick="document.getElementById('actionInput-<?php echo (int)$package['package_id']; ?>').value='save_probationary_decision';">
-                                        <i class="fas fa-file-signature me-1"></i>Save Decision &amp; Signature
-                                    </button>
-                                </div>
-                            </div>
-                        </section>
-                    <?php endif; ?>
-
                     <div class="mb-3 package-review-remarks">
                         <label class="form-label fw-bold" for="comments-<?php echo (int)$package['package_id']; ?>">
                             Review Remarks &amp; Feedback <span class="text-muted fw-normal">(Optional for approval, required for returns)</span>
@@ -1205,7 +1172,11 @@ asort($package_department_options, SORT_NATURAL | SORT_FLAG_CASE);
                             </button>
                         <?php endif; ?>
 
-                        <?php if ($package['step_type'] !== 'Consolidation' && !($is_probationary_package && (int)$package['current_step_order'] === 1)): ?>
+                        <?php if ($is_probationary_package && (int)$package['current_step_order'] === 1 && count($members) === 1): ?>
+                            <button class="btn btn-outline-danger px-4 py-2 fw-bold" type="submit" formnovalidate onclick="return submitProbationaryReturn(<?php echo (int)$package['package_id']; ?>);" style="min-height:46px; border-radius:8px;">
+                                <i class="fas fa-undo me-1"></i>Return for Revision
+                            </button>
+                        <?php elseif ($package['step_type'] !== 'Consolidation' && !($is_probationary_package && (int)$package['current_step_order'] === 1)): ?>
                             <button class="btn btn-outline-danger px-4 py-2 fw-bold" type="submit" onclick="document.getElementById('actionInput-<?php echo (int)$package['package_id']; ?>').value='return';" style="min-height:46px; border-radius:8px;">
                                 <i class="fas fa-undo me-1"></i>Return for Revision
                             </button>
@@ -1302,10 +1273,33 @@ asort($package_department_options, SORT_NATURAL | SORT_FLAG_CASE);
 </div>
 
 <script>
+function submitProbationaryReturn(packageId) {
+    const remarks = document.getElementById('comments-' + packageId);
+    if (!remarks || !remarks.value.trim()) {
+        alert('Enter a return reason in Review Remarks & Feedback before returning this evaluation.');
+        remarks?.focus();
+        return false;
+    }
+    if (!confirm('Return this probationary evaluation to the employee for revision?')) return false;
+    document.getElementById('actionInput-' + packageId).value = 'return_member';
+    return true;
+}
+
 const packageCategoryTabs = Array.from(document.querySelectorAll('[data-package-category-tab]'));
 const packageCards = Array.from(document.querySelectorAll('[data-package-category]'));
 const packageDepartmentFilter = document.getElementById('packageDepartmentFilter');
 const packageFilterEmpty = document.getElementById('packageFilterEmpty');
+
+document.querySelectorAll('[data-return-toggle]').forEach((button) => {
+    button.addEventListener('click', () => {
+        const row = document.getElementById(button.dataset.returnToggle);
+        if (!row) return;
+        const expanded = button.getAttribute('aria-expanded') === 'true';
+        row.classList.toggle('d-none', expanded);
+        button.setAttribute('aria-expanded', String(!expanded));
+        if (!expanded) row.querySelector('input[name="comments"]')?.focus();
+    });
+});
 
 function applyPackageFilters() {
     const activeTab = packageCategoryTabs.find((tab) => tab.classList.contains('active'));
@@ -1364,49 +1358,6 @@ function submitPackageForm(packageId) {
     }
 }
 
-document.querySelectorAll('.probationary-head-signature-canvas').forEach((canvas) => {
-    const packageId = canvas.id.replace('head-signature-canvas-', '');
-    const ctx = canvas.getContext('2d');
-    const signature = document.getElementById('head-signature-data-' + packageId);
-    let drawing = false;
-    let hasInk = Boolean(signature.value);
-    if (hasInk) {
-        const image = new Image();
-        image.onload = () => ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
-        image.src = signature.value;
-    }
-    const point = (event) => {
-        const rect = canvas.getBoundingClientRect();
-        const source = event.touches ? event.touches[0] : event;
-        return { x: (source.clientX - rect.left) * canvas.width / rect.width, y: (source.clientY - rect.top) * canvas.height / rect.height };
-    };
-    const start = (event) => {
-        drawing = true;
-        const p = point(event);
-        ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.strokeStyle = '#111827'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
-        event.preventDefault();
-    };
-    const move = (event) => {
-        if (!drawing) return;
-        const p = point(event); ctx.lineTo(p.x, p.y); ctx.stroke(); hasInk = true; event.preventDefault();
-    };
-    const stop = () => {
-        if (!drawing) return;
-        drawing = false;
-        if (hasInk) signature.value = canvas.toDataURL('image/png');
-    };
-    canvas.addEventListener('mousedown', start); canvas.addEventListener('mousemove', move); window.addEventListener('mouseup', stop);
-    canvas.addEventListener('touchstart', start, { passive: false }); canvas.addEventListener('touchmove', move, { passive: false }); window.addEventListener('touchend', stop);
-    document.querySelector('.clear-probationary-signature[data-package-id="' + packageId + '"]')?.addEventListener('click', () => {
-        ctx.clearRect(0, 0, canvas.width, canvas.height); signature.value = ''; hasInk = false;
-    });
-    canvas.closest('form')?.addEventListener('submit', (event) => {
-        const action = document.getElementById('actionInput-' + packageId)?.value;
-        if (action === 'save_probationary_decision' && !signature.value) {
-            event.preventDefault(); alert('Please sign in the Immediate Head Decision section before saving.');
-        }
-    });
-});
 </script>
 
 <?php require_once '../includes/footer.php'; ?>

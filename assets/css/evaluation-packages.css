@@ -487,6 +487,46 @@
     max-width: 100%;
 }
 
+.evaluation-packages .package-table .package-return-row td {
+    background: #f8fafc;
+    padding: 0.8rem;
+}
+
+.evaluation-packages .package-return-form {
+    display: flex;
+    align-items: end;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+    white-space: normal;
+}
+
+.evaluation-packages .package-return-form__copy {
+    display: flex;
+    flex-direction: column;
+    min-width: 12rem;
+    line-height: 1.3;
+}
+
+.evaluation-packages .package-return-form__copy span {
+    color: var(--rp-text-muted);
+    font-size: 0.78rem;
+}
+
+.evaluation-packages .package-return-form .form-control {
+    flex: 1 1 16rem;
+    min-width: 0;
+    max-width: 32rem;
+}
+
+@media (max-width: 575.98px) {
+    .evaluation-packages .package-return-form__copy,
+    .evaluation-packages .package-return-form .form-control,
+    .evaluation-packages .package-return-form .btn {
+        flex: 1 1 100%;
+        max-width: none;
+    }
+}
+
 /* ── Side-by-Side Audit Comparison (Req 4) ─────────────────────────────────── */
 .audit-chip {
     border-radius: 6px;
