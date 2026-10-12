@@ -403,8 +403,8 @@ $used_template_count = (int) $conn->query("SELECT COUNT(DISTINCT template_id) as
             $wclass = abs($kra_w - 100) < 0.01 ? 'bg-success' : 'bg-warning text-dark';
             $is_probationary_template = in_array($t['evaluation_type'] ?? '', ['Initial', 'Final'], true);
         ?>
-            <div class="col-md-6 col-lg-4">
-                <div class="chart-card fadeup h-100 position-relative<?php echo $is_probationary_template ? ' probation-template-card' : ''; ?>" style="transition:transform 0.2s,box-shadow 0.2s;cursor:pointer;" onmouseover="this.style.transform='translateY(-4px)';this.style.boxShadow='0 8px 25px rgba(0,0,0,0.08)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
+            <div class="<?php echo $templates->num_rows === 1 ? 'col-12 col-xl-8 col-xxl-6' : 'col-12 col-md-6 col-xxl-4'; ?>">
+                <div class="chart-card fadeup h-100 position-relative template-list-card<?php echo $is_probationary_template ? ' probation-template-card' : ''; ?>">
                     <!-- Checkbox for Batch Delete -->
                     <?php $is_template_owner = (int)($t['created_by'] ?? 0) === $current_user_id; ?>
                     <?php $is_template_manager = $is_template_owner || ($can_manage_department_peer_templates && canManageEvaluationTemplate($conn, (int)$t['template_id'], $current_user_id)); ?>
@@ -413,13 +413,13 @@ $used_template_count = (int) $conn->query("SELECT COUNT(DISTINCT template_id) as
                         <input class="template-checkbox" type="checkbox" name="template_ids[]" value="<?php echo $t['template_id']; ?>" aria-label="Select <?php echo e($t['template_name']); ?> for batch deletion" onchange="toggleBatchDeleteBtn()">
                     </div>
                     <?php endif; ?>
-                    <div class="card-body p-4 pt-5">
+                    <div class="card-body p-4 pt-5 template-list-card-body">
                         <!-- Top -->
-                        <div class="d-flex justify-content-between align-items-start mb-3">
+                        <div class="template-list-card-top mb-3">
                             <div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#e8f5e9,#c8e6c9);display:flex;align-items:center;justify-content:center;color:#2e7d32;font-size:1.1rem;">
                                 <i class="fas fa-file-alt"></i>
                             </div>
-                            <div class="d-flex gap-1">
+                            <div class="template-list-card-tags">
                                 <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2" style="font-size:0.65rem;">
                                     <?php echo e($t['evaluation_type'] ?? 'Annual'); ?>
                                 </span>
@@ -436,7 +436,7 @@ $used_template_count = (int) $conn->query("SELECT COUNT(DISTINCT template_id) as
                             </div>
                         </div>
 
-                        <h6 class="fw-bold mb-2"><?php echo e($t['template_name']); ?></h6>
+                        <h6 class="fw-bold mb-2 template-list-card-title"><?php echo e($t['template_name']); ?></h6>
                         <div class="small text-muted mb-2">
                             <i class="fas fa-user-edit me-1"></i>Created by <?php echo e($t['created_by_name'] ?? 'Unknown'); ?><?php if (!empty($t['created_by_role'])): ?> · <?php echo e($t['created_by_role']); ?><?php endif; ?>
                             <?php if ($is_template_owner): ?>
@@ -447,12 +447,12 @@ $used_template_count = (int) $conn->query("SELECT COUNT(DISTINCT template_id) as
                                 <span class="badge bg-light text-muted border ms-1">Read only</span>
                             <?php endif; ?>
                         </div>
-                        <p class="text-muted small mb-3" style="line-height:1.5;">
+                        <p class="text-muted small mb-3 template-list-card-description">
                             <?php echo e(substr($t['description'] ?? 'No description.', 0, 80)); ?><?php echo strlen($t['description'] ?? '') > 80 ? '...' : ''; ?>
                         </p>
 
                         <!-- Stats -->
-                        <div class="d-flex gap-2 mb-3 flex-wrap">
+                        <div class="d-flex gap-2 mb-3 flex-wrap template-list-card-stats">
                             <span class="badge bg-success-subtle text-success border px-2" style="font-size:0.7rem;">
                                 <i class="fas fa-bullseye me-1"></i><?php echo $t['kra_count']; ?> KRA
                             </span>
@@ -478,7 +478,7 @@ $used_template_count = (int) $conn->query("SELECT COUNT(DISTINCT template_id) as
                         </div>
                     </div>
                     <div class="card-footer bg-transparent border-top p-3">
-                        <div class="d-flex gap-2">
+                        <div class="d-flex gap-2 flex-wrap template-list-card-actions">
                             <?php if ($is_template_manager): ?>
                             <a href="<?php echo (!empty($creator_context['is_ceo']) ? BASE_URL . '/employee/edit-evaluation-template.php?id=' : BASE_URL . '/manager/edit-template.php?id=') . (int)$t['template_id']; ?>" class="btn btn-sm btn-outline-primary flex-fill">
                                 <i class="fas fa-edit me-1"></i>Edit
@@ -656,6 +656,48 @@ function confirmBatchDelete() {
 .bg-success-subtle { background-color: #e8f5e9; }
 .bg-info-subtle { background-color: #e0f7fa; }
 .chart-card.probation-template-card { border-color: #3730a3; }
+.template-list-card {
+    border-radius: 16px;
+    box-shadow: 0 6px 24px rgba(19, 43, 21, .07);
+    overflow: hidden;
+    transition: transform .2s ease, box-shadow .2s ease;
+}
+.template-list-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 30px rgba(19, 43, 21, .12);
+}
+.template-list-card-body { display: flex; flex-direction: column; }
+.template-list-card-top {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 12px;
+    padding-right: 22px;
+}
+.template-list-card-tags {
+    display: flex;
+    flex: 1 1 220px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 6px;
+    min-width: 0;
+}
+.template-list-card-tags .badge {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    text-align: left;
+    white-space: normal;
+}
+.template-list-card-title { color: #16331d; font-size: 1.08rem; line-height: 1.35; }
+.template-list-card-description { line-height: 1.55; overflow-wrap: anywhere; }
+.template-list-card-stats { margin-top: auto; }
+.template-list-card-actions .btn { min-height: 34px; }
+@media (max-width: 575.98px) {
+    .template-list-card .card-body { padding: 20px !important; padding-top: 48px !important; }
+    .template-list-card-top { padding-right: 0; }
+    .template-list-card-tags { justify-content: flex-start; }
+    .template-list-card-actions .btn.flex-fill { flex: 1 1 40% !important; }
+}
 .template-checkbox {
     appearance: none;
     -webkit-appearance: none;
