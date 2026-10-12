@@ -213,6 +213,7 @@ switch ($effective_role) {
 
         // Count employee portal work items for sidebar and mobile bottom-nav badges.
         $m_pending_template_count = 0;
+        $m_pending_history_count = 0;
         $m_eval_status_count = 0;
         $m_dept_review_count = 0;
         $m_confirm_rating_count = 0;
@@ -245,6 +246,7 @@ switch ($effective_role) {
 
             $_hdr_allowed_eval_types = getAllowedEvaluationTypesForEmploymentStatus($_hdr_emp_status);
             $_hdr_in_clause = "'" . implode("','", $_hdr_allowed_eval_types) . "'";
+            $_hdr_legacy_rank_sql = probationaryTemplateLegacyRankSql('et', $_hdr_emp_rank);
 
             $_hdr_pt_stmt = $conn->prepare("
                 SELECT COUNT(*) AS total
@@ -255,7 +257,8 @@ switch ($effective_role) {
                   AND ((EXISTS (SELECT 1 FROM evaluation_template_positions etp WHERE etp.template_id = et.template_id)
                         AND EXISTS (SELECT 1 FROM evaluation_template_positions etp WHERE etp.template_id = et.template_id AND etp.job_title_id = ?))
                     OR (NOT EXISTS (SELECT 1 FROM evaluation_template_positions etp WHERE etp.template_id = et.template_id)
-                        AND (et.target_job_title_id IS NULL OR et.target_job_title_id = ?)))
+                        AND (et.target_job_title_id IS NULL OR et.target_job_title_id = ?)
+                        AND $_hdr_legacy_rank_sql))
                   AND et.evaluation_type IN ($_hdr_in_clause)
                   AND NOT EXISTS (
                       SELECT 1
@@ -270,6 +273,15 @@ switch ($effective_role) {
             $_hdr_pt_stmt->execute();
             $m_pending_template_count = (int) ($_hdr_pt_stmt->get_result()->fetch_assoc()['total'] ?? 0);
             $_hdr_pt_stmt->close();
+
+            $_hdr_history_stmt = $conn->prepare("SELECT COUNT(*) AS total FROM evaluations ev
+                WHERE ev.employee_id = ? AND ev.deleted_at IS NULL
+                  AND ev.submitted_date IS NOT NULL
+                  AND ev.status NOT IN ('Approved', 'Rejected', 'Draft', 'Returned', 'Pending Self-Rating')");
+            $_hdr_history_stmt->bind_param('i', $_hdr_emp_id);
+            $_hdr_history_stmt->execute();
+            $m_pending_history_count = (int)($_hdr_history_stmt->get_result()->fetch_assoc()['total'] ?? 0);
+            $_hdr_history_stmt->close();
 
             if (ensureEmployeeEvaluationStatusViewSchema($conn)) {
                 $_hdr_status_stmt = $conn->prepare("
@@ -355,7 +367,7 @@ switch ($effective_role) {
         // ── Section 2: Evaluations ──────────────────────────────────────────
         $menu_evaluations = [
             ['icon' => 'fas fa-star',        'label' => 'Self Rating',        'url' => BASE_URL . '/employee/self-rating.php',      'page' => 'self-rating.php',      'badge' => $m_pending_template_count],
-            ['icon' => 'fas fa-history',     'label' => 'Evaluation History', 'url' => BASE_URL . '/employee/evaluation-history.php', 'page' => 'evaluation-history.php'],
+            ['icon' => 'fas fa-history',     'label' => 'Evaluation History', 'url' => BASE_URL . '/employee/evaluation-history.php', 'page' => 'evaluation-history.php', 'badge' => $m_pending_history_count ?: null, 'badge_class' => 'bg-warning text-dark'],
         ];
         // Probationary employees only need their assigned self-ratings and the
         // status/history of those evaluations. Expand automatically when HR

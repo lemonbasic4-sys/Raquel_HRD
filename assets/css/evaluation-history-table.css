@@ -1,0 +1,59 @@
+.hr-history-table.hr-history-table{width:100%;min-width:1280px;table-layout:fixed}
+.hr-history-table th,.hr-history-table td{vertical-align:middle;overflow-wrap:break-word}
+.hr-history-table th:nth-child(1){width:14%}
+.hr-history-table th:nth-child(2){width:10%}
+.hr-history-table th:nth-child(3){width:9%}
+.hr-history-table th:nth-child(4){width:15%}
+.hr-history-table th:nth-child(5){width:9%}
+.hr-history-table th:nth-child(6){width:11%}
+.hr-history-table th:nth-child(7){width:12%}
+.hr-history-table th:nth-child(8){width:9%}
+.hr-history-table th:nth-child(9){width:11%}
+.hr-history-table .history-form-code{color:#64748b;font-size:.69rem;line-height:1.35;overflow-wrap:anywhere}
+.hr-history-table td:nth-child(5),.hr-history-table td:nth-child(9){text-align:center}
+.hr-history-table td:nth-child(5) .badge,.hr-history-table td:nth-child(5) .rating-pill{white-space:normal;line-height:1.25}
+.hr-history-table th:nth-child(n+6){white-space:normal}
+.hr-history-table td:nth-child(6) .badge,.hr-history-table td:nth-child(6) .hist-status-badge{white-space:nowrap}
+.hr-history-table td:nth-child(7){line-height:1.35}
+.hr-history-table td:nth-child(8){white-space:normal}
+.hr-history-table td:nth-child(9) .btn{white-space:nowrap}
+.hr-history-table-container{max-width:100%;overflow-x:auto!important;overscroll-behavior-inline:contain;-webkit-overflow-scrolling:touch}
+.supervisor-evaluation-history-page .history-table{margin:0}
+.supervisor-evaluation-history-page .history-table thead th{background:#f0f4ee;border-bottom:1px solid #e1e7df;color:#536052;font-size:.68rem;padding:10px 9px;text-transform:uppercase}
+.supervisor-evaluation-history-page .history-table tbody td{border-color:#edf0eb;font-size:.76rem;padding:9px;vertical-align:middle}
+.supervisor-evaluation-history-page .history-table .employee-cell{display:flex;align-items:center;gap:8px;min-width:0}
+.supervisor-evaluation-history-page .history-table .employee-copy{min-width:0}
+.supervisor-evaluation-history-page .history-table .employee-copy strong,.supervisor-evaluation-history-page .history-table .employee-copy small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.supervisor-evaluation-history-page .history-table .employee-copy strong{color:#253425;font-size:.75rem}
+.supervisor-evaluation-history-page .history-table .employee-copy small,.supervisor-evaluation-history-page .history-table .current-reviewer{color:#64748b;font-size:.68rem}
+.supervisor-evaluation-history-page .history-table .rating-pill{display:inline-block;padding:4px 9px;border-radius:999px;font-size:.65rem;font-weight:700}
+.supervisor-evaluation-history-page .history-table .rating-excellent{background:#dff7e8;color:#166534}
+.supervisor-evaluation-history-page .history-table .rating-exceeds{background:#dbeafe;color:#1d4ed8}
+.supervisor-evaluation-history-page .history-table .rating-meets{background:#fef3c7;color:#92400e}
+.supervisor-evaluation-history-page .history-table .rating-needs{background:#fee2e2;color:#991b1b}
+.supervisor-evaluation-history-page .history-table .hist-status-badge{display:inline-flex;align-items:center;padding:4px 12px;border-radius:999px;font-size:.72rem;font-weight:700}
+.supervisor-evaluation-history-page .history-table .hist-status-badge.approved{background:#d1fae5;color:#065f46}
+.supervisor-evaluation-history-page .history-table .hist-status-badge.rejected{background:#fee2e2;color:#991b1b}
+.supervisor-evaluation-history-page .history-table .hist-status-badge.returned{background:#fef3c7;color:#92400e}
+.staff-evaluation-history-page .table-responsive.hr-history-table-container{display:block;width:100%}
+.hr-history-table thead th{white-space:normal!important;overflow-wrap:normal;line-height:1.25}
+.hr-history-table tbody td{padding:clamp(5px,.65vw,10px)}
+.hr-history-table td:nth-child(6) .badge,.hr-history-table td:nth-child(6) .hist-status-badge{max-width:100%;min-width:0;white-space:normal;line-height:1.25;box-sizing:border-box}
+.hr-history-table td:nth-child(7) .current-reviewer{overflow-wrap:anywhere}
+.staff-evaluation-history-page .history-review-tabs{display:flex;align-items:end;gap:8px;margin:18px 0 14px;border-bottom:1px solid #dce4d8}
+.staff-evaluation-history-page .history-review-tab{display:flex;align-items:center;gap:10px;min-width:205px;padding:12px 16px;border:1px solid transparent;border-bottom:0;border-radius:10px 10px 0 0;background:#f1f3f2;color:#64748b;text-align:left}
+.staff-evaluation-history-page .history-review-tab.active{border-color:#dbe5d8;background:#fff;box-shadow:inset 0 3px #2e7d32;color:#173b1b;font-weight:700}
+.staff-evaluation-history-page .history-review-tab.probationary.active{box-shadow:inset 0 3px #3730a3}
+.staff-evaluation-history-page .history-review-tab .tab-count{display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:26px;margin-left:auto;border-radius:50%;background:#eef2e9;font-size:.72rem}
+.staff-evaluation-history-page .history-section-heading{padding:14px 16px 8px;border:1px solid #edf0eb;border-bottom:0;border-radius:12px 12px 0 0;background:#fff}
+.staff-evaluation-history-page .staff-history-directory{margin-top:0;border-radius:0 0 12px 12px;overflow:hidden}
+.staff-evaluation-history-page .staff-history-filters{background:#fff;border-bottom:1px solid #edf0eb}
+.staff-evaluation-history-page .hist-status-pills{display:flex;flex-wrap:wrap;gap:8px}
+.staff-evaluation-history-page .hist-status-pill{padding:9px 14px;border:1px solid transparent;border-radius:999px;background:#f1f3f2;color:#667085;font-size:.78rem;font-weight:700}
+.staff-evaluation-history-page .hist-status-pill.active-all{background:#082e06;color:#fff}
+.staff-evaluation-history-page .hist-status-pill.active-approved{background:#d1fae5;border-color:#6ee7b7;color:#065f46}
+.staff-evaluation-history-page .hist-status-pill.active-rejected{background:#fee2e2;border-color:#fca5a5;color:#991b1b}
+.staff-evaluation-history-page .hist-status-pill.active-returned{background:#fef3c7;border-color:#fcd34d;color:#92400e}
+.staff-evaluation-history-page .hr-history-table thead th{background:#f0f4ee;color:#536052;font-size:.68rem;text-transform:uppercase}
+.staff-evaluation-history-page .hr-history-table tbody td{font-size:.76rem}
+@media(max-width:640px){.staff-evaluation-history-page .history-review-tab{flex:1;min-width:0;padding:10px}.staff-evaluation-history-page .history-review-tab small{display:none!important}}

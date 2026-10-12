@@ -326,13 +326,14 @@ function ensureManagerNotificationSchema($conn): bool
     if (!isset($columns['category']) && !$conn->query('ALTER TABLE notifications ADD COLUMN category VARCHAR(32) NULL AFTER link')) return false;
     if (!isset($columns['needs_action']) && !$conn->query('ALTER TABLE notifications ADD COLUMN needs_action TINYINT(1) NOT NULL DEFAULT 0 AFTER category')) return false;
 
-    // Classify only legacy HR Manager records. Other roles retain their own inboxes.
-    $legacy = $conn->query("SELECT n.notification_id, n.title, n.message, n.link FROM notifications n JOIN users u ON u.user_id = n.user_id WHERE u.role = 'HR Manager' AND n.category IS NULL");
+    // Reclassify older records when rules improve; keep their read state intact.
+    $legacy = $conn->query("SELECT n.notification_id, n.title, n.message, n.link, n.category, n.needs_action FROM notifications n JOIN users u ON u.user_id = n.user_id WHERE u.role = 'HR Manager'");
     if (!$legacy) return false;
     $update = $conn->prepare('UPDATE notifications SET category = ?, needs_action = ? WHERE notification_id = ?');
     while ($row = $legacy->fetch_assoc()) {
         $category = managerNotificationCategory($row['title'], $row['message'], $row['link']);
-        $needs_action = (int) managerNotificationNeedsAction($row['title'], $row['message'], $row['link']);
+        $needs_action = (int)managerNotificationNeedsAction($row['title'], $row['message'], $row['link']);
+        if ($category === $row['category'] && $needs_action === (int)$row['needs_action']) continue;
         $id = (int) $row['notification_id'];
         $update->bind_param('sii', $category, $needs_action, $id);
         $update->execute();
@@ -345,6 +346,7 @@ function managerNotificationCategory($title, $message = '', $link = ''): string
 {
     $text = strtolower((string) $title . ' ' . (string) $message);
     $url = strtolower((string) $link);
+    if (str_contains($text, 'awaiting your approval') || str_contains($text, 'pending your approval') || str_contains($text, 'review required') || str_contains($url, 'pending-approvals')) return 'approvals';
     if (str_contains($text, 'probation') || str_contains($text, 'regulariz')) return 'probation';
     if (str_contains($text, 'career movement') || str_contains($text, 'transfer') || str_contains($text, 'promotion') || str_contains($url, 'career-movements')) return 'career';
     if (str_contains($text, 'account') || str_contains($text, 'access') || str_contains($text, 'credential') || str_contains($url, 'employee-accounts')) return 'accounts';
@@ -359,6 +361,7 @@ function managerNotificationNeedsAction($title, $message = '', $link = ''): bool
     $text = strtolower((string) $title . ' ' . (string) $message);
     if (str_contains($text, 'no further hr approval is required')) return false;
     return str_contains($text, 'review required') || str_contains($text, 'waiting for your review')
+        || str_contains($text, 'awaiting your approval')
         || str_contains($text, 'pending your approval') || str_contains($text, 'please review')
         || str_contains($text, 'approval required') || str_contains((string) $link, '/manager/pending-approvals');
 }
@@ -367,6 +370,7 @@ function supervisorNotificationCategory($title, $message = '', $link = ''): stri
 {
     $text = strtolower((string) $title . ' ' . (string) $message);
     $url = strtolower((string) $link);
+    if (str_contains($url, 'pending-endorsements') || str_contains($text, 'ready for review') || str_contains($text, 'pending validation') || str_contains($text, 'review required')) return 'validations';
     if (str_contains($text, 'probation') || str_contains($text, 'regulariz')) return 'probation';
     if (str_contains($text, 'career movement') || str_contains($text, 'transfer') || str_contains($text, 'promotion') || str_contains($url, 'career-movements')) return 'career';
     if (str_contains($text, 'pds') || str_contains($text, 'employee profile') || str_contains($text, 'employee record') || str_contains($url, 'edit-employee')) return 'employees';
@@ -389,12 +393,13 @@ function supervisorNotificationNeedsAction($title, $message = '', $link = ''): b
 function ensureSupervisorNotificationSchema($conn): bool
 {
     if (!ensureManagerNotificationSchema($conn)) return false;
-    $legacy = $conn->query("SELECT n.notification_id, n.title, n.message, n.link FROM notifications n JOIN users u ON u.user_id = n.user_id WHERE u.role = 'HR Supervisor' AND n.category IS NULL");
+    $legacy = $conn->query("SELECT n.notification_id, n.title, n.message, n.link, n.category, n.needs_action FROM notifications n JOIN users u ON u.user_id = n.user_id WHERE u.role = 'HR Supervisor'");
     if (!$legacy) return false;
     $update = $conn->prepare('UPDATE notifications SET category = ?, needs_action = ? WHERE notification_id = ?');
     while ($row = $legacy->fetch_assoc()) {
         $category = supervisorNotificationCategory($row['title'], $row['message'], $row['link']);
-        $needs_action = (int) supervisorNotificationNeedsAction($row['title'], $row['message'], $row['link']);
+        $needs_action = (int)supervisorNotificationNeedsAction($row['title'], $row['message'], $row['link']);
+        if ($category === $row['category'] && $needs_action === (int)$row['needs_action']) continue;
         $id = (int) $row['notification_id'];
         $update->bind_param('sii', $category, $needs_action, $id);
         $update->execute();
@@ -427,12 +432,13 @@ function staffNotificationNeedsAction($title, $message = '', $link = ''): bool
 function ensureStaffNotificationSchema($conn): bool
 {
     if (!ensureManagerNotificationSchema($conn)) return false;
-    $legacy = $conn->query("SELECT n.notification_id, n.title, n.message, n.link FROM notifications n JOIN users u ON u.user_id = n.user_id WHERE u.role = 'HR Staff' AND n.category IS NULL");
+    $legacy = $conn->query("SELECT n.notification_id, n.title, n.message, n.link, n.category, n.needs_action FROM notifications n JOIN users u ON u.user_id = n.user_id WHERE u.role = 'HR Staff'");
     if (!$legacy) return false;
     $update = $conn->prepare('UPDATE notifications SET category = ?, needs_action = ? WHERE notification_id = ?');
     while ($row = $legacy->fetch_assoc()) {
         $category = staffNotificationCategory($row['title'], $row['message'], $row['link']);
-        $needs_action = (int) staffNotificationNeedsAction($row['title'], $row['message'], $row['link']);
+        $needs_action = (int)staffNotificationNeedsAction($row['title'], $row['message'], $row['link']);
+        if ($category === $row['category'] && $needs_action === (int)$row['needs_action']) continue;
         $id = (int) $row['notification_id'];
         $update->bind_param('sii', $category, $needs_action, $id);
         $update->execute();
@@ -3211,7 +3217,7 @@ function notifyHRManagementOfProbationaryApproval($conn, $evaluation_id)
     $stmt->close();
     if (!$row) return 0;
 
-    $recipient_stmt = $conn->prepare("SELECT user_id FROM users WHERE role IN ('HR Supervisor','HR Manager')
+    $recipient_stmt = $conn->prepare("SELECT user_id, role FROM users WHERE role IN ('HR Supervisor','HR Manager')
         AND is_active = 1 AND COALESCE(account_hold,0) = 0 AND deleted_at IS NULL");
     $recipient_stmt->execute();
     $recipients = $recipient_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
@@ -3221,8 +3227,9 @@ function notifyHRManagementOfProbationaryApproval($conn, $evaluation_id)
     $recommendation = $row['recommendation'] ?? 'Decision not recorded';
     $reason = trim((string)($row['recommendation_reason'] ?? ''));
     $message = $name . ' (' . ($row['department_name'] ?? 'Department') . ' — ' . ($row['job_title'] ?? 'Probationary') . ') has a department-approved ' . $row['evaluation_type'] . ' evaluation. Final score: ' . number_format((float)$row['total_score'], 2) . '. Recommendation: ' . $recommendation . '. Reason: ' . ($reason !== '' ? $reason : 'Not provided') . '. This is an informational HR record; no further HR approval is required.';
-    $link = BASE_URL . '/manager/evaluation-history.php?evaluation_id=' . $evaluation_id;
     foreach ($recipients as $recipient) {
+        $history_portal = $recipient['role'] === 'HR Supervisor' ? 'supervisor' : 'manager';
+        $link = BASE_URL . '/' . $history_portal . '/evaluation-history.php?evaluation_id=' . $evaluation_id;
         createNotification($conn, (int)$recipient['user_id'], 'Department-approved probationary evaluation', $message, $link);
     }
     return count($recipients);

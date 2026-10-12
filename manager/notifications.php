@@ -73,6 +73,47 @@ $search = mb_substr(trim((string) ($_GET['search'] ?? '')), 0, 120);
 $page = max(1, (int) ($_GET['page'] ?? 1));
 $selected_id = max(0, (int) ($_GET['id'] ?? 0));
 $per_page = 20;
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    verifyCsrfToken();
+    $inbox_action = (string)($_POST['inbox_action'] ?? '');
+    $action_id = max(0, (int)($_POST['notification_id'] ?? 0));
+    $next_id = $action_id;
+    if ($inbox_action === 'mark_all_read') {
+        $mark_all = $conn->prepare('UPDATE notifications SET is_read = 1 WHERE user_id = ? AND is_read = 0');
+        $mark_all->bind_param('i', $user_id);
+        $mark_all->execute();
+        $mark_all->close();
+        $next_id = 0;
+    } elseif ($action_id > 0 && in_array($inbox_action, ['open_or_select', 'open_related', 'mark_read', 'mark_unread', 'delete'], true)) {
+        $owned = $conn->prepare('SELECT link FROM notifications WHERE notification_id = ? AND user_id = ? LIMIT 1');
+        $owned->bind_param('ii', $action_id, $user_id);
+        $owned->execute();
+        $owned_row = $owned->get_result()->fetch_assoc();
+        $owned->close();
+        if ($owned_row) {
+            if ($inbox_action === 'delete') {
+                $update = $conn->prepare('DELETE FROM notifications WHERE notification_id = ? AND user_id = ?');
+                $next_id = 0;
+            } else {
+                $read_value = $inbox_action === 'mark_unread' ? 0 : 1;
+                $update = $conn->prepare('UPDATE notifications SET is_read = ? WHERE notification_id = ? AND user_id = ?');
+                $update->bind_param('iii', $read_value, $action_id, $user_id);
+            }
+            if ($inbox_action === 'delete') $update->bind_param('ii', $action_id, $user_id);
+            $update->execute();
+            $update->close();
+            if ($inbox_action === 'open_related' || ($inbox_action === 'open_or_select' && !empty($_POST['already_selected']))) {
+                $destination = managerNotifLink($owned_row['link']);
+                if ($destination) {
+                    header('Location: ' . $destination);
+                    exit;
+                }
+            }
+        }
+    }
+    header('Location: ' . managerNotifUrl(['id' => $next_id ?: null]));
+    exit;
+}
 $scope = $notification_center_role === 'Employee'
     ? "user_id = ? AND (link LIKE '%/employee/%' OR link IS NULL OR link = '')"
     : "user_id = ? AND (link NOT LIKE '%/employee/%' OR link LIKE '%/employee/team-evaluation%' OR link LIKE '%/employee/package-member%' OR link IS NULL OR link = '')";
@@ -134,7 +175,11 @@ function managerNotifUrl(array $overrides = []): string {
 }
 function managerNotifLink($link): ?string {
     $link = trim((string) $link);
-    return str_starts_with($link, BASE_URL . '/') ? $link : null;
+    if (!str_starts_with($link, BASE_URL . '/')) return null;
+    if ($GLOBALS['notification_center_role'] === 'HR Supervisor') {
+        $link = str_replace(BASE_URL . '/manager/evaluation-history.php', BASE_URL . '/supervisor/evaluation-history.php', $link);
+    }
+    return $link;
 }
 require_once '../includes/header.php';
 ?>
@@ -160,39 +205,26 @@ require_once '../includes/header.php';
         </form>
         <div class="mn-toolbar"><nav class="mn-tabs" aria-label="Read status">
             <?php foreach (['all' => 'All', 'unread' => 'Unread', 'read' => 'Read', 'action' => in_array($notification_center_role, ['HR Staff', 'Employee'], true) ? 'My Follow-Ups' : 'Needs My Action'] as $key => $label): ?><a class="<?php echo $filter === $key ? 'active' : ''; ?>" href="<?php echo e(managerNotifUrl(['filter' => $key, 'page' => 1, 'id' => null])); ?>"><?php echo $label; ?></a><?php endforeach; ?>
-        </nav><?php if ($total_unread > 0): ?><button type="button" class="mn-mark-all" onclick="managerNotifAction('mark_all_read')"><i class="fas fa-check-double"></i> Mark all as read</button><?php endif; ?></div>
+        </nav><?php if ($total_unread > 0): ?><form method="post" onsubmit="return confirm('Mark all notifications as read?');"><input type="hidden" name="inbox_action" value="mark_all_read"><?php echo csrfField(); ?><button type="submit" class="mn-mark-all"><i class="fas fa-check-double"></i> Mark all as read</button></form><?php endif; ?></div>
         <?php if ($filter === 'action'): ?><p class="mn-action-note"><?php if ($notification_center_role === 'Admin'): ?>Unread security and access notices requiring administrative review. <a href="<?php echo BASE_URL; ?>/admin/employee-accounts.php">Review employee accounts</a>.<?php elseif ($notification_center_role === 'Employee'): ?>Unread self-rating reminders and returned evaluations needing your attention.<?php elseif ($notification_center_role === 'HR Staff'): ?>Unread returned work and approaching deadlines assigned to you. Open an item for its related page.<?php else: ?>Unread requests for your attention. <a href="<?php echo BASE_URL . '/' . $notification_center_portal . '/' . ($notification_center_role === 'HR Supervisor' ? 'pending-endorsements.php' : 'pending-approvals.php'); ?>">Check the current review queue</a> for open decisions.<?php endif; ?></p><?php endif; ?>
         <div class="mn-results-label"><?php echo $total_filtered; ?> notification<?php echo $total_filtered === 1 ? '' : 's'; ?></div>
         <?php if (!$manager_notif_items): ?><div class="mn-empty"><i class="far fa-bell-slash"></i><strong>No notifications found</strong><p>Try another category, date range, or search.</p></div>
         <?php else: ?><div class="mn-list">
             <?php foreach ($manager_notif_items as $item): $id = (int) $item['notification_id']; $meta = $categories[$item['category'] ?? 'system'] ?? $categories['system']; ?>
-            <a href="<?php echo e(managerNotifUrl(['id' => $id])); ?>" class="mn-item <?php echo $selected_id === $id ? 'selected' : ''; ?> <?php echo $item['is_read'] ? '' : 'unread'; ?>"><span class="mn-item-icon"><i class="<?php echo $meta[1]; ?>"></i></span><span class="mn-item-content"><strong><?php echo e($item['title']); ?></strong><small><?php echo e($meta[0]); ?></small><span><?php echo e($item['message']); ?></span></span><span class="mn-item-meta"><time><?php echo e(timeAgoFormat($item['created_at'])); ?></time><?php if (!$item['is_read']): ?><i class="mn-unread-dot" aria-label="Unread"></i><?php endif; ?></span></a>
+            <form method="post" class="mn-item-form"><input type="hidden" name="inbox_action" value="open_or_select"><input type="hidden" name="notification_id" value="<?php echo $id; ?>"><input type="hidden" name="already_selected" value="<?php echo $selected_id === $id ? 1 : 0; ?>"><?php echo csrfField(); ?>
+                <button type="submit" class="mn-item <?php echo $selected_id === $id ? 'selected' : ''; ?> <?php echo $item['is_read'] ? '' : 'unread'; ?>" title="<?php echo $selected_id === $id && managerNotifLink($item['link']) ? 'Open related page' : 'View notification details'; ?>"><span class="mn-item-icon"><i class="<?php echo $meta[1]; ?>"></i></span><span class="mn-item-content"><strong><?php echo e($item['title']); ?></strong><small><?php echo e($meta[0]); ?></small><span><?php echo e($item['message']); ?></span></span><span class="mn-item-meta"><time><?php echo e(timeAgoFormat($item['created_at'])); ?></time><?php if (!$item['is_read']): ?><i class="mn-unread-dot" aria-label="Unread"></i><?php endif; ?></span></button>
+            </form>
             <?php endforeach; ?>
         </div><?php if ($total_pages > 1): ?><nav class="mn-pages" aria-label="Notification pages"><?php if ($page > 1): ?><a href="<?php echo e(managerNotifUrl(['page' => $page - 1, 'id' => null])); ?>">Previous</a><?php endif; ?><span>Page <?php echo $page; ?> of <?php echo $total_pages; ?></span><?php if ($page < $total_pages): ?><a href="<?php echo e(managerNotifUrl(['page' => $page + 1, 'id' => null])); ?>">Next</a><?php endif; ?></nav><?php endif; ?><?php endif; ?>
     </section>
     <aside class="mn-detail" aria-label="Selected notification">
         <?php if ($selected): $meta = $categories[$selected['category'] ?? 'system'] ?? $categories['system']; $target = managerNotifLink($selected['link']); ?>
-        <div class="mn-detail-head"><span class="mn-detail-icon"><i class="<?php echo $meta[1]; ?>"></i></span><div><h2><?php echo e($selected['title']); ?></h2><time><?php echo e(date('M j, Y · g:i A', strtotime($selected['created_at']))); ?></time></div><button type="button" class="mn-close" onclick="managerNotifAction('delete', <?php echo $selected_id; ?>)" title="Delete notification" aria-label="Delete notification">&times;</button></div>
+        <div class="mn-detail-head"><span class="mn-detail-icon"><i class="<?php echo $meta[1]; ?>"></i></span><div><h2><?php echo e($selected['title']); ?></h2><time><?php echo e(date('M j, Y · g:i A', strtotime($selected['created_at']))); ?></time></div><form method="post" onsubmit="return confirm('Delete this notification?');"><input type="hidden" name="inbox_action" value="delete"><input type="hidden" name="notification_id" value="<?php echo $selected_id; ?>"><?php echo csrfField(); ?><button type="submit" class="mn-close" title="Delete notification" aria-label="Delete notification">&times;</button></form></div>
         <div class="mn-detail-labels"><span><?php echo e($meta[0]); ?></span><span class="<?php echo $selected['is_read'] ? 'read' : 'unread'; ?>"><?php echo $selected['is_read'] ? 'Read' : 'Unread'; ?></span></div>
         <div class="mn-detail-message"><?php echo nl2br(e($selected['message'])); ?></div>
-        <?php if ($target): ?><a class="mn-primary-action" href="<?php echo e($target); ?>"><i class="fas fa-external-link-alt"></i> Open related page</a><?php endif; ?>
-        <button type="button" class="mn-secondary-action" onclick="managerNotifAction('<?php echo $selected['is_read'] ? 'mark_unread' : 'mark_read'; ?>', <?php echo $selected_id; ?>)"><i class="fas fa-<?php echo $selected['is_read'] ? 'envelope' : 'check'; ?>"></i> Mark as <?php echo $selected['is_read'] ? 'unread' : 'read'; ?></button>
+        <?php if ($target): ?><form method="post"><input type="hidden" name="inbox_action" value="open_related"><input type="hidden" name="notification_id" value="<?php echo $selected_id; ?>"><?php echo csrfField(); ?><button type="submit" class="mn-primary-action"><i class="fas fa-external-link-alt"></i> Open related page</button></form><?php endif; ?>
+        <form method="post"><input type="hidden" name="inbox_action" value="<?php echo $selected['is_read'] ? 'mark_unread' : 'mark_read'; ?>"><input type="hidden" name="notification_id" value="<?php echo $selected_id; ?>"><?php echo csrfField(); ?><button type="submit" class="mn-secondary-action"><i class="fas fa-<?php echo $selected['is_read'] ? 'envelope' : 'check'; ?>"></i> Mark as <?php echo $selected['is_read'] ? 'unread' : 'read'; ?></button></form>
         <?php else: ?><div class="mn-detail-empty"><i class="far fa-envelope-open"></i><strong>Select a notification</strong><p>Its full message and related action will appear here.</p></div><?php endif; ?>
     </aside>
 </div>
-<script>
-async function managerNotifAction(action, id = 0) {
-    if (action === 'delete' && !confirm('Delete this notification?')) return;
-    if (action === 'mark_all_read' && !confirm('Mark all notifications as read?')) return;
-    const data = new FormData();
-    data.append('action', action); data.append('notification_id', id); data.append('context', <?php echo json_encode($notification_center_role === 'Employee' ? 'employee' : 'hr'); ?>);
-    data.append('csrf_token', document.querySelector('meta[name="csrf-token"]').content);
-    try {
-        const response = await fetch('<?php echo BASE_URL; ?>/includes/ajax/notification-action.php', {method: 'POST', body: data});
-        const result = await response.json();
-        if (!result.success) throw new Error(result.error || 'Action failed');
-        location.href = <?php echo json_encode(managerNotifUrl(['id' => null]), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
-    } catch (error) { alert(error.message); }
-}
-</script>
 <?php require_once '../includes/footer.php'; ?>

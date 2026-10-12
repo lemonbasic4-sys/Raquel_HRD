@@ -9,7 +9,7 @@ require_once '../includes/header.php';
 
 // History is reserved for completed evaluations. Active package members stay in Performance Evaluation.
 $history = $conn->query("SELECT ev.*, CONCAT(e.first_name, ' ', e.last_name) as employee_name, e.job_title, e.rank_category_id, e.profile_picture, d.department_name,
-    u.full_name as submitted_by_name, u2.full_name as endorsed_by_name, u3.full_name as approved_by_name, et.template_name,
+    u.full_name as submitted_by_name, u2.full_name as endorsed_by_name, u3.full_name as approved_by_name, et.template_name, et.form_code,
     ep.package_id, ep.status AS package_status, COALESCE(ep.evaluation_type, et.evaluation_type) AS package_evaluation_type,
     ep.period_start, ep.period_end, ep.current_step_order,
     current_route.step_label AS current_step_label,
@@ -81,6 +81,7 @@ ksort($existing_departments);
 ksort($existing_templates);
 ?>
 
+<link rel="stylesheet" href="<?php echo BASE_URL; ?>/assets/css/evaluation-history-table.css?v=7">
 <div class="evaluation-history-page">
 <div class="page-hero fadeup">
     <div class="d-flex flex-wrap align-items-center justify-content-between mb-4 gap-3">
@@ -548,9 +549,9 @@ ksort($existing_templates);
 </div>
 
 <!-- Evaluation table -->
-<div class="history-table-wrap fadeup fadeup-2"><table class="table history-table" id="histTable"><thead><tr><th>Employee Name</th><th>Department</th><th>Position</th><th>Overall Rating</th><th>Status</th><th>Current Reviewer</th><th>Date Submitted</th><th>Actions</th></tr></thead><tbody id="histTableBody">
+<div class="history-table-wrap hr-history-table-container fadeup fadeup-2"><table class="table history-table hr-history-table" id="histTable"><thead><tr><th>Employee Name</th><th>Department</th><th>Position</th><th>Form Code</th><th>Overall Rating</th><th>Status</th><th>Current Reviewer</th><th>Date Submitted</th><th>Actions</th></tr></thead><tbody id="histTableBody">
     <?php if (empty($all_history)): ?>
-        <tr><td colspan="8" class="history-empty-row">No evaluation records yet.</td></tr>
+        <tr><td colspan="9" class="history-empty-row">No evaluation records yet.</td></tr>
     <?php else: ?>
         <?php foreach ($all_history as $row):
             $h_score = (float)($row['total_score'] ?? 0);
@@ -593,12 +594,12 @@ ksort($existing_templates);
         <tr class="history-row" data-type="<?php echo $is_probationary_history ? 'probationary' : 'regular'; ?>" data-status="<?php echo e($status_filter_key); ?>"
              data-department="<?php echo e($row['department_name'] ?? ''); ?>"
              data-template="<?php echo e($row['template_name'] ?? ''); ?>"
-             data-search="<?php echo strtolower(e($row['employee_name']) . ' ' . e($row['department_name'] ?? '') . ' ' . e($row['template_name']) . ' ' . e($row['job_title'])); ?>">
+             data-search="<?php echo strtolower(e($row['employee_name']) . ' ' . e($row['department_name'] ?? '') . ' ' . e($row['template_name']) . ' ' . e($row['job_title']) . ' ' . e($row['form_code'] ?? '')); ?>">
             <td><div class="employee-cell"><div class="hist-card-avatar">
                 <img src="<?php echo e($avatar_h); ?>?v=<?php echo time(); ?>" alt="<?php echo e($row['employee_name']); ?>">
             </div><div class="employee-copy"><strong><?php echo e($row['employee_name']); ?></strong><small><?php echo e($row['employee_code'] ?? ('ID ' . $row['employee_id'])); ?></small></div></div></td>
             <!-- Dept + Template -->
-            <td><?php echo e($row['department_name'] ?? 'N/A'); ?></td><td><?php echo e($row['job_title'] ?? 'N/A'); ?></td>
+            <td><?php echo e($row['department_name'] ?? 'N/A'); ?></td><td><?php echo e($row['job_title'] ?? 'N/A'); ?></td><td class="history-form-code"><?php echo e($row['form_code'] ?: 'N/A'); ?></td>
             <!-- Score -->
             <td class="text-center"><strong class="d-block"><?php echo $h_score > 0 ? number_format($h_score, 2) : '—'; ?></strong><?php if ($h_perf): $rating_class = str_contains($h_badge_class, 'success') ? 'rating-excellent' : (str_contains($h_badge_class, 'info') ? 'rating-exceeds' : (str_contains($h_badge_class, 'warning') ? 'rating-meets' : (str_contains($h_badge_class, 'danger') ? 'rating-needs' : ''))); ?><span class="rating-pill <?php echo $rating_class; ?>"><?php echo e($h_perf); ?></span><?php endif; ?></td>
             <!--
@@ -639,7 +640,7 @@ ksort($existing_templates);
         <?php endforeach; ?>
 
         <!-- No results (search) -->
-    <tr class="d-none" id="histNoResults"><td colspan="8" class="history-empty-row">No evaluations match these filters.</td></tr>
+    <tr class="d-none" id="histNoResults"><td colspan="9" class="history-empty-row">No evaluations match these filters.</td></tr>
     <?php endif; ?>
 </tbody></table></div>
 
@@ -1128,11 +1129,11 @@ function renderTable() {
             let valA = a.querySelectorAll("td")[currentSortColumn].textContent.trim();
             let valB = b.querySelectorAll("td")[currentSortColumn].textContent.trim();
             
-            if (currentSortColumn === 2) {
+            if (currentSortColumn === 7) {
                 valA = new Date(valA).getTime() || valA;
                 valB = new Date(valB).getTime() || valB;
             }
-            if (currentSortColumn === 3) {
+            if (currentSortColumn === 4) {
                 valA = parseFloat(valA.replace('%', '')) || 0;
                 valB = parseFloat(valB.replace('%', '')) || 0;
             }
@@ -1205,7 +1206,7 @@ function handleNoResults(totalItems, filterInput, tbody) {
             noResultsRow.className = 'no-results-row search-empty text-center';
             tbody.appendChild(noResultsRow);
         }
-        noResultsRow.innerHTML = `<td colspan="6" class="py-4 text-muted"><i class="fas fa-search fa-2x mb-3 d-block"></i>No evaluations found matching "<strong>${filterInput}</strong>"</td>`;
+        noResultsRow.innerHTML = `<td colspan="9" class="py-4 text-muted"><i class="fas fa-search fa-2x mb-3 d-block"></i>No evaluations found matching "<strong>${filterInput}</strong>"</td>`;
         noResultsRow.style.display = '';
         const origNoResults = tbody.querySelector('.no-results-row:not(.search-empty)');
         if(origNoResults) origNoResults.style.display = 'none';

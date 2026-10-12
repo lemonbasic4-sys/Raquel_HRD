@@ -9,7 +9,7 @@ require_once '../includes/header.php';
 
 // Fetch evaluation history 
 $history = $conn->query("SELECT ev.*, CONCAT(e.first_name, ' ', e.last_name) as employee_name, e.job_title, e.rank_category_id, e.profile_picture, d.department_name,
-    u.full_name as submitted_by_name, u2.full_name as endorsed_by_name, u3.full_name as approved_by_name, et.template_name,
+    u.full_name as submitted_by_name, u2.full_name as endorsed_by_name, u3.full_name as approved_by_name, et.template_name, et.form_code,
     ep.package_id, ep.status AS package_status,
     COALESCE(ep.evaluation_type, et.evaluation_type, ev.evaluation_type) AS package_evaluation_type
     FROM evaluations ev
@@ -53,6 +53,7 @@ ksort($existing_departments);
 ksort($existing_templates);
 ?>
 
+<link rel="stylesheet" href="<?php echo BASE_URL; ?>/assets/css/evaluation-history-table.css?v=8">
 <div class="evaluation-history-page supervisor-evaluation-history-page">
 <div class="page-hero fadeup supervisor-history-hero">
     <div class="d-flex flex-wrap align-items-center justify-content-between mb-4 gap-3">
@@ -142,13 +143,6 @@ ksort($existing_templates);
 .hist-status-pill.active-rejected{background:#fee2e2;border-color:#fca5a5;color:#991b1b;}
 .hist-status-pill.active-returned{background:#fef3c7;border-color:#fcd34d;color:#92400e;}
 .history-table-wrap{background:#fff;border:1px solid #edf0eb;border-radius:0 0 12px 12px;overflow:auto;}
-#evalTable{margin:0;min-width:940px;}
-#evalTable thead th{background:#f0f4ee;border-bottom:1px solid #e1e7df;color:#536052;font-size:.68rem;padding:10px 9px;text-transform:uppercase;white-space:nowrap;}
-#evalTable tbody td{border-color:#edf0eb;font-size:.76rem;padding:10px 9px;vertical-align:middle;}
-#evalTable tbody tr:hover{background:#f8faf7;}
-.supervisor-history-employee{color:#253425;font-size:.78rem;font-weight:700;}
-.supervisor-history-sub{color:#94a3b8;font-size:.66rem;}
-.supervisor-history-score{font-size:.8rem;font-weight:700;}
 .hist-card-avatar{align-items:center;background:#f1f5f1;border:1px solid #e2e8e0;border-radius:50%;display:flex;flex:0 0 34px;height:34px;justify-content:center;overflow:hidden;width:34px;}
 .hist-card-avatar img{height:100%;object-fit:cover;width:100%;}
 @media(max-width:767.98px){.history-review-tabs{gap:4px}.history-review-tab{flex:1;min-width:0;padding:10px}.supervisor-history-filters .form-select{max-width:none!important;width:100%}}
@@ -172,37 +166,37 @@ ksort($existing_templates);
         <div class="input-group input-group-sm" style="min-width:200px;max-width:360px;"><span class="input-group-text bg-white border-end-0 text-muted"><i class="fas fa-search"></i></span><input type="search" class="form-control border-start-0 ps-0" id="customSearchEval" placeholder="Search employee, position..."></div>
     </div>
 </div>
-<div class="history-table-wrap fadeup fadeup-2">
-        <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0" id="evalTable">
+<div class="history-table-wrap hr-history-table-container fadeup fadeup-2">
+            <table class="table history-table hr-history-table" id="evalTable">
                 <thead class="bg-light">
                     <tr>
-                        <th class="ps-3" style="cursor: pointer;" onclick="sortTable(0)">Employee Name <i class="fas fa-sort text-muted ms-1 small"></i></th>
-                        <th style="cursor: pointer;" onclick="sortTable(1)">Department <i class="fas fa-sort text-muted ms-1 small"></i></th>
-                        <th style="cursor: pointer;" onclick="sortTable(2)">Position <i class="fas fa-sort text-muted ms-1 small"></i></th>
-                        <th style="cursor: pointer;" onclick="sortTable(3)">Overall Rating <i class="fas fa-sort text-muted ms-1 small"></i></th>
-                        <th style="cursor: pointer;" onclick="sortTable(4)">Status <i class="fas fa-sort text-muted ms-1 small"></i></th>
-                        <th>Current Reviewer</th><th style="cursor: pointer;" onclick="sortTable(6)">Date Submitted <i class="fas fa-sort text-muted ms-1 small"></i></th>
+                        <th class="ps-3">Employee Name</th>
+                        <th>Department</th>
+                        <th>Position</th>
+                        <th>Form Code</th>
+                        <th>Overall Rating</th>
+                        <th>Status</th>
+                        <th>Current Reviewer</th><th>Date Submitted</th>
                         <th class="text-end pe-3">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php if (empty($all_history)): ?>
-                        <tr class="no-results-row text-center"><td colspan="8" class="text-muted py-5"><i class="fas fa-history fa-3x mb-3 d-block opacity-25"></i>No evaluation history found.</td></tr>
+                        <tr class="no-results-row text-center"><td colspan="9" class="text-muted py-5"><i class="fas fa-history fa-3x mb-3 d-block opacity-25"></i>No evaluation history found.</td></tr>
                     <?php else: ?>
                         <?php foreach ($all_history as $row): ?>
                             <tr class="eval-row" data-type="<?php echo in_array($row['package_evaluation_type'] ?? '', ['Initial', 'Final'], true) ? 'probationary' : 'regular'; ?>"
                                 data-status="<?php echo e($row['status']); ?>"
                                 data-department="<?php echo e($row['department_name'] ?? ''); ?>"
                                 data-template="<?php echo e($row['template_name'] ?? ''); ?>"
-                                data-search="<?php echo strtolower(e($row['employee_name']) . ' ' . e($row['department_name'] ?? '') . ' ' . e($row['template_name']) . ' ' . e($row['job_title'])); ?>">
-                                <td class="ps-3"><div class="d-flex align-items-center gap-2">
+                                data-search="<?php echo strtolower(e($row['employee_name']) . ' ' . e($row['department_name'] ?? '') . ' ' . e($row['template_name']) . ' ' . e($row['job_title']) . ' ' . e($row['form_code'] ?? '')); ?>">
+                                <td><div class="employee-cell">
                                     <div class="hist-card-avatar"><img src="<?php echo e(getEmployeeAvatar($row['profile_picture'] ?? '')); ?>?v=<?php echo time(); ?>" alt="<?php echo e($row['employee_name']); ?>"></div>
-                                    <div><div class="supervisor-history-employee"><?php echo e($row['employee_name']); ?></div><div class="supervisor-history-sub">ID <?php echo e($row['employee_id']); ?></div></div>
+                                    <div class="employee-copy"><strong><?php echo e($row['employee_name']); ?></strong><small>ID <?php echo e($row['employee_id']); ?></small></div>
                                 </div></td>
-                                <td><div class="small fw-semibold"><?php echo e($row['department_name'] ?? 'N/A'); ?></div><div class="supervisor-history-sub"><?php echo e($row['template_name']); ?></div></td>
-                                <td><?php echo e($row['job_title'] ?? 'N/A'); ?></td>
-                                <td>
+                                <td><?php echo e($row['department_name'] ?? 'N/A'); ?></td>
+                                <td><?php echo e($row['job_title'] ?? 'N/A'); ?></td><td class="history-form-code"><?php echo e($row['form_code'] ?: 'N/A'); ?></td>
+                                <td class="text-center">
                                     <?php
                                     $h_score = (float)($row['total_score'] ?? 0);
                                     $h_perf = $row['performance_level'] ?? '';
@@ -211,10 +205,11 @@ ksort($existing_templates);
                                     }
                                     $h_badge = getPerformanceBadgeClass($h_perf);
                                     ?>
-                                    <strong><?php echo $h_score > 0 ? number_format($h_score, 2) . ' / 4' : '—'; ?></strong>
-                                    <div style="font-size:0.65rem;">
+                                    <strong class="d-block"><?php echo $h_score > 0 ? number_format($h_score, 2) : '—'; ?></strong>
+                                    <div>
                                         <?php if ($h_perf): ?>
-                                            <span class="badge <?php echo $h_badge; ?> rounded-pill px-2" style="font-size:0.65rem;"><?php echo e($h_perf); ?></span>
+                                            <?php $rating_class = str_contains($h_badge, 'success') ? 'rating-excellent' : (str_contains($h_badge, 'info') ? 'rating-exceeds' : (str_contains($h_badge, 'warning') ? 'rating-meets' : (str_contains($h_badge, 'danger') ? 'rating-needs' : ''))); ?>
+                                            <span class="rating-pill <?php echo $rating_class; ?>"><?php echo e($h_perf); ?></span>
                                         <?php else: ?>
                                             <span class="text-muted">Unscored</span>
                                         <?php endif; ?>
@@ -224,19 +219,13 @@ ksort($existing_templates);
                                     <?php if (!empty($row['package_id'])): ?>
                                         <?php echo renderOrganizationPipelineBadge($conn, (int)$row['package_id']); ?>
                                     <?php else: ?>
-                                        <?php
-                                        $statusClass = 'bg-secondary';
-                                        if ($row['status'] === 'Approved') $statusClass = 'bg-success';
-                                        if ($row['status'] === 'Rejected') $statusClass = 'bg-danger';
-                                        if ($row['status'] === 'Returned') $statusClass = 'bg-warning text-dark';
-                                        ?>
-                                        <span class="badge <?php echo $statusClass; ?> rounded-pill px-2" style="font-size:0.7rem;"><?php echo e($row['status']); ?></span>
+                                        <span class="hist-status-badge <?php echo e(strtolower($row['status'])); ?>"><?php echo e($row['status']); ?></span>
                                     <?php endif; ?>
                                 </td>
                                 <td><div class="current-reviewer"><?php echo e(($row['approved_by_name'] ?? '') ?: (($row['endorsed_by_name'] ?? '') ?: 'Completed')); ?></div></td>
                                 <td><small><?php echo formatDate($row['submitted_date'] ?? $row['updated_at']); ?></small></td>
-                                <td class="text-end pe-3">
-                                    <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#reviewModal<?php echo $row['evaluation_id']; ?>">
+                                <td>
+                                    <button class="btn btn-sm btn-primary rounded-pill px-3 fw-semibold shadow-sm" data-bs-toggle="modal" data-bs-target="#reviewModal<?php echo $row['evaluation_id']; ?>">
                                         <i class="fas fa-eye me-1"></i>View
                                     </button>
                                 </td>
@@ -245,15 +234,13 @@ ksort($existing_templates);
                     <?php endif; ?>
                 </tbody>
             </table>
-        </div>
+    </div>
         <!-- Pagination Controls -->
         <div class="d-flex justify-content-between align-items-center p-3 border-top" id="paginationWrapper">
             <div id="paginationInfo" class="text-muted small"></div>
             <ul class="pagination pagination-sm mb-0" id="paginationNumbers">
             </ul>
         </div>
-    </div>
-</div>
 
 <?php 
 // Render Modals at the end of the file
@@ -651,11 +638,11 @@ function renderTable() {
             let valA = a.querySelectorAll("td")[currentSortColumn].textContent.trim();
             let valB = b.querySelectorAll("td")[currentSortColumn].textContent.trim();
             
-            if (currentSortColumn === 6) {
+            if (currentSortColumn === 7) {
                 valA = new Date(valA).getTime() || valA;
                 valB = new Date(valB).getTime() || valB;
             }
-            if (currentSortColumn === 3) {
+            if (currentSortColumn === 4) {
                 valA = parseFloat(valA.replace('%', '')) || 0;
                 valB = parseFloat(valB.replace('%', '')) || 0;
             }
@@ -728,7 +715,7 @@ function handleNoResults(totalItems, filterInput, tbody) {
             noResultsRow.className = 'no-results-row search-empty text-center';
             tbody.appendChild(noResultsRow);
         }
-        noResultsRow.innerHTML = `<td colspan="8" class="py-4 text-muted"><i class="fas fa-search fa-2x mb-3 d-block"></i>No evaluations found matching "<strong>${filterInput}</strong>"</td>`;
+        noResultsRow.innerHTML = `<td colspan="9" class="py-4 text-muted"><i class="fas fa-search fa-2x mb-3 d-block"></i>No evaluations found matching "<strong>${filterInput}</strong>"</td>`;
         noResultsRow.style.display = '';
         const origNoResults = tbody.querySelector('.no-results-row:not(.search-empty)');
         if(origNoResults) origNoResults.style.display = 'none';
@@ -909,7 +896,7 @@ function applySupervisorFilters() {
     if (!noResRow) {
         noResRow = document.createElement('tr');
         noResRow.className = 'no-results-row text-center';
-        noResRow.innerHTML = '<td colspan="8" class="text-muted py-5"></td>';
+        noResRow.innerHTML = '<td colspan="9" class="text-muted py-5"></td>';
         document.querySelector('#evalTable tbody')?.appendChild(noResRow);
     }
     noResRow.style.display = (typeCount === 0 || visible === 0) ? '' : 'none';

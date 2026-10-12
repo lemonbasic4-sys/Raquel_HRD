@@ -432,6 +432,14 @@
     background: #F8FAFC;
 }
 
+.team-evaluation-history .package-table tbody tr {
+    background: #FFFFFF;
+}
+
+.team-evaluation-history .package-table tbody tr:hover {
+    background: #F8FAFC;
+}
+
 .evaluation-packages .package-table .tabular-nums {
     font-variant-numeric: tabular-nums;
     white-space: nowrap;

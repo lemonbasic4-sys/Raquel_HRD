@@ -441,6 +441,23 @@ if ((float)($row['total_score'] ?? 0) > 0 && (empty($pl) || $pl === '0')) {
       font-size: 9px;
     }
 
+    .comment-signature {
+      text-align: center;
+      padding: 0 4px 4px;
+      margin-top: 8px;
+    }
+
+    .comment-signature .signature-line {
+      border-top: 1px solid #000;
+      width: 220px;
+      max-width: 85%;
+      margin: 22px auto 2px;
+    }
+
+    .comment-signature .signature-caption {
+      font-size: 8px;
+    }
+
     @media print {
       body {
         background: none;
@@ -817,21 +834,21 @@ if ((float)($row['total_score'] ?? 0) > 0 && (empty($pl) || $pl === '0')) {
 
     <!-- Employee's Comments -->
     <div class="comment-box">
-      <div class="label"><?php echo in_array(($row['evaluation_type'] ?? ''), ['Initial', 'Final'], true) ? 'Probationary Employee:' : 'Employee:'; ?></div>
+      <div class="label"><?php echo in_array(($row['evaluation_type'] ?? ''), ['Initial', 'Final'], true) ? 'Probationary Employee Comments:' : 'Employee Comments:'; ?></div>
       <div class="content"><?php echo !empty($row['staff_comments']) ? nl2br(e($row['staff_comments'])) : '&nbsp;'; ?></div>
-      <div style="text-align:center; padding-bottom:3px; margin-top:8px;">
-        <div style="font-weight:bold; font-size:11px;"><?php echo strtoupper(e($row['employee_name'] ?? '')); ?><?php echo in_array(($row['evaluation_type'] ?? ''), ['Initial', 'Final'], true) ? ' (PROBATIONARY)' : ''; ?></div>
-        <?php if (!empty($row['job_title'])): ?><div style="font-size:9px; color:#555;"><?php echo e($row['job_title']); ?></div><?php endif; ?>
+      <div class="comment-signature">
+        <div class="signature-line"></div>
+        <div class="signature-caption">Signature over Printed Name</div>
       </div>
     </div>
 
     <!-- Immediate Supervisor Comments -->
     <div class="comment-box">
-      <div class="label">Immediate Supervisor:</div>
+      <div class="label">Immediate Supervisor Comments:</div>
       <div class="content"><?php echo !empty($supervisor_comments) ? nl2br(e($supervisor_comments)) : '&nbsp;'; ?></div>
-      <div style="text-align:center; padding-bottom:3px; margin-top:8px;">
-        <div style="font-weight:bold; font-size:11px;"><?php echo strtoupper(e($supervisor_name)); ?></div>
-        <div style="font-size:9px; color:#555;"><?php echo e($supervisor_title); ?></div>
+      <div class="comment-signature">
+        <div class="signature-line"></div>
+        <div class="signature-caption">Signature over Printed Name</div>
       </div>
     </div>
 
@@ -853,21 +870,12 @@ if ((float)($row['total_score'] ?? 0) > 0 && (empty($pl) || $pl === '0')) {
       <div style="display:flex; justify-content:space-around; align-items:flex-end; gap:16px; padding:0 10px;">
         <div style="text-align:center; min-width:130px; flex:1;">
           <div style="border-top:1px solid #000; width:85%; max-width:160px; margin:0 auto 2px;"></div>
-          <div style="font-weight:bold; font-size:10px;"><?php echo strtoupper(e($vp_name)); ?></div>
-          <div style="font-size:8.5px; color:#333;"><?php echo e($vp_title); ?></div>
+          <div style="font-size:9px; color:#333;">Vice President</div>
         </div>
         <div style="text-align:center; min-width:130px; flex:1;">
           <div style="border-top:1px solid #000; width:85%; max-width:160px; margin:0 auto 2px;"></div>
-          <div style="font-weight:bold; font-size:10px;"><?php echo strtoupper(e($pres_name)); ?></div>
-          <div style="font-size:8.5px; color:#333;"><?php echo e($pres_title); ?></div>
+          <div style="font-size:9px; color:#333;">President and CEO</div>
         </div>
-        <?php if (!empty($board_name)): ?>
-        <div style="text-align:center; min-width:130px; flex:1;">
-          <div style="border-top:1px solid #000; width:85%; max-width:160px; margin:0 auto 2px;"></div>
-          <div style="font-weight:bold; font-size:10px;"><?php echo strtoupper(e($board_name)); ?></div>
-          <div style="font-size:8.5px; color:#333;"><?php echo e($board_title); ?></div>
-        </div>
-        <?php endif; ?>
       </div>
     </div>
 

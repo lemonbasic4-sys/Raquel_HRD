@@ -14,8 +14,9 @@ require_once '../includes/header.php';
 // Fetch evaluation history
 $history = $conn->query("
     SELECT ev.*, CONCAT(e.first_name, ' ', e.last_name) as employee_name, e.job_title, e.rank_category_id, e.profile_picture, d.department_name,
-           u.full_name as submitted_by_name, u2.full_name as endorsed_by_name, u3.full_name as approved_by_name, et.template_name,
-           ep.package_id, ep.status AS package_status
+           u.full_name as submitted_by_name, u2.full_name as endorsed_by_name, u3.full_name as approved_by_name, et.template_name, et.form_code,
+           ep.package_id, ep.status AS package_status,
+           COALESCE(ep.evaluation_type, et.evaluation_type, ev.evaluation_type) AS package_evaluation_type
     FROM evaluations ev
     LEFT JOIN employees e ON ev.employee_id = e.employee_id
     LEFT JOIN departments d ON e.department_id = d.department_id
@@ -34,6 +35,8 @@ $total_c = 0;
 $approved_c = 0;
 $rejected_c = 0;
 $returned_c = 0;
+$probationary_c = 0;
+$regular_c = 0;
 
 $all_history = [];
 if ($history) {
@@ -43,6 +46,8 @@ if ($history) {
         if ($row['status'] === 'Approved') $approved_c++;
         elseif ($row['status'] === 'Rejected') $rejected_c++;
         elseif ($row['status'] === 'Returned') $returned_c++;
+        if (in_array($row['package_evaluation_type'] ?? '', ['Initial', 'Final'], true)) $probationary_c++;
+        else $regular_c++;
     }
 }
 // Extract only existing departments & templates present in the history records
@@ -60,6 +65,7 @@ ksort($existing_departments);
 ksort($existing_templates);
 ?>
 
+<link rel="stylesheet" href="<?php echo BASE_URL; ?>/assets/css/evaluation-history-table.css?v=7">
 <div class="evaluation-history-page staff-evaluation-history-page">
 <div class="page-hero fadeup">
     <div class="d-flex flex-wrap align-items-center justify-content-between mb-4 gap-3">
@@ -156,15 +162,19 @@ ksort($existing_templates);
     }
 </style>
 
-<div class="content-card fadeup-1">
-    <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-3">
+<div class="history-review-tabs fadeup fadeup-1" role="tablist" aria-label="Evaluation type">
+    <button class="history-review-tab probationary active" type="button" role="tab" aria-selected="true" onclick="setStaffHistoryType('probationary', this)"><i class="fas fa-users"></i><span><strong>Probationary Evaluation</strong><small class="d-block text-muted fw-normal">Initial and Final evaluations</small></span><span class="tab-count"><?php echo $probationary_c; ?></span></button>
+    <button class="history-review-tab regular" type="button" role="tab" aria-selected="false" onclick="setStaffHistoryType('regular', this)"><i class="fas fa-user"></i><span><strong>Regular Employee</strong><small class="d-block text-muted fw-normal">Annual team evaluations</small></span><span class="tab-count"><?php echo $regular_c; ?></span></button>
+</div>
+<section class="history-section-heading"><h5 class="fw-bold mb-1" id="staffHistoryHeading">Probationary Evaluation</h5><div class="text-muted small" id="staffHistorySubheading">Initial and Final employee evaluations</div></section>
+<div class="content-card staff-history-directory fadeup-1">
+    <div class="card-header staff-history-filters d-flex flex-wrap justify-content-between align-items-center gap-3">
         <div class="d-flex align-items-center flex-wrap gap-2">
-            <h5 class="mb-0 me-3"><i class="fas fa-th-list me-2 text-primary"></i>Evaluation Directory</h5>
-            <div class="btn-group btn-group-sm" role="group">
-                <button type="button" class="btn btn-outline-secondary active" onclick="filterHistory('All', this)">All</button>
-                <button type="button" class="btn btn-outline-secondary" onclick="filterHistory('Approved', this)">Approved</button>
-                <button type="button" class="btn btn-outline-secondary" onclick="filterHistory('Returned', this)">Returned</button>
-                <button type="button" class="btn btn-outline-secondary" onclick="filterHistory('Rejected', this)">Rejected</button>
+            <div class="hist-status-pills" role="group" aria-label="Filter by evaluation status">
+                <button type="button" class="hist-status-pill active-all" onclick="filterHistory('All', this)">All</button>
+                <button type="button" class="hist-status-pill" onclick="filterHistory('Approved', this)">Approved</button>
+                <button type="button" class="hist-status-pill" onclick="filterHistory('Rejected', this)">Rejected</button>
+                <button type="button" class="hist-status-pill" onclick="filterHistory('Returned', this)">Returned</button>
             </div>
         </div>
         <div class="d-flex align-items-center gap-2 flex-wrap ms-auto">
@@ -195,28 +205,32 @@ ksort($existing_templates);
         </div>
     </div>
     <div class="card-body p-0">
-        <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0" id="historyTable">
+        <div class="table-responsive hr-history-table-container">
+            <table class="table table-hover align-middle mb-0 hr-history-table" id="historyTable">
                 <thead class="table-light">
                     <tr>
-                        <th>Employee & Template</th>
-                        <th>Submissions Info</th>
-                        <th>Workflow Status</th>
+                        <th>Employee Name</th>
+                        <th>Department</th>
+                        <th>Position</th>
+                        <th>Form Code</th>
                         <th>Overall Rating</th>
+                        <th>Status</th>
+                        <th>Current Reviewer</th>
+                        <th>Date Submitted</th>
                         <th class="text-end">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php if (empty($all_history)): ?>
                         <tr class="no-history-row">
-                            <td colspan="5" class="text-center py-5 text-muted">
+                            <td colspan="9" class="text-center py-5 text-muted">
                                 <i class="fas fa-folder-open fa-3x mb-3 opacity-25"></i>
                                 <p class="mb-0">No historical evaluation records found.</p>
                             </td>
                         </tr>
                     <?php else: ?>
                         <tr class="no-history-row text-center py-5 text-muted" style="display:none;">
-                            <td colspan="5" class="text-center py-5 text-muted">
+                            <td colspan="9" class="text-center py-5 text-muted">
                                 <i class="fas fa-search fa-3x mb-3 opacity-25"></i>
                                 <p class="mb-0">No matching evaluation records found.</p>
                             </td>
@@ -224,15 +238,14 @@ ksort($existing_templates);
                         <?php foreach ($all_history as $row): 
                             $initials = strtoupper(substr($row['employee_name'], 0, 1) . substr(explode(' ', $row['employee_name'])[1] ?? '', 0, 1));
                             $score = (float)$row['total_score'];
-                            $score_width = max(0, min(100, ($score / 4) * 100));
                             $status_class = getStatusBadgeClass($row['status']);
                             $perf_class = getPerformanceBadgeClass($row['performance_level']);
                         ?>
-                            <tr class="history-row" 
+                            <tr class="history-row" data-type="<?php echo in_array($row['package_evaluation_type'] ?? '', ['Initial', 'Final'], true) ? 'probationary' : 'regular'; ?>"
                                 data-status="<?php echo e($row['status']); ?>"
                                 data-department="<?php echo e($row['department_name'] ?? ''); ?>"
                                 data-template="<?php echo e($row['template_name'] ?? ''); ?>"
-                                data-search="<?php echo strtolower(e($row['employee_name']) . ' ' . e($row['department_name'] ?? '') . ' ' . e($row['template_name']) . ' ' . e($row['job_title'])); ?>">
+                                data-search="<?php echo strtolower(e($row['employee_name']) . ' ' . e($row['department_name'] ?? '') . ' ' . e($row['template_name']) . ' ' . e($row['job_title']) . ' ' . e($row['form_code'] ?? '')); ?>">
                                 <td>
                                     <div class="d-flex align-items-center">
                                         <div class="avatar-circle-sm me-3" style="width:40px; height:40px; border-radius:10px; background:rgba(41, 67, 6, 0.06); color:var(--primary-blue); display:flex; align-items:center; justify-content:center; font-weight:700;">
@@ -240,33 +253,25 @@ ksort($existing_templates);
                                         </div>
                                         <div>
                                             <div class="fw-bold text-dark"><?php echo e($row['employee_name']); ?></div>
-                                            <small class="text-muted"><?php echo e($row['template_name']); ?><?php echo !empty($row['department_name']) ? ' &bull; ' . e($row['department_name']) : ''; ?></small>
+                                            <small class="text-muted">ID <?php echo e($row['employee_id']); ?></small>
                                         </div>
                                     </div>
                                 </td>
-                                <td>
-                                    <div class="small text-dark">Submitter: <?php echo e($row['submitted_by_name'] ?: 'N/A'); ?></div>
-                                    <div class="small text-muted">Date: <?php echo $row['submitted_date'] ? formatDate($row['submitted_date']) : 'N/A'; ?></div>
+                                <td><?php echo e($row['department_name'] ?? 'N/A'); ?></td>
+                                <td><?php echo e($row['job_title'] ?? 'N/A'); ?></td><td class="history-form-code"><?php echo e($row['form_code'] ?: 'N/A'); ?></td>
+                                <td class="text-center">
+                                    <strong class="d-block"><?php echo number_format($score, 2); ?> / 4</strong>
+                                    <span class="badge <?php echo $perf_class; ?> rounded-pill mt-1"><?php echo e($row['performance_level']); ?></span>
                                 </td>
                                 <td>
                                     <?php if (!empty($row['package_id'])): ?>
                                         <?php echo renderOrganizationPipelineBadge($conn, (int)$row['package_id']); ?>
                                     <?php else: ?>
                                         <span class="badge <?php echo $status_class; ?> px-3 py-2 rounded-pill"><?php echo e($row['status']); ?></span>
-                                        <?php if ($row['approved_by_name']): ?>
-                                             <div class="small text-muted mt-1">HRM: <?php echo e($row['approved_by_name']); ?></div>
-                                        <?php endif; ?>
                                     <?php endif; ?>
                                 </td>
-                                <td>
-                                    <div class="d-flex align-items-center gap-3">
-                                        <div class="fw-bold" style="min-width: 55px;"><?php echo number_format($score, 2); ?> / 4</div>
-                                        <div class="progress flex-grow-1" style="height: 6px; max-width: 100px;">
-                                            <div class="progress-bar <?php echo $perf_class; ?>" style="width: <?php echo $score_width; ?>%"></div>
-                                        </div>
-                                        <span class="badge <?php echo $perf_class; ?> rounded-pill"><?php echo e($row['performance_level']); ?></span>
-                                    </div>
-                                </td>
+                                <td><small><?php echo e(($row['approved_by_name'] ?? '') ?: (($row['endorsed_by_name'] ?? '') ?: 'Completed')); ?></small></td>
+                                <td><small><?php echo !empty($row['submitted_date']) ? formatDate($row['submitted_date']) : (!empty($row['updated_at']) ? formatDate($row['updated_at']) : 'N/A'); ?></small></td>
                                 <td class="text-end">
                                     <button class="btn btn-sm btn-outline-primary rounded-pill px-3 shadow-sm" data-bs-toggle="modal" data-bs-target="#reviewModal<?php echo $row['evaluation_id']; ?>">
                                         <i class="fas fa-eye me-1"></i>View Details
@@ -536,6 +541,19 @@ foreach ($all_history as $row):
 
 <script>
 let staffActiveStatus = 'All';
+let staffActiveType = 'probationary';
+
+function setStaffHistoryType(type, button) {
+    staffActiveType = type;
+    document.querySelectorAll('.staff-evaluation-history-page .history-review-tab').forEach(tab => {
+        const active = tab === button;
+        tab.classList.toggle('active', active);
+        tab.setAttribute('aria-selected', active ? 'true' : 'false');
+    });
+    document.getElementById('staffHistoryHeading').textContent = type === 'probationary' ? 'Probationary Evaluation' : 'Regular Employee';
+    document.getElementById('staffHistorySubheading').textContent = type === 'probationary' ? 'Initial and Final employee evaluations' : 'Annual team evaluations';
+    applyStaffFilters();
+}
 
 function normalizeFilterValue(value) {
     return String(value ?? '').trim().toLowerCase();
@@ -561,10 +579,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
 function filterHistory(status, btn) {
     staffActiveStatus = status || 'All';
-    const container = btn.closest('.btn-group');
+    const container = btn.closest('.hist-status-pills');
     if (container) {
-        container.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
+        container.querySelectorAll('.hist-status-pill').forEach(b => b.className = 'hist-status-pill');
+        btn.classList.add('active-' + staffActiveStatus.toLowerCase());
     }
     applyStaffFilters();
 }
@@ -581,12 +599,13 @@ function applyStaffFilters() {
         const rowDept = normalizeFilterValue(row.dataset.department);
         const rowTmpl = normalizeFilterValue(row.dataset.template);
         const rowSearch = normalizeFilterValue(row.dataset.search);
+        const typeMatch = row.dataset.type === staffActiveType;
 
         const statusMatch = staffActiveStatus === 'All' || rowStatus === normalizeFilterValue(staffActiveStatus);
         const deptMatch = selDept === 'all' || rowDept === selDept;
         const tmplMatch = selTmpl === 'all' || rowTmpl === selTmpl;
         const searchMatch = !q || rowSearch.includes(q);
-        const show = statusMatch && deptMatch && tmplMatch && searchMatch;
+        const show = typeMatch && statusMatch && deptMatch && tmplMatch && searchMatch;
 
         row.style.display = show ? '' : 'none';
         if (show) visible++;

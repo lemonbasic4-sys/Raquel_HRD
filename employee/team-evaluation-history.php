@@ -48,7 +48,7 @@ $packages_stmt->close();
 
 require_once '../includes/header.php';
 ?>
-<div class="evaluation-packages">
+<div class="evaluation-packages team-evaluation-history">
     <section class="package-hero">
         <a class="history-back-link" href="<?php echo BASE_URL; ?>/employee/team-evaluation-packages.php">
             <i class="fas fa-arrow-left"></i> Back to assigned reviews
@@ -128,14 +128,14 @@ require_once '../includes/header.php';
                         <table class="package-table table align-middle mb-0">
                             <thead>
                                 <tr>
-                                    <th>Employee</th>
-                                    <th>Position</th>
-                                    <th class="text-end">Individual KRA</th>
-                                    <th class="text-end">Individual Behavior</th>
-                                    <th class="text-end">Individual Score</th>
-                                    <th class="text-end">Final Score</th>
-                                    <th>Status</th>
-                                    <th class="text-end">Action</th>
+                                    <th class="col-employee">Employee</th>
+                                    <th class="col-position">Position</th>
+                                    <th class="text-end col-score"><?php echo $is_probationary_package ? 'KRA Score' : 'Individual KRA'; ?></th>
+                                    <th class="text-end col-score"><?php echo $is_probationary_package ? 'Core Values Score' : 'Individual Behavior'; ?></th>
+                                    <th class="text-end col-score"><?php echo $is_probationary_package ? 'Weighted Score' : 'Individual Score'; ?></th>
+                                    <th class="text-end col-final-score">Final Score</th>
+                                    <th class="col-status">Status</th>
+                                    <th class="text-end col-action">Action</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -149,7 +149,7 @@ require_once '../includes/header.php';
                                     $final_score_val = calculateEvalTotal((float)$member['kra_subtotal'], $shared_beh_val, $kra_w, $beh_w);
                                     ?>
                                     <tr>
-                                        <td>
+                                        <td class="col-employee">
                                             <div class="fw-bold"><?php echo e($member['first_name'] . ' ' . $member['last_name']); ?></div>
                                             <?php if (!empty($member['has_adjustments'])): ?>
                                                 <span class="audit-chip audit-chip--adjusted">
@@ -157,27 +157,27 @@ require_once '../includes/header.php';
                                                 </span>
                                             <?php endif; ?>
                                         </td>
-                                        <td><?php echo e($member['job_title']); ?></td>
-                                        <td class="text-end fw-semibold tabular-nums">
+                                        <td class="col-position"><?php echo e($member['job_title']); ?></td>
+                                        <td class="col-score text-end fw-semibold tabular-nums">
                                             <?php echo $member['kra_subtotal'] !== null ? number_format((float) $member['kra_subtotal'], 2) : '&mdash;'; ?>
                                         </td>
-                                        <td class="text-end fw-semibold tabular-nums">
+                                        <td class="col-score text-end fw-semibold tabular-nums">
                                             <?php echo $member['individual_behavior'] !== null ? number_format((float) $member['individual_behavior'], 2) : '&mdash;'; ?>
                                         </td>
-                                        <td class="text-end fw-semibold text-muted tabular-nums">
+                                        <td class="col-score text-end fw-semibold text-muted tabular-nums">
                                             <?php echo number_format($total_score_val, 2); ?>
                                         </td>
-                                        <td class="text-end fw-bold text-success tabular-nums" style="font-size: 1.05rem;">
+                                        <td class="col-final-score text-end fw-bold text-success tabular-nums" style="font-size: 1.05rem;">
                                             <?php echo number_format($final_score_val, 2); ?>
                                         </td>
-                                        <td>
+                                        <td class="col-status">
                                             <span class="badge <?php echo $member['status'] === 'Approved' ? 'bg-success' : 'bg-secondary'; ?>">
                                                 <?php echo e($member['status']); ?>
                                             </span>
                                         </td>
-                                        <td class="text-end">
+                                        <td class="col-action text-end">
                                             <a class="btn-action-view btn btn-sm" href="<?php echo BASE_URL; ?>/employee/package-member-view.php?package_id=<?php echo $package_id; ?>&evaluation_id=<?php echo (int) $member['evaluation_id']; ?>">
-                                                <i class="fas fa-file-signature me-1"></i>View Details
+                                                <i class="fas fa-eye me-1"></i>View
                                             </a>
                                         </td>
                                     </tr>
