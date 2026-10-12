@@ -27,6 +27,9 @@ $template_scope_sql = '1 = 1';
 $current_user_id = (int)($_SESSION['user_id'] ?? 0);
 $owned_template_scope_sql = 'et.created_by = ' . $current_user_id;
 $viewer_role = (string)($creator_context['role'] ?? '');
+if (in_array($viewer_role, ['HR Manager', 'HR Supervisor'], true)) {
+    $template_scope_sql = $owned_template_scope_sql;
+}
 $cross_department_viewer = !empty($creator_context['is_ceo'])
     || in_array($viewer_role, ['HR Manager', 'HR Supervisor', 'HR Staff'], true);
 $viewer_department_id = (int)($creator_context['department_id'] ?? 0);
@@ -47,7 +50,7 @@ if (!$cross_department_viewer && $viewer_department_id > 0) {
 if (isset($_GET['activate']) && is_numeric($_GET['activate'])) {
     $tid = (int)$_GET['activate'];
     if (!canManageEvaluationTemplate($conn, $tid, $current_user_id)) {
-        redirectWith($template_archive_url, 'danger', 'You can only restore templates you own or templates managed by a supervisor or manager in your department.');
+        redirectWith($template_archive_url, 'danger', 'You can only restore templates you own.');
     }
     $conn->query("UPDATE evaluation_templates et SET status = 'Active' WHERE et.template_id = $tid AND $template_scope_sql");
     if ($conn->affected_rows > 0) notifyHrStaffOfTemplateChange($conn, $tid, 'Restored');
@@ -59,7 +62,7 @@ if (isset($_GET['activate']) && is_numeric($_GET['activate'])) {
 if (isset($_GET['delete']) && is_numeric($_GET['delete'])) {
     $tid = (int)$_GET['delete'];
     if (!canManageEvaluationTemplate($conn, $tid, $current_user_id)) {
-        redirectWith($template_archive_url, 'danger', 'You can only delete templates you own or templates managed by a supervisor or manager in your department.');
+        redirectWith($template_archive_url, 'danger', 'You can only delete templates you own.');
     }
     // Delete related evaluation scores that reference this template's criteria
     $conn->query("DELETE es FROM evaluation_scores es INNER JOIN evaluation_criteria ec ON es.criterion_id = ec.criterion_id INNER JOIN evaluation_templates et ON et.template_id = ec.template_id WHERE ec.template_id = $tid AND $template_scope_sql");

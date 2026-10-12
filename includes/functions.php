@@ -3335,7 +3335,7 @@ function isEvaluationTemplateOwner($conn, $template_id, $user_id)
     return $is_owner;
 }
 
-/** Allow department managers and HR managers/supervisors to maintain peer templates within their own department. */
+/** HRIS managers and supervisors manage only templates created by their own account. */
 function canManageEvaluationTemplate($conn, $template_id, $user_id)
 {
     $stmt = $conn->prepare("SELECT et.created_by,
@@ -3355,6 +3355,8 @@ function canManageEvaluationTemplate($conn, $template_id, $user_id)
     $stmt->close();
     if (!$row) return false;
     if ((int)$row['created_by'] === $user_id) return true;
+
+    if (in_array($row['viewer_role'], ['HR Manager', 'HR Supervisor'], true)) return false;
 
     $viewer_rank = (int)($row['viewer_rank'] ?? 0);
     $creator_rank = (int)($row['creator_rank'] ?? 0);

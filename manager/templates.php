@@ -40,6 +40,9 @@ $template_archive_url = !empty($creator_context['is_ceo'])
 $template_scope_sql = '1 = 1';
 $owned_template_scope_sql = 'et.created_by = ' . $current_user_id;
 $template_viewer_role = (string)($creator_context['role'] ?? '');
+if (in_array($template_viewer_role, ['HR Manager', 'HR Supervisor'], true)) {
+    $template_scope_sql = $owned_template_scope_sql;
+}
 $is_cross_department_template_viewer = !empty($creator_context['is_ceo'])
     || in_array($template_viewer_role, ['HR Manager', 'HR Supervisor', 'HR Staff'], true);
 $viewer_department_id = (int)($creator_context['department_id'] ?? 0);
@@ -57,10 +60,9 @@ if (!$is_cross_department_template_viewer && $viewer_department_id > 0) {
     $template_scope_sql = '1 = 0';
 }
 $viewer_rank_category_id = (int)($creator_context['rank_category_id'] ?? 0);
-$can_manage_department_peer_templates = (
-    ($template_viewer_role === 'Employee' && in_array($viewer_rank_category_id, [3, 4], true))
-    || in_array($template_viewer_role, ['HR Manager', 'HR Supervisor'], true)
-) && $viewer_department_id > 0;
+$can_manage_department_peer_templates = $template_viewer_role === 'Employee'
+    && in_array($viewer_rank_category_id, [3, 4], true)
+    && $viewer_department_id > 0;
 $manageable_template_scope_sql = $owned_template_scope_sql;
 if ($can_manage_department_peer_templates) {
     $manageable_template_scope_sql = "(et.created_by = $current_user_id OR et.created_by IN (
@@ -78,7 +80,7 @@ if ($can_manage_department_peer_templates) {
 if (isset($_GET['archive']) && is_numeric($_GET['archive'])) {
     $tid = (int)$_GET['archive'];
     if (!canManageEvaluationTemplate($conn, $tid, $current_user_id)) {
-        redirectWith($template_list_url, 'danger', 'You can only archive templates you own or templates managed by a supervisor or manager in your department.');
+        redirectWith($template_list_url, 'danger', 'You can only archive templates you own.');
     }
     $conn->query("UPDATE evaluation_templates et SET status = 'Archived' WHERE et.template_id = $tid AND $manageable_template_scope_sql");
     if ($conn->affected_rows > 0) notifyHrStaffOfTemplateChange($conn, $tid, 'Archived');
@@ -90,7 +92,7 @@ if (isset($_GET['archive']) && is_numeric($_GET['archive'])) {
 if (isset($_GET['delete']) && is_numeric($_GET['delete'])) {
     $tid = (int)$_GET['delete'];
     if (!canManageEvaluationTemplate($conn, $tid, $current_user_id)) {
-        redirectWith($template_list_url, 'danger', 'You can only delete templates you own or templates managed by a supervisor or manager in your department.');
+        redirectWith($template_list_url, 'danger', 'You can only delete templates you own.');
     }
     $usage = $conn->query("SELECT COUNT(*) as cnt FROM evaluations WHERE template_id = $tid")->fetch_assoc()['cnt'];
     if ($usage > 0) {
@@ -268,7 +270,7 @@ $templates = $conn->query("SELECT et.*,
 $filtered_template_count = $templates->num_rows;
 $active_template_count = (int) $conn->query("SELECT COUNT(*) as cnt FROM evaluation_templates et WHERE status = 'Active' AND ($template_scope_sql)")->fetch_assoc()['cnt'];
 $archived_template_count = (int) $conn->query("SELECT COUNT(*) as cnt FROM evaluation_templates et WHERE status = 'Archived' AND ($template_scope_sql)")->fetch_assoc()['cnt'];
-$used_template_count = (int) $conn->query("SELECT COUNT(DISTINCT template_id) as cnt FROM evaluations WHERE template_id IS NOT NULL AND deleted_at IS NULL")->fetch_assoc()['cnt'];
+$used_template_count = (int) $conn->query("SELECT COUNT(DISTINCT ev.template_id) as cnt FROM evaluations ev JOIN evaluation_templates et ON et.template_id = ev.template_id WHERE ev.template_id IS NOT NULL AND ev.deleted_at IS NULL AND ($template_scope_sql)")->fetch_assoc()['cnt'];
 ?>
 
 <div class="template-library-page">
@@ -277,7 +279,7 @@ $used_template_count = (int) $conn->query("SELECT COUNT(DISTINCT template_id) as
         <div>
             <div style="font-size:.72rem;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,.55);"><?php echo !empty($creator_context['is_ceo']) ? 'President and CEO' : e($creator_context['role']); ?> · Evaluations</div>
             <h4 class="text-white fw-bold mb-0 mt-1"><i class="fas fa-file-alt me-2" style="color:#BD9414;"></i>Evaluation Templates</h4>
-            <p class="text-white-50 small mb-0 mt-2"><?php echo $can_create_templates ? 'Create templates and manage eligible templates within your department.' : 'Browse evaluation templates. Templates created by others are read-only.'; ?></p>
+            <p class="text-white-50 small mb-0 mt-2"><?php echo in_array($template_viewer_role, ['HR Manager', 'HR Supervisor'], true) ? 'Create and manage evaluation templates from your own HRIS account.' : ($can_create_templates ? 'Create templates and manage eligible templates within your department.' : 'Browse evaluation templates. Templates created by others are read-only.'); ?></p>
         </div>
         <div class="d-flex flex-wrap gap-2">
         <?php if ($can_create_templates): ?>
