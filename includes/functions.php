@@ -1486,6 +1486,30 @@ function ensureCareerProgressionMovements($conn)
 
 
 
+/** Employee-submitted, read-only profile correction reports for HR follow-up. */
+function ensureEmployeeProfileCorrectionRequests($conn): bool
+{
+    static $ready = false;
+    if ($ready) return true;
+    $ready = (bool) $conn->query("CREATE TABLE IF NOT EXISTS employee_profile_correction_requests (
+        request_id INT AUTO_INCREMENT PRIMARY KEY,
+        employee_id INT NOT NULL,
+        submitted_by INT NOT NULL,
+        field_key VARCHAR(50) NOT NULL,
+        description TEXT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_profile_correction_employee (employee_id, created_at),
+        CONSTRAINT fk_profile_correction_employee FOREIGN KEY (employee_id) REFERENCES employees(employee_id) ON DELETE CASCADE,
+        CONSTRAINT fk_profile_correction_submitter FOREIGN KEY (submitted_by) REFERENCES users(user_id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    if (!$ready) return false;
+    $column = $conn->query("SHOW COLUMNS FROM employee_profile_correction_requests LIKE 'description'");
+    if (!$column || $column->num_rows === 0) {
+        $ready = (bool) $conn->query('ALTER TABLE employee_profile_correction_requests ADD COLUMN description TEXT NULL AFTER field_key');
+    }
+    return $ready;
+}
+
 /**
  * Ensures the employee_change_requests table exists (auto-migration).
  */

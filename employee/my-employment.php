@@ -6,568 +6,284 @@ require_once '../includes/functions.php';
 ensureProbationaryEvaluationSchema($conn);
 
 $employee_id = (int) ($_SESSION['employee_id'] ?? 0);
+if ($employee_id <= 0) {
+    redirectWith(BASE_URL . '/employee/dashboard.php', 'danger', 'No employment record is linked to your account.');
+}
 
-$emp_stmt = $conn->prepare("
-    SELECT e.*,
-           d.department_name,
-           b.branch_name,
-           rc.rank_name,
-           ed.height_m, ed.weight_kg, ed.blood_type, ed.citizenship,
-           ec.mobile_number, ec.telephone_number, ec.personal_email,
-           eg.sss_number, eg.philhealth_number, eg.pagibig_number, eg.tin_number
+$emp_stmt = $conn->prepare("SELECT e.*, d.department_name, b.branch_name, rc.rank_name,
+        ed.height_m, ed.weight_kg, ed.blood_type, ed.citizenship,
+        ec.mobile_number, ec.telephone_number, ec.personal_email
     FROM employees e
     LEFT JOIN departments d ON e.department_id = d.department_id
     LEFT JOIN branches b ON e.branch_id = b.branch_id
     LEFT JOIN rank_categories rc ON e.rank_category_id = rc.rank_category_id
     LEFT JOIN employee_details ed ON e.employee_id = ed.employee_id
     LEFT JOIN employee_contacts ec ON e.employee_id = ec.employee_id
-    LEFT JOIN employee_government_ids eg ON e.employee_id = eg.employee_id
-    WHERE e.employee_id = ?
-    LIMIT 1
-");
-$emp_stmt->bind_param("i", $employee_id);
+    WHERE e.employee_id = ? AND e.deleted_at IS NULL LIMIT 1");
+$emp_stmt->bind_param('i', $employee_id);
 $emp_stmt->execute();
-$emp = $emp_stmt->get_result()->fetch_assoc() ?? [];
+$emp = $emp_stmt->get_result()->fetch_assoc();
 $emp_stmt->close();
-
 if (!$emp) {
     redirectWith(BASE_URL . '/employee/dashboard.php', 'danger', 'No employment record was found for your account.');
 }
 
-// Fetch Addresses
-$addr_stmt = $conn->prepare("SELECT * FROM employee_addresses WHERE employee_id = ?");
-$addr_stmt->bind_param("i", $employee_id);
-$addr_stmt->execute();
-$addr_res = $addr_stmt->get_result();
-$addresses = [];
-while ($row = $addr_res->fetch_assoc()) {
-    $addresses[$row['address_type']] = $row;
+$correction_fields = [
+    'name' => 'Name', 'position' => 'Position or rank', 'department' => 'Department or branch',
+    'employment' => 'Employment status or type', 'hire_date' => 'Hire date',
+    'contact' => 'Contact information', 'address' => 'Address',
+    'emergency' => 'Emergency contact', 'personal' => 'Other personal detail',
+];
+$corrections_ready = ensureEmployeeProfileCorrectionRequests($conn);
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'report_correction') {
+    verifyCsrfToken();
+    $field_key = (string) ($_POST['correction_field'] ?? '');
+    $description = trim((string) ($_POST['correction_description'] ?? ''));
+    $description = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $description);
+    if (!$corrections_ready || !isset($correction_fields[$field_key])) {
+        redirectWith(BASE_URL . '/employee/my-employment.php', 'danger', 'Unable to submit the correction report. Please contact HR directly.');
+    }
+    if (mb_strlen($description) < 15 || mb_strlen($description) > 1000) {
+        redirectWith(BASE_URL . '/employee/my-employment.php', 'danger', 'Please describe the incorrect detail in 15 to 1,000 characters.');
+    }
+    $user_id = (int) $_SESSION['user_id'];
+    $recipients = $conn->query("SELECT user_id, role FROM users WHERE role IN ('HR Staff', 'HR Manager') AND is_active = 1 AND deleted_at IS NULL ORDER BY CASE role WHEN 'HR Staff' THEN 0 ELSE 1 END");
+    $hr_users = $recipients ? $recipients->fetch_all(MYSQLI_ASSOC) : [];
+    if (!$hr_users) {
+        redirectWith(BASE_URL . '/employee/my-employment.php', 'danger', 'No HR recipient is available. Please contact your HR office directly.');
+    }
+    $recent = $conn->prepare('SELECT request_id FROM employee_profile_correction_requests WHERE employee_id = ? AND submitted_by = ? AND field_key = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 1 DAY) LIMIT 1');
+    $recent->bind_param('iis', $employee_id, $user_id, $field_key);
+    $recent->execute();
+    $already_reported = (bool) $recent->get_result()->fetch_assoc();
+    $recent->close();
+    if ($already_reported) {
+        redirectWith(BASE_URL . '/employee/my-employment.php', 'info', 'You already reported this field within the last 24 hours. HR has the report.');
+    }
+    $insert = $conn->prepare('INSERT INTO employee_profile_correction_requests (employee_id, submitted_by, field_key, description) VALUES (?, ?, ?, ?)');
+    $insert->bind_param('iiss', $employee_id, $user_id, $field_key, $description);
+    $saved = $insert->execute();
+    $request_id = (int) $insert->insert_id;
+    $insert->close();
+    if (!$saved) {
+        redirectWith(BASE_URL . '/employee/my-employment.php', 'danger', 'The correction report could not be saved. Please contact HR directly.');
+    }
+    $name = trim(($emp['first_name'] ?? '') . ' ' . ($emp['last_name'] ?? ''));
+    foreach ($hr_users as $hr_user) {
+        $hr_role = (string) $hr_user['role'];
+        $link = BASE_URL . ($hr_role === 'HR Staff' ? '/staff/correction-request.php?id=' : '/manager/correction-request.php?id=') . $request_id;
+        createNotification($conn, (int) $hr_user['user_id'], 'Employee Record Correction Reported',
+            "{$name} (ID " . getEmployeeDisplayId($emp) . ") reported a possible issue with {$correction_fields[$field_key]}. Open the report to read the description and follow up through the HR process.",
+            $link, $hr_role === 'HR Staff' ? 'records' : 'employees', 1);
+    }
+    logAudit($conn, $user_id, 'CREATE', 'EmployeeProfileCorrectionRequest', $request_id, 'Employee reported a possible issue with ' . $correction_fields[$field_key] . '.');
+    redirectWith(BASE_URL . '/employee/my-employment.php', 'success', 'Your report was sent to HR. Your profile has not been changed.');
 }
+
+$correction_reports = [];
+if ($corrections_ready) {
+    $history_stmt = $conn->prepare('SELECT field_key, created_at FROM employee_profile_correction_requests WHERE employee_id = ? AND submitted_by = ? ORDER BY created_at DESC LIMIT 5');
+    $user_id = (int) $_SESSION['user_id'];
+    $history_stmt->bind_param('ii', $employee_id, $user_id);
+    $history_stmt->execute();
+    $correction_reports = $history_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $history_stmt->close();
+}
+
+$addr_stmt = $conn->prepare('SELECT * FROM employee_addresses WHERE employee_id = ?');
+$addr_stmt->bind_param('i', $employee_id);
+$addr_stmt->execute();
+$addresses = [];
+foreach ($addr_stmt->get_result()->fetch_all(MYSQLI_ASSOC) as $row) $addresses[$row['address_type']] = $row;
 $addr_stmt->close();
 
-// Fetch Emergency Contacts
-$emerg_stmt = $conn->prepare("SELECT * FROM employee_emergency_contacts WHERE employee_id = ? ORDER BY is_primary DESC, emergency_id ASC");
-$emerg_stmt->bind_param("i", $employee_id);
+$emerg_stmt = $conn->prepare('SELECT * FROM employee_emergency_contacts WHERE employee_id = ? ORDER BY is_primary DESC, emergency_id ASC');
+$emerg_stmt->bind_param('i', $employee_id);
 $emerg_stmt->execute();
-$emerg_res = $emerg_stmt->get_result();
-$emergency_contacts = [];
-while ($row = $emerg_res->fetch_assoc()) {
-    $emergency_contacts[] = $row;
-}
+$emergency_contacts = $emerg_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $emerg_stmt->close();
 
-if (!function_exists('formatAddress')) {
-    function formatAddress($addr) {
-        if (!$addr) return '—';
+$cm_history = [];
+$cm_check = $conn->query("SHOW TABLES LIKE 'career_movements'");
+if ($cm_check && $cm_check->num_rows > 0) {
+    $cm_stmt = $conn->prepare("SELECT cm.*, pb.branch_name AS from_branch_name, nb.branch_name AS to_branch_name
+        FROM career_movements cm
+        LEFT JOIN branches pb ON cm.previous_branch_id = pb.branch_id
+        LEFT JOIN branches nb ON cm.new_branch_id = nb.branch_id
+        WHERE cm.employee_id = ? AND cm.approval_status = 'Approved'
+        ORDER BY cm.effective_date DESC, cm.created_at DESC");
+    $cm_stmt->bind_param('i', $employee_id);
+    $cm_stmt->execute();
+    $cm_history = $cm_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $cm_stmt->close();
+}
+
+if (!function_exists('employmentValue')) {
+    function employmentValue($value): string {
+        $value = trim((string) ($value ?? ''));
+        return $value === '' ? 'Not provided' : $value;
+    }
+}
+if (!function_exists('employmentAddress')) {
+    function employmentAddress($address): string {
+        if (!$address) return 'Not provided';
         $parts = [];
-        if (!empty($addr['house_no'])) $parts[] = $addr['house_no'];
-        if (!empty($addr['street'])) $parts[] = $addr['street'];
-        if (!empty($addr['subdivision'])) $parts[] = $addr['subdivision'];
-        if (!empty($addr['barangay'])) $parts[] = 'Brgy. ' . $addr['barangay'];
-        if (!empty($addr['city'])) $parts[] = $addr['city'];
-        if (!empty($addr['province'])) $parts[] = $addr['province'];
-        if (!empty($addr['zip_code'])) $parts[] = $addr['zip_code'];
-        return implode(', ', $parts);
+        foreach (['house_no', 'street', 'subdivision'] as $key) if (!empty($address[$key])) $parts[] = $address[$key];
+        if (!empty($address['barangay'])) $parts[] = 'Brgy. ' . $address['barangay'];
+        foreach (['city', 'province', 'zip_code'] as $key) if (!empty($address[$key])) $parts[] = $address[$key];
+        return $parts ? implode(', ', $parts) : 'Not provided';
+    }
+}
+if (!function_exists('employmentField')) {
+    function employmentField(string $label, $value): void {
+        echo '<div class="me-field"><dt>' . e($label) . '</dt><dd>' . e(employmentValue($value)) . '</dd></div>';
     }
 }
 
-if (!function_exists('maskGovId')) {
-    function maskGovId($val) {
-        $trimmed = trim((string)$val);
-        if (empty($trimmed) || $trimmed === '—') return '—';
-        return '••••••••••••';
-    }
-}
-
+$full_name = trim(($emp['first_name'] ?? '') . ' ' . ($emp['last_name'] ?? ''));
+$avatar = getEmployeeAvatar($emp['profile_picture'] ?? '');
 require_once '../includes/header.php';
 ?>
+<link rel="stylesheet" href="<?php echo BASE_URL; ?>/assets/css/my-employment.css">
 
-<div class="page-hero fadeup">
-    <div class="d-flex flex-wrap align-items-center justify-content-between mb-0 gap-4">
-        <div class="d-flex align-items-center gap-4 flex-wrap">
-            <img src="<?php echo getEmployeeAvatar($emp['profile_picture'] ?? ''); ?>"
-                onclick="viewFullImage('<?php echo getEmployeeAvatar($emp['profile_picture'] ?? ''); ?>', '<?php echo e(($emp['first_name'] ?? '') . ' ' . ($emp['last_name'] ?? '')); ?>')"
-                class="cursor-pointer emp-portal-avatar"
-                loading="lazy"
-                alt="Profile photo of <?php echo e(trim(($emp['first_name'] ?? '') . ' ' . ($emp['last_name'] ?? ''))); ?>"
-                style="width:76px;height:76px;border-radius:50%;object-fit:cover;border:3px solid rgba(255,255,255,.3); box-shadow: 0 4px 15px rgba(0,0,0,0.2); transition: transform 0.2s; background-color: #ffffff; flex-shrink:0;">
-
-            <div>
-                <div style="font-size:.72rem;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,.55);">
-                    Employee Portal · Welcome Back</div>
-                <h2 class="text-white fw-bold mb-1 mt-1">
-                    Hello, <?php echo e(trim(($emp['first_name'] ?? '') . ' ' . ($emp['last_name'] ?? ''))); ?>!</h2>
-                <p class="mb-2 text-white-50 small">
-                    <i class="fas fa-briefcase me-1"></i><?php echo e($emp['job_title'] ?? '—'); ?> &bull;
-                    <?php echo e($emp['department_name'] ?? '—'); ?>
-                </p>
-                <div class="d-flex flex-wrap gap-2">
-                    <span class="badge bg-white text-dark py-1 px-2" style="font-size: 0.7rem;"><i
-                            class="fas fa-building me-1 text-primary"></i><?php echo e($emp['branch_name'] ?? 'N/A'); ?></span>
-                    <span class="badge bg-white text-dark py-1 px-2 d-none d-md-inline" style="font-size: 0.7rem;"><i
-                            class="fas fa-calendar-alt me-1 text-primary"></i>Hired:
-                        <?php echo formatDate($emp['hire_date'] ?? ''); ?></span>
-                    <span class="badge bg-white text-dark py-1 px-2" style="font-size: 0.7rem;"><i
-                            class="fas fa-user-check me-1 text-primary"></i><?php echo e($emp['employment_status'] ?? '—'); ?></span>
-                    <?php if (!empty($emp['probationary_regularization_eligible'])): ?>
-                    <span class="badge py-1 px-2" style="font-size:.7rem;background:#dcfce7;color:#166534;"><i class="fas fa-check-circle me-1"></i>Eligible for regularization</span>
-                    <?php elseif (!empty($emp['probationary_next_evaluation_type']) && !empty($emp['probationary_next_evaluation_due_date'])): ?>
-                    <span class="badge py-1 px-2" style="font-size:.7rem;background:#eef2ff;color:#3730a3;"><i class="fas fa-calendar-check me-1"></i>Next: <?php echo e($emp['probationary_next_evaluation_type']); ?> by <?php echo e(formatDate($emp['probationary_next_evaluation_due_date'])); ?></span>
-                    <?php endif; ?>
-                </div>
-            </div>
+<section class="me-identity" aria-labelledby="me-name">
+    <img class="me-avatar" src="<?php echo e($avatar); ?>" alt="Profile photo of <?php echo e($full_name); ?>" loading="lazy">
+    <div class="me-identity-main">
+        <span class="me-eyebrow">Employee profile</span>
+        <h1 id="me-name"><?php echo e($full_name); ?></h1>
+        <p><?php echo e(employmentValue($emp['job_title'] ?? null)); ?> <span aria-hidden="true">·</span> <?php echo e(employmentValue($emp['rank_name'] ?? null)); ?> <span aria-hidden="true">·</span> <?php echo e(employmentValue($emp['department_name'] ?? null)); ?></p>
+        <div class="me-badges">
+            <span class="me-badge me-badge-status"><?php echo !empty($emp['is_active']) ? 'Active' : 'Inactive'; ?></span>
+            <span class="me-badge"><?php echo e(employmentValue($emp['employment_status'] ?? null)); ?></span>
+            <?php if (!empty($emp['probationary_regularization_eligible'])): ?><span class="me-badge">Eligible for regularization</span><?php endif; ?>
         </div>
-        <div class="d-none d-md-block text-end">
-            <a href="<?php echo BASE_URL; ?>/employee/dashboard.php" class="btn btn-outline-light btn-sm rounded-pill px-3 mb-2">
-                <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
-            </a>
-            <div class="text-white-50 x-small"><i class="fas fa-info-circle me-1"></i>Employment info is read-only. Contact HR for updates.</div>
-        </div>
+        <div class="me-identity-meta"><span><i class="fas fa-id-badge" aria-hidden="true"></i> <?php echo e(getEmployeeDisplayId($emp)); ?></span><span><i class="fas fa-building" aria-hidden="true"></i> <?php echo e(employmentValue($emp['branch_name'] ?? null)); ?></span><span><i class="fas fa-calendar-alt" aria-hidden="true"></i> Hired <?php echo !empty($emp['hire_date']) ? e(formatDate($emp['hire_date'])) : 'Not provided'; ?></span></div>
     </div>
+    <div class="me-identity-actions"><a href="<?php echo BASE_URL; ?>/employee/dashboard.php" class="me-back"><i class="fas fa-arrow-left" aria-hidden="true"></i> Back to Dashboard</a><small>Read-only profile</small></div>
+</section>
+
+<div class="me-tab-shell">
+    <nav class="me-tabs" role="tablist" aria-label="My employment sections">
+        <button id="me-tab-overview" type="button" role="tab" aria-controls="me-panel-overview" aria-selected="true" tabindex="0" data-me-tab="overview"><i class="fas fa-th-large" aria-hidden="true"></i> Overview</button>
+        <button id="me-tab-employment" type="button" role="tab" aria-controls="me-panel-employment" aria-selected="false" tabindex="-1" data-me-tab="employment"><i class="fas fa-briefcase" aria-hidden="true"></i> Employment</button>
+        <button id="me-tab-personal" type="button" role="tab" aria-controls="me-panel-personal" aria-selected="false" tabindex="-1" data-me-tab="personal"><i class="fas fa-user" aria-hidden="true"></i> Personal Information</button>
+        <button id="me-tab-help" type="button" role="tab" aria-controls="me-panel-help" aria-selected="false" tabindex="-1" data-me-tab="help"><i class="fas fa-life-ring" aria-hidden="true"></i> Help & Corrections</button>
+        <button id="me-tab-career" type="button" role="tab" aria-controls="me-panel-career" aria-selected="false" tabindex="-1" data-me-tab="career"><i class="fas fa-route" aria-hidden="true"></i> Career History</button>
+    </nav>
 </div>
 
-<!-- Mobile-only section -->
-<div class="d-md-none d-flex justify-content-between align-items-center mt-3 mb-4 flex-wrap gap-3 fadeup" style="animation-delay: 0.1s;">
-    <a href="<?php echo BASE_URL; ?>/employee/dashboard.php" class="btn btn-primary btn-sm rounded-pill px-3 shadow-sm">
-        <i class="fas fa-arrow-left me-2"></i>Back to My Dashboard
-    </a>
-    <div class="alert alert-light border-0 shadow-sm py-2 px-3 mb-0" style="border-radius: 10px; font-size: 0.85rem; background: #fff;">
-        <i class="fas fa-info-circle me-2 text-primary"></i>
-        <span class="text-muted fw-500">Read-only. Contact HR for updates.</span>
+<section id="me-panel-overview" class="me-panel" role="tabpanel" aria-labelledby="me-tab-overview" data-me-panel="overview">
+    <div class="me-overview-grid">
+        <article class="me-card"><h2><i class="fas fa-briefcase" aria-hidden="true"></i> Employment Summary</h2><dl class="me-fields">
+            <?php employmentField('Position', $emp['job_title'] ?? null); employmentField('Department', $emp['department_name'] ?? null); employmentField('Employment Type', $emp['employment_type'] ?? null); employmentField('Employment Status', $emp['employment_status'] ?? null); ?>
+        </dl></article>
+        <article class="me-card"><h2><i class="fas fa-phone" aria-hidden="true"></i> Contact Details</h2><dl class="me-fields">
+            <?php employmentField('Mobile', $emp['mobile_number'] ?? null); employmentField('Telephone', $emp['telephone_number'] ?? null); employmentField('Personal Email', $emp['personal_email'] ?? null); employmentField('Citizenship', $emp['citizenship'] ?? null); ?>
+        </dl></article>
     </div>
-</div>
+    <?php if (($emp['employment_status'] ?? '') === 'Probationary'): ?>
+    <article class="me-card me-probation-note"><h2><i class="fas fa-user-clock" aria-hidden="true"></i> Probationary Milestone</h2>
+        <?php if (!empty($emp['probationary_regularization_eligible'])): ?><p>You are marked eligible for regularization. HR will confirm any official employment-status change.</p>
+        <?php elseif (!empty($emp['probationary_next_evaluation_type']) && !empty($emp['probationary_next_evaluation_due_date'])): ?><p>Your <?php echo e($emp['probationary_next_evaluation_type']); ?> evaluation is due <?php echo e(formatDate($emp['probationary_next_evaluation_due_date'])); ?>.</p>
+        <?php else: ?><p>Your next evaluation date is not recorded here yet. Check Self Rating or contact HR for the current schedule.</p><?php endif; ?>
+        <a href="<?php echo BASE_URL; ?>/employee/self-rating.php">Go to Self Rating <i class="fas fa-arrow-right" aria-hidden="true"></i></a>
+    </article>
+    <?php endif; ?>
+    <article class="me-card me-preview"><div class="me-card-heading"><h2><i class="fas fa-route" aria-hidden="true"></i> Recent Career Activity</h2><button type="button" class="me-text-action" data-me-open="career">View history <i class="fas fa-arrow-right" aria-hidden="true"></i></button></div>
+        <?php if (!$cm_history): ?><p class="me-empty">No approved career movements recorded yet.</p><?php else: ?><ol class="me-preview-list"><?php foreach (array_slice($cm_history, 0, 2) as $movement): ?><li><strong><?php echo e($movement['movement_type']); ?></strong><span><?php echo e(employmentValue($movement['new_position'] ?? null)); ?> · <?php echo !empty($movement['effective_date']) ? e(formatDate($movement['effective_date'])) : 'Date not provided'; ?></span></li><?php endforeach; ?></ol><?php endif; ?>
+    </article>
+</section>
 
-<nav class="employee-information-tabs" role="tablist" aria-label="Employment information sections">
-    <button class="employee-information-tab" type="button" role="tab" aria-selected="true" tabindex="0" data-profile-tab="all"><i class="fas fa-th-large"></i>All Information</button>
-    <button class="employee-information-tab" type="button" role="tab" aria-selected="false" tabindex="-1" data-profile-tab="employment"><i class="fas fa-briefcase"></i>Employment Details</button>
-    <button class="employee-information-tab" type="button" role="tab" aria-selected="false" tabindex="-1" data-profile-tab="contact"><i class="fas fa-envelope"></i>Contact Information</button>
-    <button class="employee-information-tab" type="button" role="tab" aria-selected="false" tabindex="-1" data-profile-tab="government"><i class="fas fa-id-card"></i>Government IDs</button>
-    <button class="employee-information-tab" type="button" role="tab" aria-selected="false" tabindex="-1" data-profile-tab="personal"><i class="fas fa-user"></i>Profile Summary</button>
-    <button class="employee-information-tab" type="button" role="tab" aria-selected="false" tabindex="-1" data-profile-tab="addresses"><i class="fas fa-map-marker-alt"></i>Addresses</button>
-    <button class="employee-information-tab" type="button" role="tab" aria-selected="false" tabindex="-1" data-profile-tab="emergency"><i class="fas fa-exclamation-circle"></i>Emergency Contacts</button>
-    <button class="employee-information-tab" type="button" role="tab" aria-selected="false" tabindex="-1" data-profile-tab="career"><i class="fas fa-route"></i>Career Movement History</button>
-</nav>
-
-<style>
-    .employee-information-tabs {
-        display: flex;
-        width: 100%;
-        gap: 0;
-        overflow-x: auto;
-        margin-bottom: 1rem;
-        padding: 0;
-        background: #fff;
-        border: 1px solid #e5ebe7;
-        border-radius: 10px;
-        scrollbar-width: thin;
-    }
-
-    .employee-information-tab {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        flex: 0 0 auto;
-        min-width: 118px;
-        appearance: none;
-        border: 0;
-        border-bottom: 2px solid transparent;
-        border-radius: 8px 8px 0 0;
-        background: transparent;
-        color: #60706a;
-        font-size: .66rem;
-        font-weight: 700;
-        padding: .7rem .35rem .62rem;
-        white-space: nowrap;
-        text-align: center;
-        transition: color .18s ease, background-color .18s ease, border-color .18s ease;
-    }
-
-    .employee-information-tab:hover,
-    .employee-information-tab:focus-visible,
-    .employee-information-tab[aria-selected="true"] {
-        color: #12613a;
-        background: #f5faf7;
-        border-bottom-color: #12613a;
-        outline: none;
-    }
-
-    .employee-information-tab i {
-        margin-right: .35rem;
-    }
-
-    .pds-card[hidden] {
-        display: none !important;
-    }
-
-    .pds-info-grid {
-        display: grid;
-        grid-template-columns: 1fr;
-        gap: 18px;
-        width: 100%;
-    }
-
-    .pds-card {
-        max-width: 100%;
-        width: 100%;
-        min-height: 270px;
-        background: #fff;
-        border: 1px solid #e8ece8;
-        border-radius: 14px;
-        padding: 18px 18px 14px;
-        box-shadow: 0 8px 22px rgba(15, 23, 42, 0.04);
-    }
-
-    .pds-card-title {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        margin-bottom: 18px;
-        padding-bottom: 12px;
-        border-bottom: 1px solid #edf1ee;
-        font-size: 1.05rem;
-        font-weight: 800;
-        color: #1d2d24;
-    }
-
-    .pds-card-title i {
-        color: #12613a;
-        font-size: 0.96rem;
-    }
-
-    .pds-data-row {
-        display: grid;
-        grid-template-columns: minmax(120px, 170px) 1fr;
-        gap: 10px 18px;
-        align-items: center;
-        padding: 8px 0;
-        border-bottom: 1px solid #f2f5f2;
-        font-size: 0.9rem;
-    }
-
-    .pds-data-row:last-child {
-        border-bottom: none;
-    }
-
-    .pds-data-row .label {
-        color: #64706a;
-        font-weight: 600;
-        letter-spacing: 0.01em;
-    }
-
-    .pds-data-row .value {
-        color: #1d2d24;
-        font-weight: 600;
-        word-break: break-word;
-    }
-
-    .company-id-text,
-    .company-id-value {
-        font-weight: 700;
-    }
-
-    .rank-badge {
-        display: inline-block;
-        background: linear-gradient(135deg, #efebff, #dbd0ff);
-        color: #5e3bc7;
-        border: 1px solid rgba(94, 59, 199, 0.18);
-        border-radius: 999px;
-        padding: 4px 10px;
-        font-size: 0.72rem;
-        font-weight: 800;
-        letter-spacing: 0.04em;
-        text-transform: uppercase;
-    }
-</style>
-
-<div class="pds-info-grid">
-    <div class="pds-card fadeup-1" data-profile-panel="employment" style="max-width: 100%; width: 100%;">
-        <div class="pds-card-title"><i class="fas fa-briefcase"></i>Employment Details</div>
-        <div class="pds-data-row"><span class="label company-id-text">Company ID</span><span class="value company-id-value"><?php echo e(getEmployeeDisplayId($emp)); ?></span></div>
-        <div class="pds-data-row"><span class="label">Rank</span><span class="value"><span class="rank-badge"><?php echo e($emp['rank_name'] ?? '—'); ?></span></span></div>
-        <div class="pds-data-row"><span class="label">Full Name</span><span class="value"><?php echo e(trim(($emp['first_name'] ?? '') . ' ' . ($emp['last_name'] ?? ''))); ?></span></div>
-        <div class="pds-data-row"><span class="label">Position</span><span class="value"><?php echo e($emp['job_title'] ?? '—'); ?></span></div>
-        <div class="pds-data-row"><span class="label">Department</span><span class="value"><?php echo e($emp['department_name'] ?? '—'); ?></span></div>
-        <div class="pds-data-row"><span class="label">Branch</span><span class="value"><?php echo e($emp['branch_name'] ?? '—'); ?></span></div>
-        <div class="pds-data-row"><span class="label">Hire Date</span><span class="value"><?php echo formatDate($emp['hire_date'] ?? ''); ?></span></div>
-        <div class="pds-data-row"><span class="label">Employment Status</span><span class="value"><?php echo e($emp['employment_status'] ?? '—'); ?></span></div>
-        <div class="pds-data-row"><span class="label">Employment Type</span><span class="value"><?php echo e($emp['employment_type'] ?? '—'); ?></span></div>
+<section id="me-panel-employment" class="me-panel" role="tabpanel" aria-labelledby="me-tab-employment" data-me-panel="employment" hidden>
+    <div class="me-overview-grid">
+        <article class="me-card"><h2><i class="fas fa-sitemap" aria-hidden="true"></i> Position & Assignment</h2><dl class="me-fields">
+            <?php employmentField('Company ID', getEmployeeDisplayId($emp)); employmentField('Rank', $emp['rank_name'] ?? null); employmentField('Full Name', $full_name); employmentField('Position', $emp['job_title'] ?? null); employmentField('Department', $emp['department_name'] ?? null); employmentField('Branch', $emp['branch_name'] ?? null); ?>
+        </dl></article>
+        <article class="me-card"><h2><i class="fas fa-calendar-check" aria-hidden="true"></i> Employment Details</h2><dl class="me-fields">
+            <?php employmentField('Hire Date', !empty($emp['hire_date']) ? formatDate($emp['hire_date']) : null); employmentField('Employment Status', $emp['employment_status'] ?? null); employmentField('Employment Type', $emp['employment_type'] ?? null); ?>
+            <?php if (!empty($emp['probationary_next_evaluation_type'])) employmentField('Next Probationary Evaluation', $emp['probationary_next_evaluation_type']); ?>
+            <?php if (!empty($emp['probationary_next_evaluation_due_date'])) employmentField('Next Evaluation Due', formatDate($emp['probationary_next_evaluation_due_date'])); ?>
+        </dl></article>
     </div>
+</section>
 
-    <div class="pds-card fadeup-2" data-profile-panel="contact" style="max-width: 100%; width: 100%;">
-        <div class="pds-card-title"><i class="fas fa-phone"></i>Contact Information</div>
-        <div class="pds-data-row"><span class="label">Mobile Number</span><span
-                class="value"><?php echo e($emp['mobile_number'] ?? '—'); ?></span></div>
-        <div class="pds-data-row"><span class="label">Telephone</span><span
-                class="value"><?php echo e($emp['telephone_number'] ?? '—'); ?></span></div>
-        <div class="pds-data-row"><span class="label">Personal Email</span><span
-                class="value"><?php echo e($emp['personal_email'] ?? '—'); ?></span></div>
-        <div class="pds-data-row"><span class="label">Citizenship</span><span
-                class="value"><?php echo e($emp['citizenship'] ?? '—'); ?></span></div>
-        <div class="pds-data-row"><span class="label">Civil Status</span><span
-                class="value"><?php echo e($emp['civil_status'] ?? '—'); ?></span></div>
-        <div class="pds-data-row"><span class="label">Date of Birth</span><span
-                class="value"><?php 
-                    $dob_text = '';
-                    if (!empty($emp['date_of_birth'])) {
-                        $dob_text = formatDate($emp['date_of_birth']);
-                        $dob = new DateTime($emp['date_of_birth']);
-                        $today = new DateTime();
-                        $age = $today->diff($dob)->y;
-                        $dob_text .= " ($age years old)";
-                    }
-                    echo $dob_text ?: '—';
-                ?></span></div>
+<section id="me-panel-personal" class="me-panel" role="tabpanel" aria-labelledby="me-tab-personal" data-me-panel="personal" hidden>
+    <div class="me-overview-grid">
+        <article class="me-card"><h2><i class="fas fa-phone" aria-hidden="true"></i> Contact Information</h2><dl class="me-fields"><?php employmentField('Mobile Number', $emp['mobile_number'] ?? null); employmentField('Telephone', $emp['telephone_number'] ?? null); employmentField('Personal Email', $emp['personal_email'] ?? null); ?></dl></article>
+        <article class="me-card"><h2><i class="fas fa-user" aria-hidden="true"></i> Profile Summary</h2><dl class="me-fields">
+            <?php employmentField('Citizenship', $emp['citizenship'] ?? null); employmentField('Civil Status', $emp['civil_status'] ?? null);
+            $birth_display = null;
+            if (!empty($emp['date_of_birth'])) {
+                $birth_display = formatDate($emp['date_of_birth']) . ' (' . (new DateTime())->diff(new DateTime($emp['date_of_birth']))->y . ' years old)';
+            }
+            employmentField('Date of Birth', $birth_display); employmentField('Gender', $emp['gender'] ?? null); employmentField('Place of Birth', $emp['place_of_birth'] ?? null);
+            employmentField('Height', !empty($emp['height_m']) ? $emp['height_m'] . ' m' : null); employmentField('Weight', !empty($emp['weight_kg']) ? $emp['weight_kg'] . ' kg' : null); employmentField('Blood Type', $emp['blood_type'] ?? null); employmentField('Account Status', !empty($emp['is_active']) ? 'Active' : 'Inactive'); ?>
+        </dl></article>
+        <article class="me-card"><h2><i class="fas fa-map-marker-alt" aria-hidden="true"></i> Addresses</h2><dl class="me-fields"><?php employmentField('Residential Address', employmentAddress($addresses['Residential'] ?? null)); employmentField('Permanent Address', employmentAddress($addresses['Permanent'] ?? null)); ?></dl></article>
+        <article class="me-card"><h2><i class="fas fa-exclamation-circle" aria-hidden="true"></i> Emergency Contacts</h2>
+            <?php if (!$emergency_contacts): ?><p class="me-empty">No emergency contacts listed.</p><?php else: ?><?php foreach ($emergency_contacts as $contact): ?><div class="me-contact"><strong><?php echo e(employmentValue($contact['contact_name'] ?? null)); ?><?php if (!empty($contact['is_primary'])): ?> <span class="me-primary">Primary</span><?php endif; ?></strong><span><?php echo e(employmentValue($contact['relationship'] ?? null)); ?> · <?php echo e(employmentValue($contact['contact_number'] ?? null)); ?></span></div><?php endforeach; ?><?php endif; ?>
+        </article>
     </div>
+</section>
 
-    <div class="pds-card fadeup-3" data-profile-panel="government" style="max-width: 100%; width: 100%;">
-        <div class="pds-card-title d-flex align-items-center justify-content-between">
-            <span><i class="fas fa-id-badge me-2"></i>Government IDs</span>
-            <button type="button" class="btn btn-sm btn-light border py-1 px-2 rounded-pill shadow-none" id="toggleGovIdsBtn" onclick="toggleGovIds()" style="font-size: 0.75rem; font-weight: 600; color: #475569; background: #f8fafc; transition: all 0.2s ease;" title="Toggle Confidential IDs">
-                <i class="fas fa-eye me-1" id="govIdsEyeIcon" style="color: #64748b;"></i><span id="govIdsBtnText">Show IDs</span>
-            </button>
-        </div>
-        
-        <?php 
-        $gov_ids = [
-            'SSS Number' => $emp['sss_number'] ?? '',
-            'PhilHealth Number' => $emp['philhealth_number'] ?? '',
-            'Pag-IBIG Number' => $emp['pagibig_number'] ?? '',
-            'TIN Number' => $emp['tin_number'] ?? '',
-        ];
-        foreach ($gov_ids as $label => $raw_val):
-            $has_val = !empty(trim((string)$raw_val));
-            $masked_val = maskGovId($raw_val);
-            $raw_val_clean = $has_val ? e(trim($raw_val)) : '—';
-        ?>
-            <div class="pds-data-row">
-                <span class="label"><?php echo $label; ?></span>
-                <span class="value d-flex align-items-center gap-2">
-                    <span class="gov-id-val" data-raw="<?php echo $raw_val_clean; ?>" data-masked="<?php echo $masked_val; ?>"><?php echo $masked_val; ?></span>
-                    <?php if ($has_val): ?>
-                        <i class="fas fa-eye text-muted cursor-pointer single-id-toggle ms-auto" onclick="toggleSingleId(this)" title="Toggle <?php echo $label; ?>" style="font-size:0.82rem; opacity: 0.55; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.55'"></i>
-                    <?php endif; ?>
-                </span>
-            </div>
-        <?php endforeach; ?>
-    </div>
+<section id="me-panel-help" class="me-panel" role="tabpanel" aria-labelledby="me-tab-help" data-me-panel="help" hidden>
+    <article class="me-card"><h2><i class="fas fa-life-ring" aria-hidden="true"></i> Help & Corrections</h2>
+        <p class="me-help-intro">This profile is read-only. Report an incorrect or missing field to HR; HR will follow up and make any approved changes through its normal process.</p>
+        <?php if ($corrections_ready): ?>
+        <form method="post" action="<?php echo BASE_URL; ?>/employee/my-employment.php" class="me-correction-form">
+            <?php echo csrfField(); ?><input type="hidden" name="action" value="report_correction">
+            <label for="me-correction-field">Which field needs review?</label>
+            <div class="me-correction-controls"><select id="me-correction-field" name="correction_field" required><option value="">Select a field</option><?php foreach ($correction_fields as $key => $label): ?><option value="<?php echo e($key); ?>"><?php echo e($label); ?></option><?php endforeach; ?></select></div>
+            <label for="me-correction-description">What is incorrect?</label>
+            <textarea id="me-correction-description" name="correction_description" rows="4" minlength="15" maxlength="1000" required placeholder="Describe the current detail and what HR should check. Do not include government ID numbers."></textarea>
+            <small>15–1,000 characters. Do not include government ID numbers or attach documents here; HR will contact you if evidence is needed.</small>
+            <button type="submit" class="me-correction-submit">Send report to HR</button>
+        </form>
+        <?php else: ?><p class="me-empty">In-app reporting is temporarily unavailable. Please contact your HR office directly.</p><?php endif; ?>
+        <?php if ($correction_reports): ?><h3 class="me-report-heading">Recent reports</h3><ul class="me-report-list"><?php foreach ($correction_reports as $report): ?><li><span><?php echo e($correction_fields[$report['field_key']] ?? 'Profile detail'); ?></span><time><?php echo e(formatDateTime($report['created_at'])); ?></time></li><?php endforeach; ?></ul><?php endif; ?>
+        <ol class="me-help-steps"><li>Review the field shown in Employment or Personal Information.</li><li>Send a report above. HR will contact you if supporting documents are needed.</li><li>Return after HR confirms a change to verify your updated record.</li></ol>
+        <p class="me-help-security"><i class="fas fa-shield-alt" aria-hidden="true"></i> For government identifiers or other sensitive records, contact HR directly. Do not send full ID numbers through unsecured messages.</p>
+    </article>
+</section>
 
-    <div class="pds-card fadeup-4" data-profile-panel="personal" style="max-width: 100%; width: 100%;">
-        <div class="pds-card-title"><i class="fas fa-user"></i>Profile Summary</div>
-        <div class="pds-data-row"><span class="label">Gender</span><span
-                class="value"><?php echo e($emp['gender'] ?? '—'); ?></span></div>
-        <div class="pds-data-row"><span class="label">Place of Birth</span><span
-                class="value"><?php echo e($emp['place_of_birth'] ?? '—'); ?></span></div>
-        <div class="pds-data-row"><span class="label">Height</span><span
-                class="value"><?php echo !empty($emp['height_m']) ? e($emp['height_m']) . ' m' : '—'; ?></span></div>
-        <div class="pds-data-row"><span class="label">Weight</span><span
-                class="value"><?php echo !empty($emp['weight_kg']) ? e($emp['weight_kg']) . ' kg' : '—'; ?></span></div>
-        <div class="pds-data-row"><span class="label">Blood Type</span><span
-                class="value"><?php echo e($emp['blood_type'] ?? '—'); ?></span></div>
-        <div class="pds-data-row"><span class="label">Account Status</span><span
-                class="value"><?php echo !empty($emp['is_active']) ? 'Active' : 'Inactive'; ?></span></div>
-    </div>
-
-    <div class="pds-card fadeup-5" data-profile-panel="addresses" style="max-width: 100%; width: 100%;">
-        <div class="pds-card-title"><i class="fas fa-map-marker-alt"></i>Addresses</div>
-        <div class="pds-data-row flex-column align-items-start mb-3">
-            <span class="label mb-1" style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;">Residential Address</span>
-            <span class="value text-start fw-semibold" style="text-align: left; color: #1e293b; font-size: 0.88rem; line-height: 1.4;">
-                <?php echo e(formatAddress($addresses['Residential'] ?? null)); ?>
-            </span>
-        </div>
-        <hr style="border-top: 1px solid #eee; margin: 12px 0;">
-        <div class="pds-data-row flex-column align-items-start mb-0">
-            <span class="label mb-1" style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;">Permanent Address</span>
-            <span class="value text-start fw-semibold" style="text-align: left; color: #1e293b; font-size: 0.88rem; line-height: 1.4;">
-                <?php echo e(formatAddress($addresses['Permanent'] ?? null)); ?>
-            </span>
-        </div>
-    </div>
-
-    <div class="pds-card fadeup-6" data-profile-panel="emergency" style="max-width: 100%; width: 100%;">
-        <div class="pds-card-title"><i class="fas fa-exclamation-circle"></i>Emergency Contacts</div>
-        <?php if (empty($emergency_contacts)): ?>
-            <div class="text-muted small text-center py-3">No emergency contacts listed.</div>
-        <?php else: ?>
-            <?php foreach ($emergency_contacts as $idx => $contact): ?>
-                <?php if ($idx > 0): ?>
-                    <hr class="my-2" style="border-top: 1px dashed #eee; margin-top: 10px; margin-bottom: 10px;">
-                <?php endif; ?>
-                <div class="pds-data-row">
-                    <span class="label">Contact Person</span>
-                    <span class="value">
-                        <?php echo e($contact['contact_name']); ?>
-                        <?php if ($contact['is_primary']): ?>
-                            <span class="badge bg-success-light text-success ms-1" style="font-size: 0.65rem; background-color: #e6fcf5; color: #0ca678 !important; padding: 2px 5px; border-radius: 4px; font-weight: bold; border: 1px solid rgba(12, 166, 120, 0.15);">Primary</span>
-                        <?php endif; ?>
-                    </span>
-                </div>
-                <div class="pds-data-row">
-                    <span class="label">Relationship</span>
-                    <span class="value"><?php echo e($contact['relationship'] ?? '—'); ?></span>
-                </div>
-                <div class="pds-data-row">
-                    <span class="label">Contact Number</span>
-                    <span class="value"><?php echo e($contact['contact_number'] ?? '—'); ?></span>
-                </div>
-            <?php endforeach; ?>
-        <?php endif; ?>
-    </div><!-- /.pds-card Emergency Contacts -->
-
-    <!-- Career Movement History Card -->
-    <?php
-    $cm_history = [];
-    $cm_check = $conn->query("SHOW TABLES LIKE 'career_movements'");
-    if ($cm_check && $cm_check->num_rows > 0) {
-        $cm_stmt = $conn->prepare("
-            SELECT cm.*,
-                pb.branch_name AS from_branch_name,
-                nb.branch_name AS to_branch_name
-            FROM career_movements cm
-            LEFT JOIN branches pb ON cm.previous_branch_id = pb.branch_id
-            LEFT JOIN branches nb ON cm.new_branch_id       = nb.branch_id
-            WHERE cm.employee_id = ? AND cm.approval_status = 'Approved'
-            ORDER BY cm.effective_date DESC, cm.created_at DESC
-        ");
-        $cm_stmt->bind_param("i", $employee_id);
-        $cm_stmt->execute();
-        $cm_history = $cm_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-        $cm_stmt->close();
-    }
-    ?>
-    <div class="pds-card fadeup-7" data-profile-panel="career" style="grid-column: 1 / -1; max-width: 100%; width: 100%;">
-        <div class="pds-card-title"><i class="fas fa-route"></i>Career Movement History</div>
-        <?php if (empty($cm_history)): ?>
-            <div class="text-muted small text-center py-3"><i class="fas fa-route d-block mb-1" style="font-size:1.5rem;opacity:.3;"></i>No career movements recorded yet.</div>
-        <?php else: ?>
-            <div class="table-responsive">
-                <table class="table table-sm modern-table align-middle mb-0" style="font-size:.85rem;">
-                    <thead>
-                        <tr>
-                            <th>Effective Date</th>
-                            <th>Type</th>
-                            <th>Previous Position</th>
-                            <th>New Position</th>
-                            <th>Branch Change</th>
-                            <th>Reason</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($cm_history as $cm):
-                            $typeBadge = match($cm['movement_type']) {
-                                'Promotion'   => 'bg-success',
-                                'Transfer'    => 'bg-info text-dark',
-                                'Demotion'    => 'bg-danger',
-                                'Role Change' => 'bg-primary',
-                                default       => 'bg-secondary',
-                            };
-                        ?>
-                        <tr>
-                            <td class="fw-semibold"><?php echo formatDate($cm['effective_date']); ?></td>
-                            <td><span class="badge <?php echo $typeBadge; ?>"><?php echo e($cm['movement_type']); ?></span></td>
-                            <td class="text-muted"><?php echo e($cm['previous_position'] ?: '—'); ?></td>
-                            <td class="fw-bold text-success"><?php echo e($cm['new_position']); ?></td>
-                            <td>
-                                <?php if (!empty($cm['new_branch_id'])): ?>
-                                    <?php echo e($cm['from_branch_name'] ?: '—'); ?> &rarr; <strong><?php echo e($cm['to_branch_name'] ?: '—'); ?></strong>
-                                <?php else: ?>
-                                    <span class="text-muted">Same Branch</span>
-                                <?php endif; ?>
-                            </td>
-                            <td><?php echo e($cm['reason'] ?: '—'); ?></td>
-                        </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
-            </div>
-        <?php endif; ?>
-    </div>
-</div>
+<section id="me-panel-career" class="me-panel" role="tabpanel" aria-labelledby="me-tab-career" data-me-panel="career" hidden>
+    <article class="me-card"><h2><i class="fas fa-route" aria-hidden="true"></i> Career History</h2>
+        <?php if (!$cm_history): ?><p class="me-empty">No approved career movements recorded yet.</p><?php else: ?><ol class="me-timeline">
+            <?php foreach ($cm_history as $movement): ?><li><div class="me-timeline-date"><?php echo !empty($movement['effective_date']) ? e(formatDate($movement['effective_date'])) : 'Date not provided'; ?></div><div class="me-timeline-body"><h3><?php echo e(employmentValue($movement['movement_type'] ?? null)); ?></h3><p><span>Position:</span> <?php echo e(employmentValue($movement['previous_position'] ?? null)); ?> <span aria-hidden="true">→</span> <?php echo e(employmentValue($movement['new_position'] ?? null)); ?></p><?php if (!empty($movement['new_branch_id'])): ?><p><span>Branch:</span> <?php echo e(employmentValue($movement['from_branch_name'] ?? null)); ?> <span aria-hidden="true">→</span> <?php echo e(employmentValue($movement['to_branch_name'] ?? null)); ?></p><?php else: ?><p><span>Branch:</span> Same branch</p><?php endif; ?><p><span>Reason:</span> <?php echo e(employmentValue($movement['reason'] ?? null)); ?></p></div></li><?php endforeach; ?>
+        </ol><?php endif; ?>
+    </article>
+</section>
 
 <script>
-let govIdsVisible = false;
+document.addEventListener('DOMContentLoaded', () => {
+    const tabs = [...document.querySelectorAll('[data-me-tab]')];
+    const panels = [...document.querySelectorAll('[data-me-panel]')];
 
-function toggleGovIds() {
-    govIdsVisible = !govIdsVisible;
-    const btnText = document.getElementById('govIdsBtnText');
-    const eyeIcon = document.getElementById('govIdsEyeIcon');
-    const elements = document.querySelectorAll('.gov-id-val');
-    
-    if (govIdsVisible) {
-        if (btnText) btnText.textContent = 'Hide IDs';
-        if (eyeIcon) eyeIcon.className = 'fas fa-eye-slash me-1';
-        elements.forEach(el => {
-            const raw = el.getAttribute('data-raw');
-            if (raw && raw !== '—') {
-                el.textContent = raw;
-                el.classList.add('fw-bold');
-            }
-        });
-        document.querySelectorAll('.single-id-toggle').forEach(icon => {
-            icon.className = 'fas fa-eye-slash text-primary cursor-pointer single-id-toggle ms-auto';
-        });
-    } else {
-        if (btnText) btnText.textContent = 'Show IDs';
-        if (eyeIcon) eyeIcon.className = 'fas fa-eye me-1';
-        elements.forEach(el => {
-            const masked = el.getAttribute('data-masked');
-            if (masked) {
-                el.textContent = masked;
-                el.classList.remove('fw-bold');
-            }
-        });
-        document.querySelectorAll('.single-id-toggle').forEach(icon => {
-            icon.className = 'fas fa-eye text-muted cursor-pointer single-id-toggle ms-auto';
-        });
-    }
-}
-
-function toggleSingleId(iconEl) {
-    const parent = iconEl.closest('.value');
-    const valEl = parent ? parent.querySelector('.gov-id-val') : null;
-    if (!valEl) return;
-    
-    const raw = valEl.getAttribute('data-raw');
-    const masked = valEl.getAttribute('data-masked');
-    
-    if (valEl.textContent === masked) {
-        valEl.textContent = raw;
-        valEl.classList.add('fw-bold');
-        iconEl.className = 'fas fa-eye-slash text-primary cursor-pointer single-id-toggle ms-auto';
-    } else {
-        valEl.textContent = masked;
-        valEl.classList.remove('fw-bold');
-        iconEl.className = 'fas fa-eye text-muted cursor-pointer single-id-toggle ms-auto';
-    }
-}
-
-document.addEventListener('DOMContentLoaded', function () {
-    const tabs = Array.from(document.querySelectorAll('.employee-information-tab'));
-    const panels = Array.from(document.querySelectorAll('[data-profile-panel]'));
-
-    function activateTab(tab) {
-        const selected = tab.getAttribute('data-profile-tab');
-
-        tabs.forEach(function (item) {
+    function activate(tab, focus = false) {
+        tabs.forEach(item => {
             const active = item === tab;
             item.setAttribute('aria-selected', active ? 'true' : 'false');
             item.tabIndex = active ? 0 : -1;
         });
-
-        panels.forEach(function (panel) {
-            const visible = selected === 'all' || panel.getAttribute('data-profile-panel') === selected;
-            panel.hidden = !visible;
-        });
+        panels.forEach(panel => { panel.hidden = panel.dataset.mePanel !== tab.dataset.meTab; });
+        if (focus) tab.focus();
     }
-
-    tabs.forEach(function (tab) {
-        tab.addEventListener('click', function () {
-            activateTab(tab);
+    tabs.forEach((tab, index) => {
+        tab.addEventListener('click', () => activate(tab));
+        tab.addEventListener('keydown', event => {
+            let next = null;
+            if (event.key === 'ArrowRight') next = (index + 1) % tabs.length;
+            if (event.key === 'ArrowLeft') next = (index - 1 + tabs.length) % tabs.length;
+            if (event.key === 'Home') next = 0;
+            if (event.key === 'End') next = tabs.length - 1;
+            if (next !== null) { event.preventDefault(); activate(tabs[next], true); }
         });
     });
+    document.querySelectorAll('[data-me-open]').forEach(button => button.addEventListener('click', () => {
+        const tab = tabs.find(item => item.dataset.meTab === button.dataset.meOpen);
+        if (tab) { activate(tab, true); tab.scrollIntoView({block: 'nearest', inline: 'nearest'}); }
+    }));
 
-    if (tabs.length) activateTab(tabs[0]);
 });
 </script>
-
 <?php require_once '../includes/footer.php'; ?>

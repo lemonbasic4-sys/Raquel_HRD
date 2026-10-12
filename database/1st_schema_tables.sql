@@ -959,6 +959,22 @@ CREATE TABLE employee_edit_history (
     INDEX idx_eeh_created (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- ============================================
+-- 47. Employee Profile Correction Reports
+-- ============================================
+DROP TABLE IF EXISTS employee_profile_correction_requests;
+CREATE TABLE employee_profile_correction_requests (
+    request_id INT AUTO_INCREMENT PRIMARY KEY,
+    employee_id INT NOT NULL,
+    submitted_by INT NOT NULL,
+    field_key VARCHAR(50) NOT NULL,
+    description TEXT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_profile_correction_employee (employee_id, created_at),
+    CONSTRAINT fk_profile_correction_employee FOREIGN KEY (employee_id) REFERENCES employees(employee_id) ON DELETE CASCADE,
+    CONSTRAINT fk_profile_correction_submitter FOREIGN KEY (submitted_by) REFERENCES users(user_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- ============================================
