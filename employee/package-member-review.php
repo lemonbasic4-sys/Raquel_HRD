@@ -60,7 +60,7 @@ if (!$review_step) {
 $is_probationary_head_review = in_array($review_step['evaluation_type'] ?? '', ['Initial', 'Final'], true)
     && (int)($review_step['step_order'] ?? 0) === 1;
 if (in_array($review_step['evaluation_type'] ?? '', ['Initial', 'Final'], true) && !$is_probationary_head_review) {
-    redirectWith(BASE_URL . '/employee/package-member-view.php?package_id=' . $package_id . '&evaluation_id=' . $evaluation_id, 'info', 'Only the immediate head may adjust ratings in a probationary evaluation.');
+    redirectWith(BASE_URL . '/employee/package-member-view.php?package_id=' . $package_id . '&evaluation_id=' . $evaluation_id, 'info', 'Only the assigned reviewer may adjust ratings in a probationary evaluation.');
 }
 $eval_status_check = $conn->query("SELECT status FROM evaluations WHERE evaluation_id = $evaluation_id LIMIT 1")->fetch_assoc();
 if (($eval_status_check['status'] ?? '') === 'Approved') {
@@ -144,7 +144,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $audit->bind_param('iis', $package_id, $user_id, $remarks);
         $audit->execute();
         $audit->close();
-        redirectWith(BASE_URL . '/employee/package-member-review.php?package_id=' . $package_id . '&evaluation_id=' . $evaluation_id, 'success', 'Individual ratings and Developmental Plan were saved successfully. Return to the evaluation review to record the immediate head recommendation and signature.');
+        $next_instruction = (($review_step['evaluation_type'] ?? '') === 'Final'
+                || !isHumanResourcesPackageDepartment($conn, (int)($review_step['department_id'] ?? 0)))
+            ? ' Return to the evaluation review to record the reviewer recommendation and signature.'
+            : ' Return to the evaluation review to approve the Initial evaluation.';
+        redirectWith(BASE_URL . '/employee/package-member-review.php?package_id=' . $package_id . '&evaluation_id=' . $evaluation_id, 'success', 'Individual ratings and Developmental Plan were saved successfully.' . $next_instruction);
     }
 
     if ($sort_idx > 0) {
@@ -192,6 +196,8 @@ $existing_dev_plans = $dev_plan_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $dev_plan_stmt->close();
 
 $is_probationary = in_array($evaluation['evaluation_type'], ['Initial', 'Final'], true);
+$is_hr_initial_review = $evaluation['evaluation_type'] === 'Initial'
+    && isHumanResourcesPackageDepartment($conn, (int)($review_step['department_id'] ?? 0));
 $kra_w = $is_probationary ? 80 : (float)($evaluation['kra_weight'] ?? 80);
 $beh_w = $is_probationary ? 20 : (float)($evaluation['behavior_weight'] ?? 20);
 $shared_beh = $evaluation['shared_behavior_score'] !== null ? (float)$evaluation['shared_behavior_score'] : (float)$evaluation['behavior_average'];
@@ -400,7 +406,7 @@ $devplan_count = count($existing_dev_plans);
                 <button type="button" class="eval-tab-btn" id="btn-tab-devplan" onclick="switchReviewTab(event, 'tab-devplan')" role="tab" aria-selected="false" aria-controls="tab-devplan">
                     <i class="fas fa-seedling me-1"></i>Developmental Plan &amp; Recommendations <span class="eval-tab-badge ms-1" id="badge-devplan-count"><?php echo $devplan_count > 0 ? $devplan_count : 1; ?></span>
                 </button>
-                <?php if ($is_probationary_head_review): ?>
+                <?php if ($is_probationary_head_review && !$is_hr_initial_review): ?>
                 <button type="button" class="eval-tab-btn" id="btn-tab-decision" onclick="switchReviewTab(event, 'tab-decision')" role="tab" aria-selected="false" aria-controls="tab-decision">
                     <i class="fas fa-file-signature me-1"></i>Decision &amp; Signature
                 </button>
@@ -628,9 +634,9 @@ $devplan_count = count($existing_dev_plans);
                 </button>
             </div>
 
-            <?php if ($is_probationary_head_review): ?>
+            <?php if ($is_probationary_head_review && !$is_hr_initial_review): ?>
             <div id="tab-decision" class="eval-tab-content" role="tabpanel" aria-labelledby="btn-tab-decision">
-                <div class="eval-section-title"><span><i class="fas fa-file-signature me-2"></i>Immediate Head Decision &amp; Signature</span></div>
+                <div class="eval-section-title"><span><i class="fas fa-file-signature me-2"></i><?php echo isHumanResourcesPackageDepartment($conn, (int)($review_step['department_id'] ?? 0)) ? 'Final Reviewer' : 'Immediate Head'; ?> Decision &amp; Signature</span></div>
                 <p class="text-muted small mb-3">For <?php echo e($evaluation['first_name'] . ' ' . $evaluation['last_name']); ?>. Save any rating adjustments first, then record the recommendation and signature.</p>
                 <?php if (!empty($evaluation['immediate_head_signed_at'])): ?>
                 <span class="badge text-bg-success mb-3"><i class="fas fa-check-circle me-1"></i>Signed <?php echo e(date('M j, Y g:i A', strtotime($evaluation['immediate_head_signed_at']))); ?></span>

@@ -3033,7 +3033,8 @@ function ensureOrganizationEvaluationPackageSchema($conn)
               AND rs.step_order IN (1, 2)
               AND rs.step_type <> 'Governance'
               AND rs.action_status IN ('Pending', 'Waiting')
-              AND rs.eligible_role IS NULL");
+              AND rs.eligible_role IS NULL
+              AND rs.reviewer_user_id IS NULL AND rs.reviewer_employee_id IS NULL");
         $conn->query("UPDATE evaluation_packages ep
             JOIN departments d ON d.department_id = ep.department_id
             JOIN evaluation_package_route_steps rs ON rs.package_id = ep.package_id
@@ -3166,23 +3167,29 @@ function applyProbationaryEvaluationOutcome($conn, $evaluation_id)
     $evaluation_id = (int)$evaluation_id;
     if ($evaluation_id <= 0 || !ensureProbationaryEvaluationSchema($conn)) return false;
     $stmt = $conn->prepare("SELECT ev.employee_id, ev.evaluation_type, e.hire_date,
-            per.recommendation
+            d.department_name, per.recommendation
         FROM evaluations ev
         JOIN employees e ON e.employee_id = ev.employee_id
+        LEFT JOIN departments d ON d.department_id = e.department_id
         LEFT JOIN probationary_evaluation_reviews per ON per.evaluation_id = ev.evaluation_id
         WHERE ev.evaluation_id = ? AND ev.evaluation_type IN ('Initial','Final') LIMIT 1");
     $stmt->bind_param('i', $evaluation_id);
     $stmt->execute();
     $row = $stmt->get_result()->fetch_assoc();
     $stmt->close();
-    if (!$row || !in_array($row['recommendation'] ?? '', ['Recommend regularization', 'Continue training'], true)) return false;
+    if (!$row) return false;
+    $is_hr = strcasecmp((string)($row['department_name'] ?? ''), 'Human Resources') === 0;
+    if ((!$is_hr || $row['evaluation_type'] === 'Final')
+        && !in_array($row['recommendation'] ?? '', ['Recommend regularization', 'Continue training'], true)) return false;
 
     $employee_id = (int)$row['employee_id'];
-    $eligible = $row['recommendation'] === 'Recommend regularization' ? 1 : 0;
+    $eligible = $row['recommendation'] === 'Recommend regularization'
+        && (!$is_hr || $row['evaluation_type'] === 'Final') ? 1 : 0;
     $eligible_eval_id = $eligible ? $evaluation_id : null;
-    $next_type = (!$eligible && $row['evaluation_type'] === 'Initial') ? 'Final' : null;
+    $next_type = $is_hr ? ($eligible ? null : 'Final')
+        : ((!$eligible && $row['evaluation_type'] === 'Initial') ? 'Final' : null);
     $next_due_date = null;
-    if ($next_type === 'Final' && !empty($row['hire_date'])) {
+    if ($next_type === 'Final' && (!$is_hr || $row['evaluation_type'] === 'Initial') && !empty($row['hire_date'])) {
         $next_due_date = date('Y-m-d', strtotime('+5 months', strtotime($row['hire_date'])));
     }
     $update = $conn->prepare("UPDATE employees
@@ -3233,6 +3240,43 @@ function notifyHRManagementOfProbationaryApproval($conn, $evaluation_id)
         createNotification($conn, (int)$recipient['user_id'], 'Department-approved probationary evaluation', $message, $link);
     }
     return count($recipients);
+}
+
+/** Inform HR Managers after an HR Staff probationary result is finalized by an HR Supervisor. */
+function notifyHrManagersOfStaffProbationaryApproval($conn, $evaluation_id)
+{
+    $evaluation_id = (int)$evaluation_id;
+    $stmt = $conn->prepare("SELECT ev.evaluation_type, ev.total_score, e.first_name, e.last_name,
+            e.job_title, per.recommendation, per.recommendation_reason,
+            e.probationary_regularization_eligible
+        FROM evaluations ev
+        JOIN employees e ON e.employee_id = ev.employee_id
+        JOIN departments d ON d.department_id = e.department_id AND d.department_name = 'Human Resources'
+        LEFT JOIN probationary_evaluation_reviews per ON per.evaluation_id = ev.evaluation_id
+        WHERE ev.evaluation_id = ? AND ev.status = 'Approved' AND e.rank_category_id = 5 LIMIT 1");
+    $stmt->bind_param('i', $evaluation_id);
+    $stmt->execute();
+    $result = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    if (!$result) return 0;
+    $recipients = $conn->query("SELECT u.user_id FROM users u
+        JOIN employees e ON e.employee_id = u.employee_id
+        JOIN departments d ON d.department_id = e.department_id AND d.department_name = 'Human Resources'
+        WHERE u.role = 'HR Manager' AND u.is_active = 1 AND u.deleted_at IS NULL
+          AND COALESCE(u.account_hold, 0) = 0 AND e.is_active = 1 AND e.deleted_at IS NULL");
+    $message = trim($result['first_name'] . ' ' . $result['last_name']) . ' (' . $result['job_title'] . ') had an HR Supervisor-approved '
+        . $result['evaluation_type'] . ' probationary evaluation. Score: ' . number_format((float)$result['total_score'], 2)
+        . '/4. Recommendation: ' . ($result['recommendation'] ?: 'Not recorded')
+        . '. Reason: ' . ($result['recommendation_reason'] ?: 'Not provided')
+        . '. Regularization eligible: ' . ((int)$result['probationary_regularization_eligible'] === 1 ? 'Yes' : 'No')
+        . '. This is an informational record; no further evaluation approval is required.';
+    $count = 0;
+    while ($recipient = $recipients->fetch_assoc()) {
+        createNotification($conn, (int)$recipient['user_id'], 'HR Staff probationary evaluation approved',
+            $message, BASE_URL . '/manager/evaluation-history.php?evaluation_id=' . $evaluation_id);
+        $count++;
+    }
+    return $count;
 }
 
 /**
@@ -4596,12 +4640,38 @@ function createOrganizationPackageRoute($conn, $package_id, $consolidator_employ
     $pkg_stmt->close();
     if ($pkg_row) $package_department_id = (int) $pkg_row['department_id'];
 
-    // Probationary reviews are individual. The department head is the final
-    // approver for non-HR evaluations; HR Manager is the final approver for HR.
+    // Probationary reviews are individual. HR reviewer level follows employee rank.
     // Keep every stage even when the position is vacant; the next-stage check
     // will hold the evaluation until an active reviewer is available.
     if (in_array($pkg_row['evaluation_type'] ?? '', ['Initial', 'Final'], true)) {
         $is_hr_probationary = isHumanResourcesPackageDepartment($conn, $package_department_id);
+        $hr_employee_rank = 0;
+        $hr_ceo_user_id = 0;
+        $hr_ceo_employee_id = 0;
+        if ($is_hr_probationary && (int)$probationary_evaluation_id > 0) {
+            $rank_stmt = $conn->prepare("SELECT e.rank_category_id, et.created_by,
+                    creator.role AS creator_role, creator_emp.rank_category_id AS creator_rank,
+                    creator_emp.job_title AS creator_title, creator_emp.employee_id AS creator_employee_id
+                FROM evaluations ev
+                JOIN employees e ON e.employee_id = ev.employee_id
+                JOIN evaluation_templates et ON et.template_id = ev.template_id
+                LEFT JOIN users creator ON creator.user_id = et.created_by AND creator.is_active = 1 AND creator.deleted_at IS NULL
+                LEFT JOIN employees creator_emp ON creator_emp.employee_id = creator.employee_id
+                WHERE ev.evaluation_id = ? LIMIT 1");
+            $rank_stmt->bind_param('i', $probationary_evaluation_id);
+            $rank_stmt->execute();
+            $rank_row = $rank_stmt->get_result()->fetch_assoc() ?: [];
+            $rank_stmt->close();
+            $hr_employee_rank = (int)($rank_row['rank_category_id'] ?? 0);
+            $creator_is_ceo = ($rank_row['creator_role'] ?? '') === 'President and CEO'
+                || ((int)($rank_row['creator_rank'] ?? 0) > 0
+                    && (int)($rank_row['creator_rank'] ?? 0) <= 2
+                    && preg_match('/president|chief executive officer|\bceo\b/i', (string)($rank_row['creator_title'] ?? '')));
+            if ($hr_employee_rank === 3 && $creator_is_ceo) {
+                $hr_ceo_user_id = (int)($rank_row['created_by'] ?? 0);
+                $hr_ceo_employee_id = (int)($rank_row['creator_employee_id'] ?? 0);
+            }
+        }
         $direct_head_employee_id = 0;
         $direct_head_user_id = 0;
         if (!$is_hr_probationary && (int)$probationary_evaluation_id > 0) {
@@ -4621,10 +4691,21 @@ function createOrganizationPackageRoute($conn, $package_id, $consolidator_employ
             $direct_head_employee_id = (int)($head['employee_id'] ?? 0);
             $direct_head_user_id = (int)($head['user_id'] ?? 0);
         }
-        $steps = $is_hr_probationary
-            ? [['HR Supervisor — Immediate Head Review', 'HR Supervisor', null, 0, 0], ['HR Manager — Final Approval', 'HR Manager', null, 0, 0]]
-            : [['Department Supervisor — Immediate Head Review', null, $direct_head_employee_id ? null : 4, $direct_head_employee_id, $direct_head_user_id],
-               ['Department Manager — Final Approval', null, 3, 0, 0]];
+        if ($is_hr_probationary) {
+            if ($hr_employee_rank === 5) {
+                $steps = [['HR Supervisor - Final Review', 'HR Supervisor', null, 0, 0]];
+            } elseif ($hr_employee_rank === 4) {
+                $steps = [['HR Manager - Final Review', 'HR Manager', null, 0, 0]];
+            } elseif ($hr_employee_rank === 3) {
+                $steps = [['President and CEO - Final Review', $hr_ceo_user_id ? null : 'President and CEO', null,
+                    $hr_ceo_employee_id, $hr_ceo_user_id]];
+            } else {
+                return;
+            }
+        } else {
+            $steps = [['Department Supervisor — Immediate Head Review', null, $direct_head_employee_id ? null : 4, $direct_head_employee_id, $direct_head_user_id],
+                ['Department Manager — Final Approval', null, 3, 0, 0]];
+        }
         $insert = $conn->prepare("INSERT INTO evaluation_package_route_steps
             (package_id, step_order, reviewer_employee_id, reviewer_user_id, step_label, step_type, eligible_role, eligible_rank_category_id, action_status)
             VALUES (?, ?, NULLIF(?, 0), NULLIF(?, 0), ?, 'Review', ?, ?, 'Waiting')");
@@ -4801,6 +4882,64 @@ function createOrganizationPackageRoute($conn, $package_id, $consolidator_employ
 
     // --- Board of Directors (Final lock & apply) ---
     appendOrganizationGovernanceRouteStep($conn, $package_id, $order, 'Board of Directors', 'Board of Directors approval');
+}
+
+/** Repair unapproved HR probationary routes created under the old two-reviewer rule. */
+function syncOpenHrProbationaryRoutes($conn)
+{
+    $rows = $conn->query("SELECT ep.package_id, ev.evaluation_id, e.rank_category_id,
+            COUNT(rs.package_route_step_id) AS step_count,
+            MAX(CASE WHEN rs.step_order = 1 THEN rs.eligible_role END) AS first_role,
+            MAX(CASE WHEN rs.step_order = 1 THEN rs.reviewer_user_id END) AS first_user_id,
+            MAX(CASE WHEN rs.step_order = 1 THEN rs.action_status END) AS first_status
+        FROM evaluation_packages ep
+        JOIN departments d ON d.department_id = ep.department_id AND d.department_name = 'Human Resources'
+        JOIN evaluation_package_members pm ON pm.package_id = ep.package_id
+        JOIN evaluations ev ON ev.evaluation_id = pm.evaluation_id
+        JOIN employees e ON e.employee_id = ev.employee_id
+        LEFT JOIN evaluation_package_route_steps rs ON rs.package_id = ep.package_id
+        WHERE ep.evaluation_type IN ('Initial', 'Final')
+          AND ep.status NOT IN ('Approved and Applied', 'Cancelled')
+          AND NOT EXISTS (SELECT 1 FROM evaluation_package_route_steps acted
+              WHERE acted.package_id = ep.package_id AND acted.action_status = 'Approved')
+        GROUP BY ep.package_id, ev.evaluation_id, e.rank_category_id");
+    if (!$rows) return 0;
+    $repaired = 0;
+    while ($row = $rows->fetch_assoc()) {
+        $rank = (int)$row['rank_category_id'];
+        $expected_role = $rank === 5 ? 'HR Supervisor' : ($rank === 4 ? 'HR Manager' : 'President and CEO');
+        if (!in_array($rank, [3, 4, 5], true)) continue;
+        $valid = (int)$row['step_count'] === 1
+            && ($row['first_role'] === $expected_role || ($rank === 3 && (int)$row['first_user_id'] > 0));
+        if ($valid) continue;
+        $package_id = (int)$row['package_id'];
+        $was_pending = $row['first_status'] === 'Pending';
+        $conn->begin_transaction();
+        try {
+            $delete = $conn->prepare('DELETE FROM evaluation_package_route_steps WHERE package_id = ?');
+            $delete->bind_param('i', $package_id);
+            $delete->execute();
+            $delete->close();
+            createOrganizationPackageRoute($conn, $package_id, 0, (int)$row['evaluation_id']);
+            if ($was_pending) {
+                $open = $conn->prepare("UPDATE evaluation_package_route_steps SET action_status = 'Pending' WHERE package_id = ? AND step_order = 1");
+                $open->bind_param('i', $package_id);
+                $open->execute();
+                $open->close();
+            }
+            $clear = $conn->prepare('UPDATE evaluation_packages SET consolidator_employee_id = NULL WHERE package_id = ?');
+            $clear->bind_param('i', $package_id);
+            $clear->execute();
+            $clear->close();
+            $conn->commit();
+            $repaired++;
+        } catch (Throwable $error) {
+            $conn->rollback();
+            error_log('Unable to repair HR probationary route ' . $package_id . ': ' . $error->getMessage());
+        }
+    }
+    $rows->close();
+    return $repaired;
 }
 
 /**
