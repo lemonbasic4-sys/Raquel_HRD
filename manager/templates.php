@@ -81,6 +81,7 @@ if (isset($_GET['archive']) && is_numeric($_GET['archive'])) {
         redirectWith($template_list_url, 'danger', 'You can only archive templates you own or templates managed by a supervisor or manager in your department.');
     }
     $conn->query("UPDATE evaluation_templates et SET status = 'Archived' WHERE et.template_id = $tid AND $manageable_template_scope_sql");
+    if ($conn->affected_rows > 0) notifyHrStaffOfTemplateChange($conn, $tid, 'Archived');
     logAudit($conn, $current_user_id, 'UPDATE', 'Template', $tid, 'Archived evaluation template');
     redirectWith($template_list_url, 'success', 'Template archived successfully.');
 }

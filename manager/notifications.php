@@ -1,14 +1,46 @@
 <?php
 $page_title = 'Notifications';
 require_once '../includes/session-check.php';
-checkRole(['HR Manager']);
+$notification_center_role = $notification_center_role ?? 'HR Manager';
+checkRole($notification_center_role === 'Employee' ? ['Employee', 'President and CEO'] : [$notification_center_role]);
 require_once '../includes/functions.php';
-if (!ensureManagerNotificationSchema($conn)) {
+$notification_center_portal = ['HR Manager' => 'manager', 'HR Supervisor' => 'supervisor', 'HR Staff' => 'staff', 'Employee' => 'employee'][$notification_center_role] ?? 'manager';
+$schema_ready = match ($notification_center_role) {
+    'HR Supervisor' => ensureSupervisorNotificationSchema($conn),
+    'HR Staff' => ensureStaffNotificationSchema($conn),
+    'Employee' => ensureEmployeeNotificationSchema($conn),
+    default => ensureManagerNotificationSchema($conn),
+};
+if (!$schema_ready) {
     http_response_code(500);
     exit('Notification categories are unavailable.');
 }
 $user_id = (int) $_SESSION['user_id'];
-$categories = [
+$categories = $notification_center_role === 'Employee' ? [
+    'all' => ['All Notifications', 'fas fa-inbox'],
+    'probation' => ['Probationary Evaluation', 'fas fa-user-clock'],
+    'approvals' => ['Reviews & Approvals', 'fas fa-clipboard-check'],
+    'evaluations' => ['Evaluations', 'fas fa-clipboard-list'],
+    'career' => ['Career Movements', 'fas fa-exchange-alt'],
+    'profile' => ['My Profile & Account', 'fas fa-id-card'],
+    'system' => ['System & Announcements', 'fas fa-bullhorn'],
+] : ($notification_center_role === 'HR Staff' ? [
+    'all' => ['All Notifications', 'fas fa-inbox'],
+    'records' => ['Employee Record Requests', 'fas fa-user-edit'],
+    'evaluations' => ['Evaluation Tracking', 'fas fa-clipboard-list'],
+    'probation' => ['Probation Tracking', 'fas fa-user-clock'],
+    'career' => ['Career Movements', 'fas fa-exchange-alt'],
+    'templates' => ['Templates', 'fas fa-file-alt'],
+    'system' => ['System & Announcements', 'fas fa-bullhorn'],
+] : ($notification_center_role === 'HR Supervisor' ? [
+    'all' => ['All Notifications', 'fas fa-inbox'],
+    'validations' => ['Pending Validations', 'fas fa-clipboard-check'],
+    'probation' => ['Probation & Regularization', 'fas fa-user-clock'],
+    'evaluations' => ['Evaluation Updates', 'fas fa-clipboard-list'],
+    'employees' => ['Employee Records', 'fas fa-users'],
+    'career' => ['Career Movements', 'fas fa-exchange-alt'],
+    'system' => ['System & Announcements', 'fas fa-bullhorn'],
+] : [
     'all' => ['All Notifications', 'fas fa-inbox'],
     'approvals' => ['Pending Approvals', 'fas fa-check-circle'],
     'evaluations' => ['Evaluations', 'fas fa-clipboard-list'],
@@ -17,7 +49,7 @@ $categories = [
     'career' => ['Career Movements', 'fas fa-exchange-alt'],
     'accounts' => ['Accounts & Access', 'fas fa-user-shield'],
     'system' => ['System & Announcements', 'fas fa-bullhorn'],
-];
+]));
 $category = (string) ($_GET['category'] ?? 'all');
 if (!isset($categories[$category])) $category = 'all';
 $filter = (string) ($_GET['filter'] ?? 'all');
@@ -28,7 +60,9 @@ $search = mb_substr(trim((string) ($_GET['search'] ?? '')), 0, 120);
 $page = max(1, (int) ($_GET['page'] ?? 1));
 $selected_id = max(0, (int) ($_GET['id'] ?? 0));
 $per_page = 20;
-$scope = "user_id = ? AND (link NOT LIKE '%/employee/%' OR link LIKE '%/employee/team-evaluation%' OR link LIKE '%/employee/package-member%' OR link IS NULL OR link = '')";
+$scope = $notification_center_role === 'Employee'
+    ? "user_id = ? AND (link LIKE '%/employee/%' OR link IS NULL OR link = '')"
+    : "user_id = ? AND (link NOT LIKE '%/employee/%' OR link LIKE '%/employee/team-evaluation%' OR link LIKE '%/employee/package-member%' OR link IS NULL OR link = '')";
 
 $summary = $conn->prepare("SELECT category, COUNT(*) AS total, SUM(is_read = 0) AS unread FROM notifications WHERE $scope GROUP BY category");
 $summary->bind_param('i', $user_id);
@@ -83,7 +117,7 @@ $selected_id = (int) ($selected['notification_id'] ?? 0);
 function managerNotifUrl(array $overrides = []): string {
     $params = ['category' => $_GET['category'] ?? 'all', 'filter' => $_GET['filter'] ?? 'all', 'date' => $_GET['date'] ?? 'all', 'search' => $_GET['search'] ?? '', 'page' => $_GET['page'] ?? 1];
     foreach ($overrides as $key => $value) $params[$key] = $value;
-    return BASE_URL . '/manager/notifications.php?' . http_build_query($params);
+    return BASE_URL . '/' . $GLOBALS['notification_center_portal'] . '/notifications.php?' . http_build_query($params);
 }
 function managerNotifLink($link): ?string {
     $link = trim((string) $link);
@@ -93,7 +127,7 @@ require_once '../includes/header.php';
 ?>
 <link rel="stylesheet" href="<?php echo BASE_URL; ?>/assets/css/manager-notifications.css">
 <div class="page-hero mn-hero">
-    <div><span class="mn-eyebrow">HR Manager · Inbox</span><h1><i class="fas fa-bell"></i> Notifications</h1><p>Stay updated with important activities, approvals, and system updates.</p></div>
+    <div><span class="mn-eyebrow"><?php echo e($notification_center_role); ?> · Inbox</span><h1><i class="fas fa-bell"></i> Notifications</h1><p>Stay updated with important activities, reviews, and system updates.</p></div>
     <div class="mn-hero-count"><strong><?php echo $total_unread; ?></strong><span>unread</span></div>
 </div>
 <div class="mn-layout">
@@ -105,16 +139,16 @@ require_once '../includes/header.php';
         </nav><p class="mn-count-note">Counts show unread notifications.</p>
     </aside>
     <section class="mn-list-panel" aria-label="Notification list">
-        <form class="mn-search-row" method="get" action="<?php echo BASE_URL; ?>/manager/notifications.php">
+        <form class="mn-search-row" method="get" action="<?php echo BASE_URL . '/' . $notification_center_portal; ?>/notifications.php">
             <input type="hidden" name="category" value="<?php echo e($category); ?>"><input type="hidden" name="filter" value="<?php echo e($filter); ?>">
             <label class="mn-search"><i class="fas fa-search"></i><input name="search" value="<?php echo e($search); ?>" placeholder="Search notifications" aria-label="Search notifications"></label>
             <select name="date" aria-label="Date range" onchange="this.form.submit()"><option value="all" <?php echo $date_filter === 'all' ? 'selected' : ''; ?>>All time</option><option value="today" <?php echo $date_filter === 'today' ? 'selected' : ''; ?>>Today</option><option value="7" <?php echo $date_filter === '7' ? 'selected' : ''; ?>>Last 7 days</option><option value="30" <?php echo $date_filter === '30' ? 'selected' : ''; ?>>Last 30 days</option></select>
             <button type="submit" class="mn-search-submit" aria-label="Search"><i class="fas fa-arrow-right"></i></button>
         </form>
         <div class="mn-toolbar"><nav class="mn-tabs" aria-label="Read status">
-            <?php foreach (['all' => 'All', 'unread' => 'Unread', 'read' => 'Read', 'action' => 'Needs My Action'] as $key => $label): ?><a class="<?php echo $filter === $key ? 'active' : ''; ?>" href="<?php echo e(managerNotifUrl(['filter' => $key, 'page' => 1, 'id' => null])); ?>"><?php echo $label; ?></a><?php endforeach; ?>
+            <?php foreach (['all' => 'All', 'unread' => 'Unread', 'read' => 'Read', 'action' => in_array($notification_center_role, ['HR Staff', 'Employee'], true) ? 'My Follow-Ups' : 'Needs My Action'] as $key => $label): ?><a class="<?php echo $filter === $key ? 'active' : ''; ?>" href="<?php echo e(managerNotifUrl(['filter' => $key, 'page' => 1, 'id' => null])); ?>"><?php echo $label; ?></a><?php endforeach; ?>
         </nav><?php if ($total_unread > 0): ?><button type="button" class="mn-mark-all" onclick="managerNotifAction('mark_all_read')"><i class="fas fa-check-double"></i> Mark all as read</button><?php endif; ?></div>
-        <?php if ($filter === 'action'): ?><p class="mn-action-note">Unread requests for your attention. <a href="<?php echo BASE_URL; ?>/manager/pending-approvals.php">Check the current approval queue</a> for open decisions.</p><?php endif; ?>
+        <?php if ($filter === 'action'): ?><p class="mn-action-note"><?php if ($notification_center_role === 'Employee'): ?>Unread self-rating reminders and returned evaluations needing your attention.<?php elseif ($notification_center_role === 'HR Staff'): ?>Unread returned work and approaching deadlines assigned to you. Open an item for its related page.<?php else: ?>Unread requests for your attention. <a href="<?php echo BASE_URL . '/' . $notification_center_portal . '/' . ($notification_center_role === 'HR Supervisor' ? 'pending-endorsements.php' : 'pending-approvals.php'); ?>">Check the current review queue</a> for open decisions.<?php endif; ?></p><?php endif; ?>
         <div class="mn-results-label"><?php echo $total_filtered; ?> notification<?php echo $total_filtered === 1 ? '' : 's'; ?></div>
         <?php if (!$manager_notif_items): ?><div class="mn-empty"><i class="far fa-bell-slash"></i><strong>No notifications found</strong><p>Try another category, date range, or search.</p></div>
         <?php else: ?><div class="mn-list">
@@ -138,7 +172,7 @@ async function managerNotifAction(action, id = 0) {
     if (action === 'delete' && !confirm('Delete this notification?')) return;
     if (action === 'mark_all_read' && !confirm('Mark all notifications as read?')) return;
     const data = new FormData();
-    data.append('action', action); data.append('notification_id', id); data.append('context', 'hr');
+    data.append('action', action); data.append('notification_id', id); data.append('context', <?php echo json_encode($notification_center_role === 'Employee' ? 'employee' : 'hr'); ?>);
     data.append('csrf_token', document.querySelector('meta[name="csrf-token"]').content);
     try {
         const response = await fetch('<?php echo BASE_URL; ?>/includes/ajax/notification-action.php', {method: 'POST', body: data});

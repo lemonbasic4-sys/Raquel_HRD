@@ -50,6 +50,7 @@ if (isset($_GET['activate']) && is_numeric($_GET['activate'])) {
         redirectWith($template_archive_url, 'danger', 'You can only restore templates you own or templates managed by a supervisor or manager in your department.');
     }
     $conn->query("UPDATE evaluation_templates et SET status = 'Active' WHERE et.template_id = $tid AND $template_scope_sql");
+    if ($conn->affected_rows > 0) notifyHrStaffOfTemplateChange($conn, $tid, 'Restored');
     logAudit($conn, $_SESSION['user_id'], 'UPDATE', 'Template', $tid, 'Restored archived template to Active');
     redirectWith($template_archive_url, 'success', 'Template restored to active successfully.');
 }

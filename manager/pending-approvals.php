@@ -34,13 +34,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ecr_action'], $_POST[
         $upd->execute(); $upd->close();
 
         // Apply the diff to the live employee record
-        applyEmployeeChangeRequest($conn, $ecr_id);
+        if (applyEmployeeChangeRequest($conn, $ecr_id)) {
+            notifyHrSupervisorOfEmployeeRecordChange($conn, (int) $ecr_row['employee_id'], (string) $ecr_row['emp_name']);
+        }
 
         // Notify HR Staff submitter
         createNotification($conn, (int)$ecr_row['submitted_by'],
             'Edit Request Approved',
             "Your change request for {$ecr_row['emp_name']} has been approved by the HR Manager." . ($mgr_notes ? ' Notes: ' . $mgr_notes : ''),
-            BASE_URL . '/staff/employees.php'
+            BASE_URL . '/staff/view-employee.php?id=' . (int) $ecr_row['employee_id']
         );
         logAudit($conn, $reviewer, 'APPROVE', 'EmployeeChangeRequest', $ecr_id, "Approved change request for {$ecr_row['emp_name']}");
         redirectWith(BASE_URL . '/manager/pending-approvals.php?tab=changes', 'success', "Changes for {$ecr_row['emp_name']} approved and applied.");
@@ -53,7 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ecr_action'], $_POST[
         createNotification($conn, (int)$ecr_row['submitted_by'],
             'Edit Request Rejected',
             "Your change request for {$ecr_row['emp_name']} was rejected." . ($mgr_notes ? ' Reason: ' . $mgr_notes : ''),
-            BASE_URL . '/staff/employees.php'
+            BASE_URL . '/staff/view-employee.php?id=' . (int) $ecr_row['employee_id']
         );
         logAudit($conn, $reviewer, 'REJECT', 'EmployeeChangeRequest', $ecr_id, "Rejected change request for {$ecr_row['emp_name']}");
         redirectWith(BASE_URL . '/manager/pending-approvals.php?tab=changes', 'warning', "Change request for {$ecr_row['emp_name']} rejected.");

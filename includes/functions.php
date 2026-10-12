@@ -269,8 +269,7 @@ function getEmployeeDisplayId($employee)
 
 function createNotification($conn, $user_id, $title, $message, $link = null, $category = null, $needs_action = null)
 {
-    // Other portals keep their existing notification behavior. Manager metadata is
-    // persisted when the optional columns have been installed.
+    // Store role-specific inbox metadata when the optional columns are installed.
     $has_manager_fields = managerNotificationSchemaAvailable($conn);
     if ($has_manager_fields) {
         $role_stmt = $conn->prepare('SELECT role FROM users WHERE user_id = ? LIMIT 1');
@@ -281,6 +280,15 @@ function createNotification($conn, $user_id, $title, $message, $link = null, $ca
         if (($recipient['role'] ?? '') === 'HR Manager') {
             $category = $category ?? managerNotificationCategory($title, $message, $link);
             $needs_action = $needs_action ?? (int) managerNotificationNeedsAction($title, $message, $link);
+        } elseif (($recipient['role'] ?? '') === 'HR Supervisor') {
+            $category = $category ?? supervisorNotificationCategory($title, $message, $link);
+            $needs_action = $needs_action ?? (int) supervisorNotificationNeedsAction($title, $message, $link);
+        } elseif (($recipient['role'] ?? '') === 'HR Staff') {
+            $category = $category ?? staffNotificationCategory($title, $message, $link);
+            $needs_action = $needs_action ?? (int) staffNotificationNeedsAction($title, $message, $link);
+        } elseif (in_array(($recipient['role'] ?? ''), ['Employee', 'President and CEO'], true)) {
+            $category = $category ?? employeeNotificationCategory($title, $message, $link);
+            $needs_action = $needs_action ?? (int) employeeNotificationNeedsAction($title, $message, $link);
         }
         $stmt = $conn->prepare('INSERT INTO notifications (user_id, title, message, link, category, needs_action) VALUES (?, ?, ?, ?, ?, ?)');
         $needs_action = (int) ($needs_action ?? 0);
@@ -299,7 +307,7 @@ function createNotification($conn, $user_id, $title, $message, $link = null, $ca
 function managerNotificationSchemaAvailable($conn): bool
 {
     static $available = null;
-    if ($available === null) {
+    if ($available !== true) {
         $result = $conn->query("SHOW COLUMNS FROM notifications WHERE Field IN ('category', 'needs_action')");
         $available = $result && $result->num_rows === 2;
     }
@@ -350,6 +358,325 @@ function managerNotificationNeedsAction($title, $message = '', $link = ''): bool
     return str_contains($text, 'review required') || str_contains($text, 'waiting for your review')
         || str_contains($text, 'pending your approval') || str_contains($text, 'please review')
         || str_contains($text, 'approval required') || str_contains((string) $link, '/manager/pending-approvals');
+}
+
+function supervisorNotificationCategory($title, $message = '', $link = ''): string
+{
+    $text = strtolower((string) $title . ' ' . (string) $message);
+    $url = strtolower((string) $link);
+    if (str_contains($text, 'probation') || str_contains($text, 'regulariz')) return 'probation';
+    if (str_contains($text, 'career movement') || str_contains($text, 'transfer') || str_contains($text, 'promotion') || str_contains($url, 'career-movements')) return 'career';
+    if (str_contains($text, 'pds') || str_contains($text, 'employee profile') || str_contains($text, 'employee record') || str_contains($url, 'edit-employee')) return 'employees';
+    if (str_contains($url, 'pending-endorsements') || str_contains($text, 'review required') || str_contains($text, 'pending validation') || str_contains($text, 'self-rating submitted') || str_contains($text, 'ready for review') || str_contains($text, 'consolidation started')) return 'validations';
+    if (str_contains($text, 'evaluation') || str_contains($text, 'rating') || str_contains($text, 'template') || str_contains($text, 'package') || str_contains($url, 'evaluation-')) return 'evaluations';
+    return 'system';
+}
+
+function supervisorNotificationNeedsAction($title, $message = '', $link = ''): bool
+{
+    $text = strtolower((string) $title . ' ' . (string) $message);
+    if (str_contains($text, 'no further hr approval is required') || str_contains($text, 'finalized')) return false;
+    return str_contains((string) $link, '/supervisor/pending-endorsements')
+        || str_contains($text, 'review required') || str_contains($text, 'ready for review')
+        || str_contains($text, 'requires your decision') || str_contains($text, 'pending your approval')
+        || str_contains($text, 'please review')
+        || str_contains($text, 'consolidation started') || str_contains($text, 're-opened');
+}
+
+function ensureSupervisorNotificationSchema($conn): bool
+{
+    if (!ensureManagerNotificationSchema($conn)) return false;
+    $legacy = $conn->query("SELECT n.notification_id, n.title, n.message, n.link FROM notifications n JOIN users u ON u.user_id = n.user_id WHERE u.role = 'HR Supervisor' AND n.category IS NULL");
+    if (!$legacy) return false;
+    $update = $conn->prepare('UPDATE notifications SET category = ?, needs_action = ? WHERE notification_id = ?');
+    while ($row = $legacy->fetch_assoc()) {
+        $category = supervisorNotificationCategory($row['title'], $row['message'], $row['link']);
+        $needs_action = (int) supervisorNotificationNeedsAction($row['title'], $row['message'], $row['link']);
+        $id = (int) $row['notification_id'];
+        $update->bind_param('sii', $category, $needs_action, $id);
+        $update->execute();
+    }
+    $update->close();
+    return true;
+}
+
+function staffNotificationCategory($title, $message = '', $link = ''): string
+{
+    $text = strtolower((string) $title . ' ' . (string) $message);
+    $url = strtolower((string) $link);
+    if (str_contains($text, 'career movement') || str_contains($text, 'transfer') || str_contains($text, 'promotion') || str_contains($url, 'career-movements')) return 'career';
+    if (str_contains($text, 'probation') || str_contains($text, 'regulariz')) return 'probation';
+    if (str_contains($text, 'template') || str_contains($url, 'template')) return 'templates';
+    if (str_contains($text, 'edit request') || str_contains($text, 'employee record') || str_contains($text, 'employee profile') || str_contains($text, 'pds') || str_contains($url, 'edit-employee')) return 'records';
+    if (str_contains($text, 'evaluation') || str_contains($text, 'rating') || str_contains($text, 'package') || str_contains($url, 'evaluation-') || str_contains($url, 'package-tracker')) return 'evaluations';
+    return 'system';
+}
+
+function staffNotificationNeedsAction($title, $message = '', $link = ''): bool
+{
+    $text = strtolower((string) $title . ' ' . (string) $message);
+    return str_contains($text, 'rejected') || str_contains($text, 'returned')
+        || str_contains($text, 'revision requested') || str_contains($text, 'needs revision')
+        || str_contains($text, 'due soon') || str_contains($text, 'due today')
+        || str_contains($text, 'overdue') || str_contains($text, 'requires your action');
+}
+
+function ensureStaffNotificationSchema($conn): bool
+{
+    if (!ensureManagerNotificationSchema($conn)) return false;
+    $legacy = $conn->query("SELECT n.notification_id, n.title, n.message, n.link FROM notifications n JOIN users u ON u.user_id = n.user_id WHERE u.role = 'HR Staff' AND n.category IS NULL");
+    if (!$legacy) return false;
+    $update = $conn->prepare('UPDATE notifications SET category = ?, needs_action = ? WHERE notification_id = ?');
+    while ($row = $legacy->fetch_assoc()) {
+        $category = staffNotificationCategory($row['title'], $row['message'], $row['link']);
+        $needs_action = (int) staffNotificationNeedsAction($row['title'], $row['message'], $row['link']);
+        $id = (int) $row['notification_id'];
+        $update->bind_param('sii', $category, $needs_action, $id);
+        $update->execute();
+    }
+    $update->close();
+    return true;
+}
+
+function employeeNotificationCategory($title, $message = '', $link = ''): string
+{
+    $text = strtolower((string) $title . ' ' . (string) $message);
+    $url = strtolower((string) $link);
+    if (str_contains($text, 'probation') || str_contains($text, 'regulariz')) return 'probation';
+    if (str_contains($text, 'career movement') || str_contains($text, 'transfer') || str_contains($text, 'promotion') || str_contains($url, 'my-employment')) return 'career';
+    if (str_contains($url, 'branch-manager-approvals') || str_contains($url, 'team-evaluation-packages')
+        || str_contains($text, 'awaiting your review') || str_contains($text, 'pending your approval')
+        || str_contains($text, 'approval assignment')) return 'approvals';
+    if (str_contains($text, 'evaluation') || str_contains($text, 'self-rating') || str_contains($text, 'package') || str_contains($url, 'self-rating')) return 'evaluations';
+    if (str_contains($text, 'profile') || str_contains($text, 'account') || str_contains($text, 'credential') || str_contains($url, 'profile')) return 'profile';
+    return 'system';
+}
+
+function employeeNotificationNeedsAction($title, $message = '', $link = ''): bool
+{
+    $text = strtolower((string) $title . ' ' . (string) $message);
+    return str_contains($text, 'returned for revision') || str_contains($text, 'revision requested')
+        || str_contains($text, 'due soon') || str_contains($text, 'due today')
+        || str_contains($text, 'overdue') || str_contains($text, 'self-rating required')
+        || str_contains($text, 'pending your approval') || str_contains($text, 'awaiting your review')
+        || str_contains($text, 'for your review') || str_contains($text, 'review required');
+}
+
+function ensureEmployeeNotificationSchema($conn): bool
+{
+    if (!ensureManagerNotificationSchema($conn)) return false;
+    $legacy = $conn->query("SELECT n.notification_id, n.title, n.message, n.link, n.category, n.needs_action FROM notifications n JOIN users u ON u.user_id = n.user_id WHERE u.role IN ('Employee', 'President and CEO')");
+    if (!$legacy) return false;
+    $update = $conn->prepare('UPDATE notifications SET category = ?, needs_action = ? WHERE notification_id = ?');
+    while ($row = $legacy->fetch_assoc()) {
+        $category = employeeNotificationCategory($row['title'], $row['message'], $row['link']);
+        $needs_action = (int) employeeNotificationNeedsAction($row['title'], $row['message'], $row['link']);
+        if ($row['category'] === $category && (int) $row['needs_action'] === $needs_action) continue;
+        $id = (int) $row['notification_id'];
+        $update->bind_param('sii', $category, $needs_action, $id);
+        $update->execute();
+    }
+    $update->close();
+    return true;
+}
+
+/** Notify active HR Staff of a template lifecycle event visible in their library. */
+function notifyHrStaffOfTemplateChange($conn, $template_id, $event): void
+{
+    $template_id = (int) $template_id;
+    if ($template_id <= 0) return;
+    $stmt = $conn->prepare('SELECT template_name, target_department FROM evaluation_templates WHERE template_id = ? LIMIT 1');
+    $stmt->bind_param('i', $template_id);
+    $stmt->execute();
+    $template = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    if (!$template) return;
+    $event = in_array($event, ['Published', 'Updated', 'Archived', 'Restored'], true) ? $event : 'Updated';
+    $name = (string) $template['template_name'];
+    $department = (string) ($template['target_department'] ?: 'All Departments');
+    $link = BASE_URL . ($event === 'Archived' ? '/staff/templates.php' : '/staff/view-template.php?id=' . $template_id);
+    $recipients = $conn->query("SELECT user_id FROM users WHERE role = 'HR Staff' AND is_active = 1 AND deleted_at IS NULL");
+    if (!$recipients) return;
+    while ($recipient = $recipients->fetch_assoc()) {
+        createNotification($conn, (int) $recipient['user_id'], 'Evaluation Template ' . $event,
+            "{$name} ({$department}) was {$event}. Check the template library for the current version.",
+            $link, 'templates', 0);
+    }
+}
+
+function notifyHrStaffOfPackageProgress($conn, $package_id, $department, $stage, $returned = false): void
+{
+    $package_id = (int) $package_id;
+    if ($package_id <= 0) return;
+    $title = $returned ? 'Evaluation Package Returned' : 'Evaluation Package Advanced';
+    $message = "The {$department} evaluation package #{$package_id} was "
+        . ($returned ? 'returned for revision.' : "forwarded to {$stage}.");
+    $link = BASE_URL . '/staff/package-tracker.php';
+    $recipients = $conn->query("SELECT user_id FROM users WHERE role = 'HR Staff' AND is_active = 1 AND deleted_at IS NULL");
+    if (!$recipients) return;
+    while ($recipient = $recipients->fetch_assoc()) {
+        createNotification($conn, (int) $recipient['user_id'], $title, $message, $link, 'evaluations', 0);
+    }
+}
+
+/** One alert per milestone and staff account, generated when the staff portal is visited. */
+function sendStaffProbationReminders($conn, $staff_user_id): void
+{
+    static $checked = [];
+    $staff_user_id = (int) $staff_user_id;
+    if ($staff_user_id <= 0 || isset($checked[$staff_user_id])) return;
+    $checked[$staff_user_id] = true;
+    if (!ensureProbationaryEvaluationSchema($conn) || !ensureStaffNotificationSchema($conn)) return;
+    $employees = $conn->query("SELECT employee_id, first_name, last_name,
+        CASE WHEN probationary_next_evaluation_type = 'Final' THEN 'Final' ELSE 'Initial' END AS evaluation_type,
+        CASE WHEN probationary_next_evaluation_type = 'Final' THEN COALESCE(probationary_next_evaluation_due_date, DATE_ADD(hire_date, INTERVAL 5 MONTH))
+             ELSE DATE_ADD(hire_date, INTERVAL 3 MONTH) END AS due_date
+        FROM employees WHERE is_active = 1 AND deleted_at IS NULL AND employment_status = 'Probationary' AND hire_date IS NOT NULL");
+    if (!$employees) return;
+    $completed = $conn->prepare("SELECT 1 FROM evaluations WHERE employee_id = ? AND evaluation_type = ?
+        AND status NOT IN ('Draft', 'Pending Self-Rating') AND deleted_at IS NULL LIMIT 1");
+    $already_sent = $conn->prepare('SELECT 1 FROM notifications WHERE user_id = ? AND title = ? AND link = ? AND message = ? LIMIT 1');
+    $today = new DateTimeImmutable('today');
+    while ($employee = $employees->fetch_assoc()) {
+        $due = DateTimeImmutable::createFromFormat('!Y-m-d', (string) $employee['due_date']);
+        if (!$due) continue;
+        $days = (int) $today->diff($due)->format('%r%a');
+        if ($days > 7) continue;
+        $employee_id = (int) $employee['employee_id'];
+        $evaluation_type = (string) $employee['evaluation_type'];
+        $completed->bind_param('is', $employee_id, $evaluation_type);
+        $completed->execute();
+        if ($completed->get_result()->fetch_assoc()) continue;
+        $stage = $days < 0 ? 'Overdue' : ($days === 0 ? 'Due Today' : 'Due Soon');
+        $title = "Probationary {$evaluation_type} Evaluation {$stage}";
+        $link = BASE_URL . '/staff/view-employee.php?id=' . $employee_id;
+        $name = trim($employee['first_name'] . ' ' . $employee['last_name']);
+        $message = "{$name}'s {$evaluation_type} probationary evaluation is due on " . $due->format('M j, Y') . '. Check the employee record and evaluation tracker.';
+        $already_sent->bind_param('isss', $staff_user_id, $title, $link, $message);
+        $already_sent->execute();
+        if (!$already_sent->get_result()->fetch_assoc()) {
+            createNotification($conn, $staff_user_id, $title, $message, $link, 'probation', 1);
+        }
+    }
+    $completed->close();
+    $already_sent->close();
+}
+
+/** Remind a probationary employee about their own upcoming Initial/Final evaluation. */
+function sendEmployeeProbationReminder($conn, $user_id): void
+{
+    static $checked = [];
+    $user_id = (int) $user_id;
+    if ($user_id <= 0 || isset($checked[$user_id])) return;
+    $checked[$user_id] = true;
+    if (!ensureProbationaryEvaluationSchema($conn)) return;
+    $stmt = $conn->prepare("SELECT e.employee_id,
+        CASE WHEN e.probationary_next_evaluation_type = 'Final' THEN 'Final' ELSE 'Initial' END AS evaluation_type,
+        CASE WHEN e.probationary_next_evaluation_type = 'Final' THEN COALESCE(e.probationary_next_evaluation_due_date, DATE_ADD(e.hire_date, INTERVAL 5 MONTH))
+             ELSE DATE_ADD(e.hire_date, INTERVAL 3 MONTH) END AS due_date
+        FROM users u JOIN employees e ON e.employee_id = u.employee_id
+        WHERE u.user_id = ? AND u.is_active = 1 AND e.is_active = 1 AND e.deleted_at IS NULL
+          AND e.employment_status = 'Probationary' AND e.hire_date IS NOT NULL LIMIT 1");
+    $stmt->bind_param('i', $user_id);
+    $stmt->execute();
+    $employee = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    if (!$employee) return;
+    $due = DateTimeImmutable::createFromFormat('!Y-m-d', (string) $employee['due_date']);
+    if (!$due) return;
+    $days = (int) (new DateTimeImmutable('today'))->diff($due)->format('%r%a');
+    if ($days > 7) return;
+    $employee_id = (int) $employee['employee_id'];
+    $evaluation_type = (string) $employee['evaluation_type'];
+    $submitted = $conn->prepare("SELECT 1 FROM evaluations WHERE employee_id = ? AND evaluation_type = ?
+        AND status NOT IN ('Draft', 'Pending Self-Rating') AND deleted_at IS NULL LIMIT 1");
+    $submitted->bind_param('is', $employee_id, $evaluation_type);
+    $submitted->execute();
+    $is_submitted = (bool) $submitted->get_result()->fetch_assoc();
+    $submitted->close();
+    if ($is_submitted) return;
+    $stage = $days < 0 ? 'Overdue' : ($days === 0 ? 'Due Today' : 'Due Soon');
+    $title = "Your Probationary {$evaluation_type} Evaluation Is {$stage}";
+    $message = "Your {$evaluation_type} probationary evaluation is due on " . $due->format('M j, Y')
+        . '. Check your self-rating page. If no form is available, contact HR.';
+    $link = BASE_URL . '/employee/self-rating.php';
+    $existing = $conn->prepare('SELECT 1 FROM notifications WHERE user_id = ? AND title = ? AND link = ? LIMIT 1');
+    $existing->bind_param('iss', $user_id, $title, $link);
+    $existing->execute();
+    $sent = (bool) $existing->get_result()->fetch_assoc();
+    $existing->close();
+    if (!$sent) createNotification($conn, $user_id, $title, $message, $link);
+}
+
+/** Create one reminder per probation milestone for the actual HR immediate head. */
+function sendSupervisorProbationReminders($conn, $supervisor_user_id): void
+{
+    static $checked = [];
+    $supervisor_user_id = (int) $supervisor_user_id;
+    if ($supervisor_user_id <= 0 || isset($checked[$supervisor_user_id])) return;
+    $checked[$supervisor_user_id] = true;
+    if (!ensureProbationaryEvaluationSchema($conn) || !ensureSupervisorNotificationSchema($conn)) return;
+
+    $recipient_stmt = $conn->prepare("SELECT employee_id FROM users WHERE user_id = ? AND role = 'HR Supervisor' AND is_active = 1 LIMIT 1");
+    $recipient_stmt->bind_param('i', $supervisor_user_id);
+    $recipient_stmt->execute();
+    $recipient = $recipient_stmt->get_result()->fetch_assoc();
+    $recipient_stmt->close();
+    $supervisor_employee_id = (int) ($recipient['employee_id'] ?? 0);
+    if (!$supervisor_employee_id) return;
+
+    $employees = $conn->query("SELECT e.employee_id, e.first_name, e.last_name,
+        CASE WHEN e.probationary_next_evaluation_type = 'Final' THEN 'Final' ELSE 'Initial' END AS evaluation_type,
+        CASE WHEN e.probationary_next_evaluation_type = 'Final' THEN COALESCE(e.probationary_next_evaluation_due_date, DATE_ADD(e.hire_date, INTERVAL 5 MONTH))
+             ELSE DATE_ADD(e.hire_date, INTERVAL 3 MONTH) END AS due_date
+        FROM employees e JOIN departments d ON d.department_id = e.department_id
+        WHERE e.is_active = 1 AND e.deleted_at IS NULL AND e.employment_status = 'Probationary'
+          AND d.department_name = 'Human Resources' AND e.hire_date IS NOT NULL");
+    if (!$employees) return;
+    $completed = $conn->prepare("SELECT 1 FROM evaluations WHERE employee_id = ? AND evaluation_type = ?
+        AND status NOT IN ('Draft', 'Pending Self-Rating') AND deleted_at IS NULL LIMIT 1");
+    $already_sent = $conn->prepare('SELECT 1 FROM notifications WHERE user_id = ? AND title = ? AND link = ? AND message = ? LIMIT 1');
+    $today = new DateTimeImmutable('today');
+    while ($employee = $employees->fetch_assoc()) {
+        $route = getHRDirectReportByPosition($conn, (int) $employee['employee_id']);
+        if ((int) ($route['supervisor']['supervisor_employee_id'] ?? 0) !== $supervisor_employee_id) continue;
+        $due = DateTimeImmutable::createFromFormat('!Y-m-d', (string) $employee['due_date']);
+        if (!$due) continue;
+        $days = (int) $today->diff($due)->format('%r%a');
+        if ($days > 7) continue;
+        $employee_id = (int) $employee['employee_id'];
+        $evaluation_type = (string) $employee['evaluation_type'];
+        $completed->bind_param('is', $employee_id, $evaluation_type);
+        $completed->execute();
+        if ($completed->get_result()->fetch_assoc()) continue;
+        $stage = $days < 0 ? 'Overdue' : ($days === 0 ? 'Due Today' : 'Due Soon');
+        $title = "Probationary {$evaluation_type} Evaluation {$stage}";
+        $link = BASE_URL . '/supervisor/view-employee.php?id=' . $employee_id;
+        $name = trim($employee['first_name'] . ' ' . $employee['last_name']);
+        $message = "{$name}'s {$evaluation_type} probationary evaluation is due on " . $due->format('M j, Y') . '. Please check the employee profile and evaluation workflow.';
+        $already_sent->bind_param('isss', $supervisor_user_id, $title, $link, $message);
+        $already_sent->execute();
+        if ($already_sent->get_result()->fetch_assoc()) continue;
+        createNotification($conn, $supervisor_user_id, $title, $message, $link, 'probation', 1);
+    }
+    $completed->close();
+    $already_sent->close();
+}
+
+function notifyHrSupervisorOfEmployeeRecordChange($conn, $employee_id, $employee_name): void
+{
+    $route = getHRDirectReportByPosition($conn, (int) $employee_id);
+    $supervisor_employee_id = (int) ($route['supervisor']['supervisor_employee_id'] ?? 0);
+    if ($supervisor_employee_id <= 0) return;
+    $role = $conn->prepare("SELECT user_id FROM users WHERE employee_id = ? AND role = 'HR Supervisor' AND is_active = 1 AND deleted_at IS NULL LIMIT 1");
+    $role->bind_param('i', $supervisor_employee_id);
+    $role->execute();
+    $supervisor_id = (int) ($role->get_result()->fetch_assoc()['user_id'] ?? 0);
+    $role->close();
+    if ($supervisor_id <= 0) return;
+    createNotification($conn, $supervisor_id, 'Employee Record Updated',
+        "The HR Manager approved changes to {$employee_name}'s employee record. Review the updated profile if needed.",
+        BASE_URL . '/supervisor/view-employee.php?id=' . (int) $employee_id, 'employees', 0);
 }
 
 /**

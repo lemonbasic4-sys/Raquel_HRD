@@ -358,6 +358,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $audit->close();
 
         $prev_name = getOrganizationPackageReviewerDisplayName($conn, (int)($previous['reviewer_user_id'] ?? 0), (int)($previous['reviewer_employee_id'] ?? 0));
+        notifyHrStaffOfPackageProgress($conn, $package_id, (string) $step['department_name'], (string) $previous['step_label'], true);
         if (!empty($previous['reviewer_employee_id'])) {
             notifyUsersForEmployee($conn, (int)$previous['reviewer_employee_id'], 'Team evaluation returned for revision', 'A package was returned to you by ' . $step['step_label'] . '. Reason: ' . $comments, BASE_URL . '/employee/team-evaluation-packages.php');
         } elseif (!empty($previous['reviewer_user_id'])) {
@@ -459,6 +460,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($was_merged) {
             redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'success', 'Evaluation approved. This member\'s evaluation has been merged into the main ' . $step['department_name'] . ' team package (Package #' . $merged_into . ') for review at the same approval stage.');
         }
+        notifyHrStaffOfPackageProgress($conn, $package_id, (string) $step['department_name'], (string) $next['step_label']);
         redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'success', 'Evaluation package successfully adjusted and forwarded to ' . $next_name . ' (' . $next['step_label'] . ').');
     } else {
         // Final governance step (Board of Directors) locks and applies.

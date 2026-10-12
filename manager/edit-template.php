@@ -150,6 +150,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $beh_stmt->close();
 
     logAudit($conn, $_SESSION['user_id'], 'UPDATE', 'Template', $template_id, "Updated template: $template_name");
+    notifyHrStaffOfTemplateChange($conn, $template_id, 'Updated');
     redirectWith($template_list_url, 'success', "Template '$template_name' updated successfully.");
 }
 

@@ -154,6 +154,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $beh_stmt->close();
 
     logAudit($conn, $_SESSION['user_id'], 'CREATE', 'Template', $template_id, "Created evaluation template: $template_name");
+    notifyHrStaffOfTemplateChange($conn, $template_id, 'Published');
     redirectWith($template_list_url, 'success', "Template '$template_name' created successfully.");
 }
 

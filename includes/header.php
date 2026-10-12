@@ -31,6 +31,15 @@ if ($current_dir === 'employee' && $effective_role === 'President and CEO') {
 
 // Notifications are strictly account-based but now isolated by portal context.
 $notif_context = ($current_dir === 'employee') ? 'employee' : 'hr';
+if ($effective_role === 'HR Supervisor' && $current_dir === 'supervisor') {
+    sendSupervisorProbationReminders($conn, (int) $_SESSION['user_id']);
+}
+if ($effective_role === 'HR Staff' && $current_dir === 'staff') {
+    sendStaffProbationReminders($conn, (int) $_SESSION['user_id']);
+}
+if ($effective_role === 'Employee' && $current_dir === 'employee') {
+    sendEmployeeProbationReminder($conn, (int) $_SESSION['user_id']);
+}
 $notif_count = getUnreadNotificationCount($conn, (int) $_SESSION['user_id'], $notif_context);
 $notifications = getRecentNotifications($conn, (int) $_SESSION['user_id'], 5, $notif_context);
 
@@ -497,6 +506,9 @@ switch ($effective_role) {
         window.BASE_URL = window.APP_BASE_URL;
         window.NOTIF_CONTEXT = <?php echo json_encode($notif_context === 'employee' ? 'employee' : 'hr'); ?>;
         window.IS_HR_MANAGER = <?php echo $effective_role === 'HR Manager' ? 'true' : 'false'; ?>;
+        window.IS_HR_SUPERVISOR = <?php echo $effective_role === 'HR Supervisor' ? 'true' : 'false'; ?>;
+        window.IS_HR_STAFF = <?php echo $effective_role === 'HR Staff' ? 'true' : 'false'; ?>;
+        window.IS_EMPLOYEE_CENTER = <?php echo $effective_role === 'Employee' && $current_dir === 'employee' ? 'true' : 'false'; ?>;
     </script>
 </head>
 
@@ -727,7 +739,7 @@ switch ($effective_role) {
                             <?php foreach ($notifications as $notif): 
                                 $icon_info = getNotifIconInfo($notif['title']);
                             ?>
-                                <a href="<?php echo $effective_role === 'HR Manager' ? e(BASE_URL . '/manager/notifications.php?id=' . (int) $notif['notification_id']) : e($notif['link'] ?? '#'); ?>"
+                                <a href="<?php echo in_array($effective_role, ['HR Manager', 'HR Supervisor', 'HR Staff', 'Employee'], true) ? e(BASE_URL . '/' . (['HR Manager' => 'manager', 'HR Supervisor' => 'supervisor', 'HR Staff' => 'staff', 'Employee' => 'employee'][$effective_role]) . '/notifications.php?id=' . (int) $notif['notification_id']) : e($notif['link'] ?? '#'); ?>"
                                     class="notification-item <?php echo $notif['is_read'] ? '' : 'unread'; ?>">
                                     <div class="notif-avatar <?php echo $icon_info['class']; ?>">
                                         <i class="<?php echo $icon_info['icon']; ?>"></i>
