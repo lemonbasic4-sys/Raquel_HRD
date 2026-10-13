@@ -27,7 +27,7 @@ $template_scope_sql = '1 = 1';
 $current_user_id = (int)($_SESSION['user_id'] ?? 0);
 $owned_template_scope_sql = 'et.created_by = ' . $current_user_id;
 $viewer_role = (string)($creator_context['role'] ?? '');
-if (in_array($viewer_role, ['HR Manager', 'HR Supervisor'], true)) {
+if (!empty($creator_context['is_ceo']) || in_array($viewer_role, ['HR Manager', 'HR Supervisor'], true)) {
     $template_scope_sql = $owned_template_scope_sql;
 }
 $cross_department_viewer = !empty($creator_context['is_ceo'])

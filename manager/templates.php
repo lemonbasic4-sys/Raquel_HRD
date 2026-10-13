@@ -40,7 +40,7 @@ $template_archive_url = !empty($creator_context['is_ceo'])
 $template_scope_sql = '1 = 1';
 $owned_template_scope_sql = 'et.created_by = ' . $current_user_id;
 $template_viewer_role = (string)($creator_context['role'] ?? '');
-if (in_array($template_viewer_role, ['HR Manager', 'HR Supervisor'], true)) {
+if (!empty($creator_context['is_ceo']) || in_array($template_viewer_role, ['HR Manager', 'HR Supervisor'], true)) {
     $template_scope_sql = $owned_template_scope_sql;
 }
 $is_cross_department_template_viewer = !empty($creator_context['is_ceo'])

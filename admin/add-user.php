@@ -25,7 +25,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $is_standalone_admin = ($role === 'Admin');
 
     if ($employee_id !== null) {
-        $employee_lookup = $conn->prepare("SELECT employee_code FROM employees WHERE employee_id = ? LIMIT 1");
+        $employee_lookup = $conn->prepare("SELECT e.employee_code, e.employment_status, e.is_active, e.deleted_at, d.department_name
+            FROM employees e LEFT JOIN departments d ON d.department_id = e.department_id
+            WHERE e.employee_id = ? LIMIT 1");
         $employee_lookup->bind_param("i", $employee_id);
         $employee_lookup->execute();
         $employee_row = $employee_lookup->get_result()->fetch_assoc();
@@ -40,6 +42,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Validate
     $errors = [];
+    if (in_array($role, ['HR Manager', 'HR Supervisor', 'HR Staff'], true)
+        && (empty($employee_row) || ($employee_row['employment_status'] ?? '') !== 'Regular'
+            || (int)($employee_row['is_active'] ?? 0) !== 1 || !empty($employee_row['deleted_at'])
+            || strcasecmp($employee_row['department_name'] ?? '', 'Human Resources') !== 0)) {
+        $errors[] = 'HRIS accounts can only be created for active, regular Human Resources employees. Probationary employees must first be regularized.';
+    }
     if (empty($username)) $errors[] = 'Username is required.';
     if (!$email) $errors[] = $is_standalone_admin ? 'Valid email is required.' : 'Valid email is required (Check employee contact info).';
     if (empty($full_name)) $errors[] = 'Full name is required.';

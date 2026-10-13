@@ -79,7 +79,7 @@ $users = $conn->query("
 // Fetch branches for the add form
 $branches = $conn->query("SELECT * FROM branches ORDER BY branch_name");
 
-// Fetch active HR employees who don't have an HR/admin account yet
+// Only regular, active HR employees are eligible for a new HRIS account.
 $eligible_employees = $conn->query("
     SELECT e.employee_id, e.employee_code, e.first_name, e.last_name, e.job_title, rc.rank_name, ec.personal_email
     FROM employees e
@@ -89,6 +89,8 @@ $eligible_employees = $conn->query("
     LEFT JOIN users u ON e.employee_id = u.employee_id AND u.role != 'Employee'
     WHERE u.user_id IS NULL
       AND e.is_active = 1
+      AND e.deleted_at IS NULL
+      AND e.employment_status = 'Regular'
       AND d.department_name = 'Human Resources'
     ORDER BY e.last_name, e.first_name
 ");
@@ -501,6 +503,7 @@ document.addEventListener('DOMContentLoaded', () => new bootstrap.Modal(document
                                 </option>
                             <?php endwhile; ?>
                         </select>
+                        <div class="form-text">Only active, regular Human Resources employees without an HRIS account are eligible.</div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Username <span class="text-danger">*</span></label>

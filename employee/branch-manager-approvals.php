@@ -12,6 +12,21 @@ require_once '../includes/session-check.php';
 checkRole(['Employee']);
 require_once '../includes/functions.php';
 
+// HR personnel handle approvals through their separately authorized HRIS account.
+$department_stmt = $conn->prepare("SELECT d.department_name FROM employees e
+    LEFT JOIN departments d ON d.department_id = e.department_id
+    WHERE e.employee_id = ? LIMIT 1");
+$portal_employee_id = (int)($_SESSION['employee_id'] ?? 0);
+$department_stmt->bind_param('i', $portal_employee_id);
+$department_stmt->execute();
+$portal_department = $department_stmt->get_result()->fetch_assoc()['department_name'] ?? '';
+$department_stmt->close();
+if (strcasecmp($portal_department, 'Human Resources') === 0
+    || in_array($_SESSION['role'] ?? '', ['HR Manager', 'HR Supervisor', 'HR Staff'], true)) {
+    redirectWith(BASE_URL . '/employee/dashboard.php', 'info',
+        'Human Resources personnel handle career movement approvals in the HRIS portal. Sign in with your separately authorized HRIS account to review requests.');
+}
+
 // Older installations may not yet have the Employee Portal workflow columns.
 // Upgrade the career-movement schema before any query references those fields.
 if (!ensureCareerProgressionMovements($conn)) {

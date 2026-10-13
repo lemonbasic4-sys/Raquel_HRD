@@ -147,8 +147,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             // ── Look up Branch Manager for the submitting branch ──────────
             $bm_stmt = $conn->prepare(
-                "SELECT employee_id FROM employees
-                 WHERE branch_id = ? AND rank_category_id = 3 AND is_active = 1
+                "SELECT e.employee_id FROM employees e
+                 JOIN departments d ON d.department_id = e.department_id
+                 WHERE e.branch_id = ? AND e.rank_category_id = 3 AND e.is_active = 1
+                   AND e.deleted_at IS NULL AND d.department_name <> 'Human Resources'
                  LIMIT 1"
             );
             $bm_stmt->bind_param("i", $supervisor_branch_id);

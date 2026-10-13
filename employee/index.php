@@ -8,7 +8,7 @@ ensureUserAccountSecuritySchema($conn);
 
 // If already logged in as an Employee account, skip to dashboard
 if (isset($_SESSION['user_id']) && in_array(($_SESSION['role'] ?? ''), ['Employee', 'President and CEO'], true) && (int) ($_SESSION['employee_id'] ?? 0) > 0) {
-    header("Location: " . (($_SESSION['role'] ?? '') === 'President and CEO' ? 'evaluation-templates.php' : 'dashboard.php'));
+    header('Location: dashboard.php');
     exit();
 }
 
@@ -81,7 +81,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 logLoginAudit($conn, $username, 'Employee Portal', 'Successful', '', (int)$user['user_id']);
 
-                header("Location: " . (($user['role'] ?? '') === 'President and CEO' ? 'evaluation-templates.php' : 'dashboard.php'));
+                header('Location: dashboard.php');
                 exit();
             } else {
                 $error = 'Invalid credentials.';

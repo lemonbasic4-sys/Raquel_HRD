@@ -66,6 +66,12 @@ if (isset($_SESSION['user_id'])) {
 function checkRole($allowed_roles)
 {
     $current_role = $_SESSION['role'] ?? '';
+    // The President/CEO also uses the employee self-service portal.
+    if ($current_role === 'President and CEO'
+        && in_array('Employee', $allowed_roles, true)
+        && strpos($_SERVER['SCRIPT_NAME'] ?? '', BASE_URL . '/employee/') === 0) {
+        return;
+    }
 
     if (!in_array($current_role, $allowed_roles, true)) {
         $path = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?: 'unknown page';

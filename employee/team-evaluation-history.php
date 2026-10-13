@@ -46,6 +46,65 @@ $packages_stmt->execute();
 $packages = $packages_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $packages_stmt->close();
 
+$filter_value = static function (string $key): string {
+    return isset($_GET[$key]) && is_string($_GET[$key]) ? trim($_GET[$key]) : '';
+};
+$filters = [];
+foreach (['search', 'department', 'type', 'status', 'from', 'to'] as $key) {
+    $filters[$key] = $filter_value($key);
+}
+$filter_errors = [];
+foreach (['from', 'to'] as $key) {
+    if ($filters[$key] !== '') {
+        $date = DateTimeImmutable::createFromFormat('!Y-m-d', $filters[$key]);
+        if (!$date || $date->format('Y-m-d') !== $filters[$key]) {
+            $filter_errors[] = 'Enter a valid cycle date.';
+            $filters[$key] = '';
+        }
+    }
+}
+if ($filters['from'] !== '' && $filters['to'] !== '' && $filters['from'] > $filters['to']) {
+    $filter_errors[] = 'The cycle end date must be on or after the start date.';
+}
+$filter_options = ['department' => [], 'type' => [], 'status' => []];
+foreach ($packages as $package) {
+    $filter_options['department'][(string)$package['department_id']] = $package['department_name'];
+    $filter_options['type'][$package['evaluation_type']] = $package['evaluation_type'];
+    $filter_options['status'][$package['status']] = $package['status'];
+}
+foreach ($filter_options as &$options) {
+    asort($options, SORT_NATURAL | SORT_FLAG_CASE);
+}
+unset($options);
+$total_packages = count($packages);
+// Search members without changing the reviewer access restrictions above.
+$member_matches = [];
+if ($filters['search'] !== '') {
+    $search_stmt = $conn->prepare("SELECT DISTINCT pm.package_id
+        FROM evaluation_package_members pm
+        JOIN evaluations ev ON ev.evaluation_id = pm.evaluation_id
+        JOIN employees emp ON emp.employee_id = ev.employee_id
+        WHERE LOCATE(?, CONCAT_WS(' ', emp.first_name, emp.last_name, emp.job_title)) > 0");
+    $search_stmt->bind_param('s', $filters['search']);
+    $search_stmt->execute();
+    $member_matches = array_fill_keys(array_column($search_stmt->get_result()->fetch_all(MYSQLI_ASSOC), 'package_id'), true);
+    $search_stmt->close();
+}
+$packages = array_values(array_filter($packages, static function (array $package) use ($filters, $filter_errors, $member_matches): bool {
+    if ($filter_errors) return false;
+    if ($filters['department'] !== '' && (string)$package['department_id'] !== $filters['department']) return false;
+    if ($filters['type'] !== '' && $package['evaluation_type'] !== $filters['type']) return false;
+    if ($filters['status'] !== '' && $package['status'] !== $filters['status']) return false;
+    // Include cycles overlapping the selected date range.
+    if ($filters['from'] !== '' && $package['period_end'] < $filters['from']) return false;
+    if ($filters['to'] !== '' && $package['period_start'] > $filters['to']) return false;
+    if ($filters['search'] !== '') {
+        $text = implode(' ', [$package['package_id'], $package['department_name'], $package['template_name']]);
+        if (stripos($text, $filters['search']) === false && !isset($member_matches[$package['package_id']])) return false;
+    }
+    return true;
+}));
+
 require_once '../includes/header.php';
 ?>
 <div class="evaluation-packages team-evaluation-history">
@@ -63,12 +122,49 @@ require_once '../includes/header.php';
     </section>
 
     <!-- ── Evaluation History Packages ────────────────────────────────────── -->
+    <section class="package-card p-3" aria-label="Filter evaluation history">
+        <form method="get" action="team-evaluation-history.php">
+            <div class="row g-3">
+                <div class="col-12 col-lg-6">
+                    <label for="history-search" class="form-label">Search</label>
+                    <input type="search" id="history-search" name="search" class="form-control" value="<?php echo e($filters['search']); ?>" placeholder="Employee, position, department, template or package ID">
+                </div>
+                <?php foreach (['department' => 'Department', 'type' => 'Evaluation type', 'status' => 'Package status'] as $key => $label): ?>
+                    <div class="col-12 col-md-4 col-lg-2">
+                        <label for="history-<?php echo $key; ?>" class="form-label"><?php echo $label; ?></label>
+                        <select id="history-<?php echo $key; ?>" name="<?php echo $key; ?>" class="form-select">
+                            <option value="">All</option>
+                            <?php foreach ($filter_options[$key] as $value => $name): ?>
+                                <option value="<?php echo e((string)$value); ?>" <?php echo $filters[$key] === (string)$value ? 'selected' : ''; ?>><?php echo e($name); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                <?php endforeach; ?>
+                <div class="col-12 col-md-4">
+                    <label for="history-from" class="form-label">Cycle from</label>
+                    <input type="date" id="history-from" name="from" class="form-control" value="<?php echo e($filters['from']); ?>">
+                </div>
+                <div class="col-12 col-md-4">
+                    <label for="history-to" class="form-label">Cycle to</label>
+                    <input type="date" id="history-to" name="to" class="form-control" value="<?php echo e($filters['to']); ?>">
+                </div>
+                <div class="col-12 col-md-4 d-flex align-items-end gap-2">
+                    <button type="submit" class="btn btn-success"><i class="fas fa-filter me-1" aria-hidden="true"></i>Apply filters</button>
+                    <a href="team-evaluation-history.php" class="btn btn-outline-secondary">Clear</a>
+                </div>
+            </div>
+            <p class="small text-muted mt-3 mb-0">Showing <?php echo count($packages); ?> of <?php echo $total_packages; ?> evaluation packages. Date filters include cycles overlapping the selected range. Employee matches show the complete package.</p>
+            <?php foreach (array_unique($filter_errors) as $error): ?>
+                <p class="text-danger mt-2 mb-0" role="alert"><?php echo e($error); ?></p>
+            <?php endforeach; ?>
+        </form>
+    </section>
     <?php if (!$packages): ?>
         <section class="package-empty">
             <i class="fas fa-folder-open fa-3x text-muted mb-3" style="opacity:0.4;"></i>
-            <h2 class="h5 fw-bold">No evaluation reviews in your history yet</h2>
+            <h2 class="h5 fw-bold"><?php echo $total_packages ? 'No evaluation reviews match your filters' : 'No evaluation reviews in your history yet'; ?></h2>
             <p class="mb-0 text-muted">
-                Evaluation reviews will appear here once you act on them or when they reach your stage in the sequential approval pipeline.
+                <?php echo $total_packages ? 'Adjust your filters or clear them to view all evaluation packages.' : 'Evaluation reviews will appear here once you act on them or when they reach your stage in the sequential approval pipeline.'; ?>
             </p>
         </section>
     <?php endif; ?>
@@ -106,12 +202,12 @@ require_once '../includes/header.php';
                 </div>
                 <div class="d-flex align-items-center gap-2">
                     <?php echo renderOrganizationPipelineBadge($conn, $package_id); ?>
-                    <button class="btn btn-sm btn-package-collapse" type="button" data-bs-toggle="collapse" data-bs-target="#pkgHistBody-<?php echo $package_id; ?>" aria-expanded="true" aria-controls="pkgHistBody-<?php echo $package_id; ?>" title="Minimize / Expand Review">
-                        <i class="fas fa-chevron-up collapse-icon"></i> <span class="d-none d-sm-inline">Minimize</span>
+                    <button class="btn btn-sm btn-package-collapse collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#pkgHistBody-<?php echo $package_id; ?>" aria-expanded="false" aria-controls="pkgHistBody-<?php echo $package_id; ?>" title="Expand Review">
+                        <i class="fas fa-chevron-up collapse-icon"></i> <span class="d-none d-sm-inline">Expand</span>
                     </button>
                 </div>
             </header>
-            <div class="collapse show" id="pkgHistBody-<?php echo $package_id; ?>">
+            <div class="collapse" id="pkgHistBody-<?php echo $package_id; ?>">
                 <div class="package-card__body">
                     <div class="shared-behavior-banner d-flex flex-wrap align-items-center justify-content-between gap-3">
                         <div>
@@ -193,4 +289,19 @@ require_once '../includes/header.php';
         </section>
     <?php endforeach; ?>
 </div>
+<script>
+document.querySelectorAll('.team-evaluation-history .btn-package-collapse').forEach(function (button) {
+    const body = document.getElementById(button.getAttribute('aria-controls'));
+    function updateLabel(expanded) {
+        button.querySelector('span').textContent = expanded ? 'Minimize' : 'Expand';
+        button.title = expanded ? 'Minimize Review' : 'Expand Review';
+    }
+    body.addEventListener('show.bs.collapse', function (event) {
+        if (event.target === body) updateLabel(true);
+    });
+    body.addEventListener('hide.bs.collapse', function (event) {
+        if (event.target === body) updateLabel(false);
+    });
+});
+</script>
 <?php require_once '../includes/footer.php'; ?>

@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 /**
  * Common Header - includes navbar, sidebar, and CDN links
  * Usage: include this file at the top of every dashboard page
@@ -403,7 +403,7 @@ switch ($effective_role) {
         // ── Section 4: Career (rank-based) ─────────────────────────────────
         $menu_career = [];
         // Branch Manager (rank 3): can approve/reject Transfer requests from their branch
-        if (!$is_probationary_employee && $_hdr_emp_rank === 3) {
+        if (!$is_probationary_employee && !$is_hr_personnel && $_hdr_emp_rank === 3) {
             // Count pending BM approvals for badge — guarded in case schema migration hasn't run yet
             $_hdr_bm_pending = 0;
             if ($_hdr_emp_branch_id > 0) {

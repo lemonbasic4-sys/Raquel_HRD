@@ -3166,7 +3166,7 @@ function applyProbationaryEvaluationOutcome($conn, $evaluation_id)
 {
     $evaluation_id = (int)$evaluation_id;
     if ($evaluation_id <= 0 || !ensureProbationaryEvaluationSchema($conn)) return false;
-    $stmt = $conn->prepare("SELECT ev.employee_id, ev.evaluation_type, e.hire_date, e.employment_status,
+    $stmt = $conn->prepare("SELECT ev.employee_id, ev.evaluation_type, e.hire_date, e.employment_status, e.job_title,
             d.department_name, per.recommendation
         FROM evaluations ev
         JOIN employees e ON e.employee_id = ev.employee_id
@@ -3206,6 +3206,24 @@ function applyProbationaryEvaluationOutcome($conn, $evaluation_id)
     $update->bind_param('iiissii', $eligible, $eligible_eval_id, $eligible, $next_type, $next_due_date, $regularize_int, $employee_id);
     $ok = $update->execute();
     $update->close();
+    if ($ok && $regularize && strcasecmp(trim((string)($row['job_title'] ?? '')), 'HR Manager I') === 0) {
+        $portal_accounts = $conn->prepare("SELECT user_id FROM users
+            WHERE employee_id = ? AND role = 'Employee' AND is_active = 1
+              AND COALESCE(account_hold, 0) = 0 AND deleted_at IS NULL");
+        $portal_accounts->bind_param('i', $employee_id);
+        $portal_accounts->execute();
+        $recipients = $portal_accounts->get_result()->fetch_all(MYSQLI_ASSOC);
+        $portal_accounts->close();
+        $message = 'Your Final probationary evaluation has been approved, and your employment status as HR Manager I has been updated to Regular. '
+            . 'HRIS access requires separate authorization from the current HRIS HR Manager. After that authorization is granted, the System Administrator must manually configure and activate your HRIS account and approved permissions. '
+            . 'Regularization does not automatically grant HRIS access or administrative privileges. Continue using your Employee Portal account while the authorization and account setup are pending. '
+            . 'Coordinate with the current HRIS HR Manager for authorization and with the System Administrator for account setup. Use the HRIS portal only after the System Administrator confirms that your access is active and provides your login instructions.';
+        foreach ($recipients as $recipient) {
+            createNotification($conn, (int)$recipient['user_id'],
+                'Regularization Confirmed - HRIS Access Authorization Required', $message,
+                BASE_URL . '/employee/my-employment.php', 'probation', 1);
+        }
+    }
     return $ok;
 }
 
