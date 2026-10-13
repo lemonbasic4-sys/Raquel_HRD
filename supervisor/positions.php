@@ -729,7 +729,7 @@ $employeesWithManagedPositions = (int) $conn->query("SELECT COUNT(*) AS cnt FROM
 
             const reportingDepartments = (option.dataset.reportingDepartments || '').split(',');
             const visible = selectedDept !== ''
-                && (option.dataset.department === selectedDept || reportingDepartments.includes(selectedDept));
+                && (option.value === '1100' || option.value === '1000' || option.dataset.department === selectedDept || reportingDepartments.includes(selectedDept));
             option.hidden = !visible;
             option.disabled = !visible;
             if (option.selected && visible) selectedOptionIsVisible = true;

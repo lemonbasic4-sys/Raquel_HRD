@@ -194,7 +194,7 @@ REPLACE INTO departments (department_id, department_name, description, is_active
 -- ============================================
 REPLACE INTO job_titles (job_title_id, job_title, rank_category_id, department_id, is_active, is_head, reports_to, created_at, updated_at) VALUES
 -- Acquired Properties (100-119)
-(100, 'VP for Acquired Properties', 1, 1, 1, 1, NULL, NOW(), NOW()),
+(100, 'VP for Acquired Properties', 1, 1, 1, 1, 1100, NOW(), NOW()),
 (101, 'AP Manager I', 3, 1, 1, 1, 100, NOW(), NOW()),
 (102, 'AP Manager II', 3, 1, 1, 1, 100, NOW(), NOW()),
 (103, 'AP Manager III', 3, 1, 1, 1, 100, NOW(), NOW()),
@@ -234,7 +234,7 @@ REPLACE INTO job_titles (job_title_id, job_title, rank_category_id, department_i
 (404, 'Compliance Staff II', 5, 4, 1, 0, 401, NOW(), NOW()),
 (405, 'Compliance Staff III', 5, 4, 1, 0, 401, NOW(), NOW()),
 -- Finance (500-529)
-(500, 'VP for Finance',                  1, 5, 1, 0, NULL, NOW(), NOW()),
+(500, 'VP for Finance',                  1, 5, 1, 0, 1100, NOW(), NOW()),
 (501, 'Accounting Manager I',            3, 5, 1, 1, 500,  NOW(), NOW()),
 (502, 'Accounting Supervisor I',         4, 5, 1, 0, 501,  NOW(), NOW()),
 (503, 'Accounting Supervisor II',        4, 5, 1, 0, 501,  NOW(), NOW()),
@@ -253,7 +253,7 @@ REPLACE INTO job_titles (job_title_id, job_title, rank_category_id, department_i
 (516, 'Treasury Staff I',               5, 5, 1, 0, 506,  NOW(), NOW()),
 (517, 'Treasury Staff II',              5, 5, 1, 0, 506,  NOW(), NOW()),
 -- General Services (600-649)
-(600, 'VP for General Services', 1, 6, 1, 0, NULL, NOW(), NOW()),
+(600, 'VP for General Services', 1, 6, 1, 0, 1100, NOW(), NOW()),
 (601, 'GS Manager I', 3, 6, 1, 1, 600, NOW(), NOW()),
 (602, 'GS Manager II', 3, 6, 1, 1, 600, NOW(), NOW()),
 (603, 'GS Manager III', 3, 6, 1, 1, 600, NOW(), NOW()),
@@ -296,7 +296,7 @@ REPLACE INTO job_titles (job_title_id, job_title, rank_category_id, department_i
 (713, 'HR Staff IV', 5, 7, 1, 0, 705, NOW(), NOW()),
 (714, 'HR Staff V', 5, 7, 1, 0, 705, NOW(), NOW()),
 -- Information Technology (800-839)
-(800, 'IT Manager I', 3, 8, 1, 1, NULL, NOW(), NOW()),
+(800, 'IT Manager I', 3, 8, 1, 1, 1000, NOW(), NOW()),
 (801, 'IT Manager II', 3, 8, 1, 1, 800, NOW(), NOW()),
 (802, 'IT Manager III', 3, 8, 1, 1, 800, NOW(), NOW()),
 (803, 'IT Manager IV', 3, 8, 1, 1, 800, NOW(), NOW()),
@@ -315,14 +315,14 @@ REPLACE INTO job_titles (job_title_id, job_title, rank_category_id, department_i
 (816, 'Helpdesk Assistant II', 5, 8, 1, 0, 804, NOW(), NOW()),
 (817, 'Helpdesk Assistant III', 5, 8, 1, 0, 804, NOW(), NOW()),
 -- Marketing (900-919)
-(900, 'Marketing Manager I', 3, 9, 1, 1, NULL, NOW(), NOW()),
+(900, 'Marketing Manager I', 3, 9, 1, 1, 1100, NOW(), NOW()),
 (901, 'Marketing Manager II', 3, 9, 1, 1, 900, NOW(), NOW()),
 (902, 'Marketing Supervisor I', 4, 9, 1, 1, 900, NOW(), NOW()),
 (903, 'Marketing Supervisor II', 4, 9, 1, 1, 900, NOW(), NOW()),
 (904, 'Marketing Staff I', 5, 9, 1, 0, 902, NOW(), NOW()),
 (905, 'Marketing Staff II', 5, 9, 1, 0, 902, NOW(), NOW()),
 -- Operations (1000-1049)
-(1000, 'VP for Operations', 1, 11, 1, 0, NULL, NOW(), NOW()),
+(1000, 'VP for Operations', 1, 11, 1, 0, 1100, NOW(), NOW()),
 (1001, 'Regional Manager I', 3, 11, 1, 1, 1000, NOW(), NOW()),
 (1002, 'Regional Manager II', 3, 11, 1, 1, 1000, NOW(), NOW()),
 (1003, 'Area Coordinator on Training', 4, 11, 1, 0, 1001, NOW(), NOW()),
