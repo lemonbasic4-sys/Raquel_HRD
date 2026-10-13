@@ -3161,12 +3161,12 @@ function ensureProbationaryEvaluationSchema($conn)
     }
 }
 
-/** Apply only the probationary profile marker; employment_status remains unchanged. */
+/** Apply a finalized probationary outcome and regularize eligible employees. */
 function applyProbationaryEvaluationOutcome($conn, $evaluation_id)
 {
     $evaluation_id = (int)$evaluation_id;
     if ($evaluation_id <= 0 || !ensureProbationaryEvaluationSchema($conn)) return false;
-    $stmt = $conn->prepare("SELECT ev.employee_id, ev.evaluation_type, e.hire_date,
+    $stmt = $conn->prepare("SELECT ev.employee_id, ev.evaluation_type, e.hire_date, e.employment_status,
             d.department_name, per.recommendation
         FROM evaluations ev
         JOIN employees e ON e.employee_id = ev.employee_id
@@ -3192,16 +3192,36 @@ function applyProbationaryEvaluationOutcome($conn, $evaluation_id)
     if ($next_type === 'Final' && (!$is_hr || $row['evaluation_type'] === 'Initial') && !empty($row['hire_date'])) {
         $next_due_date = date('Y-m-d', strtotime('+5 months', strtotime($row['hire_date'])));
     }
+    $regularize = $is_hr && $row['evaluation_type'] === 'Final'
+        && $eligible === 1 && ($row['employment_status'] ?? '') === 'Probationary';
     $update = $conn->prepare("UPDATE employees
         SET probationary_regularization_eligible = ?,
             probationary_eligible_evaluation_id = ?,
             probationary_eligible_at = IF(? = 1, NOW(), NULL),
             probationary_next_evaluation_type = ?,
-            probationary_next_evaluation_due_date = ?
+            probationary_next_evaluation_due_date = ?,
+            employment_status = IF(? = 1, 'Regular', employment_status)
         WHERE employee_id = ?");
-    $update->bind_param('iiissi', $eligible, $eligible_eval_id, $eligible, $next_type, $next_due_date, $employee_id);
+    $regularize_int = $regularize ? 1 : 0;
+    $update->bind_param('iiissii', $eligible, $eligible_eval_id, $eligible, $next_type, $next_due_date, $regularize_int, $employee_id);
     $ok = $update->execute();
     $update->close();
+    return $ok;
+}
+
+/** Remove stale probationary eligibility markers from employees already regularized. */
+function clearRegularizedEmployeeEligibility($conn, $employee_id)
+{
+    $employee_id = (int)$employee_id;
+    if ($employee_id <= 0 || !ensureProbationaryEvaluationSchema($conn)) return false;
+    $stmt = $conn->prepare("UPDATE employees
+        SET probationary_regularization_eligible = 0,
+            probationary_next_evaluation_type = NULL,
+            probationary_next_evaluation_due_date = NULL
+        WHERE employee_id = ? AND employment_status = 'Regular'");
+    $stmt->bind_param('i', $employee_id);
+    $ok = $stmt->execute();
+    $stmt->close();
     return $ok;
 }
 

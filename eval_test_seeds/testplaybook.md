@@ -21,6 +21,7 @@ cd C:\xampp\htdocs\raquel_hrd
 & "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source eval_test_seeds/02_employee_portal_accounts.sql;"
 & "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source eval_test_seeds/03_verify_hr_probationary.sql;"
 & "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source eval_test_seeds/hr_personnel_templates.sql;"
+& "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source eval_test_seeds/hr_final_probationary_evaluations.sql;"
 Write-Host "Evaluation test database reset and seeded successfully!" -ForegroundColor Green
 
 ```

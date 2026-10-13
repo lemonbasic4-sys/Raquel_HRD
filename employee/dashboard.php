@@ -16,6 +16,7 @@ $emp_stmt = $conn->prepare("
     SELECT e.employee_id, e.employee_code, e.first_name, e.last_name,
            e.job_title, e.job_title_id, e.profile_picture, e.hire_date,
            e.employment_status, e.employment_type,
+           e.probationary_eligible_evaluation_id,
            e.branch_id, e.department_id, e.rank_category_id,
            d.department_name, b.branch_name,
            rc.rank_name

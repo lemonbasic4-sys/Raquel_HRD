@@ -9,6 +9,7 @@ $employee_id = (int) ($_SESSION['employee_id'] ?? 0);
 if ($employee_id <= 0) {
     redirectWith(BASE_URL . '/employee/dashboard.php', 'danger', 'No employment record is linked to your account.');
 }
+clearRegularizedEmployeeEligibility($conn, $employee_id);
 
 $emp_stmt = $conn->prepare("SELECT e.*, d.department_name, b.branch_name, rc.rank_name,
         ed.height_m, ed.weight_kg, ed.blood_type, ed.citizenship,
@@ -155,7 +156,7 @@ require_once '../includes/header.php';
         <div class="me-badges">
             <span class="me-badge me-badge-status"><?php echo !empty($emp['is_active']) ? 'Active' : 'Inactive'; ?></span>
             <span class="me-badge"><?php echo e(employmentValue($emp['employment_status'] ?? null)); ?></span>
-            <?php if (!empty($emp['probationary_regularization_eligible'])): ?><span class="me-badge">Eligible for regularization</span><?php endif; ?>
+            <?php if (($emp['employment_status'] ?? '') === 'Probationary' && !empty($emp['probationary_regularization_eligible'])): ?><span class="me-badge">Eligible for regularization</span><?php endif; ?>
         </div>
         <div class="me-identity-meta"><span><i class="fas fa-id-badge" aria-hidden="true"></i> <?php echo e(getEmployeeDisplayId($emp)); ?></span><span><i class="fas fa-building" aria-hidden="true"></i> <?php echo e(employmentValue($emp['branch_name'] ?? null)); ?></span><span><i class="fas fa-calendar-alt" aria-hidden="true"></i> Hired <?php echo !empty($emp['hire_date']) ? e(formatDate($emp['hire_date'])) : 'Not provided'; ?></span></div>
     </div>

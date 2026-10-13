@@ -547,6 +547,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 notifyHRPersonnelPackageFinalized($conn, $package_id, $step['department_name'], $step['template_name'] ?? 'Evaluation');
             }
 
+            if ($is_final_probationary && $probationary_eval_id > 0) {
+                $outcome_stmt = $conn->prepare("SELECT e.employment_status, e.probationary_eligible_evaluation_id,
+                        e.first_name, e.last_name, u.user_id
+                    FROM evaluations ev
+                    JOIN employees e ON e.employee_id = ev.employee_id
+                    LEFT JOIN users u ON u.employee_id = e.employee_id AND u.role = 'Employee' AND u.is_active = 1
+                    WHERE ev.evaluation_id = ? LIMIT 1");
+                $outcome_stmt->bind_param('i', $probationary_eval_id);
+                $outcome_stmt->execute();
+                $regularized_users = $outcome_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+                $outcome_stmt->close();
+                foreach ($regularized_users as $regularized_user) {
+                    if (($regularized_user['employment_status'] ?? '') !== 'Regular'
+                        || (int)($regularized_user['probationary_eligible_evaluation_id'] ?? 0) !== $probationary_eval_id
+                        || (int)($regularized_user['user_id'] ?? 0) <= 0) continue;
+                    createNotification($conn, (int)$regularized_user['user_id'], 'Congratulations on your regularization!',
+                        'Your final probationary evaluation was approved. Your employment status is now Regular, and regular employee evaluation features are available in the portal.',
+                        BASE_URL . '/employee/my-employment.php');
+                }
+            }
+
             redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'success', $is_final_probationary ? 'Probationary evaluation approved and finalized. The employee profile outcome was updated.' : 'Evaluation review approved, locked, and applied to all team members. HR personnel and team members have been notified.');
         } else {
             $conn->rollback();

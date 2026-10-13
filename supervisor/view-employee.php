@@ -1510,7 +1510,7 @@ foreach ($completionSections as $k => $done) {
             </div>
             <div class="ep-status-pills mt-2">
                 <span class="ep-pill ep-pill-purple"><i class="fas fa-user-check me-1"></i><?php echo e($emp['employment_status']); ?></span>
-                <?php if (!empty($emp['probationary_regularization_eligible'])): ?><span class="ep-pill" style="background:#dcfce7;color:#166534;"><i class="fas fa-check-circle me-1"></i>Eligible for regularization</span><?php endif; ?>
+                <?php if (($emp['employment_status'] ?? '') === 'Probationary' && !empty($emp['probationary_regularization_eligible'])): ?><span class="ep-pill" style="background:#dcfce7;color:#166534;"><i class="fas fa-check-circle me-1"></i>Eligible for regularization</span><?php endif; ?>
                 <span class="ep-pill ep-pill-blue"><?php echo e($emp['employment_type'] ?: 'Full-Time'); ?></span>
                 <span class="ep-pill ep-pill-gray"><i class="fas fa-building me-1"></i><?php echo e($emp['branch_name'] ?: 'Head Office'); ?></span>
             </div>
