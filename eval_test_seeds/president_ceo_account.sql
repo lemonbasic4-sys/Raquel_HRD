@@ -16,7 +16,7 @@ INSERT INTO users (employee_id, username, email, password_hash, full_name,
 SELECT e.employee_id, e.employee_code, e.employee_code,
     '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi',
     CONCAT_WS(' ', e.first_name, e.middle_name, e.last_name),
-    'President and CEO', e.branch_id, 1, 0
+    'President and CEO', e.branch_id, 1, 1
 FROM employees e
 WHERE e.employee_code = 'OP-001'
   AND NOT EXISTS (SELECT 1 FROM users u WHERE u.employee_id = e.employee_id);

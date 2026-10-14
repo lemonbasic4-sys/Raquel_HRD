@@ -1,6 +1,6 @@
 # HR probationary evaluation test seeds
 
-This batch creates a **fresh test database** with exactly nine HRD employees: the three regular starters (Elena Delgado, Patricia Gomez, and Miguel Torres), each with an HRIS login **and** an Employee portal login, plus six fictional probationary employees (two HR Staff, two HR Supervisors, and two HR Managers), each with an Employee portal login. It does **not** create evaluation forms or submissions; create those through the application to test eligibility and routing.
+This batch creates a **fresh test database** with one President/CEO account (also able to use the Employee portal), three regular HR personnel (Elena Delgado, Patricia Gomez, and Miguel Torres) with both HRIS and Employee portal accounts, and six fictional probationary HR employees with Employee portal accounts. It also seeds **six active probationary evaluation templates**: Initial and Final for HR Staff, HR Supervisors, and HR Managers. It does **not** create employee evaluation submissions; submit those through the application to test eligibility and routing.
 
 > **Destructive reset:** `database/1st_schema_tables.sql` starts with `DROP DATABASE IF EXISTS raquel_hris`. Export or back up anything you need first, and run this only against a disposable test database. Never run this batch against production.
 
@@ -17,16 +17,24 @@ cd C:\xampp\htdocs\raquel_hrd
 # This supplies the three HRIS logins; the preceding file only supplies their employee records.
 & "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source database/xPortal_accounts.sql;"
 & "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source eval_test_seeds/test_hrd_portal_accounts.sql;"
+& "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source eval_test_seeds/president_ceo_account.sql;"
 & "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source eval_test_seeds/01_probationary_hr_employees.sql;"
 & "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source eval_test_seeds/02_employee_portal_accounts.sql;"
-& "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source eval_test_seeds/03_verify_hr_probationary.sql;"
 & "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source eval_test_seeds/hr_personnel_templates.sql;"
 & "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source eval_test_seeds/hr_final_probationary_evaluations.sql;"
+& "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source eval_test_seeds/president_ceo_probationary_templates.sql;"
+& "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source eval_test_seeds/03_verify_hr_probationary.sql;"
 Write-Host "Evaluation test database reset and seeded successfully!" -ForegroundColor Green
 
 ```
 
-If your MySQL root account requires a password, add `-p` to each MySQL command; MySQL will prompt for it. Do not put the password in this file. The final file only reads the resulting rows; it should show three regular HRD employees with two accounts each, six probationary HRD employees with one portal account each, and nine HRD employees total. Import `xPortal_accounts.sql` **before** the HRD portal-account seed because it deletes existing Employee-role accounts for the three starters.
+If your MySQL root account requires a password, add `-p` to each MySQL command; MySQL will prompt for it. Do not put the password in this file. The final verification file only reads the resulting rows; it should show three regular HRD employees with two accounts each, six probationary HRD employees with one portal account each, and nine HRD employees total **plus one President/CEO outside HR**. Import `xPortal_accounts.sql` **before** the HRD portal-account seed because it deletes existing Employee-role accounts for the three starters.
+
+| Template creator | Target probationary employees | Initial | Final |
+| --- | --- | --- | --- |
+| President/CEO (`OP-001`) | 2 HR Managers | `president_ceo_probationary_templates.sql` | `president_ceo_probationary_templates.sql` |
+| HR Manager (Elena Delgado) | 2 HR Supervisors | `hr_personnel_templates.sql` | `hr_final_probationary_evaluations.sql` |
+| HR Supervisor (Patricia Gomez) | 2 HR Staff | `hr_personnel_templates.sql` | `hr_final_probationary_evaluations.sql` |
 
 | Position | Portal usernames | Target rank |
 | --- | --- | --- |
@@ -34,6 +42,6 @@ If your MySQL root account requires a password, add `-p` to each MySQL command; 
 | HR Supervisor I / II | `EVAL-HR-V01`, `EVAL-HR-V02` | 4 |
 | HR Manager I / II | `EVAL-HR-M01`, `EVAL-HR-M02` | 3 |
 
-All six test portal accounts use the password `password`. They are deliberately test-only accounts; change or remove them before using a non-test environment. Staff report to seeded HR Supervisor Patricia Gomez (employee 301), supervisors report to seeded HR Manager Elena Delgado (employee 101), and managers have no `reports_to` because the three starter files do not establish a President/CEO supervisor for them.
+The President/CEO portal account is `OP-001`. All six probationary portal accounts and the President/CEO account use the test password `password`. These are deliberately test-only credentials; never use this seed against a non-test environment. Staff report to seeded HR Supervisor Patricia Gomez (employee 301), supervisors to seeded HR Manager Elena Delgado (employee 101), and the two probationary HR Managers to the seeded President/CEO. The President/CEO uses one `President and CEO` role account for both its authorized workflow and Employee portal access.
 
-For the visibility test, create a probationary evaluation template targeting Human Resources and the intended rank, then check Self Rating with one account at the matching level and one at a different level. A form created before an employee was added should still become visible when its current targeting rules match that employee. These SQL files do not seed a President/CEO creator account; testing that creator path requires a separately configured authorized account.
+For the visibility test, sign in as one probationary employee at each level and confirm they see only the Initial/Final forms targeting their rank. Submit through the Employee portal and confirm the review reaches the assigned immediate head. The templates alone do not create submitted evaluations or approve results.

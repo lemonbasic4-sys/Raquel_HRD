@@ -30,6 +30,16 @@ WHERE NOT EXISTS (
     WHERE e.employee_id = seed.employee_id OR e.employee_code = seed.employee_code
 );
 
+-- The two probationary HR Managers report to the seeded President/CEO.
+-- Leave any reporting line subsequently edited in the UI untouched.
+UPDATE employees e
+JOIN employees president ON president.employee_code = 'OP-001'
+    AND president.job_title_id = 1100
+SET e.reports_to = president.employee_id
+WHERE e.employee_code IN ('HRD-555', 'HRD-777')
+  AND e.employment_status = 'Probationary'
+  AND e.reports_to IS NULL;
+
 -- Backfill the probation period if these test employees were imported before
 -- the date fields were added. Preserve any dates subsequently edited in the UI.
 UPDATE employees e

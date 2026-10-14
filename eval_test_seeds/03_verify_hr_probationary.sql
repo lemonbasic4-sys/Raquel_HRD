@@ -19,6 +19,27 @@ GROUP BY e.employee_id, e.employee_code, e.first_name, e.last_name,
          jt.job_title, e.employment_status
 ORDER BY e.employment_status, e.rank_category_id DESC, e.employee_code;
 
+SELECT e.employee_code, u.username, u.role, u.first_login_completed
+FROM employees e JOIN users u ON u.employee_id = e.employee_id
+WHERE e.employee_code = 'OP-001' AND u.role = 'President and CEO';
+
+SELECT e.employee_code AS probationary_manager, head.employee_code AS direct_report_code,
+       CONCAT_WS(' ', head.first_name, head.last_name) AS direct_report_name
+FROM employees e LEFT JOIN employees head ON head.employee_id = e.reports_to
+WHERE e.employee_code IN ('HRD-555', 'HRD-777');
+
+SELECT et.evaluation_type, et.template_name, creator.role AS creator_role,
+       COUNT(DISTINCT positions.job_title_id) AS target_positions,
+       COUNT(DISTINCT criteria.criterion_id) AS criteria_count
+FROM evaluation_templates et
+JOIN users creator ON creator.user_id = et.created_by
+LEFT JOIN evaluation_template_positions positions ON positions.template_id = et.template_id
+LEFT JOIN evaluation_criteria criteria ON criteria.template_id = et.template_id
+WHERE et.target_department_id = 7 AND et.status = 'Active' AND et.deleted_at IS NULL
+  AND et.evaluation_type IN ('Initial', 'Final')
+GROUP BY et.template_id, et.evaluation_type, et.template_name, creator.role
+ORDER BY creator.role, et.evaluation_type;
+
 SELECT e.employment_status, e.rank_category_id, COUNT(*) AS employee_count
 FROM employees e
 WHERE e.department_id = 7
