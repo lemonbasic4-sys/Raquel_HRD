@@ -24,11 +24,10 @@ cd C:\xampp\htdocs\raquel_hrd
 & "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source eval_test_seeds/hr_final_probationary_evaluations.sql;"
 & "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source eval_test_seeds/president_ceo_probationary_templates.sql;"
 & "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source eval_test_seeds/03_verify_hr_probationary.sql;"
-Write-Host "Evaluation test database reset and seeded successfully!" -ForegroundColor Green
 
 ```
 
-If your MySQL root account requires a password, add `-p` to each MySQL command; MySQL will prompt for it. Do not put the password in this file. The final verification file only reads the resulting rows; it should show three regular HRD employees with two accounts each, six probationary HRD employees with one portal account each, and nine HRD employees total **plus one President/CEO outside HR**. Import `xPortal_accounts.sql` **before** the HRD portal-account seed because it deletes existing Employee-role accounts for the three starters.
+If your MySQL root account requires a password, add `-p` to each MySQL command; MySQL will prompt for it. Do not put the password in this file. These plain commands do not stop the batch automatically when an import fails, so check the MySQL output for errors and review the final verification rows. They should show three regular HRD employees with two accounts each, six probationary HRD employees with one portal account each, and nine HRD employees total **plus one President/CEO outside HR**. Import `xPortal_accounts.sql` **before** the HRD portal-account seed because it deletes existing Employee-role accounts for the three starters.
 
 | Template creator | Target probationary employees | Initial | Final |
 | --- | --- | --- | --- |
@@ -38,9 +37,9 @@ If your MySQL root account requires a password, add `-p` to each MySQL command; 
 
 | Position | Portal usernames | Target rank |
 | --- | --- | --- |
-| HR Staff I / II | `EVAL-HR-S01`, `EVAL-HR-S02` | 5 |
-| HR Supervisor I / II | `EVAL-HR-V01`, `EVAL-HR-V02` | 4 |
-| HR Manager I / II | `EVAL-HR-M01`, `EVAL-HR-M02` | 3 |
+| HR Staff I / II | `HRD-111`, `HRD-222` | 5 |
+| HR Supervisor I / II | `HRD-333`, `HRD-444` | 4 |
+| HR Manager I / II | `HRD-555`, `HRD-777` | 3 |
 
 The President/CEO portal account is `OP-001`. All six probationary portal accounts and the President/CEO account use the test password `password`. These are deliberately test-only credentials; never use this seed against a non-test environment. Staff report to seeded HR Supervisor Patricia Gomez (employee 301), supervisors to seeded HR Manager Elena Delgado (employee 101), and the two probationary HR Managers to the seeded President/CEO. The President/CEO uses one `President and CEO` role account for both its authorized workflow and Employee portal access.
 
