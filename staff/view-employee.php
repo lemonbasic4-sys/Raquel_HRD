@@ -1444,7 +1444,6 @@ $completionSections = [
     'assets'       => !empty($real_props) || !empty($personal_props),
     'references'   => !empty($refs),
     'address'      => !empty($resAddr) || !empty($permAddr),
-    'performance'  => !empty($perf_history_data),
 ];
 $completedCount = count(array_filter($completionSections));
 $totalSections  = count($completionSections);
@@ -1457,7 +1456,6 @@ $sectionNames = [
     'eligibility'=>'Professional Licenses','skills'=>'Skills & Recognitions',
     'disclosures'=>'Government IDs','assets'=>'Assets & Properties',
     'references'=>'Character References','address'=>'Address Records',
-    'performance'=>'Performance Records',
 ];
 foreach ($completionSections as $k => $done) {
     if (!$done) $missingSections[] = $sectionNames[$k];

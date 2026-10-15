@@ -80,8 +80,20 @@ REPLACE INTO employee_work_experience (employee_id, date_from, date_to, job_titl
 (301, '2012-09-01', '2017-03-31', 'HR Coordinator', 'Global Staffing Solutions', 30000.00),
 (302, '2019-02-01', '2022-12-15', 'HR Assistant', 'Talent Quest Recruitment', 22000.00);
 
+-- ===================================
+-- 8. VOLUNTARY WORK / CIVIC INVOLVEMENT
+-- ===================================
+REPLACE INTO employee_voluntary_work
+    (voluntary_id, employee_id, date_from, date_to, organization_name,
+     organization_address, no_of_hours, position_nature)
+VALUES
+(30101, 101, '2023-06-10', '2023-12-16', 'Quezon Community Skills Development Foundation',
+ 'Tayabas City, Quezon', 48.00, 'Volunteer HR and Career Development Adviser'),
+(30102, 101, '2024-04-06', '2024-04-07', 'Philippine Red Cross - Quezon Chapter',
+ 'Lucena City, Quezon', 16.00, 'Community Outreach and Registration Volunteer');
+
 -- =========================
--- 8. TRAININGS & SEMINARS
+-- 9. TRAININGS & SEMINARS
 -- =========================
 REPLACE INTO employee_trainings (employee_id, training_title, conducted_by, no_of_hours) VALUES
 (101, 'Advanced HR Management Seminar', 'Philippine HR Association', 40.0),
@@ -91,14 +103,43 @@ REPLACE INTO employee_trainings (employee_id, training_title, conducted_by, no_o
 (302, 'Recruitment Best Practices', 'HR Development Forum', 20.0),
 (302, 'Employee Relations Fundamentals', 'Training and Development Center', 18.0);
 
+-- =====================================
+-- 10. ELIGIBILITY & PROFESSIONAL LICENSES
+-- =====================================
+REPLACE INTO employee_eligibility (eligibility_id, employee_id, license_title, date_from, date_to, license_number, date_of_exam, place_of_exam) VALUES
+(30101, 101, 'Career Service Professional Eligibility', '2012-06-15', NULL, 'CSP-12-101845', '2012-05-27', 'Quezon City'),
+(30301, 301, 'Career Service Professional Eligibility', '2011-11-18', NULL, 'CSP-11-301672', '2011-10-16', 'Pasig City'),
+(30302, 302, 'Certified Human Resource Associate', '2021-08-20', '2027-08-19', 'CHRA-2021-30219', '2021-07-31', 'Manila');
+
+-- =====================================
+-- 11. SKILLS, RECOGNITIONS & MEMBERSHIPS
+-- =====================================
+REPLACE INTO employee_skills (skill_id, employee_id, skill_name) VALUES
+(30101, 101, 'Strategic Human Resource Management'),
+(30102, 101, 'Labor Relations and Conflict Resolution'),
+(30301, 301, 'Performance Management'),
+(30302, 301, 'Employee Coaching and Development'),
+(30303, 302, 'Recruitment and Applicant Screening'),
+(30304, 302, 'HR Records Administration');
+
+REPLACE INTO employee_recognitions (recognition_id, employee_id, recognition_title) VALUES
+(30101, 101, 'Outstanding HR Leadership Award - 2025'),
+(30301, 301, 'Excellence in Employee Relations - 2025'),
+(30302, 302, 'HR Service Excellence Award - 2025');
+
+REPLACE INTO employee_memberships (membership_id, employee_id, organization_name) VALUES
+(30101, 101, 'People Management Association of the Philippines'),
+(30301, 301, 'Philippine Society for Talent Development'),
+(30302, 302, 'Human Resource Educators Association of the Philippines');
+
 -- ==================
--- 9. DISCLOSURES
+-- 12. DISCLOSURES
 -- ==================
 REPLACE INTO employee_disclosures (employee_id, is_related_to_company, has_admin_offense, has_criminal_charge) VALUES
 (101, 0, 0, 0), (301, 0, 0, 0), (302, 0, 0, 0);
 
 -- ==================
--- 10. GOVERNMENT IDS
+-- 13. GOVERNMENT IDS
 -- ==================
 REPLACE INTO employee_government_ids (employee_id, sss_number, philhealth_number, pagibig_number, tin_number) VALUES
 (101, '33-0234567-0', '12-787654321-5', '1210-6666-7788', '023-456-789-001'),
@@ -106,7 +147,7 @@ REPLACE INTO employee_government_ids (employee_id, sss_number, philhealth_number
 (302, '33-5234567-5', '12-587654321-4', '1210-1166-7788', '523-456-789-003');
 
 -- ==================================
--- 11. ADDRESSES & EMERGENCY CONTACTS
+-- 14. ADDRESSES & EMERGENCY CONTACTS
 -- ==================================
 REPLACE INTO employee_addresses (employee_id, address_type, region, barangay, city, province) VALUES
 (101, 'Residential', 'Region IV-A (CALABARZON)', 'San Isidro', 'Tayabas City', 'Quezon'),
@@ -122,7 +163,7 @@ REPLACE INTO employee_emergency_contacts (employee_id, contact_name, relationshi
 (302, 'Rosa Torres', 'Mother', '09185557777');
 
 -- =========================================================
--- 12. SALN INFORMATION (Real/Personal Property/Liabilities)
+-- 15. SALN INFORMATION (Real/Personal Property/Liabilities)
 -- =========================================================
 REPLACE INTO employee_real_properties (employee_id, description, kind, acquisition_cost) VALUES
 (101, 'Residential House', 'Building', 2500000.00),
@@ -140,7 +181,7 @@ REPLACE INTO employee_liabilities (employee_id, nature_of_liability, creditor_na
 (302, 'Personal Loan', 'Philippine National Bank', 280000.00);
 
 -- ========================
--- 13. CHARACTER REFERENCES
+-- 16. CHARACTER REFERENCES
 -- ========================
 REPLACE INTO employee_references (employee_id, reference_name, reference_address, reference_telephone) VALUES
 (101, 'Dr. Reynaldo Cruz', 'Pasig City', '02-9876-5432'),
