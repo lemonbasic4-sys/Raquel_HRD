@@ -926,6 +926,18 @@ $hero_name = trim($emp['first_name'] . ' ' . ($emp['middle_name'] ? $emp['middle
     background: #fffbeb;
     border-color: #fde68a;
 }
+.ep-completion-banner.is-dismissing {
+    opacity: 0;
+    transform: translateY(-8px);
+    max-height: 0;
+    margin-bottom: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    border-width: 0;
+    overflow: hidden;
+    transition: opacity .3s ease, transform .3s ease, max-height .35s ease,
+                margin .35s ease, padding .35s ease, border-width .35s ease;
+}
 
 /* ── Section Accordion Rows ── */
 .ep-section-row {
@@ -1565,7 +1577,7 @@ foreach ($completionSections as $k => $done) {
     </div>
 <?php endif; ?>
 
-<div class="ep-completion-banner <?php echo $completionPct < 100 ? 'banner-warning' : ''; ?>">
+<div class="ep-completion-banner <?php echo $completionPct < 100 ? 'banner-warning' : ''; ?>"<?php echo $completionPct >= 100 ? ' data-auto-dismiss="true"' : ''; ?>>
     <div class="d-flex align-items-center gap-3">
         <i class="fas <?php echo $completionPct == 100 ? 'fa-check-circle text-success' : 'fa-info-circle'; ?>" style="font-size:1.5rem;color:#3b82f6;"></i>
         <div>
@@ -2871,6 +2883,14 @@ foreach ($completionSections as $k => $done) {
     }
 
     document.addEventListener('DOMContentLoaded', function () {
+        const completedBanner = document.querySelector('.ep-completion-banner[data-auto-dismiss="true"]');
+        if (completedBanner) {
+            window.setTimeout(function () {
+                completedBanner.classList.add('is-dismissing');
+                window.setTimeout(function () { completedBanner.remove(); }, 400);
+            }, 5000);
+        }
+
         const profileTabs = Array.from(document.querySelectorAll('.employee-information-tab'));
         const profilePanels = Array.from(document.querySelectorAll('[data-profile-panel]'));
 
