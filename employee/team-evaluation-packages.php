@@ -568,7 +568,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
 
-            redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'success', $is_final_probationary ? 'Probationary evaluation approved and finalized. The employee profile outcome was updated.' : 'Evaluation review approved, locked, and applied to all team members. HR personnel and team members have been notified.');
+            redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'success', $is_final_probationary ? 'Probationary evaluation approved and finalized. HR Staff regularization recommendations require a separate HR Manager decision before employment status changes.' : 'Evaluation review approved, locked, and applied to all team members. HR personnel and team members have been notified.');
         } else {
             $conn->rollback();
             $restore = $conn->prepare("UPDATE evaluation_package_route_steps SET action_status = 'Pending', acted_at = NULL WHERE package_route_step_id = ? AND action_status = 'Approved'");

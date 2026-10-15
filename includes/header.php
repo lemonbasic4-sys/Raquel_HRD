@@ -92,6 +92,7 @@ switch ($effective_role) {
             if ($r) $_mgr_career_pending = (int)($r->fetch_assoc()['c'] ?? 0);
         } catch (Exception $e) {}
         $_mgr_pkg_pending = countPendingOrganizationPackagesForUser($conn, (int)($_SESSION['user_id'] ?? 0));
+        $_mgr_approvals_pending = countManagerPendingApprovals($conn);
 
         $sidebar_menus = [
             'MAIN' => [
@@ -112,9 +113,7 @@ switch ($effective_role) {
                 ['icon' => 'fas fa-layer-group', 'label' => 'Performance Evaluation', 'url' => BASE_URL . '/employee/team-evaluation-packages.php', 'page' => 'team-evaluation-packages.php',
                  'badge' => $_mgr_pkg_pending ?: null, 'badge_class' => 'bg-warning text-dark'],
                 ['icon' => 'fas fa-check-double', 'label' => 'Pending Approvals', 'url' => BASE_URL . '/manager/pending-approvals.php', 'page' => 'pending-approvals.php',
-                 'badge' => (function() use ($conn) {
-                     try { $r = $conn->query("SELECT COUNT(*) as c FROM employee_change_requests WHERE status='Pending'"); return $r ? (int)($r->fetch_assoc()['c'] ?? 0) : 0; } catch(Exception $e){ return 0; }
-                 })(), 'badge_class' => 'bg-warning text-dark'],
+                 'badge' => $_mgr_approvals_pending ?: null, 'badge_class' => 'bg-warning text-dark'],
                 ['icon' => 'fas fa-history', 'label' => 'Evaluation History', 'url' => BASE_URL . '/manager/evaluation-history.php', 'page' => 'evaluation-history.php'],
             ],
 

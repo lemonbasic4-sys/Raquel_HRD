@@ -22,6 +22,9 @@ if ($conn->connect_error) {
     die("Connection failed: " . $conn->connect_error);
 }
 
+// Apply authorized future-dated HR Staff regularizations on the first request at/after their effective date.
+applyDueStaffRegularizations($conn);
+
 // Verify user & employee account status
 if (isset($_SESSION['user_id'])) {
     $uid = (int) $_SESSION['user_id'];

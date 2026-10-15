@@ -44,3 +44,13 @@ If your MySQL root account requires a password, add `-p` to each MySQL command; 
 The President/CEO portal account is `OP-001`. All six probationary portal accounts and the President/CEO account use the test password `password`. These are deliberately test-only credentials; never use this seed against a non-test environment. Staff report to seeded HR Supervisor Patricia Gomez (employee 301), supervisors to seeded HR Manager Elena Delgado (employee 101), and the two probationary HR Managers to the seeded President/CEO. The President/CEO uses one `President and CEO` role account for both its authorized workflow and Employee portal access.
 
 For the visibility test, sign in as one probationary employee at each level and confirm they see only the Initial/Final forms targeting their rank. Submit through the Employee portal and confirm the review reaches the assigned immediate head. The templates alone do not create submitted evaluations or approve results.
+
+## HR Staff Final regularization approval check
+
+1. Sign in as `HRD-111` in the Employee portal, submit the HR Staff Final evaluation, then sign in as HR Supervisor Patricia Gomez and record **Recommend regularization** with a justification and signature. Approve the Final evaluation.
+2. Verify the Final score appears in evaluation history while `HRD-111` still has **Probationary** employment status.
+3. Sign in as HR Manager Elena Delgado. Open **Pending Approvals → Regularization Requests**. The request should show the score, supervisor justification, and a link to the full evaluation. If two active HR Managers exist, both see this same request—not separate copies.
+4. Approve with an effective date. A date of today changes the employee to **Regular** immediately; a future date keeps them **Probationary** until that date. The system applies due approvals on the first subsequent authenticated page request.
+5. For `HRD-222`, repeat the Final submission but reject the recommendation with a reason. The employee remains **Probationary**. A second manager attempting to decide either completed request must be refused.
+
+The Initial evaluation workflow and the HR Supervisor/HR Manager probationary routes are unchanged by this HR Staff approval check.

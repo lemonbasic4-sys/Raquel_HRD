@@ -66,13 +66,7 @@ if (in_array($_ft_role, ['HR Manager', 'HR Supervisor', 'HR Staff', 'Admin'])):
 <?php if ($_ft_role === 'HR Manager'): ?>
     <?php
     // Resolve pending approvals badge for HR Manager
-    $_ft_mgr_pending = 0;
-    if ($conn) {
-        try {
-            $r = $conn->query("SELECT COUNT(*) as c FROM employee_change_requests WHERE status='Pending'");
-            if ($r) $_ft_mgr_pending = (int)($r->fetch_assoc()['c'] ?? 0);
-        } catch (Exception $e) {}
-    }
+    $_ft_mgr_pending = $_mgr_approvals_pending ?? countManagerPendingApprovals($conn);
     ?>
     <a href="<?php echo BASE_URL; ?>/manager/dashboard.php"
        class="hr-nav-item<?php echo ($_ft_page === 'dashboard.php') ? ' active' : ''; ?>"

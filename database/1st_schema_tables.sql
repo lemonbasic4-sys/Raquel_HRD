@@ -538,6 +538,23 @@ CREATE TABLE probationary_evaluation_reviews (
     CONSTRAINT fk_probationary_review_employee FOREIGN KEY (employee_acknowledged_by) REFERENCES users(user_id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE regularization_requests (
+    request_id INT AUTO_INCREMENT PRIMARY KEY,
+    evaluation_id INT NOT NULL UNIQUE,
+    employee_id INT NOT NULL,
+    recommended_by INT NOT NULL,
+    recommendation_reason TEXT NOT NULL,
+    status ENUM('Pending','Approved','Rejected') NOT NULL DEFAULT 'Pending',
+    decided_by INT NULL,
+    decided_at DATETIME NULL,
+    effective_date DATE NULL,
+    decision_reason TEXT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_regularization_status (status, created_at),
+    CONSTRAINT fk_reg_request_eval FOREIGN KEY (evaluation_id) REFERENCES evaluations(evaluation_id) ON DELETE CASCADE,
+    CONSTRAINT fk_reg_request_employee FOREIGN KEY (employee_id) REFERENCES employees(employee_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- ============================================
 -- 22. Evaluation Scores
 -- ============================================

@@ -6,6 +6,73 @@ require_once '../includes/functions.php';
 
 // ── Employee Change Request: approve / reject ────────────────────────────────
 ensureEmployeeChangeRequests($conn);
+ensureProbationaryEvaluationSchema($conn);
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['regularization_action'])) {
+    verifyCsrfToken();
+    $request_id = (int)($_POST['regularization_request_id'] ?? 0);
+    $action = (string)$_POST['regularization_action'];
+    $reason = trim((string)($_POST['decision_reason'] ?? ''));
+    $effective_date = trim((string)($_POST['effective_date'] ?? ''));
+    if (!in_array($action, ['approve', 'reject'], true)
+        || ($action === 'reject' && $reason === '')
+        || ($action === 'approve' && (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $effective_date)
+            || !checkdate((int)substr($effective_date, 5, 2), (int)substr($effective_date, 8, 2), (int)substr($effective_date, 0, 4))
+            || $effective_date < date('Y-m-d')))) {
+        redirectWith(BASE_URL . '/manager/pending-approvals.php?tab=regularization', 'danger',
+            'Enter a valid effective date (today or later), or provide a rejection reason.');
+    }
+    $manager_id = (int)$_SESSION['user_id'];
+    $conn->begin_transaction();
+    try {
+        $lock = $conn->prepare("SELECT rr.*, ev.status AS evaluation_status, ev.total_score,
+                e.employment_status, e.rank_category_id, e.is_active, e.deleted_at,
+                d.department_name, CONCAT(e.first_name, ' ', e.last_name) AS employee_name
+            FROM regularization_requests rr
+            JOIN evaluations ev ON ev.evaluation_id = rr.evaluation_id
+            JOIN employees e ON e.employee_id = rr.employee_id
+            JOIN departments d ON d.department_id = e.department_id
+            WHERE rr.request_id = ? FOR UPDATE");
+        $lock->bind_param('i', $request_id);
+        $lock->execute();
+        $request = $lock->get_result()->fetch_assoc();
+        $lock->close();
+        if (!$request || $request['status'] !== 'Pending'
+            || $request['evaluation_status'] !== 'Approved'
+            || $request['employment_status'] !== 'Probationary'
+            || (int)$request['rank_category_id'] !== 5
+            || $request['department_name'] !== 'Human Resources'
+            || (int)$request['is_active'] !== 1 || $request['deleted_at'] !== null) {
+            throw new RuntimeException('This request is no longer eligible or has already been decided.');
+        }
+        $new_status = $action === 'approve' ? 'Approved' : 'Rejected';
+        $date_value = $action === 'approve' ? $effective_date : null;
+        $decision = $conn->prepare("UPDATE regularization_requests SET status = ?, decided_by = ?,
+            decided_at = NOW(), effective_date = ?, decision_reason = ?
+            WHERE request_id = ? AND status = 'Pending'");
+        $decision->bind_param('sissi', $new_status, $manager_id, $date_value, $reason, $request_id);
+        $decision->execute();
+        $changed = $decision->affected_rows;
+        $decision->close();
+        if ($changed !== 1) throw new RuntimeException('Another HR Manager already decided this request.');
+        $conn->commit();
+    } catch (Throwable $error) {
+        $conn->rollback();
+        redirectWith(BASE_URL . '/manager/pending-approvals.php?tab=regularization', 'danger', $error->getMessage());
+    }
+    applyDueStaffRegularizations($conn);
+    $decision_label = $action === 'approve' ? 'approved, effective ' . $effective_date : 'rejected';
+    notifyUsersForEmployee($conn, (int)$request['employee_id'], 'Regularization recommendation ' . $decision_label,
+        'The HR Manager ' . $decision_label . ' the regularization recommendation.'
+        . ($reason !== '' ? ' Reason: ' . $reason : ''), BASE_URL . '/employee/my-employment.php');
+    createNotification($conn, (int)$request['recommended_by'], 'HR Staff regularization recommendation ' . $decision_label,
+        $request['employee_name'] . ': ' . $decision_label . ($reason !== '' ? '. Reason: ' . $reason : ''),
+        BASE_URL . '/supervisor/evaluation-history.php');
+    logAudit($conn, $manager_id, strtoupper($action), 'RegularizationRequest', $request_id,
+        'HR Staff regularization ' . $decision_label . ' for ' . $request['employee_name'] . '.',
+        ['module' => 'Employee Management', 'target_employee_id' => (int)$request['employee_id']]);
+    redirectWith(BASE_URL . '/manager/pending-approvals.php?tab=regularization', 'success',
+        'Regularization recommendation ' . $decision_label . '.');
+}
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ecr_action'], $_POST['ecr_request_id'])) {
     $ecr_id     = (int) $_POST['ecr_request_id'];
     $ecr_action = $_POST['ecr_action'];
@@ -454,6 +521,17 @@ $ecr_pending = $conn->query("
 $ecr_pending_count = $ecr_pending ? (int)$ecr_pending->num_rows : 0;
 $ecr_all_pending = [];
 if ($ecr_pending) { while ($r = $ecr_pending->fetch_assoc()) $ecr_all_pending[] = $r; }
+$regularization_result = $conn->query("SELECT rr.*, ev.total_score, ev.performance_level,
+        CONCAT(e.first_name, ' ', e.last_name) AS employee_name, e.employee_code,
+        e.job_title, e.employment_status, u.full_name AS supervisor_name
+    FROM regularization_requests rr
+    JOIN evaluations ev ON ev.evaluation_id = rr.evaluation_id
+    JOIN employees e ON e.employee_id = rr.employee_id
+    LEFT JOIN users u ON u.user_id = rr.recommended_by
+    WHERE rr.status = 'Pending'
+    ORDER BY rr.created_at ASC");
+$regularization_pending = $regularization_result ? $regularization_result->fetch_all(MYSQLI_ASSOC) : [];
+$regularization_pending_count = count($regularization_pending);
 // ── End change request fetch ─────────────────────────────────────────────────
 ?>
 
@@ -562,6 +640,14 @@ if ($ecr_pending) { while ($r = $ecr_pending->fetch_assoc()) $ecr_all_pending[] 
         <i class="fas fa-user-edit me-1"></i>Employee Edit Requests
         <?php if ($ecr_pending_count > 0): ?>
             <span class="badge rounded-pill bg-warning text-dark ms-1"><?php echo $ecr_pending_count > 9 ? '9+' : $ecr_pending_count; ?></span>
+        <?php endif; ?>
+    </a>
+    <a href="#" data-pa-tab="regularization"
+       class="btn btn-sm fw-semibold rounded-0 border-0 border-bottom pb-2 px-3"
+       style="margin-bottom:-2px;border-bottom-width:2px !important;">
+        <i class="fas fa-user-check me-1"></i>Regularization Requests
+        <?php if ($regularization_pending_count > 0): ?>
+            <span class="badge rounded-pill bg-warning text-dark ms-1"><?php echo $regularization_pending_count; ?></span>
         <?php endif; ?>
     </a>
 </div>
@@ -2246,6 +2332,110 @@ document.addEventListener('DOMContentLoaded', function() {
 </div>
 
 </div><!-- end changes pane -->
+
+<style>
+    #regularization-pane { --reg-ink:#16341c; --reg-green:#0b4a24; --reg-gold:#bd9414; }
+    #regularization-pane .reg-intro { border:1px solid #e0e9df!important; border-radius:16px!important; box-shadow:0 8px 24px rgba(13,48,21,.06)!important; }
+    #regularization-pane .reg-intro .card-body { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; padding:20px 24px!important; }
+    #regularization-pane .reg-intro h5 { color:var(--reg-ink); }
+    #regularization-pane .reg-intro p { color:#657664!important; font-size:.84rem; }
+    #regularization-pane .reg-count { border-radius:999px; padding:7px 12px; background:#edf4eb; color:var(--reg-green); font-size:.78rem; font-weight:700; }
+    #regularization-pane .reg-card { border:1px solid #dde8dc!important; border-radius:16px!important; box-shadow:0 10px 28px rgba(13,48,21,.07)!important; overflow:hidden; }
+    #regularization-pane .reg-card::before { content:""; display:block; height:5px; background:linear-gradient(90deg,var(--reg-green),var(--reg-gold)); }
+    #regularization-pane .reg-card > .card-body { padding:0!important; }
+    #regularization-pane .reg-summary { padding:21px 24px 15px; border-bottom:1px solid #e7eee6; }
+    #regularization-pane .reg-summary h5 { color:var(--reg-ink); font-size:1.13rem; }
+    #regularization-pane .reg-meta { font-size:.78rem; color:#6c7b6a; }
+    #regularization-pane .reg-status { display:inline-flex; gap:6px; align-items:center; border:1px solid #ead594; background:#fff6dc; color:#775600; padding:7px 11px; border-radius:999px; font-size:.72rem; font-weight:700; text-align:left; }
+    #regularization-pane .reg-expand { display:inline-flex; align-items:center; gap:7px; margin-top:9px; padding:5px 0; border:0; background:transparent; color:var(--reg-green); font-size:.78rem; font-weight:700; }
+    #regularization-pane .reg-expand:hover { text-decoration:underline; }
+    #regularization-pane .reg-expand .fa-chevron-down { transition:transform .2s ease; }
+    #regularization-pane .reg-expand[aria-expanded="true"] .fa-chevron-down { transform:rotate(180deg); }
+    #regularization-pane .reg-evidence { padding:17px 24px 19px; }
+    #regularization-pane .reg-facts { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin-bottom:15px; }
+    #regularization-pane .reg-fact { min-width:0; background:#f5f8f4; border:1px solid #e7eee5; border-radius:10px; padding:10px 12px; overflow-wrap:anywhere; }
+    #regularization-pane .reg-fact span { display:block; font-size:.67rem; color:#6e806e; text-transform:uppercase; letter-spacing:.05em; font-weight:700; margin-bottom:4px; }
+    #regularization-pane .reg-fact strong { color:var(--reg-ink); font-size:.85rem; }
+    #regularization-pane .reg-justification { background:#fcfaf3; border-left:3px solid var(--reg-gold); border-radius:0 9px 9px 0; padding:11px 14px; font-size:.83rem; line-height:1.5; overflow-wrap:anywhere; }
+    #regularization-pane .reg-review-link { display:inline-flex; align-items:center; gap:7px; margin:14px 0 0!important; color:var(--reg-green); font-size:.81rem; font-weight:700; text-decoration:none; }
+    #regularization-pane .reg-review-link:hover { text-decoration:underline; }
+    #regularization-pane .reg-decision { background:#f8faf7; padding:17px 24px 22px; }
+    #regularization-pane .reg-decision-title { color:var(--reg-ink); font-size:.82rem; font-weight:700; margin-bottom:12px; }
+    #regularization-pane .reg-decision .row > div { display:flex; }
+    #regularization-pane .reg-decision form { width:100%; background:#fff; border-color:#e1e9e0!important; border-radius:11px!important; padding:15px!important; }
+    #regularization-pane .reg-decision label { color:#425744; font-size:.77rem; }
+    #regularization-pane .reg-decision .form-control { border-color:#d7e1d6; font-size:.85rem; }
+    #regularization-pane .reg-decision button { min-height:38px; width:100%; margin-top:2px; font-weight:700; font-size:.82rem; border-radius:8px; }
+    #regularization-pane .reg-decision .btn-success { background:var(--reg-green); border-color:var(--reg-green); }
+    #regularization-pane .reg-decision .btn-success:hover { background:#07391b; }
+    #regularization-pane .reg-empty { padding:42px 20px; text-align:center; color:#6c7b6a; border:1px solid #e0e9df; border-radius:16px; background:#fff; }
+    @media (max-width:850px) { #regularization-pane .reg-facts { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+    @media (max-width:620px) { #regularization-pane .reg-facts { grid-template-columns:1fr; } #regularization-pane .reg-summary,#regularization-pane .reg-evidence,#regularization-pane .reg-decision { padding-left:16px; padding-right:16px; } }
+</style>
+<div data-pa-pane data-pa-pane-id="regularization" id="regularization-pane">
+    <div class="card reg-intro mb-3">
+        <div class="card-body p-4">
+            <div><h5 class="fw-bold mb-1"><i class="fas fa-user-check me-2" style="color:#bd9414;"></i>Regularization Requests</h5>
+            <p class="mb-0">Review the final evaluation and supervisor recommendation before deciding.</p></div>
+            <span class="reg-count"><?php echo $regularization_pending_count; ?> pending</span>
+        </div>
+    </div>
+    <?php if (!$regularization_pending): ?>
+        <div class="reg-empty"><i class="fas fa-check-circle d-block mb-2" style="color:#258255;font-size:1.7rem;"></i><strong>No requests awaiting a decision</strong><div class="small mt-1">New HR Staff recommendations will appear here.</div></div>
+    <?php endif; ?>
+    <?php foreach ($regularization_pending as $request): ?>
+        <div class="card reg-card mb-3">
+            <div class="card-body p-4">
+                <div class="reg-summary d-flex flex-wrap justify-content-between gap-3">
+                    <div>
+                        <h5 class="fw-bold mb-1"><?php echo e($request['employee_name']); ?></h5>
+                        <div class="reg-meta"><?php echo e($request['employee_code']); ?> &bull; <?php echo e($request['job_title']); ?> &bull; Human Resources</div>
+                    </div>
+                    <div class="text-end">
+                        <span class="reg-status"><i class="fas fa-hourglass-half"></i>Pending HR Manager decision</span>
+                        <div><button type="button" class="reg-expand" data-bs-toggle="collapse" data-bs-target="#regularization-details-<?php echo (int)$request['request_id']; ?>" aria-expanded="false" aria-controls="regularization-details-<?php echo (int)$request['request_id']; ?>"><span>Review request</span><i class="fas fa-chevron-down"></i></button></div>
+                    </div>
+                </div>
+                <div class="collapse" id="regularization-details-<?php echo (int)$request['request_id']; ?>">
+                <div class="reg-evidence">
+                    <div class="reg-facts">
+                        <div class="reg-fact"><span>Final evaluation</span><strong><?php echo number_format((float)$request['total_score'], 2); ?>/4 <?php echo e($request['performance_level'] ?? ''); ?></strong></div>
+                        <div class="reg-fact"><span>Recommended by</span><strong><?php echo e($request['supervisor_name'] ?? 'HR Supervisor'); ?></strong></div>
+                        <div class="reg-fact"><span>Current employment</span><strong><?php echo e($request['employment_status']); ?></strong></div>
+                    </div>
+                    <div class="reg-justification"><strong>Supervisor recommends regularization</strong><br><?php echo nl2br(e($request['recommendation_reason'])); ?></div>
+                    <a class="reg-review-link" href="print-evaluation.php?id=<?php echo (int)$request['evaluation_id']; ?>" target="_blank" rel="noopener"><i class="fas fa-file-alt"></i>Review complete final evaluation<i class="fas fa-external-link-alt small"></i></a>
+                </div>
+                <div class="reg-decision">
+                <div class="reg-decision-title"><i class="fas fa-gavel me-2"></i>HR Manager decision</div>
+                <div class="row g-3">
+                    <div class="col-lg-6">
+                        <form method="post" class="border rounded-3 p-3 h-100">
+                            <?php echo csrfField(); ?>
+                            <input type="hidden" name="regularization_request_id" value="<?php echo (int)$request['request_id']; ?>">
+                            <input type="hidden" name="regularization_action" value="approve">
+                            <label class="form-label fw-semibold" for="effective-<?php echo (int)$request['request_id']; ?>">Authorized effective date</label>
+                            <input id="effective-<?php echo (int)$request['request_id']; ?>" class="form-control mb-3" type="date" name="effective_date" min="<?php echo date('Y-m-d'); ?>" required>
+                            <button class="btn btn-success" type="submit" onclick="return confirm('Approve this regularization request?')">Approve Regularization</button>
+                        </form>
+                    </div>
+                    <div class="col-lg-6">
+                        <form method="post" class="border rounded-3 p-3 h-100">
+                            <?php echo csrfField(); ?>
+                            <input type="hidden" name="regularization_request_id" value="<?php echo (int)$request['request_id']; ?>">
+                            <input type="hidden" name="regularization_action" value="reject">
+                            <label class="form-label fw-semibold" for="reason-<?php echo (int)$request['request_id']; ?>">Rejection reason</label>
+                            <textarea id="reason-<?php echo (int)$request['request_id']; ?>" class="form-control mb-3" name="decision_reason" rows="2" required></textarea>
+                            <button class="btn btn-outline-danger" type="submit" onclick="return confirm('Reject this recommendation?')">Reject Recommendation</button>
+                        </form>
+                    </div>
+                </div>
+                </div>
+                </div>
+            </div>
+        </div>
+    <?php endforeach; ?>
+</div>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
