@@ -1487,9 +1487,7 @@ foreach ($completionSections as $k => $done) {
         <button type="button" class="btn btn-light border" onclick="window.print()"><i class="fas fa-print me-2"></i>Print</button>
         <a href="<?php echo htmlspecialchars($return_to, ENT_QUOTES, 'UTF-8'); ?>" class="btn btn-light border" title="Back to employees"><i class="fas fa-arrow-left"></i></a>
         <div class="dropdown">
-            <button class="btn btn-light border dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                <i class="fas fa-ellipsis-h"></i>
-            </button>
+            
             <ul class="dropdown-menu dropdown-menu-end">
                 <li><a class="dropdown-item" href="javascript:void(0)" onclick="window.print()"><i class="fas fa-download me-2"></i>Download / Print PDS</a></li>
                 <li><a class="dropdown-item" href="<?php echo BASE_URL; ?>/staff/evaluation-history.php?employee_id=<?php echo $eid; ?>"><i class="fas fa-star me-2"></i>View Evaluations</a></li>

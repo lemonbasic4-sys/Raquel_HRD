@@ -1488,9 +1488,7 @@ foreach ($completionSections as $k => $done) {
         <button type="button" class="btn btn-light border" onclick="window.print()"><i class="fas fa-print me-2"></i>Print</button>
         <a href="<?php echo htmlspecialchars($return_to, ENT_QUOTES, 'UTF-8'); ?>" class="btn btn-light border" title="Back to employees"><i class="fas fa-arrow-left"></i></a>
         <div class="dropdown">
-            <button class="btn btn-light border dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                <i class="fas fa-ellipsis-h"></i>
-            </button>
+            
             <ul class="dropdown-menu dropdown-menu-end">
                 <li><a class="dropdown-item" href="javascript:void(0)" onclick="window.print()"><i class="fas fa-download me-2"></i>Download / Print PDS</a></li>
                 <li><a class="dropdown-item" href="<?php echo BASE_URL; ?>/manager/evaluation-history.php?employee_id=<?php echo $eid; ?>"><i class="fas fa-star me-2"></i>View Evaluations</a></li>
@@ -2895,29 +2893,6 @@ foreach ($completionSections as $k => $done) {
                 window.setTimeout(function () { completedBanner.remove(); }, 400);
             }, 5000);
         }
-
-        document.querySelectorAll('.toggle-gov-id').forEach(function (button) {
-            button.type = 'button';
-            button.setAttribute('aria-label', 'Show government ID');
-            button.setAttribute('aria-pressed', 'false');
-            button.addEventListener('click', function () {
-                const valueElement = button.closest('.ep-gov-id-value')?.querySelector('.gov-id-mask');
-                if (!valueElement) return;
-
-                if (!valueElement.dataset.masked) {
-                    valueElement.dataset.masked = valueElement.textContent.trim();
-                }
-                const willShow = valueElement.dataset.visible !== 'true';
-                valueElement.textContent = willShow
-                    ? valueElement.dataset.value
-                    : valueElement.dataset.masked;
-                valueElement.dataset.visible = willShow ? 'true' : 'false';
-                button.setAttribute('aria-pressed', willShow ? 'true' : 'false');
-                button.setAttribute('aria-label', willShow ? 'Hide government ID' : 'Show government ID');
-                const icon = button.querySelector('i');
-                if (icon) icon.className = willShow ? 'fas fa-eye-slash' : 'fas fa-eye';
-            });
-        });
 
         const profileTabs = Array.from(document.querySelectorAll('.employee-information-tab'));
         const profilePanels = Array.from(document.querySelectorAll('[data-profile-panel]'));
