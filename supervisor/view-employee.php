@@ -2891,6 +2891,29 @@ foreach ($completionSections as $k => $done) {
             }, 5000);
         }
 
+        document.querySelectorAll('.toggle-gov-id').forEach(function (button) {
+            button.type = 'button';
+            button.setAttribute('aria-label', 'Show government ID');
+            button.setAttribute('aria-pressed', 'false');
+            button.addEventListener('click', function () {
+                const valueElement = button.closest('.ep-gov-id-value')?.querySelector('.gov-id-mask');
+                if (!valueElement) return;
+
+                if (!valueElement.dataset.masked) {
+                    valueElement.dataset.masked = valueElement.textContent.trim();
+                }
+                const willShow = valueElement.dataset.visible !== 'true';
+                valueElement.textContent = willShow
+                    ? valueElement.dataset.value
+                    : valueElement.dataset.masked;
+                valueElement.dataset.visible = willShow ? 'true' : 'false';
+                button.setAttribute('aria-pressed', willShow ? 'true' : 'false');
+                button.setAttribute('aria-label', willShow ? 'Hide government ID' : 'Show government ID');
+                const icon = button.querySelector('i');
+                if (icon) icon.className = willShow ? 'fas fa-eye-slash' : 'fas fa-eye';
+            });
+        });
+
         const profileTabs = Array.from(document.querySelectorAll('.employee-information-tab'));
         const profilePanels = Array.from(document.querySelectorAll('[data-profile-panel]'));
 
