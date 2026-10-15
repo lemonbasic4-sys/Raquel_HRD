@@ -246,6 +246,8 @@ switch ($effective_role) {
             $_hdr_allowed_eval_types = getAllowedEvaluationTypesForEmploymentStatus($_hdr_emp_status);
             $_hdr_in_clause = "'" . implode("','", $_hdr_allowed_eval_types) . "'";
             $_hdr_legacy_rank_sql = probationaryTemplateLegacyRankSql('et', $_hdr_emp_rank);
+            $_hdr_final_gate = (!$is_probationary_employee || !$is_hr_personnel || !in_array($_hdr_emp_rank, [3, 4, 5], true)
+                || hasApprovedInitialProbationaryEvaluation($conn, $_hdr_emp_id)) ? 1 : 0;
 
             $_hdr_pt_stmt = $conn->prepare("
                 SELECT COUNT(*) AS total
@@ -259,6 +261,7 @@ switch ($effective_role) {
                         AND (et.target_job_title_id IS NULL OR et.target_job_title_id = ?)
                         AND $_hdr_legacy_rank_sql))
                   AND et.evaluation_type IN ($_hdr_in_clause)
+                  AND (et.evaluation_type <> 'Final' OR $_hdr_final_gate = 1)
                   AND NOT EXISTS (
                       SELECT 1
                       FROM evaluations ev

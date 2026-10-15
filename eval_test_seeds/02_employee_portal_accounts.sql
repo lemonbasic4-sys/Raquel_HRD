@@ -1,4 +1,4 @@
--- Test-only Employee portal accounts for the six fictional HR employees.
+-- Test-only Employee portal accounts for the six fictional Acquired Properties employees.
 -- Shared test password: password. Do not use these credentials in production.
 USE raquel_hris;
 
@@ -11,7 +11,7 @@ SELECT e.employee_id, e.employee_code, LOWER(CONCAT(e.employee_code, '@test.loca
        TRIM(CONCAT_WS(' ', e.first_name, e.middle_name, e.last_name)),
        'Employee', e.branch_id, 1, 1
 FROM employees e
-WHERE e.employee_code IN ('HRD-111', 'HRD-222', 'HRD-333', 'HRD-444', 'HRD-555', 'HRD-777')
+WHERE e.employee_code IN ('AP-111', 'AP-222', 'AP-333', 'AP-444', 'AP-555', 'AP-777')
   AND NOT EXISTS (
       SELECT 1 FROM users u
       WHERE u.employee_id = e.employee_id

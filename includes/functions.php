@@ -3199,6 +3199,19 @@ function ensureProbationaryEvaluationSchema($conn)
 }
 
 /** Apply a finalized probationary outcome and regularize eligible employees. */
+function hasApprovedInitialProbationaryEvaluation($conn, int $employee_id): bool
+{
+    if ($employee_id <= 0) return false;
+    $stmt = $conn->prepare("SELECT 1 FROM evaluations
+        WHERE employee_id = ? AND evaluation_type = 'Initial'
+          AND status = 'Approved' AND deleted_at IS NULL LIMIT 1");
+    $stmt->bind_param('i', $employee_id);
+    $stmt->execute();
+    $approved = (bool)$stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    return $approved;
+}
+
 function applyProbationaryEvaluationOutcome($conn, $evaluation_id)
 {
     $evaluation_id = (int)$evaluation_id;
@@ -3217,6 +3230,8 @@ function applyProbationaryEvaluationOutcome($conn, $evaluation_id)
     $stmt->close();
     if (!$row) return false;
     $is_hr = strcasecmp((string)($row['department_name'] ?? ''), 'Human Resources') === 0;
+    if ($is_hr && in_array((int)$row['rank_category_id'], [3, 4, 5], true) && $row['evaluation_type'] === 'Final'
+        && !hasApprovedInitialProbationaryEvaluation($conn, (int)$row['employee_id'])) return false;
     if ((!$is_hr || $row['evaluation_type'] === 'Final')
         && !in_array($row['recommendation'] ?? '', ['Recommend regularization', 'Continue training'], true)) return false;
 
@@ -3332,8 +3347,8 @@ function applyDueStaffRegularizations($conn): void
         $changed = $update->affected_rows === 1;
         $update->close();
         if ($changed) {
-            notifyUsersForEmployee($conn, $employee_id, 'Regularization is now effective',
-                'Your HR Manager-approved regularization is now effective. Your employment status is Regular.',
+            notifyUsersForEmployee($conn, $employee_id, 'Congratulations on your regularization!',
+                'Congratulations! Your HR Manager-approved regularization is now effective. Your employment status is Regular. You can view the update in My Employment.',
                 BASE_URL . '/employee/my-employment.php');
             logAudit($conn, (int)$row['decided_by'], 'UPDATE', 'Employee', $employee_id,
                 'Approved regularization took effect from request #' . (int)$row['request_id'] . '.',

@@ -84,6 +84,12 @@ $allowed_eval_types = getAllowedEvaluationTypesForEmploymentStatus($employee['em
 $in_clause = "'" . implode("','", $allowed_eval_types) . "'";
 $legacy_probationary_rank_et = probationaryTemplateLegacyRankSql('et', $employee['rank_category_id'] ?? 0);
 $legacy_probationary_rank_full = probationaryTemplateLegacyRankSql('evaluation_templates', $employee['rank_category_id'] ?? 0);
+$hr_initial_required = strcasecmp((string)($employee['department_name'] ?? ''), 'Human Resources') === 0
+    && in_array((int)($employee['rank_category_id'] ?? 0), [3, 4, 5], true)
+    && ($employee['employment_status'] ?? '') === 'Probationary';
+$hr_initial_approved = !$hr_initial_required
+    || hasApprovedInitialProbationaryEvaluation($conn, $employee_id);
+$hr_initial_gate = $hr_initial_approved ? 1 : 0;
 
 $edit_eval = null;
 $view_eval = null;
@@ -352,6 +358,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     $evaluation_type = trim($template['evaluation_type'] ?? 'Annual');
+    if ($action === 'submit' && $evaluation_type === 'Final' && !$hr_initial_approved) {
+        $errors[] = 'Your Initial probationary evaluation must be fully approved before you can submit the Final self-rating.';
+    }
 
     // Automatically calculate period_start and period_end if they are empty
     if (empty($period_start) || empty($period_end)) {
@@ -616,6 +625,7 @@ $templates_stmt = $conn->prepare("
             AND (et.target_job_title_id IS NULL OR et.target_job_title_id = ?)
             AND $legacy_probationary_rank_et))
       AND et.evaluation_type IN ($in_clause)
+      AND (et.evaluation_type <> 'Final' OR $hr_initial_gate = 1)
       AND NOT EXISTS (
           SELECT 1
           FROM evaluations ev
@@ -655,6 +665,7 @@ if ($selected_template_id > 0) {
                       AND (target_job_title_id IS NULL OR target_job_title_id = ?)
                       AND $legacy_probationary_rank_full))
               AND evaluation_type IN ($in_clause)
+              AND (evaluation_type <> 'Final' OR $hr_initial_gate = 1)
             LIMIT 1
         ");
         $sel_template_stmt->bind_param("isii", $selected_template_id, $employee_dept, $employee['job_title_id'], $employee['job_title_id']);

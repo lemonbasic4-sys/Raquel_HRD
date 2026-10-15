@@ -199,10 +199,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $probationary_eval_id = 0;
     $probationary_employee_id = 0;
     if ($is_probationary_step) {
-        $review_data_stmt = $conn->prepare("SELECT ev.evaluation_id, ev.employee_id, ev.total_score, per.recommendation,
+        $review_data_stmt = $conn->prepare("SELECT ev.evaluation_id, ev.employee_id, ev.total_score, e.rank_category_id, per.recommendation,
                 per.recommendation_reason, per.immediate_head_user_id, per.immediate_head_signature_data
             FROM evaluation_package_members pm
             JOIN evaluations ev ON ev.evaluation_id = pm.evaluation_id
+            JOIN employees e ON e.employee_id = ev.employee_id
             LEFT JOIN probationary_evaluation_reviews per ON per.evaluation_id = ev.evaluation_id
             WHERE pm.package_id = ? LIMIT 1");
         $review_data_stmt->bind_param('i', $package_id);
@@ -212,6 +213,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $probationary_eval_id = (int)($probationary_review['evaluation_id'] ?? 0);
         $probationary_employee_id = (int)($probationary_review['employee_id'] ?? 0);
     }
+    $decision_review_url = BASE_URL . '/employee/package-member-review.php?package_id=' . $package_id
+        . '&evaluation_id=' . $probationary_eval_id . '&attention=decision#tab-decision';
 
     if ($action === 'save_probationary_decision') {
         if (!$is_probationary_step
@@ -226,7 +229,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             || $recommendation_reason === ''
             || !preg_match('/^data:image\/png;base64,/', $head_signature)
             || strlen($head_signature) > 100000) {
-            redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'Choose a recommendation, enter its reason, and sign before saving.');
+            redirectWith($decision_review_url, 'danger', 'Choose a recommendation, enter its reason, and sign before saving.');
         }
         $decision = $conn->prepare("INSERT INTO probationary_evaluation_reviews
             (evaluation_id, recommendation, recommendation_reason, immediate_head_user_id, immediate_head_signature_data, immediate_head_signed_at)
@@ -395,12 +398,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($action === 'approve' && $is_probationary_step
         && ($step['evaluation_type'] === 'Final' || !isHumanResourcesPackageDepartment($conn, (int)$step['department_id']))) {
+        if ($step['evaluation_type'] === 'Final'
+            && isHumanResourcesPackageDepartment($conn, (int)$step['department_id'])
+            && in_array((int)($probationary_review['rank_category_id'] ?? 0), [3, 4, 5], true)
+            && !hasApprovedInitialProbationaryEvaluation($conn, $probationary_employee_id)) {
+            redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger',
+                'Approve this employee’s Initial evaluation before reviewing the Final evaluation.');
+        }
         if ((int)$step['step_order'] === 1) {
             if (empty($probationary_review['recommendation'])
                 || empty($probationary_review['recommendation_reason'])
                 || empty($probationary_review['immediate_head_signature_data'])
                 || (int)($probationary_review['immediate_head_user_id'] ?? 0) !== $user_id) {
-                redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'The assigned reviewer must record their recommendation, reason, and signature before approval.');
+                redirectWith($decision_review_url, 'danger', 'Record the recommendation, reason, and signature here before approving this evaluation.');
             }
         }
     }

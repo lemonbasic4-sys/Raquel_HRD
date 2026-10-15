@@ -41,8 +41,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['regularization_action
             || $request['employment_status'] !== 'Probationary'
             || (int)$request['rank_category_id'] !== 5
             || $request['department_name'] !== 'Human Resources'
+            || !hasApprovedInitialProbationaryEvaluation($conn, (int)$request['employee_id'])
             || (int)$request['is_active'] !== 1 || $request['deleted_at'] !== null) {
-            throw new RuntimeException('This request is no longer eligible or has already been decided.');
+            throw new RuntimeException('This request is no longer eligible, was already decided, or its Initial evaluation is not approved.');
         }
         $new_status = $action === 'approve' ? 'Approved' : 'Rejected';
         $date_value = $action === 'approve' ? $effective_date : null;
@@ -61,9 +62,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['regularization_action
     }
     applyDueStaffRegularizations($conn);
     $decision_label = $action === 'approve' ? 'approved, effective ' . $effective_date : 'rejected';
-    notifyUsersForEmployee($conn, (int)$request['employee_id'], 'Regularization recommendation ' . $decision_label,
-        'The HR Manager ' . $decision_label . ' the regularization recommendation.'
-        . ($reason !== '' ? ' Reason: ' . $reason : ''), BASE_URL . '/employee/my-employment.php');
+    if ($action === 'reject' || $effective_date > date('Y-m-d')) {
+        notifyUsersForEmployee($conn, (int)$request['employee_id'], 'Regularization recommendation ' . $decision_label,
+            'The HR Manager ' . $decision_label . ' the regularization recommendation.'
+            . ($reason !== '' ? ' Reason: ' . $reason : ''), BASE_URL . '/employee/my-employment.php');
+    }
     createNotification($conn, (int)$request['recommended_by'], 'HR Staff regularization recommendation ' . $decision_label,
         $request['employee_name'] . ': ' . $decision_label . ($reason !== '' ? '. Reason: ' . $reason : ''),
         BASE_URL . '/supervisor/evaluation-history.php');

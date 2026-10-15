@@ -637,6 +637,9 @@ $devplan_count = count($existing_dev_plans);
             <?php if ($is_probationary_head_review && !$is_hr_initial_review): ?>
             <div id="tab-decision" class="eval-tab-content" role="tabpanel" aria-labelledby="btn-tab-decision">
                 <div class="eval-section-title"><span><i class="fas fa-file-signature me-2"></i><?php echo isHumanResourcesPackageDepartment($conn, (int)($review_step['department_id'] ?? 0)) ? 'Final Reviewer' : 'Immediate Head'; ?> Decision &amp; Signature</span></div>
+                <?php if (($_GET['attention'] ?? '') === 'decision'): ?>
+                <div class="alert alert-warning border-warning small" role="alert"><i class="fas fa-exclamation-circle me-2"></i>Complete and save the recommendation, reason, and signature here before approving the evaluation.</div>
+                <?php endif; ?>
                 <p class="text-muted small mb-3">For <?php echo e($evaluation['first_name'] . ' ' . $evaluation['last_name']); ?>. Save any rating adjustments first, then record the recommendation and signature.</p>
                 <?php if (!empty($evaluation['immediate_head_signed_at'])): ?>
                 <span class="badge text-bg-success mb-3"><i class="fas fa-check-circle me-1"></i>Signed <?php echo e(date('M j, Y g:i A', strtotime($evaluation['immediate_head_signed_at']))); ?></span>
@@ -745,7 +748,15 @@ document.addEventListener('DOMContentLoaded', function () {
                 (recommendation.value ? (reason.value.trim() ? signatureCanvas : reason) : recommendation).focus();
             }
         });
-        if (window.location.hash === '#tab-decision') switchReviewTab(null, 'tab-decision');
+        if (window.location.hash === '#tab-decision') {
+            switchReviewTab(null, 'tab-decision');
+            document.getElementById('tab-decision')?.scrollIntoView({block: 'start'});
+            if (new URLSearchParams(window.location.search).get('attention') === 'decision') {
+                const recommendation = document.getElementById('headRecommendation');
+                const reason = document.getElementById('headRecommendationReason');
+                (recommendation && !recommendation.value ? recommendation : reason && !reason.value.trim() ? reason : recommendation)?.focus({preventScroll: true});
+            }
+        }
     }
     const kraWeightPct = <?php echo $kra_w; ?>;
     const behWeightPct = <?php echo $beh_w; ?>;
