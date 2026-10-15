@@ -1466,11 +1466,11 @@ foreach ($completionSections as $k => $done) {
 
 
 <div class="employee-profile-page">
-<div class="d-flex justify-content-between align-items-end flex-wrap gap-3 mb-3">
+<div class="page-hero fadeup d-flex justify-content-between align-items-end flex-wrap gap-3 mb-3">
     <div>
-        <div class="small text-muted mb-1"><a href="<?php echo htmlspecialchars($return_to, ENT_QUOTES, 'UTF-8'); ?>" class="text-decoration-none text-muted"><i class="fas fa-users me-1"></i>Employees</a> <span class="mx-1">&rsaquo;</span> Employee Profile</div>
-        <h1 class="employee-page-title mb-0">Employee Profile</h1>
-        <p class="text-muted small mb-0">View employee information, employment details, and performance records.</p>
+        <div class="small text-white-50 mb-1"><a href="<?php echo htmlspecialchars($return_to, ENT_QUOTES, 'UTF-8'); ?>" class="text-decoration-none text-white-50"><i class="fas fa-users me-1"></i>Employees</a> <span class="mx-1">&rsaquo;</span> Employee Profile</div>
+        <h1 class="employee-page-title text-white mb-0">Employee Profile</h1>
+        <p class="text-white-50 small mb-0">View employee information, employment details, and performance records.</p>
     </div>
     <div class="d-flex gap-2 flex-wrap">
         <a href="<?php echo BASE_URL; ?>/staff/edit-employee.php?id=<?php echo $eid; ?>&return=<?php echo urlencode($return_to); ?>" class="btn btn-primary"><i class="fas fa-pen me-2"></i>Edit Profile</a>
