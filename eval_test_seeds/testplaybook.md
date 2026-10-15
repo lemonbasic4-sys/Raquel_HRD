@@ -1,4 +1,4 @@
-## HRD personnel and President/CEO test seeds
+## HRD, AP, President/CEO, and Employee Portal test seeds
 
 
 ```powershell
@@ -11,9 +11,7 @@ cd C:\xampp\htdocs\raquel_hrd
 & "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source database/3rd_seed_HR_accounts_.sql;"
 & "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source eval_test_seeds/ap_complete_employee_profiles.sql;"
 & "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source eval_test_seeds/president_ceo_complete_profile.sql;"
-& "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source eval_test_seeds/probationary_hr_ap_complete_profiles.sql"
-
-# Confirm that only the four intended employee records exist
-& "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "SELECT employee_code, employment_status FROM employees ORDER BY employee_code;"
+& "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source eval_test_seeds/probationary_hr_ap_complete_profiles.sql;"
+& "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source database/create_missing_employee_portal_accounts.sql;"
 ```
 

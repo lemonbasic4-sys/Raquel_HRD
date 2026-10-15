@@ -188,5 +188,18 @@ REPLACE INTO employee_references (employee_id, reference_name, reference_address
 (301, 'Atty. Rosa Fernandez', 'Pasig City', '02-5432-1098'),
 (302, 'Prof. Antonio Lopez', 'Caloocan City', '02-3456-7891');
 
+-- ========================
+-- 17. HRIS USER ACCOUNTS
+-- ========================
+REPLACE INTO users
+    (user_id, employee_id, username, email, full_name, password_hash, role,
+     branch_id, is_active, account_hold, first_login_completed, created_at)
+VALUES
+(2, 101, 'elena.delgado', 'elena@company.com', 'Elena Delgado','$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi',
+ 'HR Manager', 102, 1, 0, 0, NOW()),
+(3, 301, 'patricia.gomez', 'patricia@company.com', 'Patricia Gomez','$2y$10$ShFYgbhwbnwUnO9BE0/Ny.Tdohwd2rFgJQ4XtCZJh.tkJylDBLw9e',
+ 'HR Supervisor', 102, 1, 0, 0, NOW()),
+(4, 302, 'miguel.torres', 'miguel@company.com', 'Miguel Torres','$2y$10$.ZTuiD7q3wdnDCHbEiYQQOyqFpn4IKK4d6G6SLbuLMFTVmKBl8GLK',
+ 'HR Staff', 102, 1, 0, 0, NOW());
 
 SET FOREIGN_KEY_CHECKS = 1;
