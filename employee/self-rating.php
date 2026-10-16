@@ -2047,7 +2047,7 @@ require_once '../includes/header.php';
                             <!-- KRA Ratings Section -->
                             <div class="rating-section">
                                 <h2 class="rating-section-title">
-                                    <i class="fas fa-bullseye me-2" aria-hidden="true"></i>KRA Self Rating
+                                    <i class="fas fa-bullseye me-2" aria-hidden="true"></i>Key Result Area (KRA) Self Rating
                                 </h2>
 
                                 <?php foreach ($criteria_kra as $index => $criterion): ?>
@@ -2103,7 +2103,7 @@ require_once '../includes/header.php';
                             <!-- Behavior Ratings Section -->
                             <div class="rating-section">
                                 <h2 class="rating-section-title">
-                                    <i class="fas fa-heart me-2" aria-hidden="true"></i>Behavior Self Rating
+                                    <i class="fas fa-heart me-2" aria-hidden="true"></i>Core Behaviors & Values Self Rating
                                 </h2>
 
                                 <?php foreach ($criteria_behavior as $index => $criterion): ?>
