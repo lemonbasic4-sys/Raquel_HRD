@@ -1159,6 +1159,62 @@ require_once '../includes/header.php';
     }
 }
 
+@media (max-width: 767.98px) {
+    body.role-employee .self-rating-page-hero {
+        margin-bottom: .5rem !important;
+        padding: .7rem .8rem !important;
+    }
+
+    .self-rating-page-hero > .d-flex {
+        margin-bottom: 0 !important;
+    }
+
+    .self-rating-progress {
+        margin: 0 0 .55rem;
+        overflow: hidden;
+        padding: .45rem .25rem .35rem;
+    }
+
+    .self-rating-progress .progress-step {
+        flex: 1 1 0;
+        gap: .25rem;
+        min-width: 0;
+    }
+
+    .self-rating-progress .progress-step-number {
+        height: 30px;
+        width: 30px;
+        font-size: .82rem;
+    }
+
+    .self-rating-progress .progress-step-label {
+        font-size: .58rem;
+        line-height: 1.1;
+        overflow-wrap: anywhere;
+    }
+
+    .self-rating-progress .progress-line {
+        margin: 0 .1rem;
+        top: -14px;
+    }
+
+    .self-rating-mobile-tools {
+        gap: .4rem !important;
+        margin-bottom: .65rem !important;
+        margin-top: .35rem !important;
+    }
+
+    .self-rating-mobile-tools > a {
+        margin: 0;
+        padding: .35rem .7rem !important;
+    }
+
+    .self-rating-mobile-tools .alert {
+        font-size: .72rem !important;
+        padding: .35rem .55rem !important;
+    }
+}
+
 /* ── Consent Modal – Clean Professional Redesign ── */
 #consentModal .modal-dialog {
     max-width: 620px;
@@ -1579,7 +1635,7 @@ require_once '../includes/header.php';
 }
 </style>
 
-<div class="page-hero fadeup">
+<div class="page-hero fadeup self-rating-page-hero">
     <div class="d-flex flex-wrap align-items-center justify-content-between mb-3 gap-3">
         <div>
             <div style="font-size:.72rem;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,.55);">
@@ -1603,7 +1659,7 @@ require_once '../includes/header.php';
 
 <?php if ($edit_eval || $view_mode): ?>
 <!-- Progress indicator for evaluation workflow -->
-<div class="progress-indicator" role="navigation" aria-label="Evaluation progress">
+<div class="progress-indicator self-rating-progress" role="navigation" aria-label="Evaluation progress">
     <?php
     $prog_steps = [
         ['label' => 'Select Template', 'icon' => 'fas fa-list'],
@@ -1647,7 +1703,7 @@ require_once '../includes/header.php';
 <?php endif; ?>
 
 <!-- Mobile-only section -->
-<div class="d-md-none d-flex justify-content-between align-items-center mt-3 mb-4 flex-wrap gap-3 fadeup"
+<div class="d-md-none d-flex justify-content-between align-items-center mt-3 mb-4 flex-wrap gap-3 fadeup self-rating-mobile-tools"
     style="animation-delay: 0.1s;">
     <a href="<?php echo BASE_URL; ?>/employee/dashboard.php" class="btn btn-primary btn-sm rounded-pill px-3 shadow-sm">
         <i class="fas fa-arrow-left me-2"></i>Back to My Dashboard
