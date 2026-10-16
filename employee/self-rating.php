@@ -941,6 +941,79 @@ require_once '../includes/header.php';
     letter-spacing: 0.03em;
 }
 
+/* Self-rating section tabs */
+.self-rating-tabs {
+    background: #eef3ec;
+    border: 1px solid #d9e4d5;
+    border-radius: 14px;
+    display: flex;
+    gap: .45rem;
+    margin-bottom: 1.25rem;
+    padding: .45rem;
+}
+
+.self-rating-tabs .nav-link {
+    align-items: center;
+    background: transparent;
+    border: 0;
+    border-radius: 10px;
+    color: #60705e;
+    display: flex;
+    flex: 1;
+    font-size: .9rem;
+    font-weight: 700;
+    gap: .55rem;
+    justify-content: center;
+    min-height: 50px;
+    padding: .7rem 1rem;
+}
+
+.self-rating-tabs .nav-link:hover {
+    background: rgba(255, 255, 255, .65);
+    color: #174817;
+}
+
+.self-rating-tabs .nav-link.active {
+    background: #fff;
+    box-shadow: 0 3px 12px rgba(20, 66, 20, .12);
+    color: #174817;
+}
+
+.self-rating-tabs .tab-item-count {
+    background: #dfe9dc;
+    border-radius: 999px;
+    color: #3e563b;
+    font-size: .7rem;
+    padding: .2rem .5rem;
+}
+
+.self-rating-tabs .nav-link.active .tab-item-count {
+    background: #174817;
+    color: #fff;
+}
+
+.self-rating-tab-intro {
+    background: #f7faf6;
+    border-left: 4px solid #2d7a2d;
+    border-radius: 8px;
+    color: #566354;
+    font-size: .86rem;
+    line-height: 1.55;
+    margin: -.5rem 0 1.2rem;
+    padding: .8rem 1rem;
+}
+
+@media (max-width: 575.98px) {
+    .self-rating-tabs {
+        flex-direction: column;
+    }
+
+    .self-rating-tabs .nav-link {
+        justify-content: flex-start;
+        width: 100%;
+    }
+}
+
 /* ── Consent Modal – Clean Professional Redesign ── */
 #consentModal .modal-dialog {
     max-width: 620px;
@@ -2044,12 +2117,31 @@ require_once '../includes/header.php';
                             ];
                             ?>
 
+                            <nav class="self-rating-tabs nav" role="tablist" aria-label="Self-rating sections">
+                                <button class="nav-link active" id="kra-rating-tab" data-bs-toggle="tab"
+                                    data-bs-target="#kra-rating-pane" type="button" role="tab"
+                                    aria-controls="kra-rating-pane" aria-selected="true">
+                                    <i class="fas fa-bullseye" aria-hidden="true"></i>
+                                    <span>Key Result Areas (KRA)</span>
+                                    <span class="tab-item-count"><?php echo count($criteria_kra); ?> items</span>
+                                </button>
+                                <button class="nav-link" id="behavior-rating-tab" data-bs-toggle="tab"
+                                    data-bs-target="#behavior-rating-pane" type="button" role="tab"
+                                    aria-controls="behavior-rating-pane" aria-selected="false">
+                                    <i class="fas fa-heart" aria-hidden="true"></i>
+                                    <span>Core Behaviors &amp; Values</span>
+                                    <span class="tab-item-count"><?php echo count($criteria_behavior); ?> items</span>
+                                </button>
+                            </nav>
+
+                            <div class="tab-content" id="self-rating-tab-content">
+
                             <!-- KRA Ratings Section -->
-                            <div class="rating-section">
+                            <div class="rating-section tab-pane fade show active" id="kra-rating-pane" role="tabpanel"
+                                aria-labelledby="kra-rating-tab" tabindex="0">
                                 <h2 class="rating-section-title">
                                     <i class="fas fa-bullseye me-2" aria-hidden="true"></i>Key Result Area (KRA) Self Rating
                                 </h2>
-
                                 <?php foreach ($criteria_kra as $index => $criterion): ?>
                                     <?php
                                     $cid      = (int) $criterion['criterion_id'];
@@ -2098,14 +2190,22 @@ require_once '../includes/header.php';
                                         </fieldset>
                                     </div>
                                 <?php endforeach; ?>
+
+                                <div class="d-flex justify-content-end mt-4">
+                                    <button type="button" class="btn btn-primary"
+                                        onclick="document.getElementById('behavior-rating-tab').click(); document.getElementById('behavior-rating-tab').focus();">
+                                        Continue to Core Behaviors &amp; Values
+                                        <i class="fas fa-arrow-right ms-2" aria-hidden="true"></i>
+                                    </button>
+                                </div>
                             </div><!-- /.rating-section (KRA) -->
 
                             <!-- Behavior Ratings Section -->
-                            <div class="rating-section">
+                            <div class="rating-section tab-pane fade" id="behavior-rating-pane" role="tabpanel"
+                                aria-labelledby="behavior-rating-tab" tabindex="0">
                                 <h2 class="rating-section-title">
                                     <i class="fas fa-heart me-2" aria-hidden="true"></i>Core Behaviors & Values Self Rating
                                 </h2>
-
                                 <?php foreach ($criteria_behavior as $index => $criterion): ?>
                                     <?php
                                     $cid      = (int) $criterion['criterion_id'];
@@ -2113,6 +2213,10 @@ require_once '../includes/header.php';
                                                     ? (int) round((float) $edit_scores[$cid])
                                                     : 0;
                                     $field_id = 'beh_criterion_' . $cid;
+                                    $behavior_description = trim((string)($criterion['kpi_description'] ?? ''));
+                                    if ($behavior_description === '') {
+                                        $behavior_description = trim((string)($criterion['description'] ?? ''));
+                                    }
                                     ?>
                                     <div class="rating-item">
                                         <div class="rating-header">
@@ -2120,8 +2224,8 @@ require_once '../includes/header.php';
                                                 <?php echo ($index + 1) . '. '; ?>
                                                 <?php echo e($criterion['criterion_name']); ?>
                                             </h3>
-                                            <?php if (!empty($criterion['description'])): ?>
-                                                <p class="rating-description"><?php echo e($criterion['description']); ?></p>
+                                            <?php if ($behavior_description !== ''): ?>
+                                                <p class="rating-description"><?php echo e($behavior_description); ?></p>
                                             <?php endif; ?>
                                         </div>
 
@@ -2151,13 +2255,28 @@ require_once '../includes/header.php';
                                         </fieldset>
                                     </div>
                                 <?php endforeach; ?>
-                            </div><!-- /.rating-section (Behavior) -->
 
-                            <div class="mb-4">
-                                <label class="form-label fw-semibold">Self Comments</label>
-                                <textarea class="form-control" name="self_comments" rows="4"
-                                    placeholder="Share any notes about your self-rating..."><?php echo e($edit_eval['staff_comments'] ?? ''); ?></textarea>
-                            </div>
+                                <div class="mb-4">
+                                    <label class="form-label fw-semibold">Self Comments</label>
+                                    <textarea class="form-control" name="self_comments" rows="4"
+                                        placeholder="Share any notes about your self-rating..."><?php echo e($edit_eval['staff_comments'] ?? ''); ?></textarea>
+                                </div>
+
+                                <div class="d-flex flex-wrap justify-content-end gap-2 self-rating-actions">
+                                    <?php if ($edit_eval): ?>
+                                        <a href="?discard=<?php echo (int) $edit_eval['evaluation_id']; ?>" class="btn btn-outline-danger me-auto" onclick="return confirm('Are you sure you want to discard this draft? This action cannot be undone.');">
+                                            <i class="fas fa-trash me-2"></i>Discard Draft
+                                        </a>
+                                    <?php endif; ?>
+                                    <button type="submit" name="submit_action" value="draft" class="btn btn-outline-secondary">
+                                        <i class="fas fa-save me-2"></i>Save Draft
+                                    </button>
+                                    <button type="button" class="btn btn-primary" onclick="showReviewModal()">
+                                        <i class="fas fa-paper-plane me-2"></i>Submit Self Rating
+                                    </button>
+                                </div>
+                            </div><!-- /.rating-section (Behavior) -->
+                            </div><!-- /#self-rating-tab-content -->
 
                             <!-- Declaration Consent & Digital Signature -->
                             <div class="modal fade" id="consentModal" tabindex="-1" aria-labelledby="consentModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
@@ -2263,19 +2382,6 @@ require_once '../includes/header.php';
                                 </div>
                             </div>
 
-                            <div class="d-flex flex-wrap justify-content-end gap-2 self-rating-actions">
-                                <?php if ($edit_eval): ?>
-                                    <a href="?discard=<?php echo (int) $edit_eval['evaluation_id']; ?>" class="btn btn-outline-danger me-auto" onclick="return confirm('Are you sure you want to discard this draft? This action cannot be undone.');">
-                                        <i class="fas fa-trash me-2"></i>Discard Draft
-                                    </a>
-                                <?php endif; ?>
-                                <button type="submit" name="submit_action" value="draft" class="btn btn-outline-secondary">
-                                    <i class="fas fa-save me-2"></i>Save Draft
-                                </button>
-                                <button type="button" class="btn btn-primary" onclick="showReviewModal()">
-                                    <i class="fas fa-paper-plane me-2"></i>Submit Self Rating
-                                </button>
-                            </div>
                         <?php else: ?>
                             <?php if (!empty($in_progress_evals)): ?>
                                 <div class="in-progress-section">

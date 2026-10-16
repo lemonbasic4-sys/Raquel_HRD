@@ -192,6 +192,10 @@ FROM (
     UNION ALL SELECT 2, 'Accountability', 'Takes ownership of decisions, commitments, results, and corrective actions.'
     UNION ALL SELECT 3, 'Customer Service', 'Responds respectfully and provides timely, practical assistance to internal and external clients.'
     UNION ALL SELECT 4, 'Teamwork and Respect', 'Cooperates with others and maintains a professional and respectful workplace.'
+    UNION ALL SELECT 5, 'Professionalism', 'Maintains a courteous, dependable, and work-appropriate manner in day-to-day situations.'
+    UNION ALL SELECT 6, 'Communication', 'Shares information clearly, listens actively, and responds constructively to feedback.'
+    UNION ALL SELECT 7, 'Adaptability', 'Adjusts constructively to changing priorities, new instructions, and workplace challenges.'
+    UNION ALL SELECT 8, 'Initiative', 'Looks for appropriate ways to contribute, solve problems, and support team goals.'
 ) behavior_criteria
 CROSS JOIN (
     SELECT 16001 template_id UNION ALL SELECT 16002 UNION ALL
@@ -204,7 +208,7 @@ CROSS JOIN (
 
 COMMIT;
 
--- Verification: 12 active templates, each with 11 KRA and 4 Behavior criteria.
+-- Verification: 12 active templates, each with 11 KRA and 8 Behavior criteria.
 SELECT
     et.template_id,
     et.template_name,
