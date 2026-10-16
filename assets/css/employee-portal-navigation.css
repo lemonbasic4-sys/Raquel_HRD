@@ -322,6 +322,28 @@
   color: #BD9414 !important;
 }
 
+/* Center the employee notification popup on narrow screens. */
+@media (max-width: 767.98px) {
+  body.role-employee .top-navbar > .nav-right > .dropdown:first-child {
+    position: static;
+  }
+
+  body.role-employee .top-navbar .notification-dropdown {
+    position: fixed !important;
+    top: calc(var(--header-height, 60px) + 8px) !important;
+    left: 50% !important;
+    right: auto !important;
+    inset-inline-start: 50% !important;
+    inset-inline-end: auto !important;
+    transform: translateX(-50%) !important;
+    width: min(360px, calc(100vw - 24px)) !important;
+    max-width: calc(100vw - 24px) !important;
+    margin: 0 !important;
+    max-height: calc(100dvh - var(--header-height, 60px) - 24px);
+    overflow-y: auto;
+  }
+}
+
 @keyframes bellRingClick {
   0% { transform: rotate(0deg) scale(1); }
   15% { transform: rotate(25deg) scale(1.25); }

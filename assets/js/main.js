@@ -495,12 +495,12 @@ document.addEventListener('DOMContentLoaded', () => {
         startNotificationPolling();
     }
 
-    // ── Auto mark-all-read when notification bell dropdown is opened ──────────
+    // ── Auto mark notifications as read when the bell dropdown is opened ────
     const bellBtn = document.getElementById('notificationBtn');
-    if (bellBtn && !window.IS_HR_MANAGER && !window.IS_HR_SUPERVISOR && !window.IS_HR_STAFF && !window.IS_EMPLOYEE_CENTER && !window.IS_ADMIN_CENTER) {
+    if (bellBtn) {
         bellBtn.addEventListener('show.bs.dropdown', function () {
             const badge = bellBtn.querySelector('.notification-badge');
-            // Only fire if there are unread notifications (badge is visible)
+            // The notification endpoint scopes updates to the current portal context.
             if (badge && badge.style.display !== 'none' && badge.textContent.trim() !== '') {
                 markAllRead();
             }
