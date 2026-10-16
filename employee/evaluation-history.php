@@ -160,6 +160,48 @@ require_once '../includes/header.php';
         .evaluation-history-hero h1 { font-size: 1.25rem; }
         .evaluation-history-hero p { font-size: .8rem; }
     }
+    @media (max-width: 575.98px) {
+        .evaluation-history-hero { padding: 1rem .9rem; }
+        .evaluation-history-hero h1 { font-size: 1.05rem; line-height: 1.3; }
+        .evaluation-history-hero p { margin-top: .55rem !important; line-height: 1.4; }
+        .evaluation-history-mobile-status { margin-bottom: .85rem !important; }
+        .eh-list { gap: .7rem; }
+        .eh-card {
+            display: grid;
+            grid-template-columns: 36px minmax(0, 1fr);
+            align-items: start;
+            gap: .65rem;
+            padding: .8rem;
+        }
+        .eh-card__icon { width: 36px; height: 36px; border-radius: 10px; font-size: .9rem; }
+        .eh-card__main { min-width: 0; }
+        .eh-card__title {
+            white-space: normal;
+            display: -webkit-box;
+            -webkit-box-orient: vertical;
+            -webkit-line-clamp: 2;
+            overflow: hidden;
+            font-size: .92rem;
+            line-height: 1.35;
+        }
+        .eh-card__meta { gap: .3rem .65rem; font-size: .7rem; line-height: 1.4; }
+        .eh-card__badges { gap: .35rem; margin-top: .55rem; }
+        .eh-card__badges .badge, .eh-adj-chip { font-size: .62rem; white-space: normal; }
+        .eh-card__scores {
+            grid-column: 1 / -1;
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: .4rem;
+            width: 100%;
+        }
+        .eh-score-pill { min-width: 0; padding: .45rem .25rem; border-radius: 9px; }
+        .eh-score-pill__label { font-size: .56rem; letter-spacing: .25px; }
+        .eh-score-pill__value { font-size: .95rem; }
+        .eh-score-pill--total .eh-score-pill__value { font-size: .95rem; }
+        .eh-score-pill--pending .eh-score-pill__value { font-size: .7rem; }
+        .eh-card__cta { grid-column: 1 / -1; width: 100%; }
+        .eh-audit-btn { min-height: 40px; padding: .55rem .75rem; font-size: .78rem; }
+    }
 </style>
 <main class="evaluation-packages container-fluid py-4">
     <section class="page-hero fadeup evaluation-history-hero">

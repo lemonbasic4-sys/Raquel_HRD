@@ -98,7 +98,7 @@ $remarks = array_filter([
 
 require_once '../includes/header.php';
 ?>
-<main class="evaluation-packages container-fluid py-4">
+<main class="evaluation-packages evaluation-history-view container-fluid py-4">
     <section class="package-hero">
         <a class="history-back-link" href="<?php echo BASE_URL; ?>/employee/evaluation-history.php">
             <i class="fas fa-arrow-left"></i> Back to Evaluation History
@@ -223,6 +223,125 @@ require_once '../includes/header.php';
         .eval-tab-btn.active .eval-tab-badge{background:#0a3a2a;color:#fff;}
         .eval-tab-content{display:none;padding:20px;}
         .eval-tab-content.active{display:block;}
+        @media (max-width: 575.98px) {
+            .evaluation-history-view { padding: .75rem !important; }
+            .evaluation-history-view .package-hero {
+                margin-bottom: .85rem;
+                padding: 1rem .9rem;
+                border-left-width: 4px;
+                border-radius: 0 12px 12px 0;
+            }
+            .evaluation-history-view .package-hero .history-back-link {
+                margin-bottom: .6rem;
+                font-size: .8rem;
+            }
+            .evaluation-history-view .package-hero p {
+                font-size: .78rem;
+                line-height: 1.45;
+                overflow-wrap: anywhere;
+            }
+            .evaluation-history-view .package-hero h1 {
+                font-size: 1.1rem;
+                line-height: 1.3;
+                overflow-wrap: anywhere;
+                word-break: normal;
+            }
+            .evaluation-history-view .package-card { margin-bottom: .9rem; border-radius: 11px; }
+            .evaluation-history-view .package-card__header {
+                align-items: flex-start;
+                flex-direction: column;
+                gap: .55rem;
+                padding: .85rem .9rem;
+            }
+            .evaluation-history-view .package-card__header h2 {
+                font-size: .95rem;
+                line-height: 1.35;
+                overflow-wrap: anywhere;
+            }
+            .evaluation-history-view .package-card__header .small { line-height: 1.4; }
+            .evaluation-history-view .package-card__header > div:last-child { max-width: 100%; }
+            .evaluation-history-view .package-card__header .pipeline-badge { max-width: 100%; }
+            .evaluation-history-view .package-card__body { padding: .85rem; }
+            .evaluation-history-view .package-card__body .alert { padding: .7rem !important; font-size: .78rem; line-height: 1.45; }
+            .evaluation-history-view .package-stat {
+                min-width: 0;
+                padding: .75rem .85rem !important;
+                gap: .3rem;
+                overflow-wrap: anywhere;
+            }
+            .evaluation-history-view .package-stat strong { font-size: 1.45rem !important; }
+            .evaluation-history-view .package-stat .small { line-height: 1.4; }
+            .evaluation-history-view .eval-tab-nav {
+                flex-wrap: nowrap;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+                scrollbar-width: thin;
+                gap: 4px;
+                padding: 8px 8px 0;
+            }
+            .evaluation-history-view .eval-tab-btn {
+                flex: 0 0 auto;
+                white-space: nowrap;
+                padding: 8px 10px 9px;
+                font-size: .72rem;
+            }
+            .evaluation-history-view .eval-tab-content { padding: 12px 10px; }
+            .evaluation-history-view .eval-tab-content .table-responsive { overflow: visible; }
+            .evaluation-history-view .eval-tab-content table,
+            .evaluation-history-view .eval-tab-content tbody,
+            .evaluation-history-view .eval-tab-content tr,
+            .evaluation-history-view .eval-tab-content td { display: block; width: 100%; }
+            .evaluation-history-view .eval-tab-content table { border: 0; }
+            .evaluation-history-view .eval-tab-content thead { display: none; }
+            .evaluation-history-view .eval-tab-content tbody tr {
+                overflow: hidden;
+                margin-bottom: .7rem;
+                border: 1px solid #e2e8f0;
+                border-radius: 10px;
+                background: #fff;
+            }
+            .evaluation-history-view .eval-tab-content td {
+                display: flex;
+                align-items: flex-start;
+                justify-content: space-between;
+                gap: .75rem;
+                padding: .55rem .65rem !important;
+                border: 0;
+                border-bottom: 1px solid #eef2f5;
+                text-align: right !important;
+                overflow-wrap: anywhere;
+                font-size: .84rem;
+            }
+            .evaluation-history-view .eval-tab-content td:last-child { border-bottom: 0; }
+            .evaluation-history-view .eval-tab-content td::before {
+                content: attr(data-label);
+                flex: 0 0 38%;
+                color: #64748b;
+                font-size: .65rem;
+                font-weight: 800;
+                line-height: 1.35;
+                text-align: left;
+                text-transform: uppercase;
+                letter-spacing: .25px;
+            }
+            .evaluation-history-view .eval-tab-content td[data-label="Criterion"] {
+                display: block;
+                text-align: left !important;
+                background: #f8fafc;
+            }
+            .evaluation-history-view .eval-tab-content td[data-label="Criterion"]::before {
+                display: block;
+                margin-bottom: .3rem;
+            }
+            .evaluation-history-view .eval-tab-content td[data-label="Criterion"] .fw-bold { font-size: .92rem !important; }
+            .evaluation-history-view .eval-tab-content td[data-label="Criterion"] .small { line-height: 1.4; }
+            .evaluation-history-view .eval-tab-content .d-flex.justify-content-end {
+                justify-content: space-between !important;
+                flex-wrap: wrap;
+                gap: .45rem .7rem !important;
+                font-size: .82rem;
+            }
+        }
     </style>
 
     <div class="eval-tabs-wrapper">
@@ -282,17 +401,17 @@ require_once '../includes/header.php';
                             $is_adj = abs($diff) > 0.001;
                         ?>
                         <tr>
-                            <td>
+                            <td data-label="Criterion">
                                 <div class="fw-bold text-dark" style="font-size:1.05rem;"><?php echo e($criterion['criterion_name']); ?></div>
                                 <?php if (!empty($criterion['description'])): ?>
                                     <div class="small text-muted mt-1"><?php echo e($criterion['description']); ?></div>
                                 <?php endif; ?>
                             </td>
-                            <td class="text-end tabular-nums fw-bold text-muted"><?php echo number_format((float)$criterion['weight'], 2); ?>%</td>
-                            <td class="text-end tabular-nums fw-semibold" style="font-size:1.05rem;"><?php echo number_format($orig, 2); ?></td>
+                            <td data-label="Weight" class="text-end tabular-nums fw-bold text-muted"><?php echo number_format((float)$criterion['weight'], 2); ?>%</td>
+                            <td data-label="<?php echo $show_reviewed_scores ? 'Original Self-Rating' : 'Submitted Rating'; ?>" class="text-end tabular-nums fw-semibold" style="font-size:1.05rem;"><?php echo number_format($orig, 2); ?></td>
                             <?php if ($show_reviewed_scores): ?>
-                                <td class="text-end tabular-nums fw-bold text-dark" style="font-size:1.1rem;"><?php echo number_format($rev, 2); ?></td>
-                                <td class="text-center">
+                                <td data-label="Reviewed / Adjusted" class="text-end tabular-nums fw-bold text-dark" style="font-size:1.1rem;"><?php echo number_format($rev, 2); ?></td>
+                                <td data-label="Variance" class="text-center">
                                     <?php if ($is_adj): ?>
                                         <span class="badge <?php echo $diff > 0 ? 'bg-success' : 'bg-danger'; ?> px-2 py-1" style="font-size:.85rem;">
                                             <?php echo ($diff > 0 ? '+' : '') . number_format($diff, 2); ?>
@@ -348,16 +467,16 @@ require_once '../includes/header.php';
                             $is_adj = abs($diff) > 0.001;
                         ?>
                         <tr>
-                            <td>
+                            <td data-label="Criterion">
                                 <div class="fw-bold text-dark" style="font-size:1.05rem;"><?php echo e($criterion['criterion_name']); ?></div>
                                 <?php if (!empty($criterion['description'])): ?>
                                     <div class="small text-muted mt-1"><?php echo e($criterion['description']); ?></div>
                                 <?php endif; ?>
                             </td>
-                            <td class="text-end tabular-nums fw-semibold" style="font-size:1.05rem;"><?php echo number_format($orig, 2); ?></td>
+                            <td data-label="<?php echo $show_reviewed_scores ? 'Original Self-Rating' : 'Submitted Rating'; ?>" class="text-end tabular-nums fw-semibold" style="font-size:1.05rem;"><?php echo number_format($orig, 2); ?></td>
                             <?php if ($show_reviewed_scores): ?>
-                                <td class="text-end tabular-nums fw-bold text-dark" style="font-size:1.1rem;"><?php echo number_format($rev, 2); ?></td>
-                                <td class="text-center">
+                                <td data-label="Reviewed / Adjusted" class="text-end tabular-nums fw-bold text-dark" style="font-size:1.1rem;"><?php echo number_format($rev, 2); ?></td>
+                                <td data-label="Variance" class="text-center">
                                     <?php if ($is_adj): ?>
                                         <span class="badge <?php echo $diff > 0 ? 'bg-success' : 'bg-danger'; ?> px-2 py-1" style="font-size:.85rem;">
                                             <?php echo ($diff > 0 ? '+' : '') . number_format($diff, 2); ?>
@@ -403,9 +522,9 @@ require_once '../includes/header.php';
                             <tbody>
                                 <?php foreach ($hist_dev_plans as $dp): ?>
                                 <tr>
-                                    <td class="fw-semibold text-dark"><?php echo e($dp['improvement_area'] ?: '—'); ?></td>
-                                    <td><?php echo e($dp['support_needed'] ?: '—'); ?></td>
-                                    <td><span class="badge bg-light text-dark border"><?php echo e($dp['time_frame'] ?: '—'); ?></span></td>
+                                    <td data-label="Area for Improvement / Development" class="fw-semibold text-dark"><?php echo e($dp['improvement_area'] ?: '—'); ?></td>
+                                    <td data-label="Support Needed / Action Plan"><?php echo e($dp['support_needed'] ?: '—'); ?></td>
+                                    <td data-label="Target Time Frame"><span class="badge bg-light text-dark border"><?php echo e($dp['time_frame'] ?: '—'); ?></span></td>
                                 </tr>
                                 <?php endforeach; ?>
                             </tbody>
@@ -513,11 +632,12 @@ require_once '../includes/header.php';
     <script>
     (function () {
         function switchHistoryTab(e, tabId) {
-            var wrapper = e.target.closest('.eval-tabs-wrapper');
+            var button = e.currentTarget;
+            var wrapper = button.closest('.eval-tabs-wrapper');
             wrapper.querySelectorAll('.eval-tab-btn').forEach(function(b){ b.classList.remove('active'); b.setAttribute('aria-selected','false'); });
             wrapper.querySelectorAll('.eval-tab-content').forEach(function(c){ c.classList.remove('active'); });
-            e.target.classList.add('active');
-            e.target.setAttribute('aria-selected','true');
+            button.classList.add('active');
+            button.setAttribute('aria-selected','true');
             var panel = wrapper.querySelector('#' + tabId);
             if (panel) panel.classList.add('active');
         }
