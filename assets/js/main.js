@@ -606,7 +606,8 @@ function _hrdDismissToast(toast) {
         void toast.offsetWidth;
         toast.classList.add('show');
 
-        var autoDismissMs = (type === 'error') ? 0 : 5000;
+        var isMobileToast = window.matchMedia && window.matchMedia('(max-width: 767px)').matches;
+        var autoDismissMs = (type === 'error' && !isMobileToast) ? 0 : (type === 'error' ? 6000 : 5000);
         if (autoDismissMs > 0) {
             setTimeout(function () { _hrdDismissToast(toast); }, autoDismissMs);
         }

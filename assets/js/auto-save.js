@@ -184,6 +184,11 @@
    * @param {number} duration - Duration in ms (0 = persistent)
    */
   function showToast(message, type = 'success', duration = SUCCESS_MESSAGE_DURATION) {
+    // Keep mobile screens clear of persistent auto-save errors.
+    if (window.matchMedia('(max-width: 767px)').matches && duration <= 0) {
+      duration = 6000;
+    }
+
     const toast = document.createElement('div');
     toast.className = `toast toast-${type}`;
     toast.setAttribute('role', 'status');

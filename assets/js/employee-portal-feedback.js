@@ -80,6 +80,11 @@
   function showToast(message, type, duration) {
     type = type || 'success';
     duration = (duration === undefined) ? (type === 'error' ? 0 : 3500) : duration;
+    // Mobile notifications should always clear themselves, including errors
+    // that are persistent on desktop when their duration is zero.
+    if (window.matchMedia('(max-width: 767px)').matches && duration <= 0) {
+      duration = 6000;
+    }
 
     var toast = document.createElement('div');
     toast.className = 'ep-toast ep-toast-' + type;
