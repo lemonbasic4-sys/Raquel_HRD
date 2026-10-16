@@ -2393,7 +2393,7 @@ require_once '../includes/header.php';
                                 <?php endforeach; ?>
 
                                 <div class="d-flex justify-content-end mt-4">
-                                    <button type="button" class="btn btn-primary"
+                                    <button type="button" class="btn btn-primary self-rating-continue"
                                         onclick="document.getElementById('behavior-rating-tab').click(); document.getElementById('behavior-rating-tab').focus();">
                                         Continue to Core Behaviors &amp; Values
                                         <i class="fas fa-arrow-right ms-2" aria-hidden="true"></i>
@@ -2821,6 +2821,24 @@ document.addEventListener('keydown', function (e) {
 });
 
 // Auto-clear error highlight when user picks a rating on a previously missing item
+function scrollRatingTargetIntoView(target) {
+    if (!target) return;
+
+    const isMobileViewport = window.matchMedia('(max-width: 767.98px)').matches;
+    if (isMobileViewport) {
+        // Direct page scrolling avoids a second browser-controlled movement
+        // caused by focusing the next radio on touch devices.
+        const targetTop = target.getBoundingClientRect().top + window.scrollY - 76;
+        requestAnimationFrame(() => window.scrollTo({
+            top: Math.max(0, targetTop),
+            behavior: 'smooth'
+        }));
+        return;
+    }
+
+    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
 document.addEventListener('change', function (e) {
     if (e.target && (e.target.name?.startsWith('kra_scores[') || e.target.name?.startsWith('beh_scores['))) {
         const item = e.target.closest('.rating-item');
@@ -2987,16 +3005,18 @@ document.addEventListener('change', function (e) {
     const currentItem = e.target.closest('.rating-item');
     if (!currentItem) return;
 
-    // Find all rating items in order
-    const allItems = Array.from(document.querySelectorAll('.rating-item'));
+    // Only advance through items in the visible tab.
+    const allItems = Array.from(document.querySelectorAll('.rating-item'))
+        .filter(item => item.offsetParent !== null);
     const currentIndex = allItems.indexOf(currentItem);
+    const isMobileViewport = window.matchMedia('(max-width: 767.98px)').matches;
 
     if (currentIndex !== -1 && currentIndex < allItems.length - 1) {
         const nextItem = allItems[currentIndex + 1];
         setTimeout(() => {
-            nextItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            scrollRatingTargetIntoView(nextItem);
             const nextRating = nextItem.querySelector('.rating-input:checked') || nextItem.querySelector('.rating-input');
-            if (nextRating) nextRating.focus({ preventScroll: true });
+            if (nextRating && !isMobileViewport) nextRating.focus({ preventScroll: true });
             // Add a brief subtle pulse outline highlight to signal active focus
             nextItem.style.transition = 'box-shadow 0.3s ease';
             nextItem.style.boxShadow = '0 0 0 3px rgba(4, 61, 7, 0.2)';
@@ -3004,10 +3024,12 @@ document.addEventListener('change', function (e) {
         }, 150);
     } else {
         // Last question reached — scroll smoothly to the comments / submit section
-        const actionsDiv = document.querySelector('.self-rating-actions') || document.querySelector('textarea[name="self_comments"]');
-        if (actionsDiv) {
+        const nextStep = currentItem.closest('#kra-rating-pane')
+            ? document.querySelector('.self-rating-continue')
+            : (document.querySelector('.self-rating-actions') || document.querySelector('textarea[name="self_comments"]'));
+        if (nextStep) {
             setTimeout(() => {
-                actionsDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                scrollRatingTargetIntoView(nextStep);
             }, 150);
         }
     }
