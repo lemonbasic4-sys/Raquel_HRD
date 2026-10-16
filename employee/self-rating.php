@@ -1003,6 +1003,151 @@ require_once '../includes/header.php';
     padding: .8rem 1rem;
 }
 
+#reviewModal .review-modal-dialog {
+    margin: .75rem auto;
+    max-width: min(900px, calc(100vw - 2rem));
+}
+
+#reviewModal .review-modal {
+    max-height: calc(100dvh - 1.5rem);
+}
+
+#reviewModal .review-modal-header {
+    padding: .75rem 1.25rem;
+}
+
+#reviewModal .review-modal-body {
+    max-height: calc(100dvh - 142px);
+    padding: .85rem 1.25rem;
+}
+
+#reviewModal .review-warning {
+    margin-bottom: .75rem;
+    padding: .65rem .85rem;
+}
+
+#reviewModal .review-warning-icon {
+    flex-basis: 32px;
+    height: 32px;
+    width: 32px;
+}
+
+#reviewModal .review-summary {
+    gap: .5rem;
+    margin-bottom: .8rem;
+}
+
+#reviewModal .review-summary-item {
+    padding: .6rem .75rem;
+}
+
+#reviewModal .review-section {
+    margin-bottom: .8rem;
+}
+
+#reviewModal .review-table-wrap {
+    border: 1px solid #e0e7df;
+    border-radius: 10px;
+    max-height: 34vh;
+    overflow: auto;
+}
+
+#reviewModal .review-rating-table {
+    font-size: .8rem;
+    margin: 0;
+}
+
+#reviewModal .review-rating-table thead th {
+    background: #f2f6f0;
+    color: #53624f;
+    font-size: .68rem;
+    font-weight: 800;
+    letter-spacing: .04em;
+    padding: .4rem .6rem;
+    position: sticky;
+    text-transform: uppercase;
+    top: 0;
+    z-index: 1;
+}
+
+#reviewModal .review-rating-table td {
+    padding: .35rem .6rem;
+    vertical-align: middle;
+}
+
+#reviewModal .review-rating-table .review-row-number {
+    color: #758071;
+    font-size: .72rem;
+    text-align: center;
+    width: 38px;
+}
+
+#reviewModal .review-rating-table .review-rating-cell {
+    text-align: right;
+    white-space: nowrap;
+}
+
+#reviewModal .review-rating-table .review-rating-badge {
+    border-radius: 999px;
+    display: inline-block;
+    font-size: .72rem;
+    font-weight: 700;
+    padding: .3rem .55rem;
+}
+
+#reviewModal .review-rating-table .review-rating-badge strong {
+    font-size: .82rem;
+    margin-right: .2rem;
+}
+
+#reviewModal .review-rating-badge.review-rating-kra,
+#reviewModal .review-rating-badge.review-rating-behavior {
+    background: #eaf4e8;
+    color: #205d20;
+}
+
+#reviewModal .review-rating-badge.review-rating-missing {
+    background: #fff1f0;
+    color: #b42318;
+}
+
+#reviewModal .review-modal-footer {
+    gap: .5rem;
+    padding: .55rem 1rem;
+}
+
+#reviewModal .review-modal-action {
+    min-height: 38px;
+    padding-bottom: .4rem;
+    padding-top: .4rem;
+}
+
+@media (max-width: 575.98px) {
+    #reviewModal .review-modal-dialog {
+        margin: 0;
+        max-width: none;
+    }
+
+    #reviewModal .review-modal {
+        max-height: 100dvh;
+    }
+
+    #reviewModal .review-modal-body {
+        max-height: none;
+        padding: .75rem;
+    }
+
+    #reviewModal .review-table-wrap {
+        max-height: 35vh;
+    }
+
+    #reviewModal .review-rating-table td,
+    #reviewModal .review-rating-table thead th {
+        padding-left: .4rem;
+        padding-right: .4rem;
+    }
+}
+
 @media (max-width: 575.98px) {
     .self-rating-tabs {
         flex-direction: column;
@@ -2435,7 +2580,7 @@ require_once '../includes/header.php';
 <div class="modal fade" id="reviewModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered modal-fullscreen-sm-down review-modal-dialog">
         <div class="modal-content border-0 shadow-lg review-modal">
-            <div class="modal-header bg-primary text-white border-0 review-modal-header">
+            <div class="modal-header text-white border-0 review-modal-header" style="background-color:#072A05;">
                 <div>
                     <div class="review-modal-eyebrow">Final check</div>
                     <h5 class="modal-title fw-bold"><i class="fas fa-search me-2"></i>Review Your Self-Rating</h5>
@@ -2509,13 +2654,19 @@ function buildReviewSection(title, inputPrefix, badgeClass) {
                 <span>${escapeReviewHtml(title)}</span>
                 <span>${names.size} item${names.size === 1 ? '' : 's'}</span>
             </div>
-            <div class="review-list">
+            <div class="review-table-wrap">
+                <table class="table table-sm table-hover align-middle review-rating-table">
+                    <thead><tr><th scope="col" class="text-center">#</th><th scope="col">Criterion</th><th scope="col" class="text-end">Self-rating</th></tr></thead>
+                    <tbody>
     `;
 
-    names.forEach(name => {
+    Array.from(names).forEach((name, index) => {
         const checkedInput = document.querySelector(`input[name="${CSS.escape(name)}"]:checked`);
         const ratingItem = document.querySelector(`input[name="${CSS.escape(name)}"]`)?.closest('.rating-item');
-        const criterion = ratingItem?.querySelector('.rating-title')?.childNodes[0]?.textContent?.trim() || name;
+        const criterionTitle = ratingItem?.querySelector('.rating-title');
+        const criterion = criterionTitle
+            ? criterionTitle.innerText.replace(/^\s*\d+\.\s*/, '').replace(/\s*Weight:\s*[\d.]+%?/i, '').trim()
+            : name;
         const value = checkedInput ? checkedInput.value : null;
         const labelText = checkedInput
             ? (document.querySelector(`label[for="${CSS.escape(checkedInput.id)}"] .rating-text`)?.innerText || value)
@@ -2523,17 +2674,17 @@ function buildReviewSection(title, inputPrefix, badgeClass) {
         const stateClass = checkedInput ? badgeClass : 'review-rating-missing';
 
         section += `
-            <article class="review-rating-card">
-                <div class="review-rating-criterion">${escapeReviewHtml(criterion)}</div>
-                <div class="review-rating-value ${stateClass}">
-                    <span>${value ? escapeReviewHtml(value) : '--'}</span>
-                    <small>${escapeReviewHtml(labelText)}</small>
-                </div>
-            </article>
+            <tr>
+                <td class="review-row-number">${index + 1}</td>
+                <td>${escapeReviewHtml(criterion)}</td>
+                <td class="review-rating-cell"><span class="review-rating-badge ${stateClass}">${value ? `<strong>${escapeReviewHtml(value)}</strong>${escapeReviewHtml(labelText)}` : 'Not rated'}</span></td>
+            </tr>
         `;
     });
 
     section += `
+                    </tbody>
+                </table>
             </div>
         </section>
     `;
