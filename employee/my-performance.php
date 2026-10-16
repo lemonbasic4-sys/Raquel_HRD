@@ -338,16 +338,6 @@ $score_label = $latest_eval['performance_level'] ?? 'N/A';
                 </div>
             </div>
 
-            <!-- Supervisor Feedback -->
-            <div class="card section-card mb-4">
-                <div class="card-body p-4">
-                    <h6 class="fw-bold text-dark mb-3"><i class="fas fa-comment-dots text-primary me-2"></i>Latest Feedback</h6>
-                    <div id="feedbackContent">
-                        <div class="text-muted small text-center py-3">Loading...</div>
-                    </div>
-                </div>
-            </div>
-
         </div>
     </div>
 </div>
@@ -448,8 +438,6 @@ $score_label = $latest_eval['performance_level'] ?? 'N/A';
             // ── Goal tracking ─────────────────────────────────────────────
             renderGoal(data.avg_score, data.next_level, data.points_needed);
 
-            // ── Feedback ─────────────────────────────────────────────────
-            renderFeedback(data.latest_eval);
         })
         .catch(() => {
             document.getElementById('perfLoadingState').style.display = 'none';
@@ -661,44 +649,6 @@ $score_label = $latest_eval['performance_level'] ?? 'N/A';
         }, 200);
     }
 
-    // ── Feedback ──────────────────────────────────────────────────────────
-    function renderFeedback(latestEval) {
-        const el = document.getElementById('feedbackContent');
-        if (!latestEval) {
-            el.innerHTML = '<div class="text-muted small text-center py-3">No feedback available yet.</div>';
-            return;
-        }
-
-        const fields = [
-            { key: 'supervisor_comments',  label: 'Supervisor', icon: 'fas fa-user-tie' },
-            { key: 'manager_comments',     label: 'Manager',    icon: 'fas fa-briefcase' },
-            { key: 'evaluator_comments',   label: 'HR Notes',   icon: 'fas fa-clipboard' },
-        ];
-
-        let html = '';
-        let hasAny = false;
-        fields.forEach(f => {
-            const val = latestEval[f.key];
-            if (val && val.trim()) {
-                hasAny = true;
-                html += `
-                    <div class="insight-card p-3 mb-3">
-                        <div class="d-flex align-items-center mb-2 gap-2">
-                            <i class="${f.icon} text-primary" style="font-size:.8rem;"></i>
-                            <span class="fw-semibold small">${f.label}</span>
-                        </div>
-                        <p class="mb-0 small text-muted" style="line-height:1.6;">${escHtml(val)}</p>
-                    </div>`;
-            }
-        });
-
-        if (!hasAny) {
-            el.innerHTML = '<div class="text-muted small text-center py-3">No written feedback from your latest evaluation.</div>';
-        } else {
-            const period = fmtPeriod(latestEval.evaluation_period_start, latestEval.evaluation_period_end);
-            el.innerHTML = `<div class="text-muted mb-2" style="font-size:.72rem;"><i class="fas fa-calendar-alt me-1"></i>From evaluation: ${period}</div>${html}`;
-        }
-    }
 })();
 </script>
 
