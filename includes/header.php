@@ -895,13 +895,15 @@ switch ($effective_role) {
                         // Confirm Rating — for immediate heads outside HR department
                         $_g_is_sup = false;
                         $_g_dept_name = '';
+                        $_g_is_hr_manager = false;
                         if ($_g_emp_id > 0 && $conn) {
                             $_g_is_sup = hasSupervisorPrivileges($conn, $_g_emp_id);
-                            if ($_g_is_sup) {
-                                $_g_dep_r = $conn->query("SELECT d.department_name FROM employees e LEFT JOIN departments d ON e.department_id = d.department_id WHERE e.employee_id = $_g_emp_id LIMIT 1");
-                                if ($_g_dep_r) {
-                                    $_g_dept_name = $_g_dep_r->fetch_assoc()['department_name'] ?? '';
-                                }
+                            $_g_dep_r = $conn->query("SELECT d.department_name, e.rank_category_id FROM employees e LEFT JOIN departments d ON e.department_id = d.department_id WHERE e.employee_id = $_g_emp_id LIMIT 1");
+                            if ($_g_dep_r) {
+                                $_g_dep_row = $_g_dep_r->fetch_assoc() ?: [];
+                                $_g_dept_name = (string)($_g_dep_row['department_name'] ?? '');
+                                $_g_is_hr_manager = strcasecmp($_g_dept_name, 'Human Resources') === 0
+                                    && (int)($_g_dep_row['rank_category_id'] ?? 0) === 3;
                             }
                         }
                         if ($_g_is_sup && !$_g_is_dept_mgr):
@@ -936,7 +938,7 @@ switch ($effective_role) {
                                 <i class="fas fa-chart-line me-2" style="width: 18px; text-align: center;"></i>My Performance
                             </a>
                         </li>
-                        <?php if ($_g_is_sup): ?>
+                        <?php if ($_g_is_sup && !$_g_is_hr_manager): ?>
                             <li>
                                 <a class="dropdown-item d-flex align-items-center" href="<?php echo BASE_URL; ?>/employee/team-list.php" style="font-size:0.82rem; padding: 6px 10px;">
                                     <i class="fas fa-users me-2" style="width: 18px; text-align: center;"></i>My Team
