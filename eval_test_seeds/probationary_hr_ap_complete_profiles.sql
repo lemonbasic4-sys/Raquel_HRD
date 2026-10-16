@@ -14,14 +14,17 @@ REPLACE INTO employees
     (employee_id, employee_code, first_name, last_name, middle_name, hire_date,
      date_of_birth, place_of_birth, gender, civil_status, job_title_id, job_title,
      department_id, rank_category_id, branch_id, reports_to, employment_status,
-     employment_type, contract_start_date, contract_end_date, profile_picture, is_active)
+     employment_type, contract_start_date, contract_end_date, profile_picture, is_active,
+     probationary_regularization_eligible, probationary_eligible_evaluation_id,
+     probationary_eligible_at, probationary_next_evaluation_type,
+     probationary_next_evaluation_due_date)
 VALUES
-(15101, 'HRD-P01', 'Marianne', 'Aguilar', 'Santos', '2026-07-06', '1988-04-14', 'Lucena City, Quezon', 'Female', 'Married', 700, 'HR Manager I', 7, 3, 102, NULL,  'Probationary', 'Full-time', '2026-07-06', '2027-01-05', 'avatar_f.jpg', 1),
-(15102, 'HRD-P02', 'Dominic', 'Navarro', 'Cruz', '2026-08-03', '1992-09-23', 'Tayabas City, Quezon', 'Male', 'Single', 705, 'HR Supervisor I', 7, 4, 102, 15101, 'Probationary', 'Full-time', '2026-08-03', '2027-02-02', 'avatar_m.jpg', 1),
-(15103, 'HRD-P03', 'Alyssa', 'Fernandez', 'Reyes', '2026-09-01', '1998-01-30', 'Sariaya, Quezon', 'Female', 'Single', 710, 'HR Staff I', 7, 5, 102, 15102, 'Probationary', 'Full-time', '2026-09-01', '2027-02-28', 'avatar_f.jpg', 1),
-(15104, 'AP-P01', 'Victor', 'Salcedo', 'Mendoza', '2026-07-13', '1987-12-08', 'Lucena City, Quezon', 'Male', 'Married', 101, 'AP Manager I', 1, 3, 102, NULL,  'Probationary', 'Full-time', '2026-07-13', '2027-01-12', 'avatar_m.jpg', 1),
-(15105, 'AP-P02', 'Clarisse', 'Domingo', 'Lopez', '2026-08-10', '1993-05-17', 'Pagbilao, Quezon', 'Female', 'Married', 105, 'AP Supervisor I', 1, 4, 102, 15104, 'Probationary', 'Full-time', '2026-08-10', '2027-02-09', 'avatar_f.jpg', 1),
-(15106, 'AP-P03', 'Paolo', 'Gonzales', 'Rivera', '2026-09-07', '1999-10-26', 'Candelaria, Quezon', 'Male', 'Single', 108, 'AP Staff I', 1, 5, 102, 15105, 'Probationary', 'Full-time', '2026-09-07', '2027-03-06', 'avatar_m.jpg', 1);
+(15101, 'HRD-P01', 'Marianne', 'Aguilar', 'Santos', '2026-07-06', '1988-04-14', 'Lucena City, Quezon', 'Female', 'Married', 700, 'HR Manager I', 7, 3, 102, NULL,  'Probationary', 'Full-time', '2026-07-06', '2027-01-05', 'avatar_f.jpg', 1, 0, NULL, NULL, 'Initial', '2026-10-06'),
+(15102, 'HRD-P02', 'Dominic', 'Navarro', 'Cruz', '2026-08-03', '1992-09-23', 'Tayabas City, Quezon', 'Male', 'Single', 705, 'HR Supervisor I', 7, 4, 102, 15101, 'Probationary', 'Full-time', '2026-08-03', '2027-02-02', 'avatar_m.jpg', 1, 0, NULL, NULL, 'Initial', '2026-11-03'),
+(15103, 'HRD-P03', 'Alyssa', 'Fernandez', 'Reyes', '2026-09-01', '1998-01-30', 'Sariaya, Quezon', 'Female', 'Single', 710, 'HR Staff I', 7, 5, 102, 15102, 'Probationary', 'Full-time', '2026-09-01', '2027-02-28', 'avatar_f.jpg', 1, 0, NULL, NULL, 'Initial', '2026-12-01'),
+(15104, 'AP-P01', 'Victor', 'Salcedo', 'Mendoza', '2026-07-13', '1987-12-08', 'Lucena City, Quezon', 'Male', 'Married', 101, 'AP Manager I', 1, 3, 102, NULL,  'Probationary', 'Full-time', '2026-07-13', '2027-01-12', 'avatar_m.jpg', 1, 0, NULL, NULL, 'Initial', '2026-10-13'),
+(15105, 'AP-P02', 'Clarisse', 'Domingo', 'Lopez', '2026-08-10', '1993-05-17', 'Pagbilao, Quezon', 'Female', 'Married', 105, 'AP Supervisor I', 1, 4, 102, 15104, 'Probationary', 'Full-time', '2026-08-10', '2027-02-09', 'avatar_f.jpg', 1, 0, NULL, NULL, 'Initial', '2026-11-10'),
+(15106, 'AP-P03', 'Paolo', 'Gonzales', 'Rivera', '2026-09-07', '1999-10-26', 'Candelaria, Quezon', 'Male', 'Single', 108, 'AP Staff I', 1, 5, 102, 15105, 'Probationary', 'Full-time', '2026-09-07', '2027-03-06', 'avatar_m.jpg', 1, 0, NULL, NULL, 'Initial', '2026-12-07');
 
 -- Contact and physical details
 REPLACE INTO employee_contacts (employee_id, personal_email, mobile_number, telephone_number) VALUES
