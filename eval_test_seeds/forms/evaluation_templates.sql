@@ -122,11 +122,17 @@ INSERT INTO evaluation_criteria
     (template_id, section, criterion_name, description, weight, scoring_method, sort_order)
 SELECT template_id, 'KRA', criterion_name, description, weight, 'Scale_1_4', sort_order
 FROM (
-    SELECT 1 sort_order, 'Strategic Execution' criterion_name, 'Translates company priorities into clear departmental plans and measurable results.' description, 25.00 weight
-    UNION ALL SELECT 2, 'Department Leadership', 'Provides direction, sound decisions, and consistent leadership to the department.', 20.00
-    UNION ALL SELECT 3, 'Operational Control', 'Maintains accurate, timely, compliant, and well-controlled departmental operations.', 20.00
-    UNION ALL SELECT 4, 'People Management', 'Develops employees, delegates effectively, and addresses performance concerns promptly.', 20.00
-    UNION ALL SELECT 5, 'Process Improvement', 'Identifies and implements practical improvements that support company objectives.', 15.00
+    SELECT 1 sort_order, 'Strategic Execution' criterion_name, 'Translates company priorities into clear departmental plans and measurable results.' description, 10.00 weight
+    UNION ALL SELECT 2, 'Department Leadership', 'Provides clear direction, sound decisions, and consistent leadership to the department.', 10.00
+    UNION ALL SELECT 3, 'Operational Planning', 'Builds practical work plans, schedules, and priorities aligned with business requirements.', 10.00
+    UNION ALL SELECT 4, 'Performance Management', 'Sets expectations, monitors results, and addresses performance concerns promptly.', 10.00
+    UNION ALL SELECT 5, 'People Development', 'Coaches employees, delegates effectively, and develops team capability.', 10.00
+    UNION ALL SELECT 6, 'Policy and Regulatory Compliance', 'Ensures departmental activities comply with company policies and applicable requirements.', 10.00
+    UNION ALL SELECT 7, 'Budget and Resource Management', 'Uses departmental funds, people, time, and other resources responsibly.', 10.00
+    UNION ALL SELECT 8, 'Reporting and Data Accuracy', 'Provides complete, accurate, timely, and decision-ready departmental reports.', 8.00
+    UNION ALL SELECT 9, 'Risk and Issue Management', 'Identifies operational risks and resolves or escalates significant issues appropriately.', 8.00
+    UNION ALL SELECT 10, 'Stakeholder Coordination', 'Maintains effective coordination with executives, departments, clients, and partners.', 7.00
+    UNION ALL SELECT 11, 'Process Improvement', 'Identifies and implements practical improvements that support company objectives.', 7.00
 ) criteria
 CROSS JOIN (
     SELECT 16001 template_id UNION ALL SELECT 16002 UNION ALL
@@ -138,11 +144,17 @@ INSERT INTO evaluation_criteria
     (template_id, section, criterion_name, description, weight, scoring_method, sort_order)
 SELECT template_id, 'KRA', criterion_name, description, weight, 'Scale_1_4', sort_order
 FROM (
-    SELECT 1 sort_order, 'Work Planning and Coordination' criterion_name, 'Plans assignments, balances workloads, and keeps daily operations on schedule.' description, 25.00 weight
-    UNION ALL SELECT 2, 'Quality and Compliance Control', 'Checks work accuracy and ensures procedures and company policies are followed.', 20.00
-    UNION ALL SELECT 3, 'Team Supervision and Coaching', 'Provides clear instructions, useful feedback, and support to team members.', 20.00
-    UNION ALL SELECT 4, 'Reports and Issue Resolution', 'Submits reliable reports and resolves or escalates operational issues promptly.', 20.00
-    UNION ALL SELECT 5, 'Initiative and Improvement', 'Takes ownership and recommends workable improvements to team processes.', 15.00
+    SELECT 1 sort_order, 'Work Planning' criterion_name, 'Plans assignments and establishes clear daily and weekly priorities.' description, 10.00 weight
+    UNION ALL SELECT 2, 'Workload Coordination', 'Balances workloads and keeps team deliverables on schedule.', 10.00
+    UNION ALL SELECT 3, 'Quality Control', 'Reviews team output for completeness, accuracy, and consistency.', 10.00
+    UNION ALL SELECT 4, 'Policy and Procedure Compliance', 'Ensures the team consistently follows approved policies and procedures.', 10.00
+    UNION ALL SELECT 5, 'Team Supervision', 'Provides clear instructions and monitors employee performance effectively.', 10.00
+    UNION ALL SELECT 6, 'Coaching and Feedback', 'Gives timely, constructive feedback and supports employee development.', 10.00
+    UNION ALL SELECT 7, 'Report Preparation', 'Produces complete, accurate, and timely operational reports.', 10.00
+    UNION ALL SELECT 8, 'Issue Resolution', 'Handles routine problems promptly and escalates significant issues appropriately.', 8.00
+    UNION ALL SELECT 9, 'Interdepartmental Coordination', 'Coordinates effectively with managers, staff, and other departments.', 8.00
+    UNION ALL SELECT 10, 'Resource Utilization', 'Uses available time, tools, information, and personnel efficiently.', 7.00
+    UNION ALL SELECT 11, 'Initiative and Improvement', 'Takes ownership and recommends workable improvements to team processes.', 7.00
 ) criteria
 CROSS JOIN (
     SELECT 16005 template_id UNION ALL SELECT 16006 UNION ALL
@@ -154,11 +166,17 @@ INSERT INTO evaluation_criteria
     (template_id, section, criterion_name, description, weight, scoring_method, sort_order)
 SELECT template_id, 'KRA', criterion_name, description, weight, 'Scale_1_4', sort_order
 FROM (
-    SELECT 1 sort_order, 'Job Knowledge' criterion_name, 'Understands assigned duties, procedures, tools, and required documentation.' description, 25.00 weight
-    UNION ALL SELECT 2, 'Quality and Accuracy', 'Produces complete, accurate, and properly documented work.', 25.00
-    UNION ALL SELECT 3, 'Productivity and Timeliness', 'Completes assigned work within expected deadlines and service standards.', 20.00
-    UNION ALL SELECT 4, 'Communication and Teamwork', 'Communicates professionally and works effectively with colleagues and clients.', 15.00
-    UNION ALL SELECT 5, 'Learning and Initiative', 'Applies feedback, learns quickly, and takes appropriate initiative.', 15.00
+    SELECT 1 sort_order, 'Job Knowledge' criterion_name, 'Understands assigned duties, procedures, tools, and required documentation.' description, 10.00 weight
+    UNION ALL SELECT 2, 'Work Quality', 'Produces complete and professionally presented work.', 10.00
+    UNION ALL SELECT 3, 'Accuracy and Attention to Detail', 'Checks information carefully and minimizes avoidable errors.', 10.00
+    UNION ALL SELECT 4, 'Productivity', 'Completes an appropriate volume of work within available time.', 10.00
+    UNION ALL SELECT 5, 'Timeliness', 'Meets deadlines and responds promptly to assigned tasks and requests.', 10.00
+    UNION ALL SELECT 6, 'Policy and Procedure Compliance', 'Follows approved procedures, instructions, and company policies.', 10.00
+    UNION ALL SELECT 7, 'Records and Documentation', 'Maintains organized, complete, and retrievable records.', 10.00
+    UNION ALL SELECT 8, 'Communication', 'Communicates clearly and professionally with colleagues and clients.', 8.00
+    UNION ALL SELECT 9, 'Teamwork', 'Cooperates with others and contributes reliably to team objectives.', 8.00
+    UNION ALL SELECT 10, 'Learning and Adaptability', 'Applies feedback and adjusts effectively to new duties or procedures.', 7.00
+    UNION ALL SELECT 11, 'Initiative and Problem Solving', 'Takes appropriate initiative and resolves routine concerns responsibly.', 7.00
 ) criteria
 CROSS JOIN (
     SELECT 16007 template_id UNION ALL SELECT 16008 UNION ALL
@@ -186,7 +204,7 @@ CROSS JOIN (
 
 COMMIT;
 
--- Verification: 12 active templates, each with 5 KRA and 4 Behavior criteria.
+-- Verification: 12 active templates, each with 11 KRA and 4 Behavior criteria.
 SELECT
     et.template_id,
     et.template_name,
