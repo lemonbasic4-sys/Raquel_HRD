@@ -399,8 +399,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action === 'approve' && $is_probationary_step
         && ($step['evaluation_type'] === 'Final' || !isHumanResourcesPackageDepartment($conn, (int)$step['department_id']))) {
         if ($step['evaluation_type'] === 'Final'
-            && isHumanResourcesPackageDepartment($conn, (int)$step['department_id'])
-            && in_array((int)($probationary_review['rank_category_id'] ?? 0), [3, 4, 5], true)
             && !hasApprovedInitialProbationaryEvaluation($conn, $probationary_employee_id)) {
             redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger',
                 'Approve this employee’s Initial evaluation before reviewing the Final evaluation.');

@@ -246,7 +246,7 @@ switch ($effective_role) {
             $_hdr_allowed_eval_types = getAllowedEvaluationTypesForEmploymentStatus($_hdr_emp_status);
             $_hdr_in_clause = "'" . implode("','", $_hdr_allowed_eval_types) . "'";
             $_hdr_legacy_rank_sql = probationaryTemplateLegacyRankSql('et', $_hdr_emp_rank);
-            $_hdr_final_gate = (!$is_probationary_employee || !$is_hr_personnel || !in_array($_hdr_emp_rank, [3, 4, 5], true)
+            $_hdr_final_gate = (!$is_probationary_employee
                 || hasApprovedInitialProbationaryEvaluation($conn, $_hdr_emp_id)) ? 1 : 0;
 
             $_hdr_pt_stmt = $conn->prepare("

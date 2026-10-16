@@ -3231,7 +3231,8 @@ function applyProbationaryEvaluationOutcome($conn, $evaluation_id)
     $stmt->close();
     if (!$row) return false;
     $is_hr = strcasecmp((string)($row['department_name'] ?? ''), 'Human Resources') === 0;
-    if ($is_hr && in_array((int)$row['rank_category_id'], [3, 4, 5], true) && $row['evaluation_type'] === 'Final'
+    if (($row['employment_status'] ?? '') === 'Probationary'
+        && $row['evaluation_type'] === 'Final'
         && !hasApprovedInitialProbationaryEvaluation($conn, (int)$row['employee_id'])) return false;
     if ((!$is_hr || $row['evaluation_type'] === 'Final')
         && !in_array($row['recommendation'] ?? '', ['Recommend regularization', 'Continue training'], true)) return false;
