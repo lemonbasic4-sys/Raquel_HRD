@@ -39,6 +39,18 @@ $template_archive_url = !empty($creator_context['is_ceo'])
     : BASE_URL . '/manager/template-archive.php';
 $template_scope_sql = '1 = 1';
 $owned_template_scope_sql = 'et.created_by = ' . $current_user_id;
+if (!empty($creator_context['is_ceo']) && (int)($creator_context['employee_id'] ?? 0) > 0) {
+    // The CEO has separate HRIS and Employee Portal logins linked to the same
+    // employee record. Treat those two accounts as one template owner.
+    $ceo_employee_id = (int)$creator_context['employee_id'];
+    $owned_template_scope_sql = "et.created_by IN (
+        SELECT owner_account.user_id
+        FROM users owner_account
+        WHERE owner_account.employee_id = $ceo_employee_id
+          AND owner_account.role IN ('President and CEO', 'Employee')
+          AND owner_account.deleted_at IS NULL
+    )";
+}
 $template_viewer_role = (string)($creator_context['role'] ?? '');
 if (!empty($creator_context['is_ceo']) || in_array($template_viewer_role, ['HR Manager', 'HR Supervisor'], true)) {
     $template_scope_sql = $owned_template_scope_sql;
@@ -408,7 +420,8 @@ $used_template_count = (int) $conn->query("SELECT COUNT(DISTINCT ev.template_id)
             <div class="<?php echo $templates->num_rows === 1 ? 'col-12 col-xl-8 col-xxl-6' : 'col-12 col-md-6 col-xxl-4'; ?>">
                 <div class="chart-card fadeup h-100 position-relative template-list-card<?php echo $is_probationary_template ? ' probation-template-card' : ''; ?>">
                     <!-- Checkbox for Batch Delete -->
-                    <?php $is_template_owner = (int)($t['created_by'] ?? 0) === $current_user_id; ?>
+                    <?php $is_template_owner = (int)($t['created_by'] ?? 0) === $current_user_id
+                        || (!empty($creator_context['is_ceo']) && canManageEvaluationTemplate($conn, (int)$t['template_id'], $current_user_id)); ?>
                     <?php $is_template_manager = $is_template_owner || ($can_manage_department_peer_templates && canManageEvaluationTemplate($conn, (int)$t['template_id'], $current_user_id)); ?>
                     <?php if ($can_create_templates && $is_template_manager): ?>
                     <div class="position-absolute" style="top: 15px; right: 15px; z-index: 10;">

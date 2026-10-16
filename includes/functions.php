@@ -3216,7 +3216,8 @@ function applyProbationaryEvaluationOutcome($conn, $evaluation_id)
 {
     $evaluation_id = (int)$evaluation_id;
     if ($evaluation_id <= 0 || !ensureProbationaryEvaluationSchema($conn)) return false;
-    $stmt = $conn->prepare("SELECT ev.employee_id, ev.evaluation_type, e.hire_date, e.employment_status, e.job_title,
+    $stmt = $conn->prepare("SELECT ev.employee_id, ev.evaluation_type, e.hire_date, e.employment_status,
+            e.first_name, e.last_name, e.job_title,
             e.rank_category_id, d.department_name, per.recommendation, per.recommendation_reason,
             per.immediate_head_user_id
         FROM evaluations ev
@@ -3307,6 +3308,33 @@ function applyProbationaryEvaluationOutcome($conn, $evaluation_id)
             createNotification($conn, (int)$recipient['user_id'],
                 'Regularization Confirmed - HRIS Access Authorization Required', $message,
                 BASE_URL . '/employee/my-employment.php', 'probation', 1);
+        }
+    }
+    if ($ok && $regularize && (int)($row['rank_category_id'] ?? 0) === 3) {
+        $hr_manager_recipients = $conn->prepare("SELECT u.user_id
+            FROM users u
+            JOIN employees hr_manager ON hr_manager.employee_id = u.employee_id
+            JOIN departments hr_department ON hr_department.department_id = hr_manager.department_id
+                AND hr_department.department_name = 'Human Resources'
+            WHERE u.role = 'HR Manager' AND u.is_active = 1
+              AND COALESCE(u.account_hold, 0) = 0 AND u.deleted_at IS NULL
+              AND hr_manager.is_active = 1 AND hr_manager.deleted_at IS NULL
+              AND hr_manager.employee_id <> ?");
+        $hr_manager_recipients->bind_param('i', $employee_id);
+        $hr_manager_recipients->execute();
+        $hr_manager_users = $hr_manager_recipients->get_result()->fetch_all(MYSQLI_ASSOC);
+        $hr_manager_recipients->close();
+
+        $employee_name = trim((string)($row['first_name'] ?? '') . ' ' . (string)($row['last_name'] ?? ''));
+        $department_name = (string)($row['department_name'] ?? 'Department');
+        $job_title = (string)($row['job_title'] ?? 'Manager');
+        $notification_message = $employee_name . ' (' . $job_title . ', ' . $department_name
+            . ') was regularized after the Final probationary evaluation was approved. '
+            . 'Please review any required HRIS access authorization separately; regularization does not automatically grant HRIS access.';
+        foreach ($hr_manager_users as $hr_manager_user) {
+            createNotification($conn, (int)$hr_manager_user['user_id'],
+                'Manager-level probationary employee regularized', $notification_message,
+                BASE_URL . '/manager/evaluation-history.php');
         }
     }
     return $ok;
@@ -3542,13 +3570,19 @@ function isEvaluationTemplateOwner($conn, $template_id, $user_id)
 function canManageEvaluationTemplate($conn, $template_id, $user_id)
 {
     $stmt = $conn->prepare("SELECT et.created_by,
-            viewer.role AS viewer_role, viewer_emp.department_id AS viewer_department_id, viewer_emp.rank_category_id AS viewer_rank,
-            creator.role AS creator_role, creator_emp.department_id AS creator_department_id, creator_emp.rank_category_id AS creator_rank
+            viewer.role AS viewer_role, viewer_emp.employee_id AS viewer_employee_id,
+            viewer_emp.department_id AS viewer_department_id, viewer_emp.rank_category_id AS viewer_rank,
+            viewer_position.job_title AS viewer_position_title,
+            creator.role AS creator_role, creator_emp.employee_id AS creator_employee_id,
+            creator_emp.department_id AS creator_department_id, creator_emp.rank_category_id AS creator_rank,
+            creator_position.job_title AS creator_position_title
         FROM evaluation_templates et
         JOIN users viewer ON viewer.user_id = ? AND viewer.is_active = 1 AND COALESCE(viewer.account_hold, 0) = 0 AND viewer.deleted_at IS NULL
         LEFT JOIN employees viewer_emp ON viewer_emp.employee_id = viewer.employee_id
+        LEFT JOIN job_titles viewer_position ON viewer_position.job_title_id = viewer_emp.job_title_id
         LEFT JOIN users creator ON creator.user_id = et.created_by
         LEFT JOIN employees creator_emp ON creator_emp.employee_id = creator.employee_id
+        LEFT JOIN job_titles creator_position ON creator_position.job_title_id = creator_emp.job_title_id
         WHERE et.template_id = ? LIMIT 1");
     $user_id = (int)$user_id;
     $template_id = (int)$template_id;
@@ -3558,6 +3592,18 @@ function canManageEvaluationTemplate($conn, $template_id, $user_id)
     $stmt->close();
     if (!$row) return false;
     if ((int)$row['created_by'] === $user_id) return true;
+
+    $viewer_is_ceo = $row['viewer_role'] === 'President and CEO'
+        || (in_array((int)($row['viewer_rank'] ?? 0), [1, 2], true)
+            && preg_match('/president|chief executive officer|\\bceo\\b/i', (string)($row['viewer_position_title'] ?? '')));
+    $creator_is_ceo = $row['creator_role'] === 'President and CEO'
+        || (in_array((int)($row['creator_rank'] ?? 0), [1, 2], true)
+            && preg_match('/president|chief executive officer|\\bceo\\b/i', (string)($row['creator_position_title'] ?? '')));
+    if ($viewer_is_ceo && $creator_is_ceo
+        && (int)($row['viewer_employee_id'] ?? 0) > 0
+        && (int)$row['viewer_employee_id'] === (int)($row['creator_employee_id'] ?? 0)) {
+        return true;
+    }
 
     if (in_array($row['viewer_role'], ['HR Manager', 'HR Supervisor'], true)) return false;
 
