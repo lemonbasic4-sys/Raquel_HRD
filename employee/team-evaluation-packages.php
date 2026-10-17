@@ -305,6 +305,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // F7 Action: Consolidator returns individual member self-rating back to employee
     if ($action === 'return_member') {
         $member_eval_id = (int) ($_POST['member_evaluation_id'] ?? 0);
+        $comments = trim((string)($_POST['return_reason'] ?? $comments));
         if ($member_eval_id <= 0) {
             redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'Select a member evaluation to return.');
         }
@@ -925,14 +926,15 @@ asort($package_department_options, SORT_NATURAL | SORT_FLAG_CASE);
         }
         $is_final_probationary_step = $is_probationary_package && (int)$package['current_step_order'] >= $route_count;
         $is_final_hr_step = $is_final_probationary_step && isHumanResourcesPackageDepartment($conn, (int)$package['department_id']);
-        $members_stmt = $conn->prepare("SELECT e.evaluation_id, emp.first_name, emp.last_name, emp.job_title,
+        $members_stmt = $conn->prepare("SELECT e.evaluation_id, emp.first_name, emp.last_name, emp.job_title, emp.rank_category_id,
                 e.kra_subtotal, e.behavior_average, e.total_score, e.status, pm.member_status,
                 (SELECT AVG(COALESCE(es.manager_override_score, es.supervisor_override_score,
                                      es.dept_manager_override_score, es.score_value))
                  FROM evaluation_scores es JOIN evaluation_criteria ec ON ec.criterion_id = es.criterion_id
                  WHERE es.evaluation_id = e.evaluation_id AND ec.section = 'Behavior') AS individual_behavior,
                 EXISTS(SELECT 1 FROM evaluation_scores es WHERE es.evaluation_id = e.evaluation_id AND (es.supervisor_override_score IS NOT NULL OR es.dept_manager_override_score IS NOT NULL OR es.manager_override_score IS NOT NULL)) AS has_adjustments,
-                per.recommendation, per.recommendation_reason, per.immediate_head_signature_data, per.immediate_head_signed_at
+                per.recommendation, per.recommendation_reason, per.immediate_head_user_id,
+                per.immediate_head_signature_data, per.immediate_head_signed_at
             FROM evaluation_package_members pm
             JOIN evaluations e ON e.evaluation_id = pm.evaluation_id
             JOIN employees emp ON emp.employee_id = e.employee_id
@@ -943,6 +945,19 @@ asort($package_department_options, SORT_NATURAL | SORT_FLAG_CASE);
         $members_stmt->execute();
         $members = $members_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
         $members_stmt->close();
+
+        $requires_probationary_decision_signature = $is_probationary_package
+            && (int)$package['current_step_order'] === 1
+            && (($package['evaluation_type'] ?? '') === 'Final'
+                || (($package['evaluation_type'] ?? '') === 'Initial'
+                    && in_array((int)($members[0]['rank_category_id'] ?? 0), [3, 4, 5], true)));
+        $has_current_reviewer_signature = $requires_probationary_decision_signature
+            && !empty($members[0]['immediate_head_signature_data'])
+            && (int)($members[0]['immediate_head_user_id'] ?? 0) === $user_id;
+        $has_saved_final_recommendation = ($package['evaluation_type'] ?? '') !== 'Final'
+            || (!empty($members[0]['recommendation']) && !empty($members[0]['recommendation_reason']));
+        $signature_gate_locked = $requires_probationary_decision_signature
+            && (!$has_current_reviewer_signature || !$has_saved_final_recommendation);
 
         // Load any late-rejoined members for informational alert in the member tab
         $late_rejoined_stmt = $conn->prepare("SELECT emp.first_name, emp.last_name, emp.job_title
@@ -1237,6 +1252,7 @@ asort($package_department_options, SORT_NATURAL | SORT_FLAG_CASE);
                     <input type="hidden" name="package_action" id="actionInput-<?php echo (int)$package['package_id']; ?>" value="<?php echo $is_unclaimed_group_step ? 'claim' : 'approve'; ?>">
                     <?php if ($is_probationary_package && (int)$package['current_step_order'] === 1 && count($members) === 1): ?>
                         <input type="hidden" name="member_evaluation_id" value="<?php echo (int)$members[0]['evaluation_id']; ?>">
+                        <input type="hidden" name="return_reason" id="returnReason-<?php echo (int)$package['package_id']; ?>" value="">
                     <?php endif; ?>
                     <?php echo csrfField(); ?>
 
@@ -1251,6 +1267,13 @@ asort($package_department_options, SORT_NATURAL | SORT_FLAG_CASE);
                     <?php if (!$package_next_check['ok']): ?>
                         <div class="alert alert-danger py-2 px-3 small mb-3 border-danger shadow-sm">
                             <i class="fas fa-exclamation-triangle me-1"></i><?php echo $package_next_check['message']; ?>
+                        </div>
+                    <?php endif; ?>
+
+                    <?php if ($signature_gate_locked): ?>
+                        <div class="alert alert-warning py-2 px-3 small mb-3" role="status">
+                            <i class="fas fa-lock me-1"></i><strong>Approval locked.</strong>
+                            Open <strong>Review &amp; Decide</strong> for this employee<?php echo ($package['evaluation_type'] ?? '') === 'Final' ? ', record the recommendation and reason, sign, and save' : ', sign the Immediate head signature, and save'; ?> to unlock approval.
                         </div>
                     <?php endif; ?>
 
@@ -1276,25 +1299,25 @@ asort($package_department_options, SORT_NATURAL | SORT_FLAG_CASE);
                         <label class="form-label fw-bold" for="comments-<?php echo (int)$package['package_id']; ?>">
                             Review Remarks &amp; Feedback <span class="text-muted fw-normal">(Optional for approval, required for returns)</span>
                         </label>
-                        <textarea class="form-control form-control-sm" id="comments-<?php echo (int)$package['package_id']; ?>" name="comments" rows="2" style="min-height:76px;max-height:160px;resize:vertical;" placeholder="Enter endorsement remarks or return instructions…"></textarea>
+                        <textarea class="form-control form-control-sm" id="comments-<?php echo (int)$package['package_id']; ?>" name="comments" rows="2" style="min-height:76px;max-height:160px;resize:vertical;" placeholder="<?php echo $signature_gate_locked ? 'Sign from Review & Decide to unlock review actions.' : 'Enter endorsement remarks or return instructions…'; ?>" <?php echo $signature_gate_locked ? 'disabled aria-disabled="true"' : ''; ?>></textarea>
                     </div>
 
                     <div class="d-flex flex-wrap gap-2 align-items-center">
                         <?php if ($is_probationary_package && ($package['evaluation_type'] ?? '') === 'Final'
                             && (int)$package['current_step_order'] === 2 && !$is_final_hr_step): ?>
                             <button class="btn btn-outline-danger px-4 py-2 fw-bold" type="button"
-                                onclick="return rejectProbationaryRegularization(<?php echo (int)$package['package_id']; ?>);" style="min-height:46px; border-radius:8px;">
+                                onclick="return rejectProbationaryRegularization(<?php echo (int)$package['package_id']; ?>);" <?php echo $signature_gate_locked ? 'disabled' : ''; ?> style="min-height:46px; border-radius:8px;">
                                 <i class="fas fa-times-circle me-1"></i>Decline Regularization
                             </button>
                         <?php endif; ?>
                         <?php if (!$package_next_check['ok']): ?>
                             <!-- Blocked Action Button with direct modal to explain reason and route to config -->
-                            <button class="btn btn-warning px-4 py-2 fw-bold text-dark" type="button" data-bs-toggle="modal" data-bs-target="#confirmApproveModal-<?php echo (int)$package['package_id']; ?>" style="min-height:46px; border-radius:8px;">
+                            <button class="btn btn-warning px-4 py-2 fw-bold text-dark" type="button" data-bs-toggle="modal" data-bs-target="#confirmApproveModal-<?php echo (int)$package['package_id']; ?>" <?php echo $signature_gate_locked ? 'disabled' : ''; ?> style="min-height:46px; border-radius:8px;">
                                 <i class="fas fa-exclamation-triangle me-1"></i>Review Blocked &mdash; Check Next Reviewer
                             </button>
                         <?php else: ?>
                             <!-- F3: Trigger Pre-Submission Confirmation Modal -->
-                            <button class="btn-action-primary btn" type="button" data-bs-toggle="modal" data-bs-target="#confirmApproveModal-<?php echo (int)$package['package_id']; ?>">
+                            <button class="btn-action-primary btn" type="button" data-bs-toggle="modal" data-bs-target="#confirmApproveModal-<?php echo (int)$package['package_id']; ?>" <?php echo $signature_gate_locked ? 'disabled' : ''; ?>>
                                 <?php if ($is_board_step || $is_final_probationary_step): ?>
                                     <i class="fas fa-lock me-1"></i>Approve, Lock, and Apply Results
                                 <?php else: ?>
@@ -1307,8 +1330,8 @@ asort($package_department_options, SORT_NATURAL | SORT_FLAG_CASE);
                             <button class="btn btn-outline-danger px-4 py-2 fw-bold" type="submit" formnovalidate onclick="return submitProbationaryReturn(<?php echo (int)$package['package_id']; ?>);" style="min-height:46px; border-radius:8px;">
                                 <i class="fas fa-undo me-1"></i>Return for Revision
                             </button>
-                        <?php elseif ($package['step_type'] !== 'Consolidation' && !($is_probationary_package && (int)$package['current_step_order'] === 1)): ?>
-                            <button class="btn btn-outline-danger px-4 py-2 fw-bold" type="submit" onclick="document.getElementById('actionInput-<?php echo (int)$package['package_id']; ?>').value='return';" style="min-height:46px; border-radius:8px;">
+                        <?php elseif (!$signature_gate_locked && $package['step_type'] !== 'Consolidation' && !($is_probationary_package && (int)$package['current_step_order'] === 1)): ?>
+                            <button class="btn btn-outline-danger px-4 py-2 fw-bold" type="submit" onclick="document.getElementById('actionInput-<?php echo (int)$package['package_id']; ?>').value='return';" <?php echo $signature_gate_locked ? 'disabled' : ''; ?> style="min-height:46px; border-radius:8px;">
                                 <i class="fas fa-undo me-1"></i>Return for Revision
                             </button>
                         <?php endif; ?>
@@ -1373,7 +1396,7 @@ asort($package_department_options, SORT_NATURAL | SORT_FLAG_CASE);
 
                                     <div class="p-3 mb-3 rounded-3 shadow-sm" style="background-color: #fffbeb !important; border: 2px solid #f59e0b !important;">
                                         <div class="form-check d-flex align-items-start gap-3 ps-2">
-                                            <input class="form-check-input flex-shrink-0 mt-1" type="checkbox" name="confirm_hand_off" value="1" id="chkConfirm-<?php echo (int)$package['package_id']; ?>" required style="width: 26px; height: 26px; min-height: 26px; cursor: pointer; accent-color: #d97706; appearance: auto; -webkit-appearance: checkbox; border: 2px solid #d97706 !important;" <?php echo !$package_next_check['ok'] ? 'disabled' : ''; ?>>
+                                            <input class="form-check-input flex-shrink-0 mt-1" type="checkbox" name="confirm_hand_off" value="1" id="chkConfirm-<?php echo (int)$package['package_id']; ?>" required style="width: 26px; height: 26px; min-height: 26px; cursor: pointer; accent-color: #d97706; appearance: auto; -webkit-appearance: checkbox; border: 2px solid #d97706 !important;" <?php echo (!$package_next_check['ok'] || $signature_gate_locked) ? 'disabled' : ''; ?>>
                                             <label class="form-check-label fw-bold text-dark mb-0 ms-2" for="chkConfirm-<?php echo (int)$package['package_id']; ?>" style="font-size: 0.98rem; line-height: 1.4; cursor: pointer;">
                                                 I confirm that I have thoroughly reviewed all member ratings, evaluator adjustments, and developmental plans for this department before forwarding to <span class="text-decoration-underline text-primary"><?php echo e($next_reviewer_name); ?></span>.
                                             </label>
@@ -1383,7 +1406,7 @@ asort($package_department_options, SORT_NATURAL | SORT_FLAG_CASE);
                                 <div class="modal-footer bg-light">
                                     <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">Cancel</button>
                                     <?php if ($package_next_check['ok']): ?>
-                                        <button type="button" class="btn btn-success px-4 fw-bold" onclick="submitPackageForm(<?php echo (int)$package['package_id']; ?>);">
+                                        <button type="button" class="btn btn-success px-4 fw-bold" onclick="submitPackageForm(<?php echo (int)$package['package_id']; ?>);" <?php echo $signature_gate_locked ? 'disabled' : ''; ?>>
                                             <i class="fas fa-paper-plane me-1"></i>Confirm &amp; Forward Review
                                         </button>
                                     <?php else: ?>
@@ -1406,12 +1429,17 @@ asort($package_department_options, SORT_NATURAL | SORT_FLAG_CASE);
 <script>
 function submitProbationaryReturn(packageId) {
     const remarks = document.getElementById('comments-' + packageId);
-    if (!remarks || !remarks.value.trim()) {
-        alert('Enter a return reason in Review Remarks & Feedback before returning this evaluation.');
-        remarks?.focus();
+    const returnReason = document.getElementById('returnReason-' + packageId);
+    let reason = remarks && !remarks.disabled ? remarks.value.trim() : '';
+    if (!reason) {
+        reason = (window.prompt('Enter the reason for returning this evaluation for revision:') || '').trim();
+    }
+    if (!reason) {
+        if (remarks && !remarks.disabled) remarks.focus();
         return false;
     }
     if (!confirm('Return this probationary evaluation to the employee for revision?')) return false;
+    if (returnReason) returnReason.value = reason;
     document.getElementById('actionInput-' + packageId).value = 'return_member';
     return true;
 }

@@ -3516,7 +3516,7 @@ function notifyDepartmentManagersOfProbationaryOutcome($conn, int $evaluation_id
     return $count;
 }
 
-/** Inform active HR Managers and Supervisors when a probationary employee submits an Initial evaluation. */
+/** Inform HR Managers and Supervisors not already assigned as the reviewer of an Initial evaluation. */
 function notifyHRManagementOfProbationaryInitialSubmission($conn, int $evaluation_id): int
 {
     $evaluation_id = (int)$evaluation_id;
@@ -3540,7 +3540,25 @@ function notifyHRManagementOfProbationaryInitialSubmission($conn, int $evaluatio
             AND hr_department.department_name = 'Human Resources'
         WHERE u.role IN ('HR Manager', 'HR Supervisor') AND u.is_active = 1
           AND COALESCE(u.account_hold, 0) = 0 AND u.deleted_at IS NULL
-          AND hr_employee.is_active = 1 AND hr_employee.deleted_at IS NULL");
+          AND hr_employee.is_active = 1 AND hr_employee.deleted_at IS NULL
+          AND NOT EXISTS (
+              SELECT 1
+              FROM evaluation_package_members pm
+              JOIN evaluation_packages ep ON ep.package_id = pm.package_id
+              JOIN evaluation_package_route_steps rs
+                ON rs.package_id = ep.package_id AND rs.step_order = ep.current_step_order
+              WHERE pm.evaluation_id = ? AND ep.status <> 'Cancelled'
+                AND (
+                    rs.reviewer_user_id = u.user_id
+                    OR rs.reviewer_employee_id = hr_employee.employee_id
+                    OR (rs.eligible_role = u.role AND rs.claimed_at IS NULL)
+                    OR (rs.eligible_rank_category_id = hr_employee.rank_category_id
+                        AND ep.department_id = hr_employee.department_id
+                        AND hr_employee.employment_status = 'Regular'
+                        AND rs.claimed_at IS NULL)
+                )
+          )");
+    $recipients_stmt->bind_param('i', $evaluation_id);
     $recipients_stmt->execute();
     $recipients = $recipients_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $recipients_stmt->close();
