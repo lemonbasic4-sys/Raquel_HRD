@@ -3262,15 +3262,9 @@ function applyProbationaryEvaluationOutcome($conn, $evaluation_id)
         && !in_array($row['recommendation'] ?? '', ['Recommend regularization', 'Continue training'], true)) return false;
 
     $employee_id = (int)$row['employee_id'];
-    $manager_rejected = false;
-    if (!$is_hr && (int)($row['rank_category_id'] ?? 0) === 5 && $row['evaluation_type'] === 'Final') {
-        $request_stmt = $conn->prepare("SELECT 1 FROM regularization_requests WHERE evaluation_id = ? AND status = 'Rejected' LIMIT 1");
-        $request_stmt->bind_param('i', $evaluation_id);
-        $request_stmt->execute();
-        $manager_rejected = (bool)$request_stmt->get_result()->fetch_assoc();
-        $request_stmt->close();
-    }
-    $eligible = $row['recommendation'] === 'Recommend regularization' && !$manager_rejected
+    // The immediate head's approved Final recommendation is the complete
+    // HR Staff decision; HR Managers receive an informational notice only.
+    $eligible = $row['recommendation'] === 'Recommend regularization'
         && (!$is_hr || $row['evaluation_type'] === 'Final') ? 1 : 0;
     $eligible_eval_id = $eligible ? $evaluation_id : null;
     $next_type = $is_hr ? ($eligible ? null : 'Final')
@@ -3281,14 +3275,6 @@ function applyProbationaryEvaluationOutcome($conn, $evaluation_id)
     }
     $regularize = $row['evaluation_type'] === 'Final'
         && $eligible === 1 && ($row['employment_status'] ?? '') === 'Probationary';
-    $staff_request = $is_hr && (int)$row['rank_category_id'] === 5
-        && $row['evaluation_type'] === 'Final' && $eligible === 1
-        && ($row['employment_status'] ?? '') === 'Probationary';
-    if ($staff_request) {
-        $regularize = false;
-        $eligible = 0;
-        $eligible_eval_id = null;
-    }
     $update = $conn->prepare("UPDATE employees
         SET probationary_regularization_eligible = ?,
             probationary_eligible_evaluation_id = ?,
@@ -3301,30 +3287,6 @@ function applyProbationaryEvaluationOutcome($conn, $evaluation_id)
     $update->bind_param('iiissii', $eligible, $eligible_eval_id, $eligible, $next_type, $next_due_date, $regularize_int, $employee_id);
     $ok = $update->execute();
     $update->close();
-    if ($ok && $staff_request) {
-        $duplicate = $conn->prepare("SELECT request_id FROM regularization_requests
-            WHERE employee_id = ? AND evaluation_id <> ? AND status = 'Pending' LIMIT 1");
-        $duplicate->bind_param('ii', $employee_id, $evaluation_id);
-        $duplicate->execute();
-        $already_pending = (bool)$duplicate->get_result()->fetch_assoc();
-        $duplicate->close();
-        if ($already_pending) return false;
-        $request = $conn->prepare("INSERT INTO regularization_requests
-            (evaluation_id, employee_id, recommended_by, recommendation_reason)
-            VALUES (?, ?, ?, ?)
-            ON DUPLICATE KEY UPDATE evaluation_id = evaluation_id");
-        $head_id = (int)$row['immediate_head_user_id'];
-        $reason = (string)$row['recommendation_reason'];
-        $request->bind_param('iiis', $evaluation_id, $employee_id, $head_id, $reason);
-        $ok = $request->execute();
-        $created = $ok && $request->affected_rows === 1;
-        $request->close();
-        if ($created) {
-            logAudit($conn, $head_id, 'CREATE', 'RegularizationRequest', $evaluation_id,
-                'HR Supervisor submitted a Final HR Staff regularization recommendation for manager approval.',
-                ['module' => 'Employee Management', 'target_employee_id' => $employee_id]);
-        }
-    }
     if ($ok && $regularize && $is_hr && (int)($row['rank_category_id'] ?? 0) === 3) {
         $hr_manager_recipients = $conn->prepare("SELECT u.user_id
             FROM users u
@@ -3566,8 +3528,7 @@ function notifyHrManagersOfStaffProbationaryApproval($conn, $evaluation_id)
 {
     $evaluation_id = (int)$evaluation_id;
     $stmt = $conn->prepare("SELECT ev.evaluation_type, ev.total_score, e.first_name, e.last_name,
-            e.job_title, per.recommendation, per.recommendation_reason,
-            e.probationary_regularization_eligible
+            e.job_title, e.employment_status, per.recommendation, per.recommendation_reason
         FROM evaluations ev
         JOIN employees e ON e.employee_id = ev.employee_id
         JOIN departments d ON d.department_id = e.department_id AND d.department_name = 'Human Resources'
@@ -3583,23 +3544,18 @@ function notifyHrManagersOfStaffProbationaryApproval($conn, $evaluation_id)
         JOIN departments d ON d.department_id = e.department_id AND d.department_name = 'Human Resources'
         WHERE u.role = 'HR Manager' AND u.is_active = 1 AND u.deleted_at IS NULL
           AND COALESCE(u.account_hold, 0) = 0 AND e.is_active = 1 AND e.deleted_at IS NULL");
-    $is_pending_request = $result['evaluation_type'] === 'Final'
-        && $result['recommendation'] === 'Recommend regularization';
+    $is_regularized = ($result['employment_status'] ?? '') === 'Regular';
     $message = trim($result['first_name'] . ' ' . $result['last_name']) . ' (' . $result['job_title'] . ') had an HR Supervisor-approved '
         . $result['evaluation_type'] . ' probationary evaluation. Score: ' . number_format((float)$result['total_score'], 2)
         . '/4. Recommendation: ' . ($result['recommendation'] ?: 'Not recorded')
         . '. Reason: ' . ($result['recommendation_reason'] ?: 'Not provided')
-        . '. Regularization eligible: ' . ((int)$result['probationary_regularization_eligible'] === 1 ? 'Yes' : 'No')
-        . ($is_pending_request
-            ? '. Regularization requires an HR Manager decision. Employment remains Probationary.'
-            : '. This is an informational record; no further evaluation approval is required.');
+        . '. Employment status: ' . ($is_regularized ? 'Regular' : 'Probationary')
+        . ". The HR Supervisor's approved recommendation is final; no additional HR Manager approval is required. This notice is for HR visibility and analytics.";
     $count = 0;
     while ($recipient = $recipients->fetch_assoc()) {
         createNotification($conn, (int)$recipient['user_id'],
-            $is_pending_request ? 'HR Staff regularization request awaiting approval' : 'HR Staff probationary evaluation approved',
-            $message, $is_pending_request
-                ? BASE_URL . '/manager/pending-approvals.php?tab=regularization'
-                : BASE_URL . '/manager/evaluation-history.php?evaluation_id=' . $evaluation_id);
+            'HR Staff probationary evaluation finalized',
+            $message, BASE_URL . '/manager/evaluation-history.php?evaluation_id=' . $evaluation_id);
         $count++;
     }
     return $count;
