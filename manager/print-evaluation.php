@@ -868,11 +868,11 @@ if ((float)($row['total_score'] ?? 0) > 0 && (empty($pl) || $pl === '0')) {
 
     <!-- Immediate Supervisor Comments -->
     <div class="comment-box">
-      <div class="label"><?php echo $is_probationary_hr_supervisor ? 'HR Manager Comments:' : 'Immediate Supervisor Comments:'; ?></div>
+      <div class="label">Immediate Head Comments:</div>
       <div class="content"><?php echo !empty($supervisor_comments) ? nl2br(e($supervisor_comments)) : '&nbsp;'; ?></div>
       <div class="comment-signature">
         <div class="signature-line"></div>
-        <div class="signature-caption"><?php echo $is_probationary_hr_supervisor ? 'HR Manager — Signature over Printed Name' : 'Signature over Printed Name'; ?></div>
+        <div class="signature-caption">Signature over Printed Name</div>
       </div>
     </div>
 
