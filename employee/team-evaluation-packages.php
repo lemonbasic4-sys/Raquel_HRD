@@ -280,7 +280,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!$is_probationary_step
             || $step['evaluation_type'] !== 'Initial'
             || (int)($step['step_order'] ?? 0) !== 1
-            || !in_array((int)($probationary_review['rank_category_id'] ?? 0), [1, 3, 4, 5], true)
+            || !in_array((int)($probationary_review['rank_category_id'] ?? 0), [1, 2, 3, 4, 5], true)
             || $probationary_eval_id <= 0) {
             redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'Only the assigned reviewer can sign this probationary Initial evaluation.');
         }
@@ -470,7 +470,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // 🔒 Prevention: verify next consolidator/reviewer exists and is assigned before advancing
     if ($action === 'approve' && $is_probationary_step && $step['evaluation_type'] === 'Initial'
-        && in_array((int)($probationary_review['rank_category_id'] ?? 0), [1, 3, 4, 5], true)) {
+        && in_array((int)($probationary_review['rank_category_id'] ?? 0), [1, 2, 3, 4, 5], true)) {
         if (empty($probationary_review['immediate_head_signature_data'])
             || (int)($probationary_review['immediate_head_user_id'] ?? 0) !== $user_id) {
             redirectWith($decision_review_url, 'danger', 'Save your Immediate head signature before approving this probationary Initial evaluation.');
@@ -646,9 +646,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             if ($is_final_probationary && $probationary_eval_id > 0) {
                 $outcome_stmt = $conn->prepare("SELECT e.employment_status, e.probationary_eligible_evaluation_id,
-                        e.first_name, e.last_name, u.user_id
+                        e.first_name, e.last_name, e.job_title, e.rank_category_id, d.department_name, u.user_id
                     FROM evaluations ev
                     JOIN employees e ON e.employee_id = ev.employee_id
+                    LEFT JOIN departments d ON d.department_id = e.department_id
                     LEFT JOIN users u ON u.employee_id = e.employee_id AND u.role = 'Employee' AND u.is_active = 1
                     WHERE ev.evaluation_id = ? LIMIT 1");
                 $outcome_stmt->bind_param('i', $probationary_eval_id);
@@ -659,9 +660,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if (($regularized_user['employment_status'] ?? '') !== 'Regular'
                         || (int)($regularized_user['probationary_eligible_evaluation_id'] ?? 0) !== $probationary_eval_id
                         || (int)($regularized_user['user_id'] ?? 0) <= 0) continue;
-                    createNotification($conn, (int)$regularized_user['user_id'], 'Congratulations on your regularization!',
-                        'Your final probationary evaluation was approved. Your employment status is now Regular, and regular employee evaluation features are available in the portal.',
-                        BASE_URL . '/employee/my-employment.php');
+                    $is_hr_leader = strcasecmp((string)($regularized_user['department_name'] ?? ''), 'Human Resources') === 0
+                        && in_array((int)($regularized_user['rank_category_id'] ?? 0), [3, 4], true);
+                    $is_hr_manager = (int)($regularized_user['rank_category_id'] ?? 0) === 3;
+                    $notification_title = $is_hr_leader
+                        ? 'Regularization confirmed - HRIS access request process'
+                        : 'Congratulations on your regularization!';
+                    $notification_message = $is_hr_leader
+                        ? 'Your probationary ' . ($is_hr_manager ? 'HR Manager' : 'HR Supervisor') . ' position has been regularized. HRIS portal access is separate and is not created automatically when you are regularized. To request access, contact ' . ($is_hr_manager ? 'another active HR Manager or an active HR Supervisor' : 'the HR Manager or an active HR Supervisor') . ' for guidance; they can coordinate with the administrator to create and activate your HRIS account. Continue using your Employee Portal account until HRIS access is confirmed. Do not share your login credentials.'
+                        : 'Your final probationary evaluation was approved. Your employment status is now Regular, and regular employee evaluation features are available in the portal.';
+                    createNotification($conn, (int)$regularized_user['user_id'], $notification_title,
+                        $notification_message, BASE_URL . '/employee/my-employment.php');
                 }
             }
 
@@ -950,7 +959,7 @@ asort($package_department_options, SORT_NATURAL | SORT_FLAG_CASE);
             && (int)$package['current_step_order'] === 1
             && (($package['evaluation_type'] ?? '') === 'Final'
                 || (($package['evaluation_type'] ?? '') === 'Initial'
-                    && in_array((int)($members[0]['rank_category_id'] ?? 0), [1, 3, 4, 5], true)));
+                    && in_array((int)($members[0]['rank_category_id'] ?? 0), [1, 2, 3, 4, 5], true)));
         $has_current_reviewer_signature = $requires_probationary_decision_signature
             && !empty($members[0]['immediate_head_signature_data'])
             && (int)($members[0]['immediate_head_user_id'] ?? 0) === $user_id;

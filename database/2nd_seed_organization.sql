@@ -192,6 +192,12 @@ REPLACE INTO departments (department_id, department_name, description, is_active
 -- ============================================
 -- Job Titles (Positions)
 -- ============================================
+-- Remove deprecated training-only position placeholders from older imports.
+DELETE FROM job_titles
+WHERE (job_title_id = 301 AND job_title = 'Business Development Staff on Training')
+   OR (job_title_id = 1003 AND job_title = 'Area Coordinator on Training')
+   OR (job_title_id = 1201 AND job_title = 'Purchasing Supervisor on Training');
+
 REPLACE INTO job_titles (job_title_id, job_title, rank_category_id, department_id, is_active, is_head, reports_to, created_at, updated_at) VALUES
 -- Acquired Properties (100-119)
 (100, 'VP for Acquired Properties', 1, 1, 1, 1, 1100, NOW(), NOW()),
@@ -223,7 +229,6 @@ REPLACE INTO job_titles (job_title_id, job_title, rank_category_id, department_i
 (210, 'Auditor V', 5, 2, 1, 0, 203, NOW(), NOW()),
 -- Business Development (300-319)
 (300, 'Business Development Officer I', 3, 3, 1, 1, 1100, NOW(), NOW()),
-(301, 'Business Development Staff on Training', 5, 3, 1, 0, 300, NOW(), NOW()),
 (302, 'Business Development Staff I', 5, 3, 1, 0, 300, NOW(), NOW()),
 (303, 'Business Development Staff II', 5, 3, 1, 0, 300, NOW(), NOW()),
 -- Compliance (400-419)
@@ -325,7 +330,6 @@ REPLACE INTO job_titles (job_title_id, job_title, rank_category_id, department_i
 (1000, 'VP for Operations', 1, 11, 1, 0, 1100, NOW(), NOW()),
 (1001, 'Regional Manager I', 3, 11, 1, 1, 1000, NOW(), NOW()),
 (1002, 'Regional Manager II', 3, 11, 1, 1, 1000, NOW(), NOW()),
-(1003, 'Area Coordinator on Training', 4, 11, 1, 0, 1001, NOW(), NOW()),
 (1004, 'Area Coordinator I', 4, 11, 1, 1, 1001, NOW(), NOW()),
 (1005, 'Area Coordinator II', 4, 11, 1, 1, 1001, NOW(), NOW()),
 (1006, 'Area Coordinator III', 4, 11, 1, 1, 1001, NOW(), NOW()),
@@ -346,7 +350,6 @@ REPLACE INTO job_titles (job_title_id, job_title, rank_category_id, department_i
 (1103, 'Executive Assistant III', 5, 10, 1, 0, 1100, NOW(), NOW()),
 -- Purchasing (1200-1219)
 (1200, 'Purchasing Supervisor I', 4, 12, 1, 1, NULL, NOW(), NOW()),
-(1201, 'Purchasing Supervisor on Training', 4, 12, 1, 1, 1200, NOW(), NOW()),
 (1202, 'Purchasing Staff I', 5, 12, 1, 0, 1200, NOW(), NOW());
 
 SET FOREIGN_KEY_CHECKS = 1;

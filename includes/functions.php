@@ -3325,24 +3325,6 @@ function applyProbationaryEvaluationOutcome($conn, $evaluation_id)
                 ['module' => 'Employee Management', 'target_employee_id' => $employee_id]);
         }
     }
-    if ($ok && $regularize && strcasecmp(trim((string)($row['job_title'] ?? '')), 'HR Manager I') === 0) {
-        $portal_accounts = $conn->prepare("SELECT user_id FROM users
-            WHERE employee_id = ? AND role = 'Employee' AND is_active = 1
-              AND COALESCE(account_hold, 0) = 0 AND deleted_at IS NULL");
-        $portal_accounts->bind_param('i', $employee_id);
-        $portal_accounts->execute();
-        $recipients = $portal_accounts->get_result()->fetch_all(MYSQLI_ASSOC);
-        $portal_accounts->close();
-        $message = 'Your Final probationary evaluation has been approved, and your employment status as HR Manager I has been updated to Regular. '
-            . 'HRIS access requires separate authorization from the current HRIS HR Manager. After that authorization is granted, the System Administrator must manually configure and activate your HRIS account and approved permissions. '
-            . 'Regularization does not automatically grant HRIS access or administrative privileges. Continue using your Employee Portal account while the authorization and account setup are pending. '
-            . 'Coordinate with the current HRIS HR Manager for authorization and with the System Administrator for account setup. Use the HRIS portal only after the System Administrator confirms that your access is active and provides your login instructions.';
-        foreach ($recipients as $recipient) {
-            createNotification($conn, (int)$recipient['user_id'],
-                'Regularization Confirmed - HRIS Access Authorization Required', $message,
-                BASE_URL . '/employee/my-employment.php', 'probation', 1);
-        }
-    }
     if ($ok && $regularize && $is_hr && (int)($row['rank_category_id'] ?? 0) === 3) {
         $hr_manager_recipients = $conn->prepare("SELECT u.user_id
             FROM users u
@@ -5140,7 +5122,9 @@ function createOrganizationPackageRoute($conn, $package_id, $consolidator_employ
                 ['Department Manager — Final Approval', null, 3, 0, 0]];
         }
         if (!$is_hr_probationary) {
-            if (!in_array($employee_rank, [1, 3, 4, 5], true)) return;
+            // Executive VPs use rank 2 in employee records even when their
+            // configured job-title rank is 1; they still route to the CEO.
+            if (!in_array($employee_rank, [1, 2, 3, 4, 5], true)) return;
             if ($template_creator_is_ceo && $employee_rank <= 3) {
                 $steps = [['President and CEO - Immediate Head Review', null, null,
                     $template_creator_employee_id, $template_creator_user_id]];
@@ -5390,7 +5374,7 @@ function syncOpenHrProbationaryRoutes($conn)
 function syncOpenNonHrProbationaryRoutes($conn)
 {
     $rows = $conn->query("SELECT ep.package_id, ep.evaluation_type, ev.evaluation_id, e.employee_id,
-            e.rank_category_id, e.employee_code,
+            e.rank_category_id, e.employee_code, ep.status AS package_status, ev.status AS evaluation_status,
             CONCAT(e.first_name, ' ', e.last_name) AS employee_name,
             COALESCE(
                 (SELECT direct_head.employee_id FROM employees direct_head
@@ -5434,13 +5418,14 @@ function syncOpenNonHrProbationaryRoutes($conn)
         GROUP BY ep.package_id, ep.evaluation_type, ev.evaluation_id, e.employee_id,
                  e.employee_code, e.first_name, e.last_name,
                  e.rank_category_id, e.department_id, e.reports_to, et.created_by, creator.role, creator.employee_id,
+                 ep.status, ev.status,
                  creator_employee.rank_category_id, creator_position.job_title");
     if (!$rows) return 0;
 
     $repaired = 0;
     while ($row = $rows->fetch_assoc()) {
         $rank = (int)$row['rank_category_id'];
-        if (!in_array($rank, [1, 3, 4, 5], true)) continue;
+        if (!in_array($rank, [1, 2, 3, 4, 5], true)) continue;
         $expected_count = 1;
         $expected_employee_id = (int)($row['expected_head_employee_id'] ?? 0);
         $expected_user_id = 0;
@@ -5473,7 +5458,14 @@ function syncOpenNonHrProbationaryRoutes($conn)
         if ($valid) continue;
 
         $package_id = (int)$row['package_id'];
-        $first_status = (string)($row['first_status'] ?? 'Waiting');
+        // A submitted package with no route is an orphaned review, not a
+        // not-yet-submitted one. Open its repaired first step immediately.
+        $first_status = (string)($row['first_status'] ?? '');
+        if ($first_status === '') {
+            $first_status = in_array((string)($row['evaluation_status'] ?? ''), ['Pending Team Consolidation', 'Pending Review'], true)
+                || in_array((string)($row['package_status'] ?? ''), ['Pending Consolidation', 'Pending Review'], true)
+                ? 'Pending' : 'Waiting';
+        }
         $conn->begin_transaction();
         try {
             $delete = $conn->prepare('DELETE FROM evaluation_package_route_steps WHERE package_id = ?');

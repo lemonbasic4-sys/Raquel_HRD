@@ -252,7 +252,7 @@ $show_probationary_decision = $is_probationary_head_review
     && $evaluation['evaluation_type'] === 'Final' && !$is_hr_initial_review;
 $show_initial_rater_signature = $is_probationary_head_review
     && $evaluation['evaluation_type'] === 'Initial'
-    && in_array((int)($evaluation['rank_category_id'] ?? 0), [1, 3, 4, 5], true);
+    && in_array((int)($evaluation['rank_category_id'] ?? 0), [1, 2, 3, 4, 5], true);
 $kra_w = $is_probationary ? 80 : (float)($evaluation['kra_weight'] ?? 80);
 $beh_w = $is_probationary ? 20 : (float)($evaluation['behavior_weight'] ?? 20);
 $shared_beh = $evaluation['shared_behavior_score'] !== null ? (float)$evaluation['shared_behavior_score'] : (float)$evaluation['behavior_average'];
