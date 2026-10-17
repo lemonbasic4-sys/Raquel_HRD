@@ -11,7 +11,7 @@ if (!$id)
 
 // Fetch evaluation details with all joins
 $query = "SELECT ev.*, 
-    CONCAT(e.first_name, ' ', e.last_name) as employee_name, e.job_title, e.department_id, d.department_name,
+    CONCAT(e.first_name, ' ', e.last_name) as employee_name, e.job_title, e.department_id, e.rank_category_id, e.employment_status, d.department_name,
     u.full_name as submitted_by_name, u2.full_name as endorsed_by_name, u3.full_name as approved_by_name,
     et.template_name, et.form_code, et.revision_date, et.effective_date_form,
     et.kra_weight AS tpl_kra_weight, et.behavior_weight AS tpl_behavior_weight,
@@ -43,6 +43,9 @@ $result = $conn->query($query);
 if (!$result || $result->num_rows === 0)
   die("Evaluation not found.");
 $row = $result->fetch_assoc();
+$is_probationary_hr_supervisor = ($row['employment_status'] ?? '') === 'Probationary'
+    && (int)($row['rank_category_id'] ?? 0) === 4
+    && isHumanResourcesPackageDepartment($conn, (int)($row['department_id'] ?? 0));
 
 // Staff check: Allowed as they have access to evaluation history in the staff portal
 if (!in_array($_SESSION['role'], ['HR Manager', 'HR Supervisor', 'HR Staff'])) {
@@ -217,6 +220,11 @@ foreach ($higher_officials as $ho) {
         $hr_manager_name = $ho['name'];
         $hr_manager_title = $ho['title'];
         if (!empty($ho['comments']) && empty($hr_manager_comments)) $hr_manager_comments = $ho['comments'];
+        if ($is_probationary_hr_supervisor) {
+            $supervisor_name = $ho['name'];
+            $supervisor_title = $ho['title'];
+            if (!empty($ho['comments'])) $supervisor_comments = $ho['comments'];
+        }
     } elseif (stripos($lbl, 'manager') !== false && empty($dept_manager_name)) {
         $dept_manager_name = $ho['name'];
         $dept_manager_title = $ho['title'];
@@ -232,8 +240,13 @@ foreach ($higher_officials as $ho) {
 
 // Ensure defaults from DB row & designated officials if not matched in route
 if (empty($supervisor_name)) {
-    $supervisor_name = $row['dept_supervisor_confirmed_by_name'] ?: ($row['consolidator_name'] ?: 'IMMEDIATE HEAD');
-    $supervisor_title = $row['consolidator_job_title'] ?: 'Department Supervisor';
+    if ($is_probationary_hr_supervisor && !empty($row['rater_name'])) {
+        $supervisor_name = $row['rater_name'];
+        $supervisor_title = 'HR Manager';
+    } else {
+        $supervisor_name = $row['dept_supervisor_confirmed_by_name'] ?: ($row['consolidator_name'] ?: 'IMMEDIATE HEAD');
+        $supervisor_title = $row['consolidator_job_title'] ?: 'Department Supervisor';
+    }
 }
 if (empty($dept_manager_name)) {
     $dept_manager_name = $row['dept_manager_endorsed_by_name'] ?: '';
@@ -855,11 +868,11 @@ if ((float)($row['total_score'] ?? 0) > 0 && (empty($pl) || $pl === '0')) {
 
     <!-- Immediate Supervisor Comments -->
     <div class="comment-box">
-      <div class="label">Immediate Supervisor Comments:</div>
+      <div class="label"><?php echo $is_probationary_hr_supervisor ? 'HR Manager Comments:' : 'Immediate Supervisor Comments:'; ?></div>
       <div class="content"><?php echo !empty($supervisor_comments) ? nl2br(e($supervisor_comments)) : '&nbsp;'; ?></div>
       <div class="comment-signature">
         <div class="signature-line"></div>
-        <div class="signature-caption">Signature over Printed Name</div>
+        <div class="signature-caption"><?php echo $is_probationary_hr_supervisor ? 'HR Manager — Signature over Printed Name' : 'Signature over Printed Name'; ?></div>
       </div>
     </div>
 
