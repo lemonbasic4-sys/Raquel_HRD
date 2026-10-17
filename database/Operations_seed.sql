@@ -32,8 +32,8 @@ REPLACE INTO employees (employee_id, employee_code, first_name, last_name, middl
 (11020, 'OPS-020', 'Albert', 'Sarmiento', 'Castillo', '2026-08-01', '2003-01-03', 'Lucena City, Quezon', 'Male', 'Single', 1012, 'Branch Staff I', 11, 5, 102, 'OJT', 'Full-time', 'avatar_m.jpg'),
 
 -- Trainee
-(11004, 'OPS-004', 'Angelo', 'Salvador', 'Mendoza', '2022-02-24', '1997-04-24', 'Lucena City, Quezon', 'Male', 'Married', 1003, 'Area Coordinator on Training', 11, 4, 6, 'Trainee', 'Full-time', 'avatar_m.jpg'),
-(11021, 'OPS-021', 'Carmelita', 'Salvador', 'Bautista', '2026-08-10', '2003-07-27', 'Lucena City, Quezon', 'Female', 'Widowed', 1003, 'Area Coordinator on Training', 11, 4, 102, 'Trainee', 'Full-time', 'avatar_f.jpg'),
+(11004, 'OPS-004', 'Angelo', 'Salvador', 'Mendoza', '2022-02-24', '1997-04-24', 'Lucena City, Quezon', 'Male', 'Married', 1004, 'Area Coordinator I', 11, 4, 6, 'Trainee', 'Full-time', 'avatar_m.jpg'),
+(11021, 'OPS-021', 'Carmelita', 'Salvador', 'Bautista', '2026-08-10', '2003-07-27', 'Lucena City, Quezon', 'Female', 'Widowed', 1004, 'Area Coordinator I', 11, 4, 102, 'Trainee', 'Full-time', 'avatar_f.jpg'),
 
 -- Project Based
 (11023, 'OPS-023', 'Sarah', 'Santos', 'Gomez', '2026-08-01', '2002-01-18', 'Lucena City, Quezon', 'Female', 'Married', 1012, 'Branch Staff I', 11, 5, 102, 'Project Based', 'Full-time', 'avatar_f.jpg'),

@@ -19,8 +19,8 @@ REPLACE INTO employees (employee_id, employee_code, first_name, last_name, middl
 (12005, 'PUR-005', 'Jose', 'Ocampo', 'De Leon', '2026-08-01', '1998-09-15', 'Lucena City, Quezon', 'Male', 'Single', 1202, 'Purchasing Staff I', 12, 5, 102, 'OJT', 'Full-time', 'avatar_m.jpg'),
 
 -- Trainee
-(12002, 'PUR-002', 'Rose', 'Sarmiento', 'Soriano', '2019-05-19', '1985-11-11', 'Lucena City, Quezon', 'Female', 'Widowed', 1201, 'Purchasing Supervisor on Training', 12, 4, 102, 'Trainee', 'Full-time', 'avatar_f.jpg'),
-(12006, 'PUR-006', 'Josefina', 'Mendoza', 'Fernandez', '2026-08-10', '2001-08-19', 'Lucena City, Quezon', 'Female', 'Separated', 1201, 'Purchasing Supervisor on Training', 12, 4, 102, 'Trainee', 'Full-time', 'avatar_f.jpg'),
+(12002, 'PUR-002', 'Rose', 'Sarmiento', 'Soriano', '2019-05-19', '1985-11-11', 'Lucena City, Quezon', 'Female', 'Widowed', 1200, 'Purchasing Supervisor I', 12, 4, 102, 'Trainee', 'Full-time', 'avatar_f.jpg'),
+(12006, 'PUR-006', 'Josefina', 'Mendoza', 'Fernandez', '2026-08-10', '2001-08-19', 'Lucena City, Quezon', 'Female', 'Separated', 1200, 'Purchasing Supervisor I', 12, 4, 102, 'Trainee', 'Full-time', 'avatar_f.jpg'),
 
 -- Project Based
 (12009, 'PUR-009', 'Corazon', 'Bautista', 'Bautista', '2026-08-01', '1996-01-03', 'Lucena City, Quezon', 'Female', 'Widowed', 1202, 'Purchasing Staff I', 12, 5, 102, 'Project Based', 'Full-time', 'avatar_f.jpg'),

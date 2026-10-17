@@ -37,7 +37,6 @@ $template_create_url = !empty($creator_context['is_ceo'])
 $template_archive_url = !empty($creator_context['is_ceo'])
     ? BASE_URL . '/employee/evaluation-template-archive.php'
     : BASE_URL . '/manager/template-archive.php';
-$template_scope_sql = '1 = 1';
 $owned_template_scope_sql = 'et.created_by = ' . $current_user_id;
 if (!empty($creator_context['is_ceo']) && (int)($creator_context['employee_id'] ?? 0) > 0) {
     // The CEO has separate HRIS and Employee Portal logins linked to the same
@@ -52,14 +51,42 @@ if (!empty($creator_context['is_ceo']) && (int)($creator_context['employee_id'] 
     )";
 }
 $template_viewer_role = (string)($creator_context['role'] ?? '');
-if (!empty($creator_context['is_ceo']) || in_array($template_viewer_role, ['HR Manager', 'HR Supervisor'], true)) {
+$_template_viewer_rank = (int)($creator_context['rank_category_id'] ?? 0);
+$_template_viewer_employee_id = (int)($creator_context['employee_id'] ?? 0);
+$viewer_department_id = (int)($creator_context['department_id'] ?? 0);
+$can_manage_same_level_templates = in_array($template_viewer_role, ['Employee', 'HR Manager', 'HR Supervisor'], true)
+    && in_array($_template_viewer_rank, [3, 4], true)
+    && $viewer_department_id > 0;
+$peer_template_scope_sql = '1 = 0';
+if ($can_manage_same_level_templates && $_template_viewer_employee_id > 0) {
+    $peer_template_scope_sql = "et.created_by IN (
+        SELECT peer_user.user_id
+        FROM users peer_user
+        JOIN employees peer_employee ON peer_employee.employee_id = peer_user.employee_id
+        WHERE peer_employee.department_id = $viewer_department_id
+          AND peer_employee.rank_category_id = $_template_viewer_rank
+          AND peer_employee.employee_id <> $_template_viewer_employee_id
+          AND peer_employee.is_active = 1 AND peer_employee.deleted_at IS NULL
+          AND peer_user.role IN ('Employee', 'HR Manager', 'HR Supervisor')
+          AND peer_user.is_active = 1 AND COALESCE(peer_user.account_hold, 0) = 0 AND peer_user.deleted_at IS NULL
+    )";
+}
+$shared_level_template_scope_sql = "($owned_template_scope_sql OR $peer_template_scope_sql)";
+$manageable_template_scope_sql = $owned_template_scope_sql;
+if (!empty($creator_context['is_ceo'])) {
     $template_scope_sql = $owned_template_scope_sql;
+} elseif ($can_manage_same_level_templates) {
+    $template_scope_sql = $shared_level_template_scope_sql;
+    $manageable_template_scope_sql = $shared_level_template_scope_sql;
+} else {
+    $template_scope_sql = in_array($template_viewer_role, ['Employee', 'HR Manager', 'HR Supervisor'], true)
+        ? $owned_template_scope_sql : '1 = 1';
+    $manageable_template_scope_sql = $owned_template_scope_sql;
 }
 $is_cross_department_template_viewer = !empty($creator_context['is_ceo'])
     || in_array($template_viewer_role, ['HR Manager', 'HR Supervisor', 'HR Staff'], true);
-$viewer_department_id = (int)($creator_context['department_id'] ?? 0);
 $viewer_department_name = '';
-if (!$is_cross_department_template_viewer && $viewer_department_id > 0) {
+if ($template_viewer_role !== 'Employee' && !$is_cross_department_template_viewer && $viewer_department_id > 0) {
     $viewer_department_stmt = $conn->prepare('SELECT department_name FROM departments WHERE department_id = ? LIMIT 1');
     $viewer_department_stmt->bind_param('i', $viewer_department_id);
     $viewer_department_stmt->execute();
@@ -68,31 +95,15 @@ if (!$is_cross_department_template_viewer && $viewer_department_id > 0) {
     $safe_viewer_department = $conn->real_escape_string($viewer_department_name);
     $template_scope_sql = "( (et.target_department_id IS NULL OR et.target_department_id = $viewer_department_id)
         AND (et.target_department IS NULL OR et.target_department = '' OR et.target_department = 'All Departments' OR et.target_department = '$safe_viewer_department') )";
-} elseif (!$is_cross_department_template_viewer) {
+} elseif ($template_viewer_role !== 'Employee' && !$is_cross_department_template_viewer) {
     $template_scope_sql = '1 = 0';
-}
-$viewer_rank_category_id = (int)($creator_context['rank_category_id'] ?? 0);
-$can_manage_department_peer_templates = $template_viewer_role === 'Employee'
-    && in_array($viewer_rank_category_id, [3, 4], true)
-    && $viewer_department_id > 0;
-$manageable_template_scope_sql = $owned_template_scope_sql;
-if ($can_manage_department_peer_templates) {
-    $manageable_template_scope_sql = "(et.created_by = $current_user_id OR et.created_by IN (
-        SELECT peer_user.user_id
-        FROM users peer_user
-        JOIN employees peer_employee ON peer_employee.employee_id = peer_user.employee_id
-        WHERE peer_employee.department_id = $viewer_department_id
-          AND ((peer_employee.rank_category_id IN (3, 4) AND peer_user.role = 'Employee')
-               OR peer_user.role IN ('HR Manager', 'HR Supervisor'))
-          AND peer_user.is_active = 1 AND COALESCE(peer_user.account_hold, 0) = 0 AND peer_user.deleted_at IS NULL
-    ))";
 }
 
 // Handle archive action
 if (isset($_GET['archive']) && is_numeric($_GET['archive'])) {
     $tid = (int)$_GET['archive'];
     if (!canManageEvaluationTemplate($conn, $tid, $current_user_id)) {
-        redirectWith($template_list_url, 'danger', 'You can only archive templates you own.');
+        redirectWith($template_list_url, 'danger', 'You can only archive templates you own or are authorized to manage as a same-level department peer.');
     }
     $conn->query("UPDATE evaluation_templates et SET status = 'Archived' WHERE et.template_id = $tid AND $manageable_template_scope_sql");
     if ($conn->affected_rows > 0) notifyHrStaffOfTemplateChange($conn, $tid, 'Archived');
@@ -291,7 +302,7 @@ $used_template_count = (int) $conn->query("SELECT COUNT(DISTINCT ev.template_id)
         <div>
             <div style="font-size:.72rem;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,.55);"><?php echo !empty($creator_context['is_ceo']) ? 'President and CEO' : e($creator_context['role']); ?> · Evaluations</div>
             <h4 class="text-white fw-bold mb-0 mt-1"><i class="fas fa-file-alt me-2" style="color:#BD9414;"></i>Evaluation Templates</h4>
-            <p class="text-white-50 small mb-0 mt-2"><?php echo in_array($template_viewer_role, ['HR Manager', 'HR Supervisor'], true) ? 'Create and manage evaluation templates from your own HRIS account.' : ($can_create_templates ? 'Create templates and manage eligible templates within your department.' : 'Browse evaluation templates. Templates created by others are read-only.'); ?></p>
+            <p class="text-white-50 small mb-0 mt-2"><?php echo $can_manage_same_level_templates ? 'Create and manage templates shared by active peers at your same rank in this department.' : (in_array($template_viewer_role, ['HR Manager', 'HR Supervisor'], true) ? 'Create and manage evaluation templates from your own HRIS account.' : ($can_create_templates ? 'Create templates and manage eligible templates within your department.' : 'Browse evaluation templates. Templates created by others are read-only.')); ?></p>
         </div>
         <div class="d-flex flex-wrap gap-2">
         <?php if ($can_create_templates): ?>
@@ -422,7 +433,7 @@ $used_template_count = (int) $conn->query("SELECT COUNT(DISTINCT ev.template_id)
                     <!-- Checkbox for Batch Delete -->
                     <?php $is_template_owner = (int)($t['created_by'] ?? 0) === $current_user_id
                         || (!empty($creator_context['is_ceo']) && canManageEvaluationTemplate($conn, (int)$t['template_id'], $current_user_id)); ?>
-                    <?php $is_template_manager = $is_template_owner || ($can_manage_department_peer_templates && canManageEvaluationTemplate($conn, (int)$t['template_id'], $current_user_id)); ?>
+                    <?php $is_template_manager = $is_template_owner || canManageEvaluationTemplate($conn, (int)$t['template_id'], $current_user_id); ?>
                     <?php if ($can_create_templates && $is_template_manager): ?>
                     <div class="position-absolute" style="top: 15px; right: 15px; z-index: 10;">
                         <input class="template-checkbox" type="checkbox" name="template_ids[]" value="<?php echo $t['template_id']; ?>" aria-label="Select <?php echo e($t['template_name']); ?> for batch deletion" onchange="toggleBatchDeleteBtn()">
@@ -457,7 +468,7 @@ $used_template_count = (int) $conn->query("SELECT COUNT(DISTINCT ev.template_id)
                             <?php if ($is_template_owner): ?>
                                 <span class="badge bg-success-subtle text-success border ms-1">You own this</span>
                             <?php elseif ($is_template_manager): ?>
-                                <span class="badge bg-primary-subtle text-primary border ms-1">Department management access</span>
+                                <span class="badge bg-primary-subtle text-primary border ms-1">Same-level access</span>
                             <?php else: ?>
                                 <span class="badge bg-light text-muted border ms-1">Read only</span>
                             <?php endif; ?>

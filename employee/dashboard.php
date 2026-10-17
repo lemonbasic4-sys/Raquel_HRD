@@ -97,7 +97,7 @@ $pending_template_count = 0;
 $employee_dept = $emp['department_name'] ?? '';
 $allowed_eval_types = getAllowedEvaluationTypesForEmploymentStatus($emp['employment_status'] ?? 'Regular');
 $allowed_eval_type_sql = "'" . implode("','", $allowed_eval_types) . "'";
-$legacy_probationary_rank_et = probationaryTemplateLegacyRankSql('et', $emp['rank_category_id'] ?? 0);
+$legacy_probationary_rank_et = probationaryTemplateLegacyRankSql('et', $emp['job_title_id'] ?? 0);
 $pending_templates_stmt = $conn->prepare("
     SELECT COUNT(*) AS total
     FROM evaluation_templates et

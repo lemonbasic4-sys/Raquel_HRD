@@ -20,6 +20,9 @@ VALUES
  '1974-06-21', 'Lucena City, Quezon', 'Female', 'Married', 1100,
  'President and CEO', 10, 1, 102, NULL, 'Regular', 'Full-time', 'avatar_f.jpg', 1);
 
+-- Link the seeded HR Manager to the CEO only after both employee rows exist.
+UPDATE employees SET reports_to = 15010 WHERE employee_id = 101 AND department_id = 7;
+
 -- Contact, physical information, and addresses
 REPLACE INTO employee_contacts
     (employee_id, personal_email, mobile_number, telephone_number)

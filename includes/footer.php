@@ -2,13 +2,12 @@
 
 
 
-<?php 
+<?php
 if (isset($_SESSION['role']) && $_SESSION['role'] === 'Employee'): 
     $curr_p = $current_page ?? basename($_SERVER['PHP_SELF']);
-    $m_notif_count = $notif_count ?? 0;
 ?>
-    <!-- Mobile Bottom Navigation (Strictly 4 Primary Shortcuts) -->
-    <nav class="employee-bottom-nav d-md-none">
+    <!-- Mobile bottom navigation keeps the four primary shortcuts; role-enabled extras live in the gear menu. -->
+    <nav class="employee-bottom-nav d-md-none" aria-label="Employee Portal Navigation">
         <a href="<?php echo BASE_URL; ?>/employee/dashboard.php" class="nav-item <?php echo ($curr_p === 'dashboard.php') ? 'active' : ''; ?>">
             <i class="fas fa-home nav-icon"></i>
             <span class="nav-label">Home</span>

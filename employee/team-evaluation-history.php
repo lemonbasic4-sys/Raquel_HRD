@@ -38,6 +38,29 @@ $package_claim_rank_category = (($claim_profile['role'] ?? '') === 'Employee'
     && in_array((int)($claim_profile['rank_category_id'] ?? 0), [3, 4], true))
     ? (int)$claim_profile['rank_category_id'] : 0;
 $package_claim_department_id = $package_claim_rank_category > 0 ? (int)($claim_profile['department_id'] ?? 0) : 0;
+$peer_history_rank = (($claim_profile['role'] ?? '') !== 'HR Staff'
+    && ($claim_profile['employment_status'] ?? '') === 'Regular'
+    && in_array((int)($claim_profile['rank_category_id'] ?? 0), [3, 4], true))
+    ? (int)$claim_profile['rank_category_id'] : 0;
+$peer_history_department_id = $peer_history_rank > 0 ? (int)($claim_profile['department_id'] ?? 0) : 0;
+$peer_history_employee_id = $peer_history_rank > 0 ? (int)($_SESSION['employee_id'] ?? 0) : 0;
+$peer_history_scope = '1 = 0';
+if ($peer_history_rank > 0 && $peer_history_department_id > 0 && $peer_history_employee_id > 0) {
+    $peer_history_scope = "EXISTS (
+        SELECT 1
+        FROM evaluation_package_route_steps peer_rs
+        JOIN employees peer_employee ON peer_employee.employee_id = COALESCE(
+            peer_rs.reviewer_employee_id,
+            (SELECT peer_account.employee_id FROM users peer_account WHERE peer_account.user_id = peer_rs.reviewer_user_id LIMIT 1)
+        )
+        WHERE peer_rs.package_id = ep.package_id
+          AND peer_employee.department_id = ep.department_id
+          AND peer_employee.department_id = ? AND peer_employee.rank_category_id = ?
+          AND peer_employee.employee_id <> ?
+          AND peer_employee.employment_status = 'Regular'
+          AND peer_employee.is_active = 1 AND peer_employee.deleted_at IS NULL
+    )";
+}
 
 // Show every non-cancelled package that has a route step assigned to this reviewer,
 // including in-progress and waiting stages, so the page can show review history/progress
@@ -50,10 +73,16 @@ $packages_stmt = $conn->prepare("SELECT DISTINCT ep.package_id, ep.status, ep.ev
     JOIN evaluation_templates et ON et.template_id = ep.template_id
     WHERE ($reviewer_match
         OR (rs.eligible_role = ? AND rs.claimed_at IS NULL)
-        OR (rs.eligible_rank_category_id = ? AND ep.department_id = ? AND rs.claimed_at IS NULL))
+        OR (rs.eligible_rank_category_id = ? AND ep.department_id = ? AND rs.claimed_at IS NULL)
+        OR ($peer_history_scope))
       AND ep.status <> 'Cancelled'
     ORDER BY ep.updated_at DESC");
-$packages_stmt->bind_param('iisii', $user_id, $user_id, $package_claim_role, $package_claim_rank_category, $package_claim_department_id);
+if ($peer_history_rank > 0 && $peer_history_department_id > 0 && $peer_history_employee_id > 0) {
+    $packages_stmt->bind_param('iisiiiii', $user_id, $user_id, $package_claim_role, $package_claim_rank_category,
+        $package_claim_department_id, $peer_history_department_id, $peer_history_rank, $peer_history_employee_id);
+} else {
+    $packages_stmt->bind_param('iisii', $user_id, $user_id, $package_claim_role, $package_claim_rank_category, $package_claim_department_id);
+}
 $packages_stmt->execute();
 $packages = $packages_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $packages_stmt->close();

@@ -20,8 +20,8 @@ REPLACE INTO employees (employee_id, employee_code, first_name, last_name, middl
 (3006, 'BD-006', 'Michael', 'Perez', 'Soriano', '2026-08-01', '2004-10-02', 'Lucena City, Quezon', 'Male', 'Married', 302, 'Business Development Staff I', 3, 5, 102, 'OJT', 'Full-time', 'avatar_m.jpg'),
 
 -- Trainee
-(3002, 'BD-002', 'Santiago', 'Tolentino', 'Soriano', '2023-09-10', '1997-07-20', 'Lucena City, Quezon', 'Male', 'Widowed', 301, 'Business Development Staff on Training', 3, 5, 102, 'Trainee', 'Full-time', 'avatar_m.jpg'),
-(3007, 'BD-007', 'Mark', 'Gomez', 'Valenzuela', '2026-08-10', '2003-12-10', 'Lucena City, Quezon', 'Male', 'Widowed', 301, 'Business Development Staff on Training', 3, 5, 102, 'Trainee', 'Full-time', 'avatar_m.jpg'),
+(3002, 'BD-002', 'Santiago', 'Tolentino', 'Soriano', '2023-09-10', '1997-07-20', 'Lucena City, Quezon', 'Male', 'Widowed', 302, 'Business Development Staff I', 3, 5, 102, 'Trainee', 'Full-time', 'avatar_m.jpg'),
+(3007, 'BD-007', 'Mark', 'Gomez', 'Valenzuela', '2026-08-10', '2003-12-10', 'Lucena City, Quezon', 'Male', 'Widowed', 302, 'Business Development Staff I', 3, 5, 102, 'Trainee', 'Full-time', 'avatar_m.jpg'),
 
 -- Project Based
 (3010, 'BD-010', 'Carmelita', 'Bautista', 'Gonzales', '2026-08-01', '1996-05-06', 'Lucena City, Quezon', 'Female', 'Single', 302, 'Business Development Staff I', 3, 5, 102, 'Project Based', 'Full-time', 'avatar_f.jpg'),

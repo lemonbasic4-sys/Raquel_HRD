@@ -28,7 +28,41 @@ $access_row = $access_stmt->get_result()->fetch_assoc();
 $access_stmt->close();
 
 if (!$access_row) {
-    redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'You are not a designated reviewer for this package.');
+    $peer_profile_stmt = $conn->prepare("SELECT u.role, e.employee_id, e.department_id, e.rank_category_id, e.employment_status
+        FROM users u JOIN employees e ON e.employee_id = u.employee_id
+        WHERE u.user_id = ? AND u.is_active = 1 AND COALESCE(u.account_hold, 0) = 0
+          AND u.deleted_at IS NULL AND e.is_active = 1 AND e.deleted_at IS NULL LIMIT 1");
+    $peer_profile_stmt->bind_param('i', $user_id);
+    $peer_profile_stmt->execute();
+    $peer_profile = $peer_profile_stmt->get_result()->fetch_assoc() ?: [];
+    $peer_profile_stmt->close();
+    $peer_rank = (int)($peer_profile['rank_category_id'] ?? 0);
+    $peer_department = (int)($peer_profile['department_id'] ?? 0);
+    $peer_employee_id = (int)($peer_profile['employee_id'] ?? 0);
+    if (($peer_profile['role'] ?? '') !== 'HR Staff'
+        && ($peer_profile['employment_status'] ?? '') === 'Regular'
+        && in_array($peer_rank, [3, 4], true) && $peer_department > 0 && $peer_employee_id > 0) {
+        $peer_access_stmt = $conn->prepare("SELECT peer_rs.action_status, ep.status AS package_status
+            FROM evaluation_package_route_steps peer_rs
+            JOIN evaluation_packages ep ON ep.package_id = peer_rs.package_id
+            JOIN employees peer_employee ON peer_employee.employee_id = COALESCE(
+                peer_rs.reviewer_employee_id,
+                (SELECT peer_account.employee_id FROM users peer_account WHERE peer_account.user_id = peer_rs.reviewer_user_id LIMIT 1)
+            )
+            WHERE peer_rs.package_id = ? AND peer_employee.department_id = ep.department_id
+              AND peer_employee.department_id = ?
+              AND peer_employee.rank_category_id = ? AND peer_employee.employee_id <> ?
+              AND peer_employee.employment_status = 'Regular'
+              AND peer_employee.is_active = 1 AND peer_employee.deleted_at IS NULL
+            LIMIT 1");
+        $peer_access_stmt->bind_param('iiii', $package_id, $peer_department, $peer_rank, $peer_employee_id);
+        $peer_access_stmt->execute();
+        $access_row = $peer_access_stmt->get_result()->fetch_assoc();
+        $peer_access_stmt->close();
+    }
+    if (!$access_row) {
+        redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'You are not a designated reviewer or same-level department peer for this package.');
+    }
 }
 
 if ($access_row['action_status'] === 'Waiting' && $access_row['package_status'] !== 'Approved and Applied') {

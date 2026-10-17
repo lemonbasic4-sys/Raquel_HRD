@@ -49,7 +49,6 @@ Department (12)
 > Business Development Officer I (Manager)
 > Business Development Staff I (R&F)
 > Business Development Staff II (R&F)
-> Business Development Staff on Training (R&F)
 
 -Compliance- 6
 > Compliance Staff I (R&F)
@@ -177,7 +176,6 @@ Department (12)
 > Regional Manager II (Manager)
 > VP for Operations (Executives)
 
--Purchasing- 3
+-Purchasing- 2
 > Purchasing Staff I (R&F)
 > Purchasing Supervisor I (Supervisor)
-> Purchasing Supervisor on Training (Supervisor)

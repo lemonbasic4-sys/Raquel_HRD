@@ -33,7 +33,7 @@ if (!$tmpl) {
     redirectWith($template_list_url, 'danger', 'Template not found.');
 }
 if (!canManageEvaluationTemplate($conn, $template_id, $current_user_id)) {
-    redirectWith($template_list_url, 'danger', 'You can only edit templates you own.');
+    redirectWith($template_list_url, 'danger', 'You can only edit templates you own or are authorized to manage as a same-level department peer.');
 }
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {

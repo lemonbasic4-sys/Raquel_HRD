@@ -245,7 +245,7 @@ switch ($effective_role) {
 
             $_hdr_allowed_eval_types = getAllowedEvaluationTypesForEmploymentStatus($_hdr_emp_status);
             $_hdr_in_clause = "'" . implode("','", $_hdr_allowed_eval_types) . "'";
-            $_hdr_legacy_rank_sql = probationaryTemplateLegacyRankSql('et', $_hdr_emp_rank);
+            $_hdr_legacy_rank_sql = probationaryTemplateLegacyRankSql('et', $_hdr_emp_position_id);
             $_hdr_final_gate = (!$is_probationary_employee
                 || hasApprovedInitialProbationaryEvaluation($conn, $_hdr_emp_id)) ? 1 : 0;
 
@@ -378,16 +378,17 @@ switch ($effective_role) {
             $menu_evaluations[] = ['icon' => 'fas fa-chart-line', 'label' => 'My Performance', 'url' => BASE_URL . '/employee/my-performance.php', 'page' => 'my-performance.php'];
         }
         $template_creator_context = null;
-        if (!$is_probationary_employee && (in_array($_hdr_emp_rank, [1, 2, 3, 4], true) || ($_SESSION['role'] ?? '') === 'President and CEO')) {
+        if (!$is_probationary_employee) {
             $template_creator_context = getEvaluationTemplateCreatorContext($conn, (int)($_SESSION['user_id'] ?? 0));
         }
-        if (!$is_hr_personnel && $template_creator_context && !empty($template_creator_context['is_ceo'])) {
-            $menu_evaluations[] = ['icon' => 'fas fa-file-alt', 'label' => 'Evaluation Templates', 'url' => BASE_URL . '/employee/evaluation-templates.php', 'page' => 'evaluation-templates.php'];
-        }
-        if (!$is_hr_personnel && in_array($_hdr_emp_rank, [3, 4], true)) {
-            if (!$template_creator_context || empty($template_creator_context['is_ceo'])) {
-                $menu_evaluations[] = ['icon' => 'fas fa-file-alt', 'label' => 'Evaluation Templates', 'url' => BASE_URL . '/manager/templates.php', 'page' => 'templates.php'];
-            }
+        if (!$is_hr_personnel && $template_creator_context && !empty($template_creator_context['can_create_templates'])) {
+            $is_ceo_template_creator = !empty($template_creator_context['is_ceo']);
+            $menu_evaluations[] = [
+                'icon' => 'fas fa-file-alt',
+                'label' => 'Evaluation Templates',
+                'url' => BASE_URL . ($is_ceo_template_creator ? '/employee/evaluation-templates.php' : '/manager/templates.php'),
+                'page' => $is_ceo_template_creator ? 'evaluation-templates.php' : 'templates.php',
+            ];
         }
 
         // ── Section 3: My Team (supervisors/managers & assigned package reviewers) ──
@@ -944,6 +945,43 @@ switch ($effective_role) {
                                     <i class="fas fa-users me-2" style="width: 18px; text-align: center;"></i>My Team
                                 </a>
                             </li>
+                        <?php endif; ?>
+                        <?php
+                        // Add other currently authorized sidebar tools to the existing mobile gear menu.
+                        $_mobile_gear_skip_pages = ['dashboard.php', 'my-employment.php', 'self-rating.php',
+                            'evaluation-history.php', 'notifications.php', 'profile-settings.php',
+                            'my-performance.php', 'team-list.php'];
+                        $_mobile_gear_has_extra_items = false;
+                        foreach (($sidebar_menus ?? []) as $_mobile_section_items) {
+                            foreach ($_mobile_section_items as $_mobile_section_item) {
+                                if (!in_array((string)($_mobile_section_item['page'] ?? ''), $_mobile_gear_skip_pages, true)) {
+                                    $_mobile_gear_has_extra_items = true;
+                                    break 2;
+                                }
+                            }
+                        }
+                        if ($_mobile_gear_has_extra_items):
+                        ?>
+                            <li><hr class="dropdown-divider my-1"></li>
+                            <?php foreach (($sidebar_menus ?? []) as $_mobile_section => $_mobile_section_items):
+                                $_mobile_extra_items = array_values(array_filter($_mobile_section_items, static function ($item) use ($_mobile_gear_skip_pages) {
+                                    return !in_array((string)($item['page'] ?? ''), $_mobile_gear_skip_pages, true);
+                                }));
+                                if (!$_mobile_extra_items) continue;
+                            ?>
+                                <li><span class="dropdown-item-text text-uppercase fw-bold" style="font-size:.62rem;letter-spacing:.07em;color:#798579;padding:5px 10px 2px;"><?php echo e(ucwords(strtolower($_mobile_section))); ?></span></li>
+                                <?php foreach ($_mobile_extra_items as $_mobile_item): ?>
+                                    <li>
+                                        <a class="dropdown-item d-flex align-items-center" href="<?php echo e($_mobile_item['url'] ?? '#'); ?>" style="font-size:0.82rem; padding: 7px 10px;">
+                                            <i class="<?php echo e($_mobile_item['icon'] ?? 'fas fa-circle'); ?> me-2" style="width:18px;text-align:center;"></i>
+                                            <span><?php echo e($_mobile_item['label'] ?? 'Open'); ?></span>
+                                            <?php if ((int)($_mobile_item['badge'] ?? 0) > 0): ?>
+                                                <span class="badge <?php echo e($_mobile_item['badge_class'] ?? 'bg-success'); ?> ms-auto"><?php echo (int)$_mobile_item['badge']; ?></span>
+                                            <?php endif; ?>
+                                        </a>
+                                    </li>
+                                <?php endforeach; ?>
+                            <?php endforeach; ?>
                         <?php endif; ?>
                         <li>
                             <a class="dropdown-item d-flex align-items-center" href="<?php echo BASE_URL; ?>/employee/profile-settings.php" style="font-size:0.82rem; padding: 6px 10px;">

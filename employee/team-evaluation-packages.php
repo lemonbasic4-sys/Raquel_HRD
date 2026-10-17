@@ -38,7 +38,7 @@ $package_claim_role = in_array($claim_profile['role'] ?? '', ['HR Supervisor', '
 $package_claim_rank_category = (($claim_profile['role'] ?? '') === 'Employee'
     && strcasecmp((string)($claim_profile['department_name'] ?? ''), 'Human Resources') !== 0
     && ($claim_profile['employment_status'] ?? '') === 'Regular'
-    && in_array((int)($claim_profile['rank_category_id'] ?? 0), [3, 4], true))
+    && in_array((int)($claim_profile['rank_category_id'] ?? 0), [1, 3, 4], true))
     ? (int) $claim_profile['rank_category_id'] : 0;
 $package_claim_department_id = $package_claim_rank_category > 0 ? (int)($claim_profile['department_id'] ?? 0) : 0;
 
@@ -52,7 +52,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $claim_role = $package_claim_role;
         $claim_rank_category = $package_claim_rank_category;
         $claim_employee_id = (int) ($_SESSION['employee_id'] ?? 0);
-        if ((!in_array($claim_role, ['HR Supervisor', 'HR Manager', 'President and CEO'], true) && !in_array($claim_rank_category, [3, 4], true))
+        if ((!in_array($claim_role, ['HR Supervisor', 'HR Manager', 'President and CEO'], true) && !in_array($claim_rank_category, [1, 3, 4], true))
             || $claim_employee_id <= 0 || $package_id <= 0) {
             redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'Only an eligible HR reviewer or department supervisor/manager can claim this evaluation review.');
         }
@@ -280,7 +280,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!$is_probationary_step
             || $step['evaluation_type'] !== 'Initial'
             || (int)($step['step_order'] ?? 0) !== 1
-            || !in_array((int)($probationary_review['rank_category_id'] ?? 0), [3, 4, 5], true)
+            || !in_array((int)($probationary_review['rank_category_id'] ?? 0), [1, 3, 4, 5], true)
             || $probationary_eval_id <= 0) {
             redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'Only the assigned reviewer can sign this probationary Initial evaluation.');
         }
@@ -470,7 +470,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // 🔒 Prevention: verify next consolidator/reviewer exists and is assigned before advancing
     if ($action === 'approve' && $is_probationary_step && $step['evaluation_type'] === 'Initial'
-        && in_array((int)($probationary_review['rank_category_id'] ?? 0), [3, 4, 5], true)) {
+        && in_array((int)($probationary_review['rank_category_id'] ?? 0), [1, 3, 4, 5], true)) {
         if (empty($probationary_review['immediate_head_signature_data'])
             || (int)($probationary_review['immediate_head_user_id'] ?? 0) !== $user_id) {
             redirectWith($decision_review_url, 'danger', 'Save your Immediate head signature before approving this probationary Initial evaluation.');
@@ -731,7 +731,7 @@ if ($current_employee_id > 0) {
 }
 
 $employee_package_access = $session_role === 'Employee'
-    && (in_array((int)($claim_profile['rank_category_id'] ?? 0), [3, 4], true) || countPendingOrganizationPackagesForUser($conn, $user_id) > 0)
+    && (in_array((int)($claim_profile['rank_category_id'] ?? 0), [1, 3, 4], true) || countPendingOrganizationPackagesForUser($conn, $user_id) > 0)
     && strcasecmp((string)($claim_profile['department_name'] ?? ''), 'Human Resources') !== 0;
 if (in_array($session_role, ['HR Manager', 'HR Supervisor', 'Admin'], true) || $employee_package_access) {
     // HR managers/supervisors/admins can also endorse any package at the HR level
@@ -950,7 +950,7 @@ asort($package_department_options, SORT_NATURAL | SORT_FLAG_CASE);
             && (int)$package['current_step_order'] === 1
             && (($package['evaluation_type'] ?? '') === 'Final'
                 || (($package['evaluation_type'] ?? '') === 'Initial'
-                    && in_array((int)($members[0]['rank_category_id'] ?? 0), [3, 4, 5], true)));
+                    && in_array((int)($members[0]['rank_category_id'] ?? 0), [1, 3, 4, 5], true)));
         $has_current_reviewer_signature = $requires_probationary_decision_signature
             && !empty($members[0]['immediate_head_signature_data'])
             && (int)($members[0]['immediate_head_user_id'] ?? 0) === $user_id;

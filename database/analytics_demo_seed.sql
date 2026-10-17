@@ -60,8 +60,8 @@ REPLACE INTO employees (
 (9300, 'ANA-BD-001', 'Victor',    'Bautista',   'Del Rosario','2016-05-20','1982-08-15', 'Lucena City, Quezon', 'Male',   'Married',   300, 'Business Development Officer I',3, 3, 102, 'Regular',      'Full-time', 'avatar_m.jpg'),
 (9301, 'ANA-BD-002', 'Josephine', 'Diaz',       'Villanueva','2019-11-11', '1987-01-09', 'Lucena City, Quezon', 'Female', 'Single',    302, 'Business Development Staff I', 3, 5, 102, 'Regular',      'Full-time', 'avatar_f.jpg'),
 (9302, 'ANA-BD-003', 'Armando',   'Gonzales',   'Reyes',     '2021-03-08', '1992-04-25', 'Lucena City, Quezon', 'Male',   'Single',    303, 'Business Development Staff II',3, 5, 102, 'Regular',      'Full-time', 'avatar_m.jpg'),
-(9303, 'ANA-BD-004', 'Natividad', 'Salvador',   'Ocampo',    '2024-09-01', '1999-12-01', 'Lucena City, Quezon', 'Female', 'Single',    301, 'Business Development Staff on Training',3, 5, 102, 'Probationary','Full-time','avatar_f.jpg'),
-(9304, 'ANA-BD-005', 'Clarence',  'Torres',     'Mendoza',   '2026-08-10', '2003-03-14', 'Lucena City, Quezon', 'Male',   'Single',    301, 'Business Development Staff on Training',3, 5, 102, 'Trainee',     'Full-time', 'avatar_m.jpg'),
+(9303, 'ANA-BD-004', 'Natividad', 'Salvador',   'Ocampo',    '2024-09-01', '1999-12-01', 'Lucena City, Quezon', 'Female', 'Single',    302, 'Business Development Staff I',3, 5, 102, 'Probationary','Full-time','avatar_f.jpg'),
+(9304, 'ANA-BD-005', 'Clarence',  'Torres',     'Mendoza',   '2026-08-10', '2003-03-14', 'Lucena City, Quezon', 'Male',   'Single',    302, 'Business Development Staff I',3, 5, 102, 'Trainee',     'Full-time', 'avatar_m.jpg'),
 
 -- =====================================================
 -- Dept 4: Compliance (dept_id=4)
@@ -155,7 +155,7 @@ REPLACE INTO employees (
 -- Dept 12: Purchasing (dept_id=12)
 -- =====================================================
 (9120, 'ANA-PU-001', 'Generoso',  'Flores',     'Santos',    '2016-10-03', '1983-02-09', 'Lucena City, Quezon', 'Male',   'Married',  1200, 'Purchasing Supervisor I',      12, 4, 102, 'Regular',      'Full-time', 'avatar_m.jpg'),
-(9121, 'ANA-PU-002', 'Estrellita','Lopez',       'Rivera',    '2019-07-29', '1989-05-21', 'Lucena City, Quezon', 'Female', 'Single',   1201, 'Purchasing Supervisor on Training',12, 4, 102,'Regular',  'Full-time', 'avatar_f.jpg'),
+(9121, 'ANA-PU-002', 'Estrellita','Lopez',       'Rivera',    '2019-07-29', '1989-05-21', 'Lucena City, Quezon', 'Female', 'Single',   1200, 'Purchasing Supervisor I',12, 4, 102,'Regular',  'Full-time', 'avatar_f.jpg'),
 (9122, 'ANA-PU-003', 'Renaldo',   'Aquino',     'Bautista',  '2022-03-14', '1995-08-04', 'Lucena City, Quezon', 'Male',   'Single',   1202, 'Purchasing Staff I',           12, 5, 102, 'Regular',      'Full-time', 'avatar_m.jpg'),
 (9123, 'ANA-PU-004', 'Dolores',   'Garcia',     'Perez',     '2025-06-01', '2001-04-18', 'Lucena City, Quezon', 'Female', 'Single',   1202, 'Purchasing Staff I',           12, 5, 102, 'Probationary', 'Full-time', 'avatar_f.jpg'),
 (9124, 'ANA-PU-005', 'Gilbert',   'Sarmiento',  'Soriano',   '2026-08-01', '2003-01-26', 'Lucena City, Quezon', 'Male',   'Single',   1202, 'Purchasing Staff I',           12, 5, 102, 'OJT',          'Full-time', 'avatar_m.jpg');
@@ -2164,7 +2164,7 @@ REPLACE INTO career_movements (movement_id, employee_id, movement_type, previous
 (9004,9802,'Promotion','IT Supervisor II','IT Manager I',102,102,'2024-09-01','Outstanding technical leadership and project delivery.',1,1,'2024-08-20','Approved',1),
 (9005,9113,'Transfer','Focal Person I','Focal Person I',10,20,'2025-01-15','Area expansion requiring additional coordination support.',1,1,'2025-01-05','Approved',1),
 (9006,9114,'Transfer','Branch Staff I','Branch Staff I',20,30,'2025-03-01','Branch staffing rebalancing.',1,1,'2025-02-20','Approved',1),
-(9007,9301,'Promotion','Business Development Staff on Training','Business Development Staff I',102,102,'2025-07-01','Completed training period with excellent performance marks.',1,1,'2025-06-20','Approved',1),
+(9007,9301,'Promotion','Business Development Staff I','Business Development Staff I',102,102,'2025-07-01','Completed training period with excellent performance marks.',1,1,'2025-06-20','Approved',1),
 (9008,9403,'Promotion','Compliance Staff I','Compliance Staff II',102,102,'2025-09-01','Completed compliance certification with outstanding results.',1,1,'2025-08-15','Approved',1),
 -- Pending approval
 (9009,9606,'Promotion','Facilities Maintenance Staff I','Facilities Maintenance Staff II',102,102,'2026-09-01','Pending: Consistent above-satisfactory performance.',1,NULL,NULL,'Pending',0),

@@ -84,18 +84,20 @@ if (!$employee) {
 }
 $allowed_eval_types = getAllowedEvaluationTypesForEmploymentStatus($employee['employment_status'] ?? 'Regular');
 $in_clause = "'" . implode("','", $allowed_eval_types) . "'";
-$probationary_phase_type = in_array($employee['probationary_next_evaluation_type'] ?? '', ['Initial', 'Final'], true)
-    ? $employee['probationary_next_evaluation_type'] : 'Initial';
-$probationary_phase_filter_et = ($employee['employment_status'] ?? '') === 'Probationary'
-    ? "AND et.evaluation_type = '" . $conn->real_escape_string($probationary_phase_type) . "'" : '';
-$probationary_phase_filter_full = ($employee['employment_status'] ?? '') === 'Probationary'
-    ? "AND evaluation_templates.evaluation_type = '" . $conn->real_escape_string($probationary_phase_type) . "'" : '';
-$legacy_probationary_rank_et = probationaryTemplateLegacyRankSql('et', $employee['rank_category_id'] ?? 0);
-$legacy_probationary_rank_full = probationaryTemplateLegacyRankSql('evaluation_templates', $employee['rank_category_id'] ?? 0);
+$legacy_probationary_rank_et = probationaryTemplateLegacyRankSql('et', $employee['job_title_id'] ?? 0);
+$legacy_probationary_rank_full = probationaryTemplateLegacyRankSql('evaluation_templates', $employee['job_title_id'] ?? 0);
 $initial_required = ($employee['employment_status'] ?? '') === 'Probationary';
 $initial_required_flag = $initial_required ? 1 : 0;
 $initial_approved = !$initial_required
     || hasApprovedInitialProbationaryEvaluation($conn, $employee_id);
+$probationary_phase_type = $initial_required
+    ? ($initial_approved ? 'Final' : 'Initial')
+    : (in_array($employee['probationary_next_evaluation_type'] ?? '', ['Initial', 'Final'], true)
+        ? $employee['probationary_next_evaluation_type'] : 'Initial');
+$probationary_phase_filter_et = $initial_required
+    ? "AND et.evaluation_type = '" . $conn->real_escape_string($probationary_phase_type) . "'" : '';
+$probationary_phase_filter_full = $initial_required
+    ? "AND evaluation_templates.evaluation_type = '" . $conn->real_escape_string($probationary_phase_type) . "'" : '';
 $initial_gate = $initial_approved ? 1 : 0;
 
 $edit_eval = null;

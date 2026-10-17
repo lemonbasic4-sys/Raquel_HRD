@@ -3467,7 +3467,7 @@ function notifyHRManagementOfProbationaryApproval($conn, $evaluation_id)
     return count($recipients);
 }
 
-/** Notify active regular department managers after a supervisor finalizes a staff probationary outcome. */
+/** Notify active regular department managers when a staff probationary cycle continues. */
 function notifyDepartmentManagersOfProbationaryOutcome($conn, int $evaluation_id): int
 {
     $stmt = $conn->prepare("SELECT ev.evaluation_type, ev.total_score, e.department_id,
@@ -3485,6 +3485,12 @@ function notifyDepartmentManagersOfProbationaryOutcome($conn, int $evaluation_id
     if (!$row || $row['evaluation_type'] !== 'Final'
         || strcasecmp((string)$row['department_name'], 'Human Resources') === 0) return 0;
 
+    // A completed regularization is an HR-only informational event. Department
+    // managers must not receive the staff regularization-completed notice.
+    $regularized = ($row['recommendation'] ?? '') === 'Recommend regularization'
+        && ($row['employment_status'] ?? '') === 'Regular';
+    if ($regularized) return 0;
+
     $recipients_stmt = $conn->prepare("SELECT DISTINCT u.user_id
         FROM users u JOIN employees manager ON manager.employee_id = u.employee_id
         WHERE manager.department_id = ? AND manager.rank_category_id = 3
@@ -3498,18 +3504,14 @@ function notifyDepartmentManagersOfProbationaryOutcome($conn, int $evaluation_id
     $recipients_stmt->close();
 
     $employee_name = trim((string)$row['first_name'] . ' ' . (string)$row['last_name']);
-    $regularized = ($row['recommendation'] ?? '') === 'Recommend regularization'
-        && ($row['employment_status'] ?? '') === 'Regular';
     $message = $employee_name . ' (' . ($row['job_title'] ?? 'Staff') . ') completed the Final probationary evaluation. '
         . 'The Department Supervisor recorded: ' . ($row['recommendation'] ?: 'No recommendation') . '. '
-        . ($regularized
-            ? 'The recommendation was applied and the employee is now Regular.'
-            : 'The employee remains Probationary for the next evaluation cycle.')
+        . 'The employee remains Probationary for the next evaluation cycle.'
         . ' Final score: ' . number_format((float)$row['total_score'], 2) . '.';
     $count = 0;
     foreach ($recipients as $recipient) {
         createNotification($conn, (int)$recipient['user_id'],
-            $regularized ? 'Staff probationary regularization completed' : 'Staff probationary evaluation completed',
+            'Staff probationary evaluation completed',
             $message, BASE_URL . '/employee/team-evaluation-history.php', 'probation', 0);
         $count++;
     }
@@ -3690,9 +3692,18 @@ function getEvaluationTemplateCreatorContext($conn, $user_id)
     $is_ceo = $role === 'President and CEO'
         || (in_array((int)($context['rank_category_id'] ?? 0), [1, 2], true)
             && preg_match('/president|chief executive officer|\bceo\b/i', (string)($context['position_title'] ?? '')));
-    $can_create = $is_ceo
-        || in_array($role, ['HR Manager', 'HR Supervisor'], true)
-        || ($role === 'Employee' && in_array((int)($context['rank_category_id'] ?? 0), [3, 4], true));
+    // Template-authoring eligibility follows the configured organization tree:
+    // any supported employee account with active direct-report positions can create.
+    $has_direct_report_positions = false;
+    $creator_position_id = (int)($context['job_title_id'] ?? 0);
+    if ($creator_position_id > 0 && in_array($role, ['Employee', 'HR Manager', 'HR Supervisor'], true)) {
+        $reports_stmt = $conn->prepare('SELECT 1 FROM job_titles WHERE reports_to = ? AND is_active = 1 LIMIT 1');
+        $reports_stmt->bind_param('i', $creator_position_id);
+        $reports_stmt->execute();
+        $has_direct_report_positions = (bool)$reports_stmt->get_result()->fetch_row();
+        $reports_stmt->close();
+    }
+    $can_create = $is_ceo || $has_direct_report_positions;
     $context['is_ceo'] = $is_ceo;
     $context['can_create_templates'] = $can_create;
     return $context;
@@ -3721,7 +3732,7 @@ function isEvaluationTemplateOwner($conn, $template_id, $user_id)
     return $is_owner;
 }
 
-/** HRIS managers and supervisors manage only templates created by their own account. */
+/** Template owners and active same-department, same-rank manager/supervisor peers can manage a template. */
 function canManageEvaluationTemplate($conn, $template_id, $user_id)
 {
     $stmt = $conn->prepare("SELECT et.created_by,
@@ -3730,7 +3741,9 @@ function canManageEvaluationTemplate($conn, $template_id, $user_id)
             viewer_position.job_title AS viewer_position_title,
             creator.role AS creator_role, creator_emp.employee_id AS creator_employee_id,
             creator_emp.department_id AS creator_department_id, creator_emp.rank_category_id AS creator_rank,
-            creator_position.job_title AS creator_position_title
+            creator_emp.is_active AS creator_employee_active, creator_emp.deleted_at AS creator_employee_deleted_at,
+            creator.is_active AS creator_user_active, creator.account_hold AS creator_account_hold,
+            creator.deleted_at AS creator_user_deleted_at, creator_position.job_title AS creator_position_title
         FROM evaluation_templates et
         JOIN users viewer ON viewer.user_id = ? AND viewer.is_active = 1 AND COALESCE(viewer.account_hold, 0) = 0 AND viewer.deleted_at IS NULL
         LEFT JOIN employees viewer_emp ON viewer_emp.employee_id = viewer.employee_id
@@ -3759,19 +3772,19 @@ function canManageEvaluationTemplate($conn, $template_id, $user_id)
         && (int)$row['viewer_employee_id'] === (int)($row['creator_employee_id'] ?? 0)) {
         return true;
     }
-
-    if (in_array($row['viewer_role'], ['HR Manager', 'HR Supervisor'], true)) return false;
-
+    $peer_roles = ['Employee', 'HR Manager', 'HR Supervisor'];
     $viewer_rank = (int)($row['viewer_rank'] ?? 0);
     $creator_rank = (int)($row['creator_rank'] ?? 0);
     $viewer_department = (int)($row['viewer_department_id'] ?? 0);
     $creator_department = (int)($row['creator_department_id'] ?? 0);
-    $viewer_can_manage_peers = ($row['viewer_role'] === 'Employee' && in_array($viewer_rank, [3, 4], true))
-        || in_array($row['viewer_role'], ['HR Manager', 'HR Supervisor'], true);
-    $creator_is_management_peer = ($row['creator_role'] === 'Employee' && in_array($creator_rank, [3, 4], true))
-        || in_array($row['creator_role'], ['HR Manager', 'HR Supervisor'], true);
-    return $viewer_can_manage_peers && $creator_is_management_peer
-        && $viewer_department > 0 && $viewer_department === $creator_department;
+    return in_array($row['viewer_role'], $peer_roles, true)
+        && in_array($row['creator_role'], $peer_roles, true)
+        && in_array($viewer_rank, [3, 4], true) && $viewer_rank === $creator_rank
+        && $viewer_department > 0 && $viewer_department === $creator_department
+        && (int)($row['viewer_employee_id'] ?? 0) > 0
+        && !empty($row['creator_employee_active']) && empty($row['creator_employee_deleted_at'])
+        && !empty($row['creator_user_active']) && empty($row['creator_account_hold'])
+        && empty($row['creator_user_deleted_at']);
 }
 
 function getEvaluationTemplateTargetPositions($conn, $context, $department_id = 0)
@@ -3781,12 +3794,15 @@ function getEvaluationTemplateTargetPositions($conn, $context, $department_id = 
     $is_ceo = !empty($context['is_ceo']);
     if (!$is_ceo && $department_id !== (int)($context['department_id'] ?? 0)) return [];
 
+    $creator_position_id = (int)($context['job_title_id'] ?? 0);
+    if ($creator_position_id <= 0) return [];
     if ($is_ceo) {
         $stmt = $conn->prepare("SELECT job_title_id, job_title, department_id
             FROM job_titles
-            WHERE (? = 0 OR department_id = ?) AND rank_category_id = 3 AND is_active = 1
+            WHERE (? = 0 OR department_id = ?)
+              AND is_active = 1 AND reports_to = ?
             ORDER BY department_id, job_title");
-        $stmt->bind_param('ii', $department_id, $department_id);
+        $stmt->bind_param('iii', $department_id, $department_id, $creator_position_id);
     } else {
         $parent_position_id = (int)($context['job_title_id'] ?? 0);
         $stmt = $conn->prepare("SELECT job_title_id, job_title, department_id
@@ -3807,37 +3823,29 @@ function getProbationaryTemplateTargetPositions($conn, $context, $department_id 
     if (!$context || empty($context['can_create_templates'])) return [];
     $department_id = (int)$department_id;
     if (empty($context['is_ceo']) && $department_id !== (int)($context['department_id'] ?? 0)) return [];
-    $role = (string)($context['role'] ?? '');
-    $creator_rank = (int)($context['rank_category_id'] ?? 0);
-    $target_rank = !empty($context['is_ceo']) ? 3
-        : ($role === 'HR Manager' ? 4
-        : (($role === 'HR Supervisor' || $creator_rank === 4) ? 5
-        : ($creator_rank === 3 ? 4 : 0)));
-    if ($target_rank === 0) return [];
-    $stmt = $conn->prepare('SELECT job_title_id, job_title, department_id FROM job_titles WHERE department_id = ? AND rank_category_id = ? AND is_active = 1 ORDER BY job_title');
-    $stmt->bind_param('ii', $department_id, $target_rank);
+    $creator_position_id = (int)($context['job_title_id'] ?? 0);
+    if ($creator_position_id <= 0) return [];
+    $stmt = $conn->prepare("SELECT job_title_id, job_title, department_id FROM job_titles
+        WHERE department_id = ? AND reports_to = ? AND is_active = 1 ORDER BY job_title");
+    $stmt->bind_param('ii', $department_id, $creator_position_id);
     $stmt->execute();
     $positions = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
     return $positions;
 }
 
-/** Legacy probationary forms without positions must still match the creator's intended rank. */
-function probationaryTemplateLegacyRankSql($alias, $employee_rank_id)
+/** Legacy probationary forms without position-map rows must match the creator's direct reports. */
+function probationaryTemplateLegacyRankSql($alias, $employee_position_id)
 {
     $alias = in_array($alias, ['et', 'evaluation_templates'], true) ? $alias : 'et';
-    $employee_rank_id = (int)$employee_rank_id;
+    $employee_position_id = (int)$employee_position_id;
+    if ($employee_position_id <= 0) return "($alias.evaluation_type NOT IN ('Initial', 'Final'))";
     return "($alias.evaluation_type NOT IN ('Initial', 'Final') OR EXISTS (
         SELECT 1 FROM users template_creator
-        LEFT JOIN employees creator_employee ON creator_employee.employee_id = template_creator.employee_id
+        JOIN employees creator_employee ON creator_employee.employee_id = template_creator.employee_id
+        JOIN job_titles target_position ON target_position.job_title_id = $employee_position_id
+            AND target_position.reports_to = creator_employee.job_title_id
         WHERE template_creator.user_id = $alias.created_by
-          AND CASE
-              WHEN template_creator.role = 'President and CEO' THEN 3
-              WHEN template_creator.role = 'HR Manager' THEN 4
-              WHEN template_creator.role = 'HR Supervisor' THEN 5
-              WHEN creator_employee.rank_category_id = 4 THEN 5
-              WHEN creator_employee.rank_category_id = 3 THEN 4
-              ELSE 0 END = $employee_rank_id
     ))";
 }
 
@@ -4002,7 +4010,7 @@ function hasOrganizationPackageRankReviewer($conn, $department_id, $rank_categor
 {
     $department_id = (int) $department_id;
     $rank_category_id = (int) $rank_category_id;
-    if ($department_id <= 0 || !in_array($rank_category_id, [3, 4], true)) return false;
+    if ($department_id <= 0 || !in_array($rank_category_id, [1, 3, 4], true)) return false;
     $stmt = $conn->prepare("SELECT 1
         FROM employees e
         JOIN users u ON u.employee_id = e.employee_id AND u.role = 'Employee'
@@ -4975,41 +4983,13 @@ function countPendingOrganizationPackagesForUser($conn, $user_id)
                    AND (SELECT e.employment_status FROM users u
                        JOIN employees e ON e.employee_id = u.employee_id WHERE u.user_id = ? LIMIT 1) = 'Regular'
                    AND rs.claimed_at IS NULL AND rs.action_status = 'Pending')
-               OR (rs.step_order = 1 AND rs.action_status = 'Pending'
-                   AND rs.reviewer_user_id IS NULL AND rs.reviewer_employee_id IS NULL
-                   AND ep.evaluation_type IN ('Initial', 'Final')
-                   AND EXISTS (
-                       SELECT 1
-                       FROM evaluation_package_members pm
-                       JOIN evaluations ev ON ev.evaluation_id = pm.evaluation_id
-                       JOIN employees probationary ON probationary.employee_id = ev.employee_id
-                       JOIN employees expected_manager ON expected_manager.employee_id = COALESCE(
-                           (SELECT direct_manager.employee_id FROM employees direct_manager
-                            WHERE direct_manager.employee_id = probationary.reports_to
-                              AND direct_manager.rank_category_id = 3
-                              AND direct_manager.employment_status = 'Regular'
-                              AND direct_manager.is_active = 1 AND direct_manager.deleted_at IS NULL LIMIT 1),
-                           (SELECT MIN(fallback_manager.employee_id) FROM employees fallback_manager
-                            WHERE fallback_manager.department_id = probationary.department_id
-                              AND fallback_manager.rank_category_id = 3
-                              AND fallback_manager.employment_status = 'Regular'
-                              AND fallback_manager.is_active = 1 AND fallback_manager.deleted_at IS NULL))
-                       JOIN users expected_manager_user ON expected_manager_user.employee_id = expected_manager.employee_id
-                           AND expected_manager_user.role = 'Employee' AND expected_manager_user.is_active = 1
-                           AND COALESCE(expected_manager_user.account_hold, 0) = 0
-                           AND expected_manager_user.deleted_at IS NULL
-                       WHERE pm.package_id = ep.package_id AND ev.evaluation_type IN ('Initial', 'Final')
-                         AND probationary.rank_category_id = 4
-                         AND probationary.employment_status = 'Probationary'
-                         AND probationary.department_id = ep.department_id
-                         AND expected_manager_user.user_id = ?
-                   )))
+               )
           AND (
               (rs.step_order = 1 AND rs.action_status IN ('Pending', 'Waiting'))
               OR (rs.step_order > 1 AND rs.action_status = 'Pending')
           )
           AND ep.status NOT IN ('Approved and Applied', 'Cancelled')");
-    $stmt->bind_param('iiiiiiii', $user_id, $user_id, $user_id, $user_id, $user_id, $user_id, $user_id, $user_id);
+    $stmt->bind_param('iiiiiii', $user_id, $user_id, $user_id, $user_id, $user_id, $user_id, $user_id);
     $stmt->execute();
     $total = (int) ($stmt->get_result()->fetch_assoc()['total'] ?? 0);
     $stmt->close();
@@ -5043,7 +5023,7 @@ function createOrganizationPackageRoute($conn, $package_id, $consolidator_employ
     $package_department_id = null;
 
     // Fetch the package department_id so we can pull the right Division VP.
-    $pkg_stmt = $conn->prepare('SELECT department_id, evaluation_type FROM evaluation_packages WHERE package_id = ? LIMIT 1');
+    $pkg_stmt = $conn->prepare('SELECT department_id, evaluation_type, template_id FROM evaluation_packages WHERE package_id = ? LIMIT 1');
     $pkg_stmt->bind_param('i', $package_id);
     $pkg_stmt->execute();
     $pkg_row = $pkg_stmt->get_result()->fetch_assoc();
@@ -5091,23 +5071,24 @@ function createOrganizationPackageRoute($conn, $package_id, $consolidator_employ
         $template_creator_employee_id = 0;
         $template_creator_role = '';
         if (!$is_hr_probationary && (int)$probationary_evaluation_id > 0) {
-            $head_stmt = $conn->prepare("SELECT emp.rank_category_id, manager.employee_id, manager_user.user_id,
-                    department_manager.employee_id AS department_manager_employee_id,
-                    department_manager_user.user_id AS department_manager_user_id,
+        $head_stmt = $conn->prepare("SELECT emp.rank_category_id, manager.employee_id, manager_user.user_id,
+                    manager.rank_category_id AS manager_rank,
                     template_creator.user_id AS template_creator_user_id,
                     template_creator.employee_id AS template_creator_employee_id,
-                    template_creator.role AS template_creator_role
+                    template_creator.role AS template_creator_role,
+                    template_creator_employee.rank_category_id AS template_creator_rank,
+                    template_creator_position.job_title AS template_creator_title
                 FROM evaluations ev
                 JOIN employees emp ON emp.employee_id = ev.employee_id
                 LEFT JOIN employees manager ON manager.employee_id = COALESCE(
                     (SELECT direct_head.employee_id FROM employees direct_head
                      WHERE direct_head.employee_id = emp.reports_to
-                       AND direct_head.rank_category_id = CASE WHEN emp.rank_category_id = 5 THEN 4 ELSE 3 END
                        AND direct_head.employment_status = 'Regular' AND direct_head.is_active = 1 AND direct_head.deleted_at IS NULL LIMIT 1),
-                    (SELECT MIN(fallback_head.employee_id) FROM employees fallback_head
+                    (SELECT fallback_head.employee_id FROM employees fallback_head
                      WHERE fallback_head.department_id = emp.department_id
-                       AND fallback_head.rank_category_id = CASE WHEN emp.rank_category_id = 5 THEN 4 ELSE 3 END
-                       AND fallback_head.employment_status = 'Regular' AND fallback_head.is_active = 1 AND fallback_head.deleted_at IS NULL))
+                       AND fallback_head.rank_category_id < emp.rank_category_id
+                       AND fallback_head.employment_status = 'Regular' AND fallback_head.is_active = 1 AND fallback_head.deleted_at IS NULL
+                     ORDER BY fallback_head.rank_category_id, fallback_head.employee_id LIMIT 1))
                 LEFT JOIN users manager_user ON manager_user.employee_id = manager.employee_id
                     AND manager_user.role = 'Employee' AND manager_user.is_active = 1
                     AND COALESCE(manager_user.account_hold, 0) = 0 AND manager_user.deleted_at IS NULL
@@ -5125,6 +5106,8 @@ function createOrganizationPackageRoute($conn, $package_id, $consolidator_employ
                 LEFT JOIN evaluation_templates et ON et.template_id = ev.template_id
                 LEFT JOIN users template_creator ON template_creator.user_id = et.created_by
                     AND template_creator.is_active = 1 AND template_creator.deleted_at IS NULL
+                LEFT JOIN employees template_creator_employee ON template_creator_employee.employee_id = template_creator.employee_id
+                LEFT JOIN job_titles template_creator_position ON template_creator_position.job_title_id = template_creator_employee.job_title_id
                 WHERE ev.evaluation_id = ? AND emp.department_id = ? LIMIT 1");
             $head_stmt->bind_param('ii', $probationary_evaluation_id, $package_department_id);
             $head_stmt->execute();
@@ -5133,11 +5116,13 @@ function createOrganizationPackageRoute($conn, $package_id, $consolidator_employ
             $employee_rank = (int)($head['rank_category_id'] ?? 0);
             $direct_head_employee_id = (int)($head['employee_id'] ?? 0);
             $direct_head_user_id = (int)($head['user_id'] ?? 0);
-            $staff_manager_employee_id = (int)($head['department_manager_employee_id'] ?? 0);
-            $staff_manager_user_id = (int)($head['department_manager_user_id'] ?? 0);
+            $manager_rank = (int)($head['manager_rank'] ?? 0);
             $template_creator_user_id = (int)($head['template_creator_user_id'] ?? 0);
             $template_creator_employee_id = (int)($head['template_creator_employee_id'] ?? 0);
             $template_creator_role = (string)($head['template_creator_role'] ?? '');
+            $template_creator_is_ceo = $template_creator_role === 'President and CEO'
+                || ((int)($head['template_creator_rank'] ?? 0) > 0 && (int)($head['template_creator_rank'] ?? 0) <= 2
+                    && preg_match('/president|chief executive officer|\\bceo\\b/i', (string)($head['template_creator_title'] ?? '')));
         }
         if ($is_hr_probationary) {
             if ($hr_employee_rank === 5) {
@@ -5155,21 +5140,14 @@ function createOrganizationPackageRoute($conn, $package_id, $consolidator_employ
                 ['Department Manager — Final Approval', null, 3, 0, 0]];
         }
         if (!$is_hr_probationary) {
-            if ($employee_rank === 3) {
-                $ceo_user_id = $template_creator_role === 'President and CEO' ? $template_creator_user_id : 0;
-                $steps = [['President and CEO - Manager Probationary Review', $ceo_user_id > 0 ? null : 'President and CEO', null,
-                    $ceo_user_id > 0 ? $template_creator_employee_id : 0, $ceo_user_id]];
-            } elseif ($employee_rank === 4) {
-                // A probationary supervisor's review is offered to the active
-                // regular department-manager pool. The first eligible manager
-                // to accept owns the review, matching staff-to-supervisor routing.
-                $steps = [['Department Manager - Supervisor Probationary Review', null, 3, 0, 0]];
-            } elseif ($employee_rank === 5) {
-                // Staff probationary reviews are offered to the active supervisor
-                // pool. The first eligible supervisor to accept owns this stage.
-                $steps = [['Department Supervisor - Staff Probationary Review', null, 4, 0, 0]];
+            if (!in_array($employee_rank, [1, 3, 4, 5], true)) return;
+            if ($template_creator_is_ceo && $employee_rank <= 3) {
+                $steps = [['President and CEO - Immediate Head Review', null, null,
+                    $template_creator_employee_id, $template_creator_user_id]];
+            } elseif ($manager_rank >= 1 && $manager_rank < $employee_rank) {
+                $steps = [['Immediate Head - Probationary Review', null, $manager_rank, 0, 0]];
             } else {
-                return;
+                $steps = [['President and CEO - Immediate Head Review', 'President and CEO', null, 0, 0]];
             }
         }
         $insert = $conn->prepare("INSERT INTO evaluation_package_route_steps
@@ -5416,15 +5394,23 @@ function syncOpenNonHrProbationaryRoutes($conn)
             CONCAT(e.first_name, ' ', e.last_name) AS employee_name,
             COALESCE(
                 (SELECT direct_head.employee_id FROM employees direct_head
-                 WHERE direct_head.employee_id = e.reports_to
-                   AND direct_head.rank_category_id = CASE WHEN e.rank_category_id = 5 THEN 4 ELSE 3 END
+                 WHERE direct_head.employee_id = e.reports_to AND direct_head.rank_category_id < e.rank_category_id
                    AND direct_head.employment_status = 'Regular' AND direct_head.is_active = 1 AND direct_head.deleted_at IS NULL LIMIT 1),
-                (SELECT MIN(fallback_head.employee_id) FROM employees fallback_head
-                 WHERE fallback_head.department_id = e.department_id
-                   AND fallback_head.rank_category_id = CASE WHEN e.rank_category_id = 5 THEN 4 ELSE 3 END
-                   AND fallback_head.employment_status = 'Regular' AND fallback_head.is_active = 1 AND fallback_head.deleted_at IS NULL)
+                (SELECT fallback_head.employee_id FROM employees fallback_head
+                 WHERE fallback_head.department_id = e.department_id AND fallback_head.rank_category_id < e.rank_category_id
+                   AND fallback_head.employment_status = 'Regular' AND fallback_head.is_active = 1 AND fallback_head.deleted_at IS NULL
+                 ORDER BY fallback_head.rank_category_id, fallback_head.employee_id LIMIT 1)
             ) AS expected_head_employee_id,
+            COALESCE(
+                (SELECT direct_head.rank_category_id FROM employees direct_head
+                 WHERE direct_head.employee_id = e.reports_to AND direct_head.rank_category_id < e.rank_category_id
+                   AND direct_head.employment_status = 'Regular' AND direct_head.is_active = 1 AND direct_head.deleted_at IS NULL LIMIT 1),
+                (SELECT MIN(fallback_head.rank_category_id) FROM employees fallback_head
+                 WHERE fallback_head.department_id = e.department_id AND fallback_head.rank_category_id < e.rank_category_id
+                   AND fallback_head.employment_status = 'Regular' AND fallback_head.is_active = 1 AND fallback_head.deleted_at IS NULL)
+            ) AS expected_head_rank,
             e.reports_to, et.created_by, creator.role AS creator_role, creator.employee_id AS creator_employee_id,
+            creator_employee.rank_category_id AS creator_rank, creator_position.job_title AS creator_title,
             COUNT(rs.package_route_step_id) AS step_count,
             MAX(CASE WHEN rs.step_order = 1 THEN rs.reviewer_employee_id END) AS first_employee_id,
             MAX(CASE WHEN rs.step_order = 1 THEN rs.reviewer_user_id END) AS first_user_id,
@@ -5438,6 +5424,8 @@ function syncOpenNonHrProbationaryRoutes($conn)
         JOIN employees e ON e.employee_id = ev.employee_id
         JOIN evaluation_templates et ON et.template_id = ev.template_id
         LEFT JOIN users creator ON creator.user_id = et.created_by
+        LEFT JOIN employees creator_employee ON creator_employee.employee_id = creator.employee_id
+        LEFT JOIN job_titles creator_position ON creator_position.job_title_id = creator_employee.job_title_id
         LEFT JOIN evaluation_package_route_steps rs ON rs.package_id = ep.package_id
         WHERE ep.evaluation_type IN ('Initial', 'Final')
           AND ep.status NOT IN ('Approved and Applied', 'Cancelled')
@@ -5445,41 +5433,36 @@ function syncOpenNonHrProbationaryRoutes($conn)
               WHERE acted.package_id = ep.package_id AND acted.action_status = 'Approved')
         GROUP BY ep.package_id, ep.evaluation_type, ev.evaluation_id, e.employee_id,
                  e.employee_code, e.first_name, e.last_name,
-                 e.rank_category_id, e.department_id, e.reports_to, et.created_by, creator.role, creator.employee_id");
+                 e.rank_category_id, e.department_id, e.reports_to, et.created_by, creator.role, creator.employee_id,
+                 creator_employee.rank_category_id, creator_position.job_title");
     if (!$rows) return 0;
 
     $repaired = 0;
     while ($row = $rows->fetch_assoc()) {
         $rank = (int)$row['rank_category_id'];
-        if (!in_array($rank, [3, 4, 5], true)) continue;
+        if (!in_array($rank, [1, 3, 4, 5], true)) continue;
         $expected_count = 1;
         $expected_employee_id = (int)($row['expected_head_employee_id'] ?? 0);
         $expected_user_id = 0;
         $expected_role = null;
         $expected_rank = null;
-        if ($rank === 4) {
-            // Supervisor reviews are offered to any active regular manager in
-            // the department; one manager claims the pending review.
+        $head_rank = (int)($row['expected_head_rank'] ?? 0);
+        $creator_is_ceo = ($row['creator_role'] ?? '') === 'President and CEO'
+            || ((int)($row['creator_rank'] ?? 0) > 0 && (int)($row['creator_rank'] ?? 0) <= 2
+                && preg_match('/president|chief executive officer|\\bceo\\b/i', (string)($row['creator_title'] ?? '')));
+        if ($creator_is_ceo && $rank <= 3) {
+            $expected_user_id = (int)$row['created_by'];
+            $expected_employee_id = (int)($row['creator_employee_id'] ?? 0);
+        } elseif ($head_rank > 0) {
             $expected_employee_id = 0;
-            $expected_rank = 3;
-        } elseif ($rank === 5) {
-            // Staff reviews remain unassigned until one active department
-            // supervisor accepts them. A claimed row keeps rank 4 populated.
+            $expected_rank = $head_rank;
+        } else {
+            $expected_role = 'President and CEO';
             $expected_employee_id = 0;
-            $expected_rank = 4;
         }
-        if ($rank === 3) {
-            if (($row['creator_role'] ?? '') === 'President and CEO') {
-                $expected_user_id = (int)$row['created_by'];
-                $expected_employee_id = (int)($row['creator_employee_id'] ?? 0);
-            } else {
-                $expected_role = 'President and CEO';
-                $expected_employee_id = 0;
-            }
-        }
-        $department_reviewer_pool_route = in_array($rank, [4, 5], true)
-            && (int)($row['first_rank'] ?? 0) === ($rank === 4 ? 3 : 4)
-            && empty($row['first_role']);
+        $department_reviewer_pool_route = !($creator_is_ceo && $rank <= 3)
+            && $head_rank > 0
+            && (int)($row['first_rank'] ?? 0) === $head_rank && empty($row['first_role']);
         $valid = (int)$row['step_count'] === $expected_count
             && ($department_reviewer_pool_route || (
                 (int)($row['first_employee_id'] ?? 0) === $expected_employee_id
