@@ -16,7 +16,7 @@ REPLACE INTO employees
      department_id, rank_category_id, branch_id, reports_to, employment_status,
      employment_type, profile_picture, is_active)
 VALUES
-(15004, 'AP-VP-001', 'Marisol', 'Alcantara', 'Reyes', '2018-06-04',
+(15004, 'VP-001', 'Marisol', 'Alcantara', 'Reyes', '2018-06-04',
  '1981-11-24', 'Lucena City, Quezon', 'Female', 'Married', 100, 'VP for Acquired Properties',
  1, 1, 102, 15010, 'Regular', 'Full-time', 'avatar_f.jpg', 1),
 (15001, 'AP-001', 'Adriana', 'Mercado', 'Villareal', '2017-03-06',
