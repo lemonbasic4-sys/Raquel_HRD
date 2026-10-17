@@ -216,7 +216,7 @@ REPLACE INTO job_titles (job_title_id, job_title, rank_category_id, department_i
 (113, 'Sales Associate I', 5, 1, 1, 0, 105, NOW(), NOW()),
 (114, 'Sales Associate II', 5, 1, 1, 0, 105, NOW(), NOW()),
 -- Audit (200-219)
-(200, 'Audit Manager I', 3, 2, 1, 1, NULL, NOW(), NOW()),
+(200, 'Audit Manager I', 3, 2, 1, 1, 1100, NOW(), NOW()),
 (201, 'Audit Manager II', 3, 2, 1, 1, 200, NOW(), NOW()),
 (202, 'Audit Manager III', 3, 2, 1, 1, 200, NOW(), NOW()),
 (203, 'Audit Supervisor I', 4, 2, 1, 1, 201, NOW(), NOW()),
@@ -232,7 +232,7 @@ REPLACE INTO job_titles (job_title_id, job_title, rank_category_id, department_i
 (302, 'Business Development Staff I', 5, 3, 1, 0, 300, NOW(), NOW()),
 (303, 'Business Development Staff II', 5, 3, 1, 0, 300, NOW(), NOW()),
 -- Compliance (400-419)
-(400, 'Compliance Supervisor I', 4, 4, 1, 1, NULL, NOW(), NOW()),
+(400, 'Compliance Supervisor I', 4, 4, 1, 1, 1100, NOW(), NOW()),
 (401, 'Compliance Supervisor II', 4, 4, 1, 0, 400, NOW(), NOW()),
 (402, 'Compliance Supervisor III', 4, 4, 1, 0, 400, NOW(), NOW()),
 (403, 'Compliance Staff I', 5, 4, 1, 0, 401, NOW(), NOW()),
@@ -349,7 +349,7 @@ REPLACE INTO job_titles (job_title_id, job_title, rank_category_id, department_i
 (1102, 'Executive Assistant II', 5, 10, 1, 0, 1100, NOW(), NOW()),
 (1103, 'Executive Assistant III', 5, 10, 1, 0, 1100, NOW(), NOW()),
 -- Purchasing (1200-1219)
-(1200, 'Purchasing Supervisor I', 4, 12, 1, 1, NULL, NOW(), NOW()),
+(1200, 'Procurement Supervisor I', 4, 12, 1, 1, 601, NOW(), NOW()),
 (1202, 'Purchasing Staff I', 5, 12, 1, 0, 1200, NOW(), NOW());
 
 SET FOREIGN_KEY_CHECKS = 1;
