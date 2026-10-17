@@ -134,11 +134,10 @@ $positions = $conn->query("
 ");
 $positionOptions = $conn->query("
     SELECT parent.job_title_id, parent.job_title, parent.department_id,
-           GROUP_CONCAT(DISTINCT child.department_id ORDER BY child.department_id SEPARATOR ',') AS reporting_departments
+           d.department_name
     FROM job_titles parent
-    LEFT JOIN job_titles child ON child.reports_to = parent.job_title_id
-    GROUP BY parent.job_title_id, parent.job_title, parent.department_id
-    ORDER BY parent.job_title
+    LEFT JOIN departments d ON d.department_id = parent.department_id
+    ORDER BY d.department_name, parent.job_title
 ")->fetch_all(MYSQLI_ASSOC);
 
 $positionCount = $positions->num_rows;
@@ -504,17 +503,19 @@ $employeesWithManagedPositions = (int) $conn->query("SELECT COUNT(*) AS cnt FROM
                     </div>
                     <div class="mb-3" id="addPositionReportsToContainer">
                         <label class="form-label">Direct Report (Reports To)</label>
-                        <select class="form-select" name="reports_to" id="addPositionReportsTo">
-                            <option value="">No Reporting Line</option>
+                        <input type="hidden" name="reports_to" id="addPositionReportsTo">
+                        <input type="text" class="form-control" id="addPositionReportsToInput"
+                            list="addPositionReportsToOptions" autocomplete="off"
+                            placeholder="Type to search positions in any department">
+                        <datalist id="addPositionReportsToOptions">
                             <?php
                             foreach ($positionOptions as $p): ?>
-                                <option value="<?php echo (int) $p['job_title_id']; ?>"
-                                    data-department="<?php echo (int) ($p['department_id'] ?? 0); ?>"
-                                    data-reporting-departments="<?php echo e($p['reporting_departments'] ?? ''); ?>">
-                                    <?php echo e($p['job_title']); ?>
+                                <option data-position-id="<?php echo (int) $p['job_title_id']; ?>"
+                                    value="<?php echo e($p['job_title'] . ' — ' . ($p['department_name'] ?: 'Unassigned')); ?>">
                                 </option>
                             <?php endforeach; ?>
-                        </select>
+                        </datalist>
+                        <div class="form-text">Search by position or department. Leave blank for no reporting line.</div>
                     </div>
                     <div class="d-flex gap-3">
                         <div class="form-check form-switch" id="addPositionHeadContainer">
@@ -575,17 +576,19 @@ $employeesWithManagedPositions = (int) $conn->query("SELECT COUNT(*) AS cnt FROM
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Direct Report (Reports To)</label>
-                        <select class="form-select" name="reports_to" id="editPositionReportsTo">
-                            <option value="">No Reporting Line</option>
+                        <input type="hidden" name="reports_to" id="editPositionReportsTo">
+                        <input type="text" class="form-control" id="editPositionReportsToInput"
+                            list="editPositionReportsToOptions" autocomplete="off"
+                            placeholder="Type to search positions in any department">
+                        <datalist id="editPositionReportsToOptions">
                             <?php
                             foreach ($positionOptions as $p): ?>
-                                <option value="<?php echo (int) $p['job_title_id']; ?>"
-                                    data-department="<?php echo (int) ($p['department_id'] ?? 0); ?>"
-                                    data-reporting-departments="<?php echo e($p['reporting_departments'] ?? ''); ?>">
-                                    <?php echo e($p['job_title']); ?>
+                                <option data-position-id="<?php echo (int) $p['job_title_id']; ?>"
+                                    value="<?php echo e($p['job_title'] . ' — ' . ($p['department_name'] ?: 'Unassigned')); ?>">
                                 </option>
                             <?php endforeach; ?>
-                        </select>
+                        </datalist>
+                        <div class="form-text">Search by position or department. Leave blank for no reporting line.</div>
                     </div>
                     <div class="d-flex gap-3">
                         <div class="form-check form-switch">
@@ -633,9 +636,9 @@ $employeesWithManagedPositions = (int) $conn->query("SELECT COUNT(*) AS cnt FROM
         document.getElementById('editPositionActive').checked = Number(isActive) === 1;
         document.getElementById('editPositionHead').checked = Number(isHead) === 1;
 
-        // Filter reports to based on department before setting value
-        filterReportsTo('editPositionDepartment', 'editPositionReportsTo');
-        document.getElementById('editPositionReportsTo').value = reportsTo || '';
+        const reportsToOption = document.querySelector(`#editPositionReportsToOptions option[data-position-id="${Number(reportsTo)}"]`);
+        document.getElementById('editPositionReportsToInput').value = reportsToOption?.value || '';
+        syncReportsToInput('editPositionReportsToInput', 'editPositionReportsTo', 'editPositionReportsToOptions');
     }
 
     function openAddPositionModal(type) {
@@ -646,8 +649,6 @@ $employeesWithManagedPositions = (int) $conn->query("SELECT COUNT(*) AS cnt FROM
         const isHeadCheckbox = document.getElementById('addPositionHead');
         const isHeadContainer = document.getElementById('addPositionHeadContainer');
         const reportsToContainer = document.getElementById('addPositionReportsToContainer');
-        const reportsToSelect = document.getElementById('addPositionReportsTo');
-
         // Reset form
         document.getElementById('addPositionModal').querySelector('form').reset();
 
@@ -711,49 +712,36 @@ $employeesWithManagedPositions = (int) $conn->query("SELECT COUNT(*) AS cnt FROM
         });
     }
 
-    function filterReportsTo(deptSelectId, reportsToSelectId) {
-        const deptSelect = document.getElementById(deptSelectId);
-        const reportsToSelect = document.getElementById(reportsToSelectId);
-        if (!deptSelect || !reportsToSelect) return;
+    function syncReportsToInput(inputId, hiddenId, listId) {
+        const input = document.getElementById(inputId);
+        const hidden = document.getElementById(hiddenId);
+        const list = document.getElementById(listId);
+        if (!input || !hidden || !list) return;
 
-        const selectedDept = deptSelect.value;
-        const options = reportsToSelect.querySelectorAll('option');
-        let selectedOptionIsVisible = false;
-
-        options.forEach(option => {
-            if (option.value === "") {
-                option.hidden = false;
-                option.disabled = false;
-                return;
-            }
-
-            const reportingDepartments = (option.dataset.reportingDepartments || '').split(',');
-            const visible = selectedDept !== ''
-                && (option.value === '1100' || option.value === '1000' || option.dataset.department === selectedDept || reportingDepartments.includes(selectedDept));
-            option.hidden = !visible;
-            option.disabled = !visible;
-            if (option.selected && visible) selectedOptionIsVisible = true;
-        });
-
-        if (!selectedOptionIsVisible && reportsToSelect.value !== '') {
-            reportsToSelect.value = '';
-        }
+        const normalizedValue = input.value.trim().toLocaleLowerCase();
+        const matchedOption = Array.from(list.options).find(option =>
+            option.value.trim().toLocaleLowerCase() === normalizedValue
+        );
+        hidden.value = matchedOption ? matchedOption.dataset.positionId : '';
+        input.setCustomValidity(input.value.trim() !== '' && !matchedOption
+            ? 'Select a position from the searchable suggestions, or clear the field.'
+            : '');
     }
 
     document.addEventListener('DOMContentLoaded', function () {
         attachTableSearch('searchPosition', 'positionTable');
 
-        const addDept = document.getElementById('addPositionDepartment');
-        if (addDept) {
-            addDept.addEventListener('change', () => filterReportsTo('addPositionDepartment', 'addPositionReportsTo'));
-            filterReportsTo('addPositionDepartment', 'addPositionReportsTo');
-        }
-
-        const editDept = document.getElementById('editPositionDepartment');
-        if (editDept) {
-            editDept.addEventListener('change', () => filterReportsTo('editPositionDepartment', 'editPositionReportsTo'));
-            filterReportsTo('editPositionDepartment', 'editPositionReportsTo');
-        }
+        [
+            ['addPositionReportsToInput', 'addPositionReportsTo', 'addPositionReportsToOptions'],
+            ['editPositionReportsToInput', 'editPositionReportsTo', 'editPositionReportsToOptions']
+        ].forEach(([inputId, hiddenId, listId]) => {
+            const input = document.getElementById(inputId);
+            if (!input) return;
+            const sync = () => syncReportsToInput(inputId, hiddenId, listId);
+            input.addEventListener('input', sync);
+            input.addEventListener('change', sync);
+            sync();
+        });
     });
 </script>
 
