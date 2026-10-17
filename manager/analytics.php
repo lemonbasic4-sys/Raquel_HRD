@@ -10,8 +10,15 @@ $date_from     = $_GET['date_from']  ?? '';
 $date_to       = $_GET['date_to']    ?? '';
 $filter_branch = $_GET['branch']     ?? '';
 $filter_dept   = $_GET['department'] ?? '';
+$cohort        = (($_GET['cohort'] ?? 'regular') === 'probationary') ? 'probationary' : 'regular';
+$evaluation_type_filter = $cohort === 'probationary'
+    ? "ev.evaluation_type IN ('Initial','Final')"
+    : "ev.evaluation_type IN ('Annual','Quarterly')";
+$evaluation_type_filter_unaliased = $cohort === 'probationary'
+    ? "evaluation_type IN ('Initial','Final')"
+    : "evaluation_type IN ('Annual','Quarterly')";
 
-$where  = "WHERE ev.status = 'Approved'";
+$where  = "WHERE ev.status = 'Approved' AND $evaluation_type_filter";
 $params = [];  $types = '';
 
 if (!empty($date_from))    { $where .= " AND ev.approved_date >= ?";              $params[] = $date_from;           $types .= 's'; }
@@ -57,7 +64,7 @@ $perf_q->close();
 
 /* ── Score Trend — per-year 12-month data (built-in year filter) ────────── */
 // Discover all years that have approved evaluations
-$yr_q = $conn->query("SELECT DISTINCT YEAR(approved_date) AS yr FROM evaluations WHERE status='Approved' ORDER BY yr DESC");
+$yr_q = $conn->query("SELECT DISTINCT YEAR(approved_date) AS yr FROM evaluations WHERE status='Approved' AND $evaluation_type_filter_unaliased ORDER BY yr DESC");
 $available_years = [];
 while ($row = $yr_q->fetch_assoc()) $available_years[] = (int)$row['yr'];
 if (empty($available_years)) $available_years = [(int)date('Y')];
@@ -70,7 +77,7 @@ $all_years_trend = [];
 foreach ($available_years as $yr) {
     $yr_months = [];
     for ($m = 1; $m <= 12; $m++) {
-        $t_where  = "WHERE status='Approved' AND MONTH(approved_date)=$m AND YEAR(approved_date)=$yr AND employee_id NOT IN (SELECT employee_id FROM users WHERE role = 'Admin' AND employee_id IS NOT NULL)";
+        $t_where  = "WHERE status='Approved' AND $evaluation_type_filter_unaliased AND MONTH(approved_date)=$m AND YEAR(approved_date)=$yr AND employee_id NOT IN (SELECT employee_id FROM users WHERE role = 'Admin' AND employee_id IS NOT NULL)";
         $t_params = []; $t_types = '';
         if (!empty($filter_branch)) { $t_where .= ' AND employee_id IN (SELECT employee_id FROM employees WHERE branch_id=?)';     $t_params[] = (int)$filter_branch; $t_types .= 'i'; }
         if (!empty($filter_dept))   { $t_where .= ' AND employee_id IN (SELECT employee_id FROM employees WHERE department_id=?)'; $t_params[] = (int)$filter_dept;   $t_types .= 'i'; }
@@ -88,7 +95,7 @@ $trend_label = 'By Year';
 /* ── Branch Comparison  ──────────────────────────────────────────────────
    Always shows ALL branches; date filter respected but branch/dept filters
    are intentionally excluded so users can compare branches side-by-side.   */
-$br_where = "WHERE ev.status = 'Approved'";
+$br_where = "WHERE ev.status = 'Approved' AND $evaluation_type_filter";
 $br_params = []; $br_types = '';
 if (!empty($date_from)) { $br_where .= " AND ev.approved_date >= ?"; $br_params[] = $date_from;            $br_types .= 's'; }
 if (!empty($date_to))   { $br_where .= " AND ev.approved_date <= ?"; $br_params[] = $date_to.' 23:59:59'; $br_types .= 's'; }
@@ -170,7 +177,7 @@ $kb_q->close();
 
 /* ── [NEW] Evaluation Lifecycle Status ──────────────────────────────────── */
 $status_dist = [];
-$status_where = "WHERE ev.employee_id NOT IN (SELECT employee_id FROM users WHERE role = 'Admin' AND employee_id IS NOT NULL)";
+$status_where = "WHERE $evaluation_type_filter AND ev.employee_id NOT IN (SELECT employee_id FROM users WHERE role = 'Admin' AND employee_id IS NOT NULL)";
 $status_params = []; $status_types = '';
 if (!empty($date_from))    { $status_where .= " AND ev.created_at >= ?"; $status_params[] = $date_from; $status_types .= 's'; }
 if (!empty($date_to))      { $status_where .= " AND ev.created_at <= ?"; $status_params[] = $date_to.' 23:59:59'; $status_types .= 's'; }
@@ -484,6 +491,7 @@ $yoy_branch_q = $conn->query("
     INNER JOIN employees e ON ev.employee_id = e.employee_id
     INNER JOIN branches b ON e.branch_id = b.branch_id
     WHERE ev.status = 'Approved'
+      AND $evaluation_type_filter
       AND ev.total_score IS NOT NULL
       AND $yoy_date_expr IS NOT NULL
       AND ev.employee_id NOT IN (SELECT employee_id FROM users WHERE role = 'Admin' AND employee_id IS NOT NULL)
@@ -502,6 +510,7 @@ $yoy_dept_q = $conn->query("
     INNER JOIN employees e ON ev.employee_id = e.employee_id
     INNER JOIN departments d ON e.department_id = d.department_id
     WHERE ev.status = 'Approved'
+      AND $evaluation_type_filter
       AND ev.total_score IS NOT NULL
       AND $yoy_date_expr IS NOT NULL
       AND ev.employee_id NOT IN (SELECT employee_id FROM users WHERE role = 'Admin' AND employee_id IS NOT NULL)
@@ -521,6 +530,7 @@ $yoy_emp_q = $conn->query("
     FROM evaluations ev
     INNER JOIN employees e ON ev.employee_id = e.employee_id
     WHERE ev.status = 'Approved'
+      AND $evaluation_type_filter
       AND ev.total_score IS NOT NULL
       AND $yoy_date_expr IS NOT NULL
       AND ev.employee_id NOT IN (SELECT employee_id FROM users WHERE role = 'Admin' AND employee_id IS NOT NULL)
@@ -615,9 +625,9 @@ $yoy_emp    = formatYoYData($yoy_emp_raw, $yoy_years);
 <div class="page-hero fadeup">
     <div class="d-flex flex-wrap align-items-center justify-content-between mb-4 gap-3">
         <div>
-            <div style="font-size:.72rem;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,.55);">HR Manager · Analytics</div>
-            <h4 class="text-white fw-bold mb-0 mt-1"><i class="fas fa-chart-bar me-2" style="color:#BD9414;"></i>Performance Analytics</h4>
-            <p class="text-white-50 small mb-0 mt-2">Use performance trends and workforce insights to identify strengths, gaps, and HR priorities.</p>
+            <div style="font-size:.72rem;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,.55);">HR Manager · Analytics · <?php echo $cohort === 'probationary' ? 'Probationary pathway' : 'Regular employees'; ?></div>
+            <h4 class="text-white fw-bold mb-0 mt-1"><i class="fas fa-chart-bar me-2" style="color:#BD9414;"></i><?php echo $cohort === 'probationary' ? 'Probationary → Regularization Analytics' : 'Regular Employee Analytics'; ?></h4>
+            <p class="text-white-50 small mb-0 mt-2"><?php echo $cohort === 'probationary' ? 'Initial and Final evaluation results are shown separately from annual and quarterly employee performance.' : 'Annual and quarterly evaluations are shown separately from the probationary regularization pathway.'; ?></p>
         </div>
         <div style="color:rgba(255,255,255,.6);font-size:.8rem;">
             <i class="fas fa-sync-alt me-1"></i>Data as of <?php echo date('F d, Y'); ?>
@@ -677,6 +687,13 @@ $yoy_emp    = formatYoYData($yoy_emp_raw, $yoy_years);
 <div class="filter-card fadeup fadeup-1">
     <form method="GET" action="" class="row align-items-end g-3">
         <div class="col-md-2 col-6">
+            <label class="form-label fw-semibold" style="font-size:.78rem;">Evaluation Group</label>
+            <select class="form-select form-select-sm" name="cohort">
+                <option value="regular" <?php echo $cohort === 'regular' ? 'selected' : ''; ?>>Regular employees</option>
+                <option value="probationary" <?php echo $cohort === 'probationary' ? 'selected' : ''; ?>>Probationary → Regularization</option>
+            </select>
+        </div>
+        <div class="col-md-2 col-6">
             <label class="form-label fw-semibold" style="font-size:.78rem;">Date From</label>
             <input type="date" class="form-control form-control-sm" name="date_from" value="<?php echo e($date_from); ?>">
         </div>
@@ -684,7 +701,7 @@ $yoy_emp    = formatYoYData($yoy_emp_raw, $yoy_years);
             <label class="form-label fw-semibold" style="font-size:.78rem;">Date To</label>
             <input type="date" class="form-control form-control-sm" name="date_to" value="<?php echo e($date_to); ?>">
         </div>
-        <div class="col-md-3">
+        <div class="col-md-2 col-6">
             <label class="form-label fw-semibold" style="font-size:.78rem;">Branch</label>
             <select class="form-select form-select-sm" name="branch">
                 <option value="">All Branches</option>
@@ -695,7 +712,7 @@ $yoy_emp    = formatYoYData($yoy_emp_raw, $yoy_years);
                 <?php endwhile; ?>
             </select>
         </div>
-        <div class="col-md-3">
+        <div class="col-md-2 col-6">
             <label class="form-label fw-semibold" style="font-size:.78rem;">Department</label>
             <select class="form-select form-select-sm" name="department">
                 <option value="">All Departments</option>
@@ -711,6 +728,10 @@ $yoy_emp    = formatYoYData($yoy_emp_raw, $yoy_years);
             <a href="analytics.php" class="btn btn-sm btn-outline-secondary px-3">Reset</a>
         </div>
     </form>
+    <div class="small text-muted mt-3">
+        <i class="fas fa-circle-info me-1"></i>
+        Evaluation charts use only <?php echo $cohort === 'probationary' ? 'Initial and Final probationary evaluations' : 'Annual and Quarterly regular-employee evaluations'; ?>. Workforce demographics and career-movement charts remain organization-wide.
+    </div>
 </div>
 
 <style>

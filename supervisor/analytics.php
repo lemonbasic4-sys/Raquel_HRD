@@ -39,6 +39,10 @@ function supervisorAnalyticsRows(mysqli $conn, string $sql, string $types = '', 
 $date_from = supervisorAnalyticsDate(trim($_GET['date_from'] ?? ''));
 $date_to = supervisorAnalyticsDate(trim($_GET['date_to'] ?? ''));
 $filter_dept = isset($_GET['department']) && $_GET['department'] !== '' ? (int) $_GET['department'] : 0;
+$cohort = (($_GET['cohort'] ?? 'regular') === 'probationary') ? 'probationary' : 'regular';
+$evaluation_type_filter = $cohort === 'probationary'
+    ? "ev.evaluation_type IN ('Initial','Final')"
+    : "ev.evaluation_type IN ('Annual','Quarterly')";
 
 $branch_name = supervisorAnalyticsScalar(
     $conn,
@@ -78,6 +82,7 @@ if ($filter_dept > 0) {
     $evalTypes .= "i";
     $evalParams[] = $filter_dept;
 }
+$evalWhere .= " AND $evaluation_type_filter";
 if ($date_from !== '') {
     $evalWhere .= " AND ev.submitted_date >= ?";
     $evalTypes .= "s";
@@ -98,6 +103,7 @@ if ($filter_dept > 0) {
     $approvedTypes .= "i";
     $approvedParams[] = $filter_dept;
 }
+$approvedWhere .= " AND $evaluation_type_filter";
 if ($date_from !== '') {
     $approvedWhere .= " AND ev.approved_date >= ?";
     $approvedTypes .= "s";
@@ -142,6 +148,7 @@ $validated_month = (int) supervisorAnalyticsScalar(
        AND e.branch_id = ?
        AND e.is_active = 1
        AND e.employee_id NOT IN (SELECT employee_id FROM users WHERE role = 'Admin' AND employee_id IS NOT NULL)
+       AND $evaluation_type_filter
        AND MONTH(ev.endorsed_date) = MONTH(CURRENT_DATE())
        AND YEAR(ev.endorsed_date) = YEAR(CURRENT_DATE())"
        . ($filter_dept > 0 ? " AND e.department_id = ?" : ""),
@@ -248,6 +255,7 @@ if ($date_to !== '') {
     $deptJoinTypes .= "s";
     $deptJoinParams[] = $date_to . ' 23:59:59';
 }
+$deptJoinDate .= " AND $evaluation_type_filter";
 $deptWhere = "WHERE e.branch_id = ?
        AND e.is_active = 1
        AND e.employee_id NOT IN (SELECT employee_id FROM users WHERE role = 'Admin' AND employee_id IS NOT NULL)";
@@ -307,6 +315,7 @@ for ($i = 5; $i >= 0; $i--) {
            AND e.branch_id = ?
            AND e.is_active = 1
            AND e.employee_id NOT IN (SELECT employee_id FROM users WHERE role = 'Admin' AND employee_id IS NOT NULL)
+           AND $evaluation_type_filter
            AND MONTH(ev.endorsed_date) = ?
            AND YEAR(ev.endorsed_date) = ?"
            . ($filter_dept > 0 ? " AND e.department_id = ?" : ""),
@@ -417,9 +426,9 @@ require_once '../includes/header.php';
 <div class="page-hero fadeup">
     <div class="d-flex flex-wrap align-items-center justify-content-between mb-4 gap-3">
         <div>
-            <div style="font-size:.72rem;text-transform:uppercase;letter-spacing:0;color:rgba(255,255,255,.55);">HR Supervisor · Branch Analytics</div>
-            <h4 class="text-white fw-bold mb-0 mt-1"><i class="fas fa-chart-bar me-2" style="color:#BD9414;"></i><?php echo e($branch_name); ?> Insights</h4>
-            <p class="text-white-50 small mb-0 mt-2">Explore branch-level workforce and performance trends to guide your day-to-day HR supervision.</p>
+            <div style="font-size:.72rem;text-transform:uppercase;letter-spacing:0;color:rgba(255,255,255,.55);">HR Supervisor · Branch Analytics · <?php echo $cohort === 'probationary' ? 'Probationary pathway' : 'Regular employees'; ?></div>
+            <h4 class="text-white fw-bold mb-0 mt-1"><i class="fas fa-chart-bar me-2" style="color:#BD9414;"></i><?php echo e($branch_name); ?> — <?php echo $cohort === 'probationary' ? 'Probationary Analytics' : 'Regular Employee Analytics'; ?></h4>
+            <p class="text-white-50 small mb-0 mt-2"><?php echo $cohort === 'probationary' ? 'Initial and Final evaluation results, shown separately from annual and quarterly employee performance.' : 'Annual and Quarterly evaluation results, shown separately from probationary regularization evaluations.'; ?></p>
         </div>
         <div style="color:rgba(255,255,255,.65);font-size:.8rem;">
             <i class="fas fa-sync-alt me-1"></i>Data as of <?php echo date('F d, Y'); ?>
@@ -487,15 +496,15 @@ require_once '../includes/header.php';
 
 <div class="filter-card fadeup fadeup-1">
     <form method="GET" action="" class="row align-items-end g-3">
-        <div class="col-md-3 col-6">
+        <div class="col-md-2 col-6">
             <label class="form-label fw-semibold small">Date From</label>
             <input type="date" class="form-control form-control-sm" name="date_from" value="<?php echo e($date_from); ?>">
         </div>
-        <div class="col-md-3 col-6">
+        <div class="col-md-2 col-6">
             <label class="form-label fw-semibold small">Date To</label>
             <input type="date" class="form-control form-control-sm" name="date_to" value="<?php echo e($date_to); ?>">
         </div>
-        <div class="col-md-4">
+        <div class="col-md-3 col-6">
             <label class="form-label fw-semibold small">Department</label>
             <select class="form-select form-select-sm" name="department">
                 <option value="">All Departments</option>
@@ -506,12 +515,21 @@ require_once '../includes/header.php';
                 <?php endforeach; ?>
             </select>
         </div>
+        <div class="col-md-3 col-6">
+            <label class="form-label fw-semibold small">Evaluation Group</label>
+            <select class="form-select form-select-sm" name="cohort">
+                <option value="regular" <?php echo $cohort === 'regular' ? 'selected' : ''; ?>>Regular employees</option>
+                <option value="probationary" <?php echo $cohort === 'probationary' ? 'selected' : ''; ?>>Probationary → Regularization</option>
+            </select>
+        </div>
         <div class="col-md-2 d-flex gap-2">
             <button type="submit" class="btn btn-primary btn-sm flex-fill"><i class="fas fa-filter me-1"></i>Apply</button>
             <a href="analytics.php" class="btn btn-sm btn-outline-secondary px-3">Reset</a>
         </div>
     </form>
 </div>
+
+<p class="text-muted small mb-3">Evaluation metrics use only <?php echo $cohort === 'probationary' ? 'Initial and Final probationary evaluations' : 'Annual and Quarterly regular-employee evaluations'; ?>. Branch workforce headcount remains inclusive of all active employees.</p>
 
 <div class="row g-4 mb-4 fadeup fadeup-2">
     <div class="col-lg-6">

@@ -4,6 +4,9 @@ require_once '../includes/session-check.php';
 checkRole(['HR Manager']);
 require_once '../includes/header.php';
 
+// Keep dashboard performance analytics separate from the probationary Initial/Final pathway.
+$dashboard_regular_eval_filter = "evaluation_type IN ('Annual','Quarterly')";
+
 // Fetch stats
 $branch_id = $_SESSION['branch_id'];
 
@@ -22,10 +25,10 @@ if (!empty($branch_id)) {
 
 $total_employees = $conn->query("SELECT COUNT(*) as c FROM employees WHERE is_active = 1 AND employee_id NOT IN (SELECT employee_id FROM users WHERE role = 'Admin' AND employee_id IS NOT NULL)")->fetch_assoc()['c'];
 $pending_evals = $conn->query("SELECT COUNT(*) as c FROM evaluations WHERE status = 'Pending Manager'")->fetch_assoc()['c'];
-$avg_score_result = $conn->query("SELECT AVG(total_score) as avg FROM evaluations WHERE status = 'Approved'");
+$avg_score_result = $conn->query("SELECT AVG(total_score) as avg FROM evaluations WHERE status = 'Approved' AND $dashboard_regular_eval_filter");
 $avg_score = round($avg_score_result->fetch_assoc()['avg'] ?? 0, 1);
-$new_evals_month = $conn->query("SELECT COUNT(*) as c FROM evaluations WHERE MONTH(submitted_date) = MONTH(CURRENT_DATE()) AND YEAR(submitted_date) = YEAR(CURRENT_DATE())")->fetch_assoc()['c'];
-$approved_evals = $conn->query("SELECT COUNT(*) as c FROM evaluations WHERE status = 'Approved'")->fetch_assoc()['c'];
+$new_evals_month = $conn->query("SELECT COUNT(*) as c FROM evaluations WHERE $dashboard_regular_eval_filter AND MONTH(submitted_date) = MONTH(CURRENT_DATE()) AND YEAR(submitted_date) = YEAR(CURRENT_DATE())")->fetch_assoc()['c'];
+$approved_evals = $conn->query("SELECT COUNT(*) as c FROM evaluations WHERE status = 'Approved' AND $dashboard_regular_eval_filter")->fetch_assoc()['c'];
 $total_branches_res = $conn->query("SELECT COUNT(*) as c FROM branches");
 $total_branches = $total_branches_res->fetch_assoc()['c'];
 
@@ -46,6 +49,7 @@ $recent_evaluations = $conn->query("SELECT ev.evaluation_id, ev.evaluation_type,
     FROM evaluations ev
     JOIN employees e ON e.employee_id = ev.employee_id
     LEFT JOIN departments d ON d.department_id = e.department_id
+    WHERE ev.evaluation_type IN ('Annual','Quarterly')
     ORDER BY COALESCE(ev.submitted_date, ev.created_at) DESC, ev.evaluation_id DESC
     LIMIT 5")->fetch_all(MYSQLI_ASSOC);
 
@@ -120,7 +124,7 @@ $pending_package_count = count($pending_packages);
 $dashboard_queue_count = $queue_employee_count + $pending_package_count;
 
 // 1. Performance Distribution Data
-$perf_dist = $conn->query("SELECT performance_level, COUNT(*) as count FROM evaluations WHERE status = 'Approved' AND performance_level IS NOT NULL GROUP BY performance_level");
+$perf_dist = $conn->query("SELECT performance_level, COUNT(*) as count FROM evaluations WHERE status = 'Approved' AND $dashboard_regular_eval_filter AND performance_level IS NOT NULL GROUP BY performance_level");
 $perf_data = ['Outstanding' => 0, 'Exceeds Expectations' => 0, 'Meets Expectations' => 0, 'Needs Improvement' => 0];
 while ($row = $perf_dist->fetch_assoc()) {
     if (isset($perf_data[$row['performance_level']])) {
@@ -130,7 +134,7 @@ while ($row = $perf_dist->fetch_assoc()) {
 $has_queue_content = $queue_employee_count > 0;
 
 // 2. Evaluation Status Data
-$status_dist = $conn->query("SELECT status, COUNT(*) as count FROM evaluations GROUP BY status");
+$status_dist = $conn->query("SELECT status, COUNT(*) as count FROM evaluations WHERE $dashboard_regular_eval_filter GROUP BY status");
 $status_labels = [];
 $status_counts = [];
 while ($row = $status_dist->fetch_assoc()) {
@@ -145,7 +149,7 @@ $top_performers = $conn->query("
     FROM evaluations ev
     JOIN employees e ON ev.employee_id = e.employee_id
     LEFT JOIN departments d ON e.department_id = d.department_id
-    WHERE ev.status = 'Approved'
+    WHERE ev.status = 'Approved' AND ev.evaluation_type IN ('Annual','Quarterly')
     ORDER BY ev.total_score DESC, ev.submitted_date DESC
     LIMIT 5
 ");
@@ -156,7 +160,7 @@ for ($i = 5; $i >= 0; $i--) {
     $month_label = date('M Y', strtotime("-$i months"));
     $month_num = date('n', strtotime("-$i months"));
     $year_num = date('Y', strtotime("-$i months"));
-    $avg_q = $conn->query("SELECT AVG(total_score) as avg_score FROM evaluations WHERE status = 'Approved' AND MONTH(approved_date) = $month_num AND YEAR(approved_date) = $year_num");
+    $avg_q = $conn->query("SELECT AVG(total_score) as avg_score FROM evaluations WHERE status = 'Approved' AND $dashboard_regular_eval_filter AND MONTH(approved_date) = $month_num AND YEAR(approved_date) = $year_num");
     $avg_val = round($avg_q->fetch_assoc()['avg_score'] ?? 0, 1);
     $monthly_data[] = ['label' => $month_label, 'value' => $avg_val];
 }
@@ -167,7 +171,7 @@ $branch_q = $conn->query("SELECT b.branch_name, AVG(ev.total_score) as avg_score
     FROM evaluations ev
     LEFT JOIN employees e ON ev.employee_id = e.employee_id
     LEFT JOIN branches b ON e.branch_id = b.branch_id
-    WHERE ev.status = 'Approved' AND b.branch_name IS NOT NULL
+    WHERE ev.status = 'Approved' AND ev.evaluation_type IN ('Annual','Quarterly') AND b.branch_name IS NOT NULL
     GROUP BY b.branch_id, b.branch_name
     ORDER BY avg_score DESC LIMIT 10");
 while ($row = $branch_q->fetch_assoc()) {
@@ -717,7 +721,7 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
             <div class="d-flex justify-content-between align-items-start">
                 <div>
                     <div class="stat-value"><?php echo $new_evals_month; ?></div>
-                    <div class="stat-label">Evals This Month</div>
+                    <div class="stat-label">Regular Evals This Month</div>
                 </div>
                 <i class="fas fa-file-alt stat-icon text-white-50"></i>
             </div>
@@ -728,7 +732,7 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
             <div class="d-flex justify-content-between align-items-start">
                 <div>
                     <div class="stat-value"><?php echo number_format($avg_score, 2); ?> / 4</div>
-                    <div class="stat-label">Average Score</div>
+                    <div class="stat-label">Regular Average Score</div>
                 </div>
                 <i class="fas fa-star stat-icon" style="color:#28a745;"></i>
             </div>
@@ -739,7 +743,7 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
             <div class="d-flex justify-content-between align-items-start">
                 <div>
                     <div class="stat-value"><?php echo $approved_evals; ?></div>
-                    <div class="stat-label">Approved Evals</div>
+                    <div class="stat-label">Approved Regular Evals</div>
                 </div>
                 <i class="fas fa-check-circle stat-icon" style="color:#20c997;"></i>
             </div>
@@ -789,11 +793,20 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
                         </a>
                     </div>
                     <div class="col-6 col-md-4 col-xl-3 col-xxl-2">
-                        <a href="analytics.php" class="text-decoration-none">
+                        <a href="analytics.php?cohort=regular" class="text-decoration-none">
                             <div class="p-3 rounded-3 text-center bg-white bg-opacity-10 border border-white border-opacity-10 text-white hover-zoom hub-link-card" style="transition: all 0.2s;">
                                 <i class="fas fa-chart-bar fa-2x mb-2 text-success"></i>
-                                <div class="fw-bold small hub-link-title">Analytics</div>
-                                <div class="text-white-50 hub-link-subtitle" style="font-size:0.68rem;">Performance &amp; Trends</div>
+                                <div class="fw-bold small hub-link-title">Regular Analytics</div>
+                                <div class="text-white-50 hub-link-subtitle" style="font-size:0.68rem;">Annual &amp; Quarterly</div>
+                            </div>
+                        </a>
+                    </div>
+                    <div class="col-6 col-md-4 col-xl-3 col-xxl-2">
+                        <a href="analytics.php?cohort=probationary" class="text-decoration-none">
+                            <div class="p-3 rounded-3 text-center bg-white bg-opacity-10 border border-white border-opacity-10 text-white hover-zoom hub-link-card" style="transition: all 0.2s;">
+                                <i class="fas fa-user-check fa-2x mb-2" style="color:#f5a3ab;"></i>
+                                <div class="fw-bold small hub-link-title">Probationary Analytics</div>
+                                <div class="text-white-50 hub-link-subtitle" style="font-size:0.68rem;">Initial, Final &amp; Regularization</div>
                             </div>
                         </a>
                     </div>
@@ -1106,7 +1119,7 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
     <div class="col-12 col-xl-6 col-xxl-4">
         <div class="chart-card h-100">
             <div class="cc-header">
-                <h5><i class="fas fa-chart-pie me-2"></i>Performance Distribution</h5>
+                <h5><i class="fas fa-chart-pie me-2"></i>Performance Distribution <small class="text-muted fw-normal">· Regular evaluations</small></h5>
             </div>
             <div class="cc-body">
                 <div class="chart-container" style="height:300px;">
@@ -1176,7 +1189,7 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
     <div class="col-12 col-xl-6 col-xxl-4">
         <div class="chart-card h-100">
             <div class="cc-header">
-                <h5><i class="fas fa-tasks me-2"></i>Status Overview</h5>
+                <h5><i class="fas fa-tasks me-2"></i>Status Overview <small class="text-muted fw-normal">· Regular evaluations</small></h5>
             </div>
             <div class="cc-body">
                 <div class="chart-container" style="height:300px;">
@@ -1192,7 +1205,7 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
     <div class="col-12 col-xxl-7">
         <div class="chart-card h-100">
             <div class="cc-header d-flex justify-content-between align-items-center">
-                <h5><i class="fas fa-chart-line me-2 text-primary"></i>Performance Trends</h5>
+                <h5><i class="fas fa-chart-line me-2 text-primary"></i>Performance Trends <small class="text-muted fw-normal">· Regular evaluations</small></h5>
                 <span class="badge bg-light text-dark fw-normal" style="font-size: 0.7rem;">Average Score (Last 6 Months)</span>
             </div>
             <div class="cc-body">
@@ -1205,7 +1218,7 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
     <div class="col-12 col-xxl-5">
         <div class="chart-card h-100">
             <div class="cc-header">
-                <h5><i class="fas fa-chart-bar me-2 text-info"></i>Branch Comparison</h5>
+                <h5><i class="fas fa-chart-bar me-2 text-info"></i>Branch Comparison <small class="text-muted fw-normal">· Regular evaluations</small></h5>
             </div>
             <div class="cc-body">
                 <span class="chart-label-premium">Top 10 Performing Branches (Avg Score)</span>
@@ -1268,7 +1281,7 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
     <div class="col-12 col-xxl-6">
         <div class="chart-card h-100">
             <div class="cc-header d-flex justify-content-between align-items-center">
-                <h5 class="mb-0"><i class="fas fa-clipboard-check me-2"></i>Recent Evaluations</h5>
+                <h5 class="mb-0"><i class="fas fa-clipboard-check me-2"></i>Recent Regular Evaluations</h5>
                 <a href="evaluation-history.php" class="btn btn-sm btn-outline-secondary">View All</a>
             </div>
             <div class="cc-body p-0">

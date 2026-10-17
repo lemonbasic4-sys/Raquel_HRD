@@ -17,6 +17,7 @@ cd C:\xampp\htdocs\raquel_hrd
 & "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source eval_test_seeds/president_ceo_complete_profile.sql;"
 & "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source eval_test_seeds/probationary_hr_ap_complete_profiles.sql;"
 & "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source eval_test_seeds/business_development_probationary_profiles.sql;"
+& "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source eval_test_seeds/remaining_department_probationary_profiles.sql;"
 & "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source database/create_missing_employee_portal_accounts.sql;"
 ```
 
@@ -32,6 +33,22 @@ seed before testing and do not rerun it if you need to preserve test history.
 After the generic account-creation script runs, all four employees can sign in
 to the Employee Portal using their employee code as the username and the test
 password `password`.
+
+The optional remaining-department seed adds Finance, General Services,
+Information Technology, Marketing, and Operations test chains. It creates
+regular reviewer accounts and probationary employees across each available
+reporting level. Its usernames are the employee codes in
+`remaining_department_probationary_profiles.sql`; the password is `password`.
+Those accounts are created by the seed itself, and the generic account script
+will skip them. Do not import the seed again after starting evaluations because
+`REPLACE INTO` can reset data linked to the seeded employee rows.
+
+The current creator/target guard may prevent VP Operations from selecting IT
+Manager I as a probationary template target because IT Manager I is assigned to
+the Information Technology department while VP Operations is in Operations.
+That cross-department direct-report case needs to be resolved before the
+`IT-P01` manager-level test can be completed; the IT Manager can still create
+templates for its direct reports after regularization.
 
 ## Configure and create evaluation templates
 
