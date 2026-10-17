@@ -127,6 +127,11 @@ ksort($existing_templates);
 <?php endif; ?>
 
 <style>
+.history-detail-modal .modal-dialog{margin:auto;max-width:min(1120px,calc(100vw - 32px));width:calc(100vw - 32px)}
+.history-detail-modal .modal-content{height:min(820px,calc(100dvh - 32px));max-height:calc(100dvh - 32px);overflow:hidden}
+.history-detail-modal .modal-header{flex:0 0 auto}
+.history-detail-modal .modal-body{min-height:0}
+@media(max-width:767.98px){.history-detail-modal .modal-dialog{margin:8px;max-width:calc(100vw - 16px);width:calc(100vw - 16px)}.history-detail-modal .modal-content{height:calc(100dvh - 16px);max-height:calc(100dvh - 16px)}}
 .supervisor-history-hero .stat-card{height:100%;}
 .history-review-tabs{align-items:end;border-bottom:1px solid #dce4d8;display:flex;gap:8px;margin:0 0 14px;}
 .history-review-tab{align-items:center;background:#f1f3f2;border:1px solid transparent;border-bottom:0;border-radius:10px 10px 0 0;color:#64748b;display:flex;gap:10px;min-width:205px;padding:12px 16px;text-align:left;}

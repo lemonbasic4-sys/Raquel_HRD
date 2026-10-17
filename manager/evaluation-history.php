@@ -302,13 +302,20 @@ ksort($existing_templates);
 .hist-card-action .btn { white-space: nowrap; }
 
 /* Evaluation details modal */
-.history-detail-modal .modal-dialog { max-width: min(1120px, calc(100vw - 32px)); }
+.history-detail-modal .modal-dialog {
+    margin: auto;
+    max-width: min(1120px, calc(100vw - 32px));
+    width: calc(100vw - 32px);
+}
 .history-detail-modal .modal-content {
+    height: min(820px, calc(100dvh - 32px));
     max-height: calc(100dvh - 32px);
     border-radius: 20px !important;
     overflow: hidden;
     box-shadow: 0 24px 80px rgba(15, 23, 42, .28);
 }
+.history-detail-modal .modal-header { flex: 0 0 auto; }
+.history-detail-modal .modal-body { min-height: 0; }
 .history-detail-modal .history-modal-header {
     align-items: center;
     background: linear-gradient(120deg, #0b2d0a, #164e24);
@@ -474,8 +481,8 @@ ksort($existing_templates);
 @media (max-width: 767px) {
     .history-review-tabs { gap:4px; }
     .history-review-tab { flex:1; min-width:0; padding:10px; }
-    .history-detail-modal .modal-dialog { margin: 8px; max-width: calc(100vw - 16px); }
-    .history-detail-modal .modal-content { max-height: calc(100dvh - 16px); border-radius: 16px !important; }
+    .history-detail-modal .modal-dialog { margin: 8px; max-width: calc(100vw - 16px); width: calc(100vw - 16px); }
+    .history-detail-modal .modal-content { height: calc(100dvh - 16px); max-height: calc(100dvh - 16px); border-radius: 16px !important; }
     .history-detail-modal .history-modal-header { flex-wrap: wrap; gap: 12px; padding: 16px; }
     .history-modal-heading { gap: 10px; }
     .history-modal-icon { flex-basis: 38px; height: 38px; }

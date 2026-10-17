@@ -117,6 +117,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $scope = $notification_center_role === 'Employee'
     ? "user_id = ? AND (link LIKE '%/employee/%' OR link IS NULL OR link = '')"
     : "user_id = ? AND (link NOT LIKE '%/employee/%' OR link LIKE '%/employee/team-evaluation%' OR link LIKE '%/employee/package-member%' OR link IS NULL OR link = '')";
+$scope .= notificationRouteRepairDuplicateFilterSql();
 
 $summary = $conn->prepare("SELECT category, COUNT(*) AS total, SUM(is_read = 0) AS unread FROM notifications WHERE $scope GROUP BY category");
 $summary->bind_param('i', $user_id);

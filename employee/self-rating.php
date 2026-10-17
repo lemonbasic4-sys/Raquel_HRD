@@ -5,6 +5,7 @@ checkRole(['Employee']);
 require_once '../includes/functions.php';
 
 ensureEvaluationWorkflowSchema($conn);
+ensureProbationaryEvaluationSchema($conn);
 if (!ensureHierarchicalEvaluationSchema($conn)) {
     http_response_code(500);
     exit('Evaluation reporting schema is unavailable.');
@@ -65,6 +66,7 @@ if (isset($_GET['discard']) && is_numeric($_GET['discard'])) {
 $employee_stmt = $conn->prepare("
     SELECT e.employee_id, e.employee_code, e.first_name, e.last_name, e.job_title, e.job_title_id, e.department_id, e.branch_id,
            e.rank_category_id, e.hire_date, e.employment_status,
+           e.probationary_next_evaluation_type,
            d.department_name, b.branch_name
     FROM employees e
     LEFT JOIN departments d ON e.department_id = d.department_id
@@ -82,9 +84,16 @@ if (!$employee) {
 }
 $allowed_eval_types = getAllowedEvaluationTypesForEmploymentStatus($employee['employment_status'] ?? 'Regular');
 $in_clause = "'" . implode("','", $allowed_eval_types) . "'";
+$probationary_phase_type = in_array($employee['probationary_next_evaluation_type'] ?? '', ['Initial', 'Final'], true)
+    ? $employee['probationary_next_evaluation_type'] : 'Initial';
+$probationary_phase_filter_et = ($employee['employment_status'] ?? '') === 'Probationary'
+    ? "AND et.evaluation_type = '" . $conn->real_escape_string($probationary_phase_type) . "'" : '';
+$probationary_phase_filter_full = ($employee['employment_status'] ?? '') === 'Probationary'
+    ? "AND evaluation_templates.evaluation_type = '" . $conn->real_escape_string($probationary_phase_type) . "'" : '';
 $legacy_probationary_rank_et = probationaryTemplateLegacyRankSql('et', $employee['rank_category_id'] ?? 0);
 $legacy_probationary_rank_full = probationaryTemplateLegacyRankSql('evaluation_templates', $employee['rank_category_id'] ?? 0);
 $initial_required = ($employee['employment_status'] ?? '') === 'Probationary';
+$initial_required_flag = $initial_required ? 1 : 0;
 $initial_approved = !$initial_required
     || hasApprovedInitialProbationaryEvaluation($conn, $employee_id);
 $initial_gate = $initial_approved ? 1 : 0;
@@ -356,6 +365,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     $evaluation_type = trim($template['evaluation_type'] ?? 'Annual');
+    if (($employee['employment_status'] ?? '') === 'Probationary'
+        && in_array($evaluation_type, ['Initial', 'Final'], true)
+        && $evaluation_type !== $probationary_phase_type
+        && !$is_valid_existing_edit) {
+        $errors[] = 'The ' . $probationary_phase_type . ' evaluation is the next form available in your probationary cycle.';
+    }
     if ($action === 'submit' && $evaluation_type === 'Final' && !$initial_approved) {
         $errors[] = 'Your Initial probationary evaluation must be fully approved before you can submit the Final self-rating.';
     }
@@ -623,6 +638,7 @@ $templates_stmt = $conn->prepare("
             AND (et.target_job_title_id IS NULL OR et.target_job_title_id = ?)
             AND $legacy_probationary_rank_et))
       AND et.evaluation_type IN ($in_clause)
+      $probationary_phase_filter_et
       AND (et.evaluation_type <> 'Final' OR $initial_gate = 1)
       AND NOT EXISTS (
           SELECT 1
@@ -631,6 +647,7 @@ $templates_stmt = $conn->prepare("
             AND ev.template_id = et.template_id
             AND ev.deleted_at IS NULL
             AND ev.status NOT IN ('Draft', 'Returned', 'Rejected', 'Pending Self-Rating')
+            AND NOT ($initial_required_flag = 1 AND ev.status = 'Approved' AND ev.evaluation_type IN ('Initial', 'Final'))
       )
     ORDER BY template_name
 ");
@@ -663,6 +680,7 @@ if ($selected_template_id > 0) {
                       AND (target_job_title_id IS NULL OR target_job_title_id = ?)
                       AND $legacy_probationary_rank_full))
               AND evaluation_type IN ($in_clause)
+              $probationary_phase_filter_full
               AND (evaluation_type <> 'Final' OR $initial_gate = 1)
             LIMIT 1
         ");
@@ -704,6 +722,7 @@ if ($selected_template_id > 0) {
             WHERE employee_id = ? 
               AND template_id = ? 
               AND status NOT IN ('Draft', 'Returned', 'Rejected', 'Pending Self-Rating')
+              AND NOT ($initial_required_flag = 1 AND status = 'Approved' AND evaluation_type IN ('Initial', 'Final'))
               AND deleted_at IS NULL 
             LIMIT 1
         ");

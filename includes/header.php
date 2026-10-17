@@ -37,7 +37,7 @@ if ($effective_role === 'HR Supervisor' && $current_dir === 'supervisor') {
 if ($effective_role === 'HR Staff' && $current_dir === 'staff') {
     sendStaffProbationReminders($conn, (int) $_SESSION['user_id']);
 }
-if ($effective_role === 'Employee' && $current_dir === 'employee') {
+if ($current_dir === 'employee' && in_array($effective_role, ['Employee', 'HR Manager', 'HR Supervisor', 'HR Staff'], true)) {
     sendEmployeeProbationReminder($conn, (int) $_SESSION['user_id']);
 }
 $notif_count = getUnreadNotificationCount($conn, (int) $_SESSION['user_id'], $notif_context);

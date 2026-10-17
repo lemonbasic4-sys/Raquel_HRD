@@ -530,8 +530,9 @@ $regularization_result = $conn->query("SELECT rr.*, ev.total_score, ev.performan
     FROM regularization_requests rr
     JOIN evaluations ev ON ev.evaluation_id = rr.evaluation_id
     JOIN employees e ON e.employee_id = rr.employee_id
+    JOIN departments d ON d.department_id = e.department_id
     LEFT JOIN users u ON u.user_id = rr.recommended_by
-    WHERE rr.status = 'Pending'
+    WHERE rr.status = 'Pending' AND d.department_name = 'Human Resources'
     ORDER BY rr.created_at ASC");
 $regularization_pending = $regularization_result ? $regularization_result->fetch_all(MYSQLI_ASSOC) : [];
 $regularization_pending_count = count($regularization_pending);

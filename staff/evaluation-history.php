@@ -135,6 +135,11 @@ ksort($existing_templates);
 <?php endif; ?>
 
 <style>
+.history-detail-modal .modal-dialog{margin:auto;max-width:min(1120px,calc(100vw - 32px));width:calc(100vw - 32px)}
+.history-detail-modal .modal-content{height:min(820px,calc(100dvh - 32px));max-height:calc(100dvh - 32px);overflow:hidden}
+.history-detail-modal .modal-header{flex:0 0 auto}
+.history-detail-modal .modal-body{min-height:0}
+@media(max-width:767.98px){.history-detail-modal .modal-dialog{margin:8px;max-width:calc(100vw - 16px);width:calc(100vw - 16px)}.history-detail-modal .modal-content{height:calc(100dvh - 16px);max-height:calc(100dvh - 16px)}}
     .badge-audit {
         background: rgba(255, 193, 7, 0.15);
         color: #d39e00;

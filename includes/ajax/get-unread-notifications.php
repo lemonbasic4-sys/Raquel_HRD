@@ -3,6 +3,7 @@
 // AJAX Endpoint: Get Unread Notifications
 // ============================================
 require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../functions.php';
 
 header('Content-Type: application/json');
 
@@ -18,6 +19,7 @@ $context = $_GET['context'] ?? ''; // 'employee' or 'hr'
 // 1. Get the unread count
 // Filter count based on context if needed
 $count_sql = "SELECT COUNT(*) as unread_count FROM notifications WHERE user_id = ? AND is_read = 0";
+$count_sql .= notificationRouteRepairDuplicateFilterSql();
 if ($context === 'employee') {
     $count_sql .= " AND (link LIKE '%/employee/%' OR link IS NULL OR link = '')";
 } elseif ($context === 'hr') {
@@ -33,6 +35,7 @@ $count_stmt->close();
 // 2. Fetch new unread notifications since last_seen_id (for live popups/banners)
 $new_notifications = [];
 $notif_sql = "SELECT notification_id, title, message, link, created_at FROM notifications WHERE user_id = ? AND is_read = 0";
+$notif_sql .= notificationRouteRepairDuplicateFilterSql();
 if ($last_seen_id > 0) {
     $notif_sql .= " AND notification_id > ?";
 }
@@ -66,6 +69,7 @@ $notif_stmt->close();
 // (We fetch recent 5 notifications to update the dropdown list dynamically)
 $recent_notifications = [];
 $recent_sql = "SELECT notification_id, title, message, link, is_read, created_at FROM notifications WHERE user_id = ?";
+$recent_sql .= notificationRouteRepairDuplicateFilterSql();
 if ($context === 'employee') {
     $recent_sql .= " AND (link LIKE '%/employee/%' OR link IS NULL OR link = '')";
 } elseif ($context === 'hr') {

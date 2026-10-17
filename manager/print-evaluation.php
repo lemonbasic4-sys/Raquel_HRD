@@ -3,6 +3,7 @@ require_once '../includes/session-check.php';
 // Allow Manager, Supervisor, and Staff to print their own/relevant evaluations
 checkRole(['HR Manager', 'HR Supervisor', 'HR Staff']);
 require_once '../includes/functions.php';
+ensureProbationaryEvaluationSchema($conn);
 
 $id = isset($_GET['id']) ? (int) $_GET['id'] : 0;
 if (!$id)
@@ -18,6 +19,8 @@ $query = "SELECT ev.*,
     dm.full_name AS dept_manager_endorsed_by_name,
     CONCAT(ce.first_name, ' ', ce.last_name) AS consolidator_name,
     ce.job_title AS consolidator_job_title,
+    per.immediate_head_signature_data AS rater_signature_data,
+    rater.full_name AS rater_name,
     ep.package_id,
     ep.updated_at AS consolidated_at
     FROM evaluations ev
@@ -32,6 +35,8 @@ $query = "SELECT ev.*,
     LEFT JOIN evaluation_package_members epm ON epm.evaluation_id = ev.evaluation_id
     LEFT JOIN evaluation_packages ep ON ep.package_id = epm.package_id
     LEFT JOIN employees ce ON ep.consolidator_employee_id = ce.employee_id
+    LEFT JOIN probationary_evaluation_reviews per ON per.evaluation_id = ev.evaluation_id
+    LEFT JOIN users rater ON rater.user_id = per.immediate_head_user_id
     WHERE ev.evaluation_id = $id";
 
 $result = $conn->query($query);
@@ -651,7 +656,13 @@ if ((float)($row['total_score'] ?? 0) > 0 && (empty($pl) || $pl === '0')) {
               </div>
               <div style="border-bottom:1px solid #000; margin:0 4px 2px;"></div>
               <div style="font-style:italic; margin-bottom:12px;">Employee</div>
-              <div style="border-bottom:1px solid #000; margin:0 4px 2px; height:12px;"></div>
+              <div style="margin:0 auto 2px; text-align:center; min-height:24px; display:flex; align-items:flex-end; justify-content:center;">
+                <?php if (!empty($row['rater_signature_data'])): ?>
+                  <img src="<?php echo e($row['rater_signature_data']); ?>" alt="Rater Signature" style="max-height:26px; max-width:95px; object-fit:contain; display:block; margin:0 auto;">
+                <?php endif; ?>
+              </div>
+              <div style="border-bottom:1px solid #000; margin:0 4px 2px;"></div>
+              <?php if (!empty($row['rater_name'])): ?><div style="font-size:8px; font-weight:bold;"><?php echo e($row['rater_name']); ?></div><?php endif; ?>
               <div style="font-style:italic;">Rater</div>
             </td>
           </tr>

@@ -22,26 +22,38 @@ if ($_session_role === 'Employee') {
 ensureOrganizationEvaluationPackageSchema($conn);
 $user_id = (int) ($_SESSION['user_id'] ?? 0);
 $reviewer_match = organizationPackageReviewerMatchSql('rs');
+$claim_profile_stmt = $conn->prepare("SELECT u.role, e.department_id, e.rank_category_id, e.employment_status, d.department_name
+    FROM users u LEFT JOIN employees e ON e.employee_id = u.employee_id
+    LEFT JOIN departments d ON d.department_id = e.department_id
+    WHERE u.user_id = ? LIMIT 1");
+$claim_profile_stmt->bind_param('i', $user_id);
+$claim_profile_stmt->execute();
+$claim_profile = $claim_profile_stmt->get_result()->fetch_assoc() ?: [];
+$claim_profile_stmt->close();
+$package_claim_role = in_array($claim_profile['role'] ?? '', ['HR Supervisor', 'HR Manager', 'President and CEO'], true)
+    ? (string)$claim_profile['role'] : '';
+$package_claim_rank_category = (($claim_profile['role'] ?? '') === 'Employee'
+    && strcasecmp((string)($claim_profile['department_name'] ?? ''), 'Human Resources') !== 0
+    && ($claim_profile['employment_status'] ?? '') === 'Regular'
+    && in_array((int)($claim_profile['rank_category_id'] ?? 0), [3, 4], true))
+    ? (int)$claim_profile['rank_category_id'] : 0;
+$package_claim_department_id = $package_claim_rank_category > 0 ? (int)($claim_profile['department_id'] ?? 0) : 0;
 
-// History Packages Query:
-// A reviewer sees packages in Team Evaluation History ONLY if:
-// 1. They have already acted on the package step (rs.action_status IN ('Approved', 'Returned'))
-// 2. The package is fully finalized (ep.status = 'Approved and Applied')
-// Current working packages pending action belong on Team Evaluation Packages (team-evaluation-packages.php).
+// Show every non-cancelled package that has a route step assigned to this reviewer,
+// including in-progress and waiting stages, so the page can show review history/progress
+// before the entire package is finalized.
 $packages_stmt = $conn->prepare("SELECT DISTINCT ep.package_id, ep.status, ep.evaluation_type, ep.period_start, ep.period_end, ep.shared_behavior_score,
         ep.department_id, ep.template_id, d.department_name, et.template_name, et.kra_weight, et.behavior_weight
     FROM evaluation_packages ep
     JOIN evaluation_package_route_steps rs ON rs.package_id = ep.package_id
     JOIN departments d ON d.department_id = ep.department_id
     JOIN evaluation_templates et ON et.template_id = ep.template_id
-    WHERE $reviewer_match
-      AND (
-          rs.action_status IN ('Approved', 'Returned')
-          OR ep.status = 'Approved and Applied'
-      )
+    WHERE ($reviewer_match
+        OR (rs.eligible_role = ? AND rs.claimed_at IS NULL)
+        OR (rs.eligible_rank_category_id = ? AND ep.department_id = ? AND rs.claimed_at IS NULL))
       AND ep.status <> 'Cancelled'
     ORDER BY ep.updated_at DESC");
-$packages_stmt->bind_param('ii', $user_id, $user_id);
+$packages_stmt->bind_param('iisii', $user_id, $user_id, $package_claim_role, $package_claim_rank_category, $package_claim_department_id);
 $packages_stmt->execute();
 $packages = $packages_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $packages_stmt->close();
@@ -117,7 +129,7 @@ require_once '../includes/header.php';
         </p>
         <h1 class="h3 mb-2 fw-bold">Team Evaluation History &amp; Progress</h1>
         <p class="mb-0">
-            Inspect past evaluation cycles, historical consolidator adjustments, and complete audit records for your teams.
+            Inspect evaluation cycles, current review progress, historical consolidator adjustments, and audit records for your teams.
         </p>
     </section>
 
