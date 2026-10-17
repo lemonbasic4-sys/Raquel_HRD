@@ -801,15 +801,7 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
                             </div>
                         </a>
                     </div>
-                    <div class="col-6 col-md-4 col-xl-3 col-xxl-2">
-                        <a href="analytics.php?cohort=probationary" class="text-decoration-none">
-                            <div class="p-3 rounded-3 text-center bg-white bg-opacity-10 border border-white border-opacity-10 text-white hover-zoom hub-link-card" style="transition: all 0.2s;">
-                                <i class="fas fa-user-check fa-2x mb-2" style="color:#f5a3ab;"></i>
-                                <div class="fw-bold small hub-link-title">Probationary Analytics</div>
-                                <div class="text-white-50 hub-link-subtitle" style="font-size:0.68rem;">Initial, Final &amp; Regularization</div>
-                            </div>
-                        </a>
-                    </div>
+                    
                     <div class="col-6 col-md-4 col-xl-3 col-xxl-2">
                         <a href="templates.php" class="text-decoration-none">
                             <div class="p-3 rounded-3 text-center bg-white bg-opacity-10 border border-white border-opacity-10 text-white hover-zoom hub-link-card" style="transition: all 0.2s;">
