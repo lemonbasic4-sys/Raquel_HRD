@@ -161,6 +161,7 @@ CREATE TABLE users (
     account_hold_at DATETIME NULL,
     account_hold_movement_id INT NULL,
     first_login_completed TINYINT(1) DEFAULT 0,
+    must_change_password TINYINT(1) NOT NULL DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     deleted_at TIMESTAMP NULL DEFAULT NULL,

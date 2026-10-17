@@ -28,7 +28,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         logLoginAudit($conn, $username, 'Employee Portal', 'Failed', 'Username or password was not provided.');
     } else {
         $stmt = $conn->prepare("
-            SELECT u.user_id, u.employee_id, u.username, u.email, u.password_hash, u.full_name, u.role, u.branch_id, u.is_active, u.account_hold, u.first_login_completed, e.is_active as emp_is_active, e.employment_status
+            SELECT u.user_id, u.employee_id, u.username, u.email, u.password_hash, u.full_name, u.role, u.branch_id, u.is_active, u.account_hold, u.first_login_completed, u.must_change_password, e.is_active as emp_is_active, e.employment_status
             FROM users u
             LEFT JOIN employees e ON u.employee_id = e.employee_id
             WHERE BINARY u.username = ? 
@@ -54,6 +54,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // Clear attempts on successful login
                 clearLoginAttempts($conn, $username, $ip);
 
+                // First successful Employee Portal login requires a password change.
+                if (empty($user['first_login_completed'])) {
+                    $require_password_change = $conn->prepare("UPDATE users SET must_change_password = 1 WHERE user_id = ?");
+                    $require_password_change->bind_param('i', $user['user_id']);
+                    $require_password_change->execute();
+                    $require_password_change->close();
+                    $user['must_change_password'] = 1;
+                }
+
                 // Handle Remember Me functionality
                 if (!empty($_POST['remember'])) {
                     setcookie('remember_employee_username', $username, time() + (30 * 24 * 60 * 60), '/');
@@ -78,6 +87,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_SESSION['full_name'] = $user['full_name'];
                 $_SESSION['role'] = $user['role'];
                 $_SESSION['first_login_completed'] = (bool) ($user['first_login_completed'] ?? false);
+                $_SESSION['must_change_password'] = (bool) ($user['must_change_password'] ?? false);
 
                 logLoginAudit($conn, $username, 'Employee Portal', 'Successful', '', (int)$user['user_id']);
 

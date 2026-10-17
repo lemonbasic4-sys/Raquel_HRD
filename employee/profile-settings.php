@@ -61,9 +61,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $field_errors['current_password'] = 'Current password is incorrect.';
         } else {
             $hash = password_hash($new, PASSWORD_DEFAULT);
-            $upd  = $conn->prepare("UPDATE users SET password_hash=? WHERE user_id=?");
+            $upd  = $conn->prepare("UPDATE users SET password_hash=?, must_change_password=0, first_login_completed=1 WHERE user_id=?");
             $upd->bind_param("si", $hash, $user_id);
             if ($upd->execute()) {
+                $_SESSION['must_change_password'] = false;
+                $_SESSION['first_login_completed'] = true;
                 logAudit($conn, $user_id, 'CHANGE_PASSWORD', 'User', $user_id, 'Employee changed their password.');
                 $success = 'Password changed successfully!';
             } else {

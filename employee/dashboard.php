@@ -11,6 +11,25 @@ if (!ensureHierarchicalEvaluationSchema($conn)) {
 $employee_id = (int)($_SESSION['employee_id'] ?? 0);
 $user_id     = (int)($_SESSION['user_id']     ?? 0);
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'dismiss_first_login_password_notice') {
+    verifyCsrfToken();
+    $dismiss_stmt = $conn->prepare("UPDATE users SET first_login_completed = 1 WHERE user_id = ? AND role = 'Employee'");
+    $dismiss_stmt->bind_param('i', $user_id);
+    $dismiss_stmt->execute();
+    $dismiss_stmt->close();
+    $_SESSION['first_login_completed'] = true;
+    header('Location: dashboard.php');
+    exit();
+}
+
+$security_stmt = $conn->prepare("SELECT first_login_completed, must_change_password FROM users WHERE user_id = ? AND role = 'Employee' LIMIT 1");
+$security_stmt->bind_param('i', $user_id);
+$security_stmt->execute();
+$security_state = $security_stmt->get_result()->fetch_assoc() ?? [];
+$security_stmt->close();
+$show_first_login_password_modal = empty($security_state['first_login_completed']);
+$must_change_password = !empty($security_state['must_change_password']);
+
 // ── Employee core info ──────────────────────────────────────────────────────
 $emp_stmt = $conn->prepare("
     SELECT e.employee_id, e.employee_code, e.first_name, e.last_name,
@@ -238,6 +257,50 @@ if ($show_validation_queue) {
 }
 
 require_once '../includes/header.php';
+?>
+<?php if ($must_change_password): ?>
+<div class="alert alert-warning d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3" role="alert">
+    <div><strong><i class="fas fa-key me-2"></i>Password change required.</strong> Please update your password in Profile Settings. Never share your login credentials with anyone.</div>
+    <a class="btn btn-warning btn-sm fw-bold" href="<?php echo BASE_URL; ?>/employee/profile-settings.php">Change Password</a>
+</div>
+<?php endif; ?>
+
+<?php if ($show_first_login_password_modal): ?>
+<div class="modal fade" id="firstLoginPasswordModal" tabindex="-1" aria-labelledby="firstLoginPasswordModalLabel" aria-modal="true" role="dialog" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header text-white" style="background:#072A05;">
+                <div>
+                    <div class="small text-uppercase opacity-75">Account Security</div>
+                    <h5 class="modal-title fw-bold" id="firstLoginPasswordModalLabel"><i class="fas fa-shield-alt me-2"></i>Change your password</h5>
+                </div>
+                <button type="button" class="btn-close btn-close-white" aria-label="Dismiss reminder" onclick="document.getElementById('dismissFirstLoginPasswordNotice').submit();"></button>
+            </div>
+            <div class="modal-body p-4">
+                <p class="mb-3">This is your first time signing in to the Employee Portal. Please change your password to help protect your account.</p>
+                <div class="alert alert-danger mb-0"><i class="fas fa-user-lock me-2"></i><strong>Keep your credentials private.</strong> Never share your username or password with anyone.</div>
+            </div>
+            <div class="modal-footer">
+                <form id="dismissFirstLoginPasswordNotice" method="post" class="me-auto">
+                    <?php echo csrfField(); ?>
+                    <input type="hidden" name="action" value="dismiss_first_login_password_notice">
+                </form>
+                <button type="button" class="btn btn-outline-secondary" onclick="document.getElementById('dismissFirstLoginPasswordNotice').submit();">Remind me later</button>
+                <a href="<?php echo BASE_URL; ?>/employee/profile-settings.php" class="btn btn-success"><i class="fas fa-key me-1"></i>Change Password</a>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const modalElement = document.getElementById('firstLoginPasswordModal');
+    if (modalElement && window.bootstrap) {
+        bootstrap.Modal.getOrCreateInstance(modalElement).show();
+    }
+});
+</script>
+<?php endif; ?>
+<?php
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 function evalStatusBadge(string $status): string {

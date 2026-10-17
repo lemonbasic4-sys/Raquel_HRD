@@ -770,7 +770,7 @@ function notifyHrSupervisorOfEmployeeRecordChange($conn, $employee_id, $employee
 }
 
 /**
- * Add account-hold fields without requiring a manual migration on existing installs.
+ * Add account-security fields without requiring a manual migration on existing installs.
  */
 function ensureUserAccountSecuritySchema($conn): bool
 {
@@ -792,6 +792,8 @@ function ensureUserAccountSecuritySchema($conn): bool
         'account_hold_reason' => "ALTER TABLE users ADD COLUMN account_hold_reason TEXT NULL AFTER account_hold",
         'account_hold_at' => "ALTER TABLE users ADD COLUMN account_hold_at DATETIME NULL AFTER account_hold_reason",
         'account_hold_movement_id' => "ALTER TABLE users ADD COLUMN account_hold_movement_id INT NULL AFTER account_hold_at",
+        'first_login_completed' => "ALTER TABLE users ADD COLUMN first_login_completed TINYINT(1) NOT NULL DEFAULT 0 AFTER account_hold_movement_id",
+        'must_change_password' => "ALTER TABLE users ADD COLUMN must_change_password TINYINT(1) NOT NULL DEFAULT 0 AFTER first_login_completed",
     ];
 
     foreach ($definitions as $column => $sql) {
