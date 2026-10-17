@@ -2843,13 +2843,13 @@ function scrollRatingTargetIntoView(target) {
 
     const isMobileViewport = window.matchMedia('(max-width: 767.98px)').matches;
     if (isMobileViewport) {
-        // Direct page scrolling avoids a second browser-controlled movement
-        // caused by focusing the next radio on touch devices.
+        // Move directly to the next item on mobile; animated scrolling feels
+        // sluggish when rating a long list of KRA and behavior criteria.
         const targetTop = target.getBoundingClientRect().top + window.scrollY - 76;
-        requestAnimationFrame(() => window.scrollTo({
+        window.scrollTo({
             top: Math.max(0, targetTop),
-            behavior: 'smooth'
-        }));
+            behavior: 'auto'
+        });
         return;
     }
 
@@ -3030,24 +3030,28 @@ document.addEventListener('change', function (e) {
 
     if (currentIndex !== -1 && currentIndex < allItems.length - 1) {
         const nextItem = allItems[currentIndex + 1];
-        setTimeout(() => {
+        const advanceToNextItem = () => {
             scrollRatingTargetIntoView(nextItem);
             const nextRating = nextItem.querySelector('.rating-input:checked') || nextItem.querySelector('.rating-input');
             if (nextRating && !isMobileViewport) nextRating.focus({ preventScroll: true });
-            // Add a brief subtle pulse outline highlight to signal active focus
-            nextItem.style.transition = 'box-shadow 0.3s ease';
-            nextItem.style.boxShadow = '0 0 0 3px rgba(4, 61, 7, 0.2)';
-            setTimeout(() => { nextItem.style.boxShadow = ''; }, 1200);
-        }, 150);
+            // Keep the focus pulse on desktop; mobile should advance without
+            // an extra transition effect.
+            if (!isMobileViewport) {
+                nextItem.style.transition = 'box-shadow 0.3s ease';
+                nextItem.style.boxShadow = '0 0 0 3px rgba(4, 61, 7, 0.2)';
+                setTimeout(() => { nextItem.style.boxShadow = ''; }, 1200);
+            }
+        };
+        if (isMobileViewport) advanceToNextItem();
+        else setTimeout(advanceToNextItem, 150);
     } else {
-        // Last question reached — scroll smoothly to the comments / submit section
+        // Last question reached — advance to the comments / submit section.
         const nextStep = currentItem.closest('#kra-rating-pane')
             ? document.querySelector('.self-rating-continue')
             : (document.querySelector('.self-rating-actions') || document.querySelector('textarea[name="self_comments"]'));
         if (nextStep) {
-            setTimeout(() => {
-                scrollRatingTargetIntoView(nextStep);
-            }, 150);
+            if (isMobileViewport) scrollRatingTargetIntoView(nextStep);
+            else setTimeout(() => scrollRatingTargetIntoView(nextStep), 150);
         }
     }
 });
