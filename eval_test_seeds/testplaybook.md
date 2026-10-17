@@ -1,8 +1,8 @@
-## HRD, AP, President/CEO, and Employee Portal test seeds
+## HRD, AP, Business Development, President/CEO, and Employee Portal test seeds
 
 This imports organization and employee test data only. It does not seed
-evaluation templates. Keep the import order below because the probationary seed
-refers to employees created by the earlier HR, AP, and CEO seeds.
+evaluation templates. Keep the import order below because the probationary and
+Business Development seeds reference employees and positions created earlier.
 
 
 ```powershell
@@ -16,8 +16,22 @@ cd C:\xampp\htdocs\raquel_hrd
 & "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source eval_test_seeds/ap_complete_employee_profiles.sql;"
 & "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source eval_test_seeds/president_ceo_complete_profile.sql;"
 & "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source eval_test_seeds/probationary_hr_ap_complete_profiles.sql;"
+& "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source eval_test_seeds/business_development_probationary_profiles.sql;"
 & "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source database/create_missing_employee_portal_accounts.sql;"
 ```
+
+The Business Development seed is optional. Import it after the organization
+and President/CEO profile seeds, and before creating Employee Portal accounts.
+It adds one regular Officer, one probationary Officer, one regular Staff member,
+and one probationary Staff member. It follows the configured hierarchy:
+Officer I reports to President/CEO; Staff I reports to Officer I. The seed uses
+`REPLACE INTO` and relinks existing Employee accounts by employee-code username.
+Because replacement can reset data linked to those employee rows, import this
+seed before testing and do not rerun it if you need to preserve test history.
+
+After the generic account-creation script runs, all four employees can sign in
+to the Employee Portal using their employee code as the username and the test
+password `password`.
 
 ## Configure and create evaluation templates
 
@@ -46,6 +60,14 @@ Use these creator-to-target relationships when setting up the test templates:
 - Each other department head → its own direct-report positions, as configured in
   Position Management (for example, AP VP → AP Manager → AP Supervisor → AP Staff).
 
+Business Development template creators/targets are President/CEO to Officer I,
+then the regular Officer to Staff I. The Employee Portal test accounts are:
+
+- BD-T01: regular Business Development Officer (employee code is username)
+- BD-P01: probationary Business Development Officer (employee code is username)
+- BD-T02: regular Business Development Staff (employee code is username)
+- BD-P02: probationary Business Development Staff (employee code is username)
+
 ## Expected evaluation results
 
 After creating the templates, sign in to each probationary employee account and
@@ -63,6 +85,8 @@ Check that each review reaches the correct immediate-head level:
 - AP-P01 (probationary AP Manager): active AP VP
 - AP-P02 (probationary AP Supervisor): active AP Manager
 - AP-P03 (probationary AP Staff): active AP Supervisor
+- BD-P01 (probationary Business Development Officer): President/CEO
+- BD-P02 (probationary Business Development Staff): regular Business Development Officer
 
 The configured immediate head should receive and accept/claim the evaluation,
 then consolidate and sign it. Once the Initial is approved, the employee can
