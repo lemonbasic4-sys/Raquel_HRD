@@ -75,6 +75,9 @@ $selected_id = max(0, (int) ($_GET['id'] ?? 0));
 $per_page = 20;
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verifyCsrfToken();
+    $is_ajax_selection = ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest'
+        && (string)($_POST['inbox_action'] ?? '') === 'open_or_select';
+    $ajax_selection_succeeded = false;
     $inbox_action = (string)($_POST['inbox_action'] ?? '');
     $action_id = max(0, (int)($_POST['notification_id'] ?? 0));
     $next_id = $action_id;
@@ -102,7 +105,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($inbox_action === 'delete') $update->bind_param('ii', $action_id, $user_id);
             $update->execute();
             $update->close();
-            if ($inbox_action === 'open_related' || ($inbox_action === 'open_or_select' && !empty($_POST['already_selected']))) {
+            if ($inbox_action === 'open_or_select' && $is_ajax_selection) {
+                $ajax_selection_succeeded = true;
+            }
+            if (!$is_ajax_selection && ($inbox_action === 'open_related' || ($inbox_action === 'open_or_select' && !empty($_POST['already_selected'])))) {
                 $destination = managerNotifLink($owned_row['link']);
                 if ($destination) {
                     header('Location: ' . $destination);
@@ -110,6 +116,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
         }
+    }
+    if ($is_ajax_selection) {
+        $inbox_scope_sql = $notification_center_role === 'Employee'
+            ? " AND (link LIKE '%/employee/%' OR link IS NULL OR link = '')"
+            : " AND (link NOT LIKE '%/employee/%' OR link LIKE '%/employee/team-evaluation%' OR link LIKE '%/employee/package-member%' OR link IS NULL OR link = '')";
+        $unread_stmt = $conn->prepare("SELECT category, COUNT(*) AS total FROM notifications WHERE user_id = ? AND is_read = 0" . $inbox_scope_sql . notificationRouteRepairDuplicateFilterSql() . " GROUP BY category");
+        $unread_stmt->bind_param('i', $user_id);
+        $unread_stmt->execute();
+        $unread_rows = $unread_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $unread_stmt->close();
+        $unread_total = 0;
+        $unread_categories = [];
+        foreach ($unread_rows as $unread_row) {
+            $unread_categories[(string)($unread_row['category'] ?? 'system')] = (int)$unread_row['total'];
+            $unread_total += (int)$unread_row['total'];
+        }
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode([
+            'success' => $ajax_selection_succeeded,
+            'unread_count' => $unread_total,
+            'unread_categories' => $unread_categories,
+        ]);
+        exit;
     }
     header('Location: ' . managerNotifUrl(['id' => $next_id ?: null]));
     exit;
@@ -193,7 +222,7 @@ require_once '../includes/header.php';
     <aside class="mn-categories" aria-label="Notification categories">
         <h2>Categories</h2><nav>
         <?php foreach ($categories as $key => $meta): $unread = $key === 'all' ? $total_unread : ($counts[$key] ?? 0); ?>
-            <a class="mn-category <?php echo $category === $key ? 'active' : ''; ?>" href="<?php echo e(managerNotifUrl(['category' => $key, 'page' => 1, 'id' => null])); ?>"><i class="<?php echo $meta[1]; ?>"></i><span><?php echo e($meta[0]); ?></span><b><?php echo (int) $unread; ?></b></a>
+            <a class="mn-category <?php echo $category === $key ? 'active' : ''; ?>" data-notification-category-key="<?php echo e($key); ?>" href="<?php echo e(managerNotifUrl(['category' => $key, 'page' => 1, 'id' => null])); ?>"><i class="<?php echo $meta[1]; ?>"></i><span><?php echo e($meta[0]); ?></span><b><?php echo (int) $unread; ?></b></a>
         <?php endforeach; ?>
         </nav><p class="mn-count-note">Counts show unread notifications.</p>
     </aside>
@@ -212,8 +241,8 @@ require_once '../includes/header.php';
         <?php if (!$manager_notif_items): ?><div class="mn-empty"><i class="far fa-bell-slash"></i><strong>No notifications found</strong><p>Try another category, date range, or search.</p></div>
         <?php else: ?><div class="mn-list">
             <?php foreach ($manager_notif_items as $item): $id = (int) $item['notification_id']; $meta = $categories[$item['category'] ?? 'system'] ?? $categories['system']; ?>
-            <form method="post" class="mn-item-form"><input type="hidden" name="inbox_action" value="open_or_select"><input type="hidden" name="notification_id" value="<?php echo $id; ?>"><input type="hidden" name="already_selected" value="<?php echo $selected_id === $id ? 1 : 0; ?>"><?php echo csrfField(); ?>
-                <button type="submit" class="mn-item <?php echo $selected_id === $id ? 'selected' : ''; ?> <?php echo $item['is_read'] ? '' : 'unread'; ?>" title="<?php echo $selected_id === $id && managerNotifLink($item['link']) ? 'Open related page' : 'View notification details'; ?>"><span class="mn-item-icon"><i class="<?php echo $meta[1]; ?>"></i></span><span class="mn-item-content"><strong><?php echo e($item['title']); ?></strong><small><?php echo e($meta[0]); ?></small><span><?php echo e($item['message']); ?></span></span><span class="mn-item-meta"><time><?php echo e(timeAgoFormat($item['created_at'])); ?></time><?php if (!$item['is_read']): ?><i class="mn-unread-dot" aria-label="Unread"></i><?php endif; ?></span></button>
+            <form method="post" class="mn-item-form" data-notification-select-form><input type="hidden" name="inbox_action" value="open_or_select"><input type="hidden" name="notification_id" value="<?php echo $id; ?>"><input type="hidden" name="already_selected" value="<?php echo $selected_id === $id ? 1 : 0; ?>"><?php echo csrfField(); ?>
+                <button type="submit" class="mn-item <?php echo $selected_id === $id ? 'selected' : ''; ?> <?php echo $item['is_read'] ? '' : 'unread'; ?>" title="<?php echo $selected_id === $id && managerNotifLink($item['link']) ? 'Open related page' : 'View notification details'; ?>" data-notification-id="<?php echo $id; ?>" data-notification-title="<?php echo e($item['title']); ?>" data-notification-message="<?php echo e($item['message']); ?>" data-notification-category="<?php echo e($meta[0]); ?>" data-notification-icon="<?php echo e($meta[1]); ?>" data-notification-created="<?php echo e(date('M j, Y · g:i A', strtotime($item['created_at']))); ?>" data-notification-related-url="<?php echo e(managerNotifLink($item['link']) ?? ''); ?>"><span class="mn-item-icon"><i class="<?php echo $meta[1]; ?>"></i></span><span class="mn-item-content"><strong><?php echo e($item['title']); ?></strong><small><?php echo e($meta[0]); ?></small><span><?php echo e($item['message']); ?></span></span><span class="mn-item-meta"><time><?php echo e(timeAgoFormat($item['created_at'])); ?></time><?php if (!$item['is_read']): ?><i class="mn-unread-dot" aria-label="Unread"></i><?php endif; ?></span></button>
             </form>
             <?php endforeach; ?>
         </div><?php if ($total_pages > 1): ?><nav class="mn-pages" aria-label="Notification pages"><?php if ($page > 1): ?><a href="<?php echo e(managerNotifUrl(['page' => $page - 1, 'id' => null])); ?>">Previous</a><?php endif; ?><span>Page <?php echo $page; ?> of <?php echo $total_pages; ?></span><?php if ($page < $total_pages): ?><a href="<?php echo e(managerNotifUrl(['page' => $page + 1, 'id' => null])); ?>">Next</a><?php endif; ?></nav><?php endif; ?><?php endif; ?>
@@ -228,4 +257,130 @@ require_once '../includes/header.php';
         <?php else: ?><div class="mn-detail-empty"><i class="far fa-envelope-open"></i><strong>Select a notification</strong><p>Its full message and related action will appear here.</p></div><?php endif; ?>
     </aside>
 </div>
+<?php if ($notification_center_role === 'Employee'): ?>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const detail = document.querySelector('.mn-detail');
+    if (!detail) return;
+
+    function appendText(parent, tag, className, value) {
+        const element = document.createElement(tag);
+        if (className) element.className = className;
+        element.textContent = value || '';
+        parent.appendChild(element);
+        return element;
+    }
+
+    function addPostForm(parent, action, id, label, iconClass, csrf) {
+        const form = document.createElement('form');
+        form.method = 'post';
+        const actionInput = document.createElement('input');
+        actionInput.type = 'hidden'; actionInput.name = 'inbox_action'; actionInput.value = action;
+        const idInput = document.createElement('input');
+        idInput.type = 'hidden'; idInput.name = 'notification_id'; idInput.value = id;
+        const csrfInput = document.createElement('input');
+        csrfInput.type = 'hidden'; csrfInput.name = 'csrf_token'; csrfInput.value = csrf;
+        form.append(actionInput, idInput, csrfInput);
+        const button = document.createElement('button');
+        button.type = 'submit'; button.className = action === 'mark_unread' ? 'mn-secondary-action' : 'mn-close';
+        button.setAttribute('aria-label', label);
+        if (action === 'delete') {
+            button.title = label; button.textContent = '×';
+            form.onsubmit = () => window.confirm('Delete this notification?');
+        } else {
+            const icon = document.createElement('i'); icon.className = iconClass; button.appendChild(icon);
+            button.appendChild(document.createTextNode(' ' + label));
+        }
+        form.appendChild(button); parent.appendChild(form);
+    }
+
+    function showNotification(button, csrf) {
+        const data = button.dataset;
+        detail.replaceChildren();
+        const header = document.createElement('div'); header.className = 'mn-detail-head';
+        const iconWrap = document.createElement('span'); iconWrap.className = 'mn-detail-icon';
+        const icon = document.createElement('i'); icon.className = data.notificationIcon; iconWrap.appendChild(icon); header.appendChild(iconWrap);
+        const heading = document.createElement('div');
+        appendText(heading, 'h2', '', data.notificationTitle);
+        appendText(heading, 'time', '', data.notificationCreated);
+        header.appendChild(heading);
+        addPostForm(header, 'delete', data.notificationId, 'Delete notification', '', csrf);
+        detail.appendChild(header);
+
+        const labels = document.createElement('div'); labels.className = 'mn-detail-labels';
+        appendText(labels, 'span', '', data.notificationCategory);
+        appendText(labels, 'span', 'read', 'Read'); detail.appendChild(labels);
+        const message = appendText(detail, 'div', 'mn-detail-message', data.notificationMessage);
+        message.style.whiteSpace = 'pre-wrap';
+
+        if (data.notificationRelatedUrl) {
+            const link = document.createElement('a'); link.className = 'mn-primary-action';
+            link.href = data.notificationRelatedUrl;
+            const linkIcon = document.createElement('i'); linkIcon.className = 'fas fa-external-link-alt'; link.append(linkIcon, document.createTextNode(' Open related page'));
+            detail.appendChild(link);
+        }
+        addPostForm(detail, 'mark_unread', data.notificationId, 'Mark as unread', 'fas fa-envelope', csrf);
+        detail.scrollIntoView({ behavior: 'auto', block: 'start' });
+    }
+
+    document.querySelectorAll('[data-notification-select-form]').forEach(function (form) {
+        form.addEventListener('submit', function (event) {
+            const button = form.querySelector('[data-notification-id]');
+            if (!button) return;
+            event.preventDefault();
+            const csrf = form.querySelector('[name="csrf_token"]')?.value || '';
+            const formData = new FormData(form);
+            // Open the notification immediately; updating its read state should not
+            // hold the detail view behind a round trip or fall back to navigation.
+            document.querySelectorAll('.mn-item.selected').forEach(item => item.classList.remove('selected'));
+            button.classList.add('selected');
+            showNotification(button, csrf);
+            fetch(window.location.href, {
+                method: 'POST', body: formData,
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin'
+            }).then(response => {
+                if (!response.ok) throw new Error('Notification update failed (' + response.status + ').');
+                return response.json();
+            }).then(result => {
+                if (!result.success) throw new Error('Notification could not be updated.');
+                button.classList.remove('unread');
+                button.querySelector('.mn-unread-dot')?.remove();
+                form.querySelector('[name="already_selected"]').value = '1';
+                document.querySelectorAll('[data-notification-select-form] [name="already_selected"]').forEach(input => {
+                    if (input !== form.querySelector('[name="already_selected"]')) input.value = '0';
+                });
+                const unreadTotal = document.querySelector('.mn-hero-count strong');
+                if (unreadTotal) unreadTotal.textContent = result.unread_count;
+                document.querySelectorAll('[data-notification-category-key]').forEach(link => {
+                    const key = link.dataset.notificationCategoryKey;
+                    const count = link.querySelector('b');
+                    if (count) count.textContent = key === 'all' ? result.unread_count : (result.unread_categories[key] || 0);
+                });
+                const bell = document.getElementById('notificationBtn');
+                if (bell) {
+                    let badge = bell.querySelector('.notification-badge');
+                    if (result.unread_count > 0) {
+                        if (!badge) { badge = document.createElement('span'); badge.className = 'notification-badge'; bell.appendChild(badge); }
+                        badge.textContent = result.unread_count > 9 ? '9+' : result.unread_count;
+                    } else if (badge) badge.remove();
+                }
+                const url = new URL(window.location.href); url.searchParams.set('id', button.dataset.notificationId);
+                window.history.replaceState({}, '', url);
+            }).catch(error => {
+                console.error('Unable to update notification read state:', error);
+                let notice = detail.querySelector('.mn-ajax-error');
+                if (!notice) {
+                    notice = document.createElement('p');
+                    notice.className = 'mn-ajax-error';
+                    notice.setAttribute('role', 'status');
+                    detail.appendChild(notice);
+                }
+                notice.textContent = 'Opened, but its read status could not be updated. Please try again.';
+            });
+        });
+    });
+});
+</script>
+<?php endif; ?>
 <?php require_once '../includes/footer.php'; ?>
