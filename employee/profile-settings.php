@@ -67,6 +67,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_SESSION['must_change_password'] = false;
                 $_SESSION['first_login_completed'] = true;
                 logAudit($conn, $user_id, 'CHANGE_PASSWORD', 'User', $user_id, 'Employee changed their password.');
+                $employee_name = trim((string) ($_SESSION['full_name'] ?? 'An employee'));
+                notifyOtherAdmins(
+                    $conn,
+                    $user_id,
+                    'Employee Password Changed',
+                    $employee_name . ' changed their Employee Portal password.',
+                    BASE_URL . '/admin/audit-trail.php',
+                    'security'
+                );
                 $success = 'Password changed successfully!';
             } else {
                 $general_error = 'Failed to update password. Please try again.';
