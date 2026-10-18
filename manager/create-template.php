@@ -52,6 +52,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Behavior criteria
     $beh_names = $_POST['behavior_name'] ?? [];
     $beh_kpis = $_POST['behavior_kpi'] ?? [];
+    if ($evaluation_type === 'Annual') {
+        if ((annualActor($conn, (int)$_SESSION['user_id'])['employment_status'] ?? '') !== 'Regular') {
+            redirectWith($template_list_url, 'danger', 'Only an active regular head may create Annual templates for direct reports.');
+        }
+        try { annualValidateTemplateKras($kra_names, $kra_weights); }
+        catch (DomainException $e) { redirectWith($template_create_url, 'danger', $e->getMessage()); }
+        $kra_weight = 80; $behavior_weight = 20;
+        $behavior_framework_code = 'ANNUAL-CORE'; $behavior_framework_version = '1';
+        $beh_names = array_column(annualCoreValues(), 'name');
+        $beh_kpis = array_column(annualCoreValues(), 'kpi');
+    }
 
     $department_stmt = $conn->prepare("SELECT department_id FROM departments WHERE department_name = ? AND is_active = 1 AND deleted_at IS NULL LIMIT 1");
     $department_stmt->bind_param('s', $target_department);
@@ -90,10 +101,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (abs(($kra_weight + $behavior_weight) - 100) > 0.01) {
         redirectWith($template_create_url, 'danger', 'KRA weight + Behavior weight must equal 100%.');
     }
-    if (!$is_probationary_template && ($behavior_framework_code === '' || $behavior_framework_version === '')) {
-        redirectWith($template_create_url, 'danger', 'Behavior Framework Code and Version are required for Annual and Quarterly templates.');
+    if ($evaluation_type === 'Quarterly' && ($behavior_framework_code === '' || $behavior_framework_version === '')) {
+        redirectWith($template_create_url, 'danger', 'Behavior Framework Code and Version are required for Quarterly templates.');
     }
-    if (!$is_probationary_template && !evaluationBehaviorFrameworkMatchesExisting($conn, $behavior_framework_code, $behavior_framework_version, $beh_names, $beh_kpis)) {
+    if ($evaluation_type === 'Quarterly' && !evaluationBehaviorFrameworkMatchesExisting($conn, $behavior_framework_code, $behavior_framework_version, $beh_names, $beh_kpis)) {
         redirectWith($template_create_url, 'danger', 'Behavior items must match other active forms using this Behavior Framework Code and Version.');
     }
     if ($is_probationary_template) {
@@ -1854,4 +1865,5 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
+<?php require_once '../includes/annual-template-controls.php'; ?>
 <?php require_once '../includes/footer.php'; ?>

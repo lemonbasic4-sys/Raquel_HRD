@@ -267,6 +267,7 @@ switch ($effective_role) {
                       FROM evaluations ev
                       WHERE ev.employee_id = ?
                         AND ev.template_id = et.template_id
+                        AND (et.evaluation_type <> 'Annual' OR YEAR(ev.evaluation_period_start) = YEAR(CURDATE()))
                         AND ev.deleted_at IS NULL
                         AND ev.status NOT IN ('Draft', 'Returned', 'Rejected', 'Pending Self-Rating')
                   )
@@ -457,6 +458,15 @@ switch ($effective_role) {
         ];
         break;
 
+}
+$annual_nav_actor = annualActor($conn, (int)($_SESSION['user_id'] ?? 0));
+if ($annual_nav_actor && $annual_nav_actor['employment_status'] === 'Regular'
+    && in_array($annual_nav_actor['role'], ['Employee','President and CEO','HR Staff'], true)) {
+    $annual_nav_section = $annual_nav_actor['role'] === 'HR Staff' ? 'EVALUATIONS & MONITORING' : 'EVALUATIONS';
+    $annual_nav_count = annualPendingCount($conn, $annual_nav_actor);
+    $sidebar_menus[$annual_nav_section][] = ['icon'=>'fas fa-users-cog', 'label'=>'Annual & 360 Ratings',
+        'url'=>annualUrl($annual_nav_actor), 'page'=>'annual-evaluations.php',
+        'badge'=>$annual_nav_count ?: null, 'badge_class'=>'bg-warning text-dark'];
 }
 ?>
 <!DOCTYPE html>

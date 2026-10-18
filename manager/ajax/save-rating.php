@@ -34,6 +34,11 @@ if (!$eval_q || $eval_q->num_rows === 0) {
 }
 
 $eval = $eval_q->fetch_assoc();
+if (($eval['evaluation_type'] ?? '') === 'Annual' && annualUsesPeerWorkflow($conn,$evaluation_id)) {
+    http_response_code(409);
+    echo json_encode(['success'=>false,'message'=>'Use Annual & 360 Ratings. Annual revisions require immediate-head finalization.']);
+    exit;
+}
 $employee_id = (int)$eval['employee_id'];
 $employee_name = $eval['employee_name'];
 

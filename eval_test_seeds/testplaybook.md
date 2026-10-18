@@ -1,7 +1,8 @@
 ## HRD, AP, Business Development, President/CEO, and Employee Portal test seeds
 
-This imports organization and employee test data only. It does not seed
-evaluation templates. Keep the import order below because the probationary and
+The base sequence below imports organization and employee test data only.
+An optional HRD Annual template seed is provided in the Annual section below.
+Keep the import order below because the probationary and
 Business Development seeds reference employees and positions created earlier.
 
 
@@ -61,7 +62,7 @@ After importing, review **Position Management** before testing templates:
 - Confirm each immediate-head position has an active portal account to receive
   reviews.
 
-No evaluation templates are imported. Create an **Initial** and a **Final**
+The base sequence imports no evaluation templates. Create an **Initial** and a **Final**
 probationary template through the portal for each required target position. The
 creator selects a department and should only be offered active positions in that
 department that report directly to the creator's position. The same rule applies
@@ -86,6 +87,78 @@ then the regular Officer to Staff I. The Employee Portal test accounts are:
 - BD-P02: probationary Business Development Staff (employee code is username)
 
 ## Expected evaluation results
+
+### Annual workflow for regular employees
+
+Use existing regular employees; no additional employee or template seed import is needed.
+
+Optional shortcut: import `eval_test_seeds/hrd_annual_evaluation_templates.sql`
+into the selected `raquel_hris` database after organization and Regular head
+accounts are available. This creates three **test-only** Annual templates:
+President/CEO → HR Manager, HR Manager → HR Supervisor, and HR Supervisor → HR Staff.
+Targets come from current Position Management reporting lines. Each template has
+four sample KRAs totaling 100%, eight standard Core Values, and an 80/20 split.
+No employees, accounts, ratings, or submissions are created. Existing templates
+are untouched and re-import skips already seeded templates. The file is not
+automatically imported and is not part of the base/probationary seed sequence.
+
+#### Import the optional HRD Annual templates
+
+Back up any database you intend to restore first. Do not rerun the base schema or
+employee replacement seeds simply to add these templates.
+
+Run from the project root after importing organization and employee/account seeds:
+
+```powershell
+cd C:\xampp\htdocs\Raquel_HRD
+# Annual tables, including independent KRA approval history (safe to rerun)
+& "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source database/zLAST_annual_peer_evaluations.sql;"
+# Templates only — does not submit or rate any evaluation
+& "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source eval_test_seeds/hrd_annual_evaluation_templates.sql;"
+```
+
+Alternatively, select `raquel_hris` in phpMyAdmin and import those two files in
+that order. The Annual schema also initializes when an Annual page first opens.
+
+Expected template output:
+
+| Template | Creator | Target positions |
+| --- | --- | --- |
+| `[TEST HRD ANNUAL] HR Manager` | President/CEO | HR Manager direct reports |
+| `[TEST HRD ANNUAL] HR Supervisor` | HR Manager | HR Supervisor direct reports |
+| `[TEST HRD ANNUAL] HR Staff` | HR Supervisor | HR Staff direct reports |
+
+The seed resolves IDs from the database and uses one active Regular head account
+per creator role. Confirm the accounts have roles `President and CEO`,
+`HR Manager`, and `HR Supervisor`, and the target positions are active and have
+the correct **Reports To**. If the output has fewer than three templates, check
+those prerequisites. The seed does not repair reporting lines or create accounts.
+The KRAs are synthetic test content, not approved production job requirements.
+Re-import leaves existing seeded templates and their criterion IDs unchanged.
+
+#### Manual Annual workflow checks
+
+1. Use the seeded templates above **or** create Annual templates manually for the configured direct-report positions. Do not create duplicate templates for the same test. Confirm eight standard Core Values, KRA item weights totaling 100%, and the fixed 80/20 split. No framework code/version entry is required.
+2. Submit self-ratings from each Regular employee's Employee Portal using **identical start/end dates** for the department cycle. Employee count is dynamic, not fixed at three. Creating/importing templates alone does not create a cycle.
+3. As HR Manager or HR Supervisor, open **Performance Evaluation → Regular Employee**. **Annual Evaluation Progress** shows only employees whose immediate-head position matches yours: HR Supervisor sees HR Staff, HR Manager sees HR Supervisor, and President/CEO reviews HR Manager through their Annual page. Your own result remains available separately through Evaluation History; its **Audit Details** opens the traditional view.
+4. Open **360 — Department peers**. HR Manager/Supervisor access it inside Performance Evaluation; HR Staff uses the dedicated **Annual & 360 Ratings** HRIS entry. Non-HRD departments use the Employee Portal. All eligible department participants appear, including your row marked **You / Cannot rate yourself**. Coworkers cannot be rated until both employees submit self-rating for that cycle.
+5. Rate the eight Core Values with numeric inputs from **1.00 to 4.00**. Review the confirmation popup before submitting. Confirm submitted peer ratings are locked and self-rating/cross-department requests are rejected.
+6. As the immediate head, open **View evaluation → Key Result Areas (KRA)**. Adjust scores if needed, explain adjustments in **KRA review remarks**, and click **Approve KRA**. This action works while peer ratings are pending, records approval separately, and preserves original self-ratings. It must not approve the entire Annual evaluation.
+7. Check the individual Core Values result: the employee's self-rating is included once with ratings received from coworkers. This is not a department-wide shared score. Named raters are visible only to the employee's immediate-head consolidator; employees see anonymous labels in their own results.
+8. While any expected peer response is missing, verify **Finalize Annual evaluation** is disabled and the server rejects direct submission even with remarks. After **all expected raters** submit, refresh and finalize as the immediate head. Final score = reviewed KRA × 80% + individual Core Values result × 20%. Finalized scores and versions must be preserved.
+9. For a late-participant test, first complete all expected responses for the original roster and finalize a result. Then add a new eligible Regular department participant and have them submit the same-period Annual self-rating. Coworkers can rate the newcomer, and the newcomer rates coworkers. A late rating on a finalized result must flag **Revision pending**, keeping the old official score until the immediate head reviews and re-finalizes. All newly expected peer responses must be present before re-finalization. Do not bypass this guard by leaving an original rater outstanding.
+10. For each **Reason for Separation** (AWOL, Retirement, Death, Permanent or Total Disability, Resignation, Failed in Training, Termination for Cause, Others), save separation on an employee who has **not** self-rated. Refresh: they must disappear from active peers and expected-rater counts, without deleting their roster record or generating zero scores. Existing submitted evaluations/ratings remain preserved for HR review; separation after submission is not automatically discarded.
+11. Check desktop and mobile navigation, category tabs, KRA approval, confirmation dialogs, and locked/finalized states. No duplicate empty-state messages should appear.
+
+Run the isolated automated checks without importing any test data into your working database:
+
+```powershell
+& "C:\xampp\php\php.exe" tests/annual-evaluations.php
+```
+
+See `annual_evaluation_design_notes.md` for confirmed rules and proposed HR exception policies.
+
+### Probationary workflow
 
 After creating the templates, sign in to each probationary employee account and
 confirm the self-rating page offers the Initial evaluation for that employee's

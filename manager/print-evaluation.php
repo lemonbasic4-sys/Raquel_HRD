@@ -43,6 +43,13 @@ $result = $conn->query($query);
 if (!$result || $result->num_rows === 0)
   die("Evaluation not found.");
 $row = $result->fetch_assoc();
+if (($row['evaluation_type'] ?? '') === 'Annual') {
+    ensureAnnualEvaluationSchema($conn);
+    $annual_print_actor=annualActor($conn,(int)$_SESSION['user_id']);
+    if ($annual_print_actor && annualMember($conn,$id)) {
+        header('Location: '.annualUrl($annual_print_actor,'?view=results&evaluation_id='.$id)); exit;
+    }
+}
 $is_probationary_hr_supervisor = ($row['employment_status'] ?? '') === 'Probationary'
     && (int)($row['rank_category_id'] ?? 0) === 4
     && isHumanResourcesPackageDepartment($conn, (int)($row['department_id'] ?? 0));

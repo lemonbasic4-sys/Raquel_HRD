@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/annual-evaluations.php';
 
 // ============================================
 
@@ -3729,24 +3730,12 @@ function getEvaluationTemplateTargetPositions($conn, $context, $department_id = 
 {
     if (!$context || empty($context['can_create_templates'])) return [];
     $department_id = (int) $department_id;
-    $is_ceo = !empty($context['is_ceo']);
-
     $creator_position_id = (int)($context['job_title_id'] ?? 0);
     if ($creator_position_id <= 0) return [];
-    if ($is_ceo) {
-        $stmt = $conn->prepare("SELECT job_title_id, job_title, department_id
-            FROM job_titles
-            WHERE (? = 0 OR department_id = ?)
-              AND is_active = 1 AND reports_to = ?
-            ORDER BY department_id, job_title");
-        $stmt->bind_param('iii', $department_id, $department_id, $creator_position_id);
-    } else {
-        $stmt = $conn->prepare("SELECT job_title_id, job_title, department_id
-            FROM job_titles
-            WHERE department_id = ? AND reports_to = ? AND is_active = 1
-            ORDER BY job_title");
-        $stmt->bind_param('ii', $department_id, $creator_position_id);
-    }
+    $stmt = $conn->prepare("SELECT job_title_id, job_title, department_id
+        FROM job_titles WHERE (? = 0 OR department_id = ?)
+          AND is_active = 1 AND reports_to = ? ORDER BY department_id, job_title");
+    $stmt->bind_param('iii', $department_id, $department_id, $creator_position_id);
     $stmt->execute();
     $positions = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
@@ -5647,6 +5636,7 @@ function syncEvaluationToOrganizationPackage($conn, $evaluation_id)
     $stmt->execute();
     $evaluation = $stmt->get_result()->fetch_assoc();
     $stmt->close();
+    if (($evaluation['evaluation_type'] ?? '') === 'Annual') return null;
     if (!$evaluation || empty($evaluation['department_id']) || empty($evaluation['evaluation_period_start']) || empty($evaluation['evaluation_period_end'])) return null;
     $department_id = (int) $evaluation['department_id'];
     $is_hr_package = isHumanResourcesPackageDepartment($conn, $department_id);
@@ -7755,6 +7745,7 @@ function recalculateEvaluationScores($conn, $evaluation_id)
     }
     
     $eval = $eval_q->fetch_assoc();
+    if (($eval['evaluation_type'] ?? '') === 'Annual' && annualUsesPeerWorkflow($conn,$evaluation_id)) return false;
     $kra_weight_pct = (float)($eval['kra_weight'] ?? 80);
     $beh_weight_pct = (float)($eval['behavior_weight'] ?? 20);
     if (in_array($eval['evaluation_type'] ?? '', ['Initial', 'Final'], true)) {

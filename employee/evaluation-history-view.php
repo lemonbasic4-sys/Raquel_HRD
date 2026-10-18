@@ -36,6 +36,8 @@ if (!$evaluation) {
 }
 
 $is_probationary_evaluation = in_array($evaluation['evaluation_type'] ?? '', ['Initial', 'Final'], true);
+$is_annual_peer_evaluation = ($evaluation['evaluation_type'] ?? '') === 'Annual'
+    && annualUsesPeerWorkflow($conn, $evaluation_id);
 $criteria_stmt = $conn->prepare("SELECT ec.section, ec.criterion_name, ec.description, ec.weight, es.score_value,
         es.dept_manager_override_score, es.supervisor_override_score, es.manager_override_score,
         COALESCE(es.supervisor_override_score, es.dept_manager_override_score, es.manager_override_score, es.score_value) AS reviewed_score
@@ -141,6 +143,8 @@ require_once '../includes/header.php';
                     <div class="small">
                         <?php if ($is_probationary_evaluation): ?>
                             <strong>Probationary evaluation in progress:</strong> The evaluation is moving through its immediate-head and final approval steps. This is an individual review; it does not use a shared department behavior score.
+                        <?php elseif ($is_annual_peer_evaluation): ?>
+                            <strong>Annual evaluation in progress:</strong> Your original submitted self-ratings are shown here. Department 360 ratings and immediate-head consolidation are handled separately in Annual &amp; 360 Ratings. Official final scores become available after your immediate head finalizes the evaluation.
                         <?php else: ?>
                             <strong>Consolidation &amp; Management Review in Progress:</strong> Your self-evaluation is currently undergoing departmental consolidation and governance routing. Official final scores, shared behavior metrics, and officer endorsements will be unlocked here once the Board of Directors approves the cycle.
                         <?php endif; ?>

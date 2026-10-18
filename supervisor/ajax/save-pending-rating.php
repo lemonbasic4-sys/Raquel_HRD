@@ -34,6 +34,11 @@ if (!$eval_q || $eval_q->num_rows === 0) {
 }
 
 $eval = $eval_q->fetch_assoc();
+if (($eval['evaluation_type'] ?? '') === 'Annual' && annualUsesPeerWorkflow($conn,$evaluation_id)) {
+    http_response_code(409);
+    echo json_encode(['success'=>false,'message'=>'Use Annual & 360 Ratings. Annual results use the dedicated peer-rating workflow.']);
+    exit;
+}
 $employee_id = (int)$eval['employee_id'];
 $employee_name = $eval['employee_name'];
 $rank_category_id = (int)$eval['rank_category_id'];

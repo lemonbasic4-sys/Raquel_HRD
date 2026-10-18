@@ -180,6 +180,7 @@ if (isset($_GET['edit']) && is_numeric($_GET['edit'])) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    verifyCsrfToken();
     $template_id = (int) ($_POST['template_id'] ?? 0);
     $period_start = $_POST['period_start'] ?: null;
     $period_end = $_POST['period_end'] ?: null;
@@ -328,16 +329,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($template_id > 0) {
+        $annual_check_start = $period_start ?: date('Y') . '-01-01';
+        $annual_check_end = $period_end ?: date('Y') . '-12-31';
         $existing_stmt = $conn->prepare("
             SELECT evaluation_id, status 
             FROM evaluations 
             WHERE employee_id = ? 
               AND template_id = ? 
+              AND (evaluation_type <> 'Annual' OR (evaluation_period_start = ? AND evaluation_period_end = ?))
               AND status NOT IN ('Draft', 'Returned', 'Rejected', 'Pending Self-Rating')
               AND deleted_at IS NULL 
             LIMIT 1
         ");
-        $existing_stmt->bind_param("ii", $employee_id, $template_id);
+        $existing_stmt->bind_param("iiss", $employee_id, $template_id, $annual_check_start, $annual_check_end);
         $existing_stmt->execute();
         $existing_eval_check = $existing_stmt->get_result()->fetch_assoc();
         $existing_stmt->close();
@@ -473,7 +477,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $kra_weight_pct = (float) ($template['kra_weight'] ?? 80);
     $beh_weight_pct = (float) ($template['behavior_weight'] ?? 20);
-    if (in_array($evaluation_type, ['Initial', 'Final'], true)) {
+    if (in_array($evaluation_type, ['Initial', 'Final', 'Annual'], true)) {
         $kra_weight_pct = 80;
         $beh_weight_pct = 20;
     }
@@ -520,6 +524,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $submitted_date = ($action === 'submit') ? date('Y-m-d H:i:s') : null;
 
     $employee_signed_at = !empty($employee_signature_data) ? date('Y-m-d H:i:s') : null;
+
+    $annual_save = $evaluation_type === 'Annual';
+    if ($annual_save) {
+        ensureAnnualEvaluationSchema($conn);
+        ensureAuditTrailSchema($conn);
+    }
+    try {
+        if ($annual_save) $conn->begin_transaction();
 
         if ($editing_id > 0) {
             $stmt = $conn->prepare("
@@ -571,6 +583,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $score_stmt->execute();
     }
     $score_stmt->close();
+
+        if ($annual_save) {
+            if ($action === 'submit') {
+                annualRegisterSubmission($conn, $eval_id);
+                logAudit($conn, $user_id, 'CREATE', 'Annual Evaluation', $eval_id, 'Annual self-rating submitted to department 360 workflow.');
+            }
+            $conn->commit();
+            if ($action === 'submit') redirectWith(BASE_URL . '/employee/annual-evaluations.php', 'success', 'Annual self-rating submitted. Complete department 360 ratings through your authorized portal.');
+        }
+    } catch (Throwable $e) {
+        if (!$annual_save) throw $e;
+        $conn->rollback();
+        error_log('Annual self-rating submission: ' . $e->getMessage());
+        $message = $e instanceof DomainException ? $e->getMessage() : 'Your Annual evaluation could not be saved. Please try again.';
+        redirectWith(BASE_URL . '/employee/self-rating.php?template=' . $template_id . ($editing_id ? '&edit=' . $editing_id : ''), 'danger', $message);
+    }
 
     if ($action === 'submit') {
         if (!ensureOrganizationEvaluationPackageSchema($conn)) {
@@ -647,6 +675,7 @@ $templates_stmt = $conn->prepare("
           FROM evaluations ev
           WHERE ev.employee_id = ?
             AND ev.template_id = et.template_id
+            AND (et.evaluation_type <> 'Annual' OR YEAR(ev.evaluation_period_start) = YEAR(CURDATE()))
             AND ev.deleted_at IS NULL
             AND ev.status NOT IN ('Draft', 'Returned', 'Rejected', 'Pending Self-Rating')
             AND NOT ($initial_required_flag = 1 AND ev.status = 'Approved' AND ev.evaluation_type IN ('Initial', 'Final'))
@@ -724,6 +753,7 @@ if ($selected_template_id > 0) {
             WHERE employee_id = ? 
               AND template_id = ? 
               AND status NOT IN ('Draft', 'Returned', 'Rejected', 'Pending Self-Rating')
+              AND (evaluation_type <> 'Annual' OR YEAR(evaluation_period_start) = YEAR(CURDATE()))
               AND NOT ($initial_required_flag = 1 AND status = 'Approved' AND evaluation_type IN ('Initial', 'Final'))
               AND deleted_at IS NULL 
             LIMIT 1
@@ -2128,6 +2158,7 @@ require_once '../includes/header.php';
                 </div>
                 <div class="card-body">
                     <form method="POST" action="" data-autosave="self-rating-form" data-validate novalidate autocomplete="off">
+                        <?php echo csrfField(); ?>
                         <?php if ($edit_eval): ?>
                             <input type="hidden" name="edit_id" value="<?php echo (int) $edit_eval['evaluation_id']; ?>">
                         <?php endif; ?>

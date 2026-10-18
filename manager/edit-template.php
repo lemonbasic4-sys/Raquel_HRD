@@ -38,6 +38,10 @@ if (!$tmpl) {
 if (!canManageEvaluationTemplate($conn, $template_id, $current_user_id)) {
     redirectWith($template_list_url, 'danger', 'You can only edit templates you own or are authorized to manage as a same-level department peer.');
 }
+if (($tmpl['evaluation_type'] ?? '') === 'Annual'
+    && annualQuery($conn, 'SELECT evaluation_id FROM evaluations WHERE template_id=? LIMIT 1', [$template_id])) {
+    redirectWith($template_list_url, 'info', 'This Annual template already has evaluation records. Publish a new template to change its criteria without altering existing results.');
+}
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verifyCsrfToken();
@@ -47,6 +51,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $behavior_framework_code = strtoupper(trim($_POST['behavior_framework_code'] ?? ''));
     $behavior_framework_version = trim($_POST['behavior_framework_version'] ?? '');
     $evaluation_type = $_POST['evaluation_type'] ?? 'Annual';
+    if ($evaluation_type === 'Annual' && annualQuery($conn, 'SELECT evaluation_id FROM evaluations WHERE template_id=? LIMIT 1', [$template_id])) {
+        redirectWith($template_list_url, 'info', 'Publish a new Annual template to preserve this template\'s existing evaluation records.');
+    }
     $is_probationary_template = isset($_POST['probationary_template']) || in_array($evaluation_type, ['Initial', 'Final'], true);
     if (!in_array($evaluation_type, ['Initial', 'Final', 'Quarterly', 'Annual'], true)) $evaluation_type = 'Annual';
     if ($is_probationary_template && !in_array($evaluation_type, ['Initial', 'Final'], true)) $evaluation_type = 'Initial';
@@ -63,6 +70,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $beh_names = $_POST['behavior_name'] ?? [];
     $beh_kpis = $_POST['behavior_kpi'] ?? [];
+    if ($evaluation_type === 'Annual') {
+        if ((annualActor($conn, (int)$_SESSION['user_id'])['employment_status'] ?? '') !== 'Regular') {
+            redirectWith($template_list_url, 'danger', 'Only an active regular head may manage Annual templates for direct reports.');
+        }
+        try { annualValidateTemplateKras($kra_names, $kra_weights); }
+        catch (DomainException $e) { redirectWith($template_edit_url . '?id=' . $template_id, 'danger', $e->getMessage()); }
+        $kra_weight = 80; $behavior_weight = 20;
+        $behavior_framework_code = 'ANNUAL-CORE'; $behavior_framework_version = '1';
+        $beh_names = array_column(annualCoreValues(), 'name');
+        $beh_kpis = array_column(annualCoreValues(), 'kpi');
+    }
 
     $department_stmt = $conn->prepare("SELECT department_id FROM departments WHERE department_name = ? AND is_active = 1 AND deleted_at IS NULL LIMIT 1");
     $department_stmt->bind_param('s', $target_department);
@@ -103,10 +121,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (abs(($kra_weight + $behavior_weight) - 100) > 0.01) {
         redirectWith($template_edit_url . "?id=$template_id", 'danger', 'KRA weight + Behavior weight must equal 100%.');
     }
-    if (!$is_probationary_template && ($behavior_framework_code === '' || $behavior_framework_version === '')) {
-        redirectWith($template_edit_url . "?id=$template_id", 'danger', 'Behavior Framework Code and Version are required for Annual and Quarterly templates.');
+    if ($evaluation_type === 'Quarterly' && ($behavior_framework_code === '' || $behavior_framework_version === '')) {
+        redirectWith($template_edit_url . "?id=$template_id", 'danger', 'Behavior Framework Code and Version are required for Quarterly templates.');
     }
-    if (!$is_probationary_template && !evaluationBehaviorFrameworkMatchesExisting($conn, $behavior_framework_code, $behavior_framework_version, $beh_names, $beh_kpis, $template_id)) {
+    if ($evaluation_type === 'Quarterly' && !evaluationBehaviorFrameworkMatchesExisting($conn, $behavior_framework_code, $behavior_framework_version, $beh_names, $beh_kpis, $template_id)) {
         redirectWith($template_edit_url . "?id=$template_id", 'danger', 'Behavior items must match other active forms using this Behavior Framework Code and Version.');
     }
     if ($is_probationary_template) {
@@ -174,10 +192,12 @@ while ($c = $crit_q->fetch_assoc()) {
     }
 }
 
-// Limit non-CEO template creators to their own department.
+// Expose only departments containing the creator's configured direct reports.
 $dept_query = !empty($creator_context['is_ceo'])
     ? "SELECT department_id, department_name FROM departments WHERE deleted_at IS NULL AND is_active = 1 ORDER BY department_name"
-    : "SELECT department_id, department_name FROM departments WHERE department_id = " . (int)$creator_context['department_id'] . " AND deleted_at IS NULL AND is_active = 1";
+    : "SELECT d.department_id, d.department_name FROM departments d
+        WHERE d.deleted_at IS NULL AND d.is_active = 1 AND (d.department_id = " . (int)$creator_context['department_id'] . "
+          OR EXISTS (SELECT 1 FROM job_titles j WHERE j.department_id=d.department_id AND j.is_active=1 AND j.reports_to=" . (int)$creator_context['job_title_id'] . ")) ORDER BY d.department_name";
 $departments = $conn->query($dept_query)->fetch_all(MYSQLI_ASSOC);
 if (empty($creator_context['can_create_templates'])) {
     $target_department_exists = false;
@@ -1670,4 +1690,5 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
+<?php require_once '../includes/annual-template-controls.php'; ?>
 <?php require_once '../includes/footer.php'; ?>
