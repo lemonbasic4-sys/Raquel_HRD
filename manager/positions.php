@@ -4,6 +4,21 @@ require_once '../includes/session-check.php';
 checkRole(['HR Manager']);
 require_once '../includes/functions.php';
 
+function respondToPositionSave(string $message, string $type = 'success'): void
+{
+    $isAjax = strtolower($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'xmlhttprequest';
+    if ($isAjax) {
+        http_response_code($type === 'success' ? 200 : 422);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['type' => $type, 'message' => $message]);
+        exit;
+    }
+
+    $department = max(0, (int) ($_POST['return_department'] ?? $_GET['department'] ?? 0));
+    $url = BASE_URL . '/manager/positions.php' . ($department > 0 ? '?department=' . $department : '');
+    redirectWith($url, $type, $message);
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     verifyCsrfToken();
     $action = $_POST['action'];
@@ -17,12 +32,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $reports_to = !empty($_POST['reports_to']) ? (int) $_POST['reports_to'] : null;
 
         if ($position_name === '') {
-            redirectWith(BASE_URL . '/manager/positions.php', 'danger', 'Position name is required.');
+            respondToPositionSave('Position name is required.', 'danger');
         }
 
         $position_id = $action === 'edit_position' ? (int) ($_POST['position_id'] ?? 0) : 0;
         if ($position_id > 0 && positionReportsToWouldCreateCycle($conn, $position_id, (int) $reports_to)) {
-            redirectWith(BASE_URL . '/manager/positions.php', 'danger', 'This reporting line would create a circular organization structure.');
+            respondToPositionSave('This reporting line would create a circular organization structure.', 'danger');
         }
 
         $dupSql = "SELECT job_title_id FROM job_titles WHERE job_title = ? AND ";
@@ -43,30 +58,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $dupStmt->execute();
         if ($dupStmt->get_result()->num_rows > 0) {
             $dupStmt->close();
-            redirectWith(BASE_URL . '/manager/positions.php', 'danger', 'That position already exists for the selected department.');
+            respondToPositionSave('That position already exists for the selected department.', 'danger');
         }
         $dupStmt->close();
 
         if ($action === 'add_position') {
-            $stmt = $conn->prepare("INSERT INTO job_titles (job_title, department_id, rank_category_id, is_active, is_head, reports_to) VALUES (?, ?, ?, ?, ?, ?)");
-            $stmt->bind_param("siiiii", $position_name, $department_id, $rank_category_id, $is_active, $is_head, $reports_to);
+            if ($reports_to === null) {
+                $stmt = $conn->prepare("INSERT INTO job_titles (job_title, department_id, rank_category_id, is_active, is_head, reports_to) VALUES (?, ?, ?, ?, ?, NULL)");
+                $stmt->bind_param("siiii", $position_name, $department_id, $rank_category_id, $is_active, $is_head);
+            } else {
+                $stmt = $conn->prepare("INSERT INTO job_titles (job_title, department_id, rank_category_id, is_active, is_head, reports_to) VALUES (?, ?, ?, ?, ?, ?)");
+                $stmt->bind_param("siiiii", $position_name, $department_id, $rank_category_id, $is_active, $is_head, $reports_to);
+            }
             $stmt->execute();
             $new_id = $stmt->insert_id;
             $stmt->close();
             logAudit($conn, $_SESSION['user_id'], 'CREATE', 'Position', $new_id, "Added position: $position_name");
-            redirectWith(BASE_URL . '/manager/positions.php', 'success', "Position \"$position_name\" added successfully.");
+            respondToPositionSave("Position \"$position_name\" added successfully.");
         }
 
         if ($position_id <= 0) {
-            redirectWith(BASE_URL . '/manager/positions.php', 'danger', 'Invalid position selected.');
+            respondToPositionSave('Invalid position selected.', 'danger');
         }
 
-        $stmt = $conn->prepare("UPDATE job_titles SET job_title = ?, department_id = ?, rank_category_id = ?, is_active = ?, is_head = ?, reports_to = ? WHERE job_title_id = ?");
-        $stmt->bind_param("siiiiii", $position_name, $department_id, $rank_category_id, $is_active, $is_head, $reports_to, $position_id);
+        if ($reports_to === null) {
+            $stmt = $conn->prepare("UPDATE job_titles SET job_title = ?, department_id = ?, rank_category_id = ?, is_active = ?, is_head = ?, reports_to = NULL WHERE job_title_id = ?");
+            $stmt->bind_param("siiiii", $position_name, $department_id, $rank_category_id, $is_active, $is_head, $position_id);
+        } else {
+            $stmt = $conn->prepare("UPDATE job_titles SET job_title = ?, department_id = ?, rank_category_id = ?, is_active = ?, is_head = ?, reports_to = ? WHERE job_title_id = ?");
+            $stmt->bind_param("siiiiii", $position_name, $department_id, $rank_category_id, $is_active, $is_head, $reports_to, $position_id);
+        }
         $stmt->execute();
         $stmt->close();
         logAudit($conn, $_SESSION['user_id'], 'UPDATE', 'Position', $position_id, "Updated position: $position_name");
-        redirectWith(BASE_URL . '/manager/positions.php', 'success', "Position \"$position_name\" updated successfully.");
+        respondToPositionSave("Position \"$position_name\" updated successfully.");
     }
 }
 
@@ -200,6 +225,53 @@ $employeesWithManagedPositions = (int) $conn->query("SELECT COUNT(*) AS cnt FROM
     .btn-xs { padding: 2px 8px; font-size: 0.75rem; }
     .position-toolbar { align-items: center; display: flex; flex-wrap: wrap; gap: 10px; }
     .position-toolbar .form-select { min-width: 210px; }
+    .position-save-toast-stack {
+        position: fixed;
+        right: 1rem;
+        bottom: 1rem;
+        z-index: 20000;
+        display: flex;
+        flex-direction: column;
+        gap: .65rem;
+        pointer-events: none;
+    }
+    .position-save-toast {
+        display: flex;
+        align-items: center;
+        gap: .75rem;
+        width: min(410px, calc(100vw - 2rem));
+        padding: .9rem 1rem;
+        color: #fff;
+        background: #10251a;
+        border-left: 4px solid #28a745;
+        border-radius: 12px;
+        box-shadow: 0 12px 32px rgba(0, 0, 0, .24);
+        opacity: 0;
+        transform: translateY(10px);
+        transition: opacity .2s ease, transform .2s ease;
+        pointer-events: auto;
+    }
+    .position-save-toast.is-visible { opacity: 1; transform: translateY(0); }
+    .position-save-toast__icon {
+        flex: 0 0 30px;
+        width: 30px;
+        height: 30px;
+        display: grid;
+        place-items: center;
+        color: #10251a;
+        background: #86efac;
+        border-radius: 50%;
+        font-weight: 800;
+    }
+    .position-save-toast__message { flex: 1; font-weight: 600; font-size: .9rem; }
+    .position-save-toast__close {
+        border: 0;
+        padding: 0 .25rem;
+        color: rgba(255,255,255,.75);
+        background: transparent;
+        font-size: 1.25rem;
+        line-height: 1;
+    }
     @media (max-width: 991.98px) {
         .position-toolbar,
         .position-toolbar form,
@@ -210,6 +282,7 @@ $employeesWithManagedPositions = (int) $conn->query("SELECT COUNT(*) AS cnt FROM
 </style>
 
 <div class="position-management-page">
+<div id="positionSaveFeedback" class="alert d-none" role="status" aria-live="polite"></div>
 <div class="page-hero fadeup">
     <div class="d-flex flex-wrap align-items-center justify-content-between mb-4 gap-3">
         <div>
@@ -223,9 +296,6 @@ $employeesWithManagedPositions = (int) $conn->query("SELECT COUNT(*) AS cnt FROM
             <div class="d-flex gap-2">
                 <button class="btn btn-head" onclick="openAddPositionModal('general')">
                     <i class="fas fa-plus me-1"></i>Add Position
-                </button>
-                <button class="btn btn-staff" onclick="openAddPositionModal('staff')">
-                    <i class="fas fa-users me-1"></i>Add to Direct Report
                 </button>
             </div>
         </div>
@@ -351,7 +421,11 @@ $employeesWithManagedPositions = (int) $conn->query("SELECT COUNT(*) AS cnt FROM
                                         <?php endif; ?>
                                     </td>
                                     <td data-label="Direct Report">
-                                        <small><?php echo e($position['reports_to_title'] ?: 'None'); ?></small>
+                                        <small><?php if (!empty($position['reports_to'])): ?>
+                                            <?php echo e($position['reports_to_title'] ?: 'None'); ?>
+                                        <?php else: ?>
+                                            <span class="text-muted">None</span>
+                                        <?php endif; ?></small>
                                     </td>
                                     <td data-label="Employees"><span
                                             class="badge bg-info"><?php echo (int) $position['employee_count']; ?></span></td>
@@ -453,7 +527,7 @@ $employeesWithManagedPositions = (int) $conn->query("SELECT COUNT(*) AS cnt FROM
 
                             <!-- Details Row: Reports To + Employees Count -->
                             <div class="d-flex justify-content-between align-items-center pt-1 text-muted small" style="font-size: 0.78rem;">
-                                <span><i class="fas fa-level-up-alt me-1 text-info"></i>Reports to: <strong><?php echo e($position['reports_to_title'] ?: 'None'); ?></strong></span>
+                                <span><i class="fas fa-level-up-alt me-1 text-info"></i>Reports to: <strong><?php echo !empty($position['reports_to']) ? e($position['reports_to_title'] ?: 'None') : 'None'; ?></strong></span>
                                 <span class="badge bg-info" style="font-size:0.7rem;"><i class="fas fa-users me-1"></i><?php echo (int) $position['employee_count']; ?> Emps</span>
                             </div>
                         </div>
@@ -471,6 +545,7 @@ $employeesWithManagedPositions = (int) $conn->query("SELECT COUNT(*) AS cnt FROM
             <form method="POST" action="">
                 <?php echo csrfField(); ?>
                 <input type="hidden" name="action" value="add_position">
+                <input type="hidden" name="return_department" value="<?php echo $selected_department; ?>">
                 <div class="modal-header bg-primary text-white" id="addPositionModalHeader">
                     <h5 class="modal-title" id="addPositionModalTitle"><i class="fas fa-plus me-2"></i>Add Position</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
@@ -545,6 +620,7 @@ $employeesWithManagedPositions = (int) $conn->query("SELECT COUNT(*) AS cnt FROM
                 <?php echo csrfField(); ?>
                 <input type="hidden" name="action" value="edit_position">
                 <input type="hidden" name="position_id" id="editPositionId">
+                <input type="hidden" name="return_department" value="<?php echo $selected_department; ?>">
                 <div class="modal-header bg-primary text-white">
                     <h5 class="modal-title"><i class="fas fa-edit me-2"></i>Edit Position</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
@@ -728,8 +804,121 @@ $employeesWithManagedPositions = (int) $conn->query("SELECT COUNT(*) AS cnt FROM
             : '');
     }
 
+    function showPositionSaveToast(message) {
+        let stack = document.querySelector('.position-save-toast-stack');
+        if (!stack) {
+            stack = document.createElement('div');
+            stack.className = 'position-save-toast-stack';
+            stack.setAttribute('role', 'region');
+            stack.setAttribute('aria-label', 'Position save notifications');
+            stack.setAttribute('aria-live', 'polite');
+            document.body.appendChild(stack);
+        }
+
+        const toast = document.createElement('div');
+        toast.className = 'position-save-toast';
+        toast.setAttribute('role', 'status');
+        const icon = document.createElement('span');
+        icon.className = 'position-save-toast__icon';
+        icon.setAttribute('aria-hidden', 'true');
+        icon.textContent = '✓';
+        const text = document.createElement('span');
+        text.className = 'position-save-toast__message';
+        text.textContent = message;
+        const close = document.createElement('button');
+        close.className = 'position-save-toast__close';
+        close.type = 'button';
+        close.setAttribute('aria-label', 'Dismiss notification');
+        close.textContent = '×';
+
+        const dismiss = () => {
+            toast.classList.remove('is-visible');
+            window.setTimeout(() => toast.remove(), 220);
+        };
+        close.addEventListener('click', dismiss);
+        toast.append(icon, text, close);
+        stack.appendChild(toast);
+        requestAnimationFrame(() => toast.classList.add('is-visible'));
+        window.setTimeout(dismiss, 5000);
+    }
+
     document.addEventListener('DOMContentLoaded', function () {
         attachTableSearch('searchPosition', 'positionTable');
+
+        document.querySelectorAll('#addPositionModal form, #editPositionModal form').forEach(form => {
+            form.addEventListener('submit', async event => {
+                event.preventDefault();
+                const submitButton = form.querySelector('[type="submit"]');
+                const feedback = document.getElementById('positionSaveFeedback');
+                const originalButtonHtml = submitButton?.innerHTML;
+                const reportsToInput = form.querySelector('input[list]');
+                if (reportsToInput) {
+                    const listId = reportsToInput.getAttribute('list');
+                    const hiddenId = reportsToInput.id.replace(/Input$/, '');
+                    syncReportsToInput(reportsToInput.id, hiddenId, listId);
+                }
+                if (submitButton) {
+                    submitButton.disabled = true;
+                    submitButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Saving...';
+                }
+
+                try {
+                    const saveUrl = new URL(window.location.href);
+                    saveUrl.hash = '';
+                    const response = await fetch(saveUrl.href, {
+                        method: 'POST',
+                        body: new FormData(form),
+                        headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+                        credentials: 'same-origin'
+                    });
+                    const responseText = await response.text();
+                    let result;
+                    try {
+                        result = JSON.parse(responseText);
+                    } catch (parseError) {
+                        throw new Error(`The save request returned an unexpected response (HTTP ${response.status} from ${response.url}).`);
+                    }
+                    if (!response.ok || result.type !== 'success') {
+                        feedback.className = 'alert alert-danger';
+                        feedback.textContent = result.message || 'The position could not be saved.';
+                        return;
+                    }
+
+                    feedback.className = 'alert d-none';
+                    feedback.textContent = '';
+                    showPositionSaveToast(result.message);
+
+                    bootstrap.Modal.getInstance(form.closest('.modal'))?.hide();
+                    const pageResponse = await fetch(window.location.href, {
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                        credentials: 'same-origin',
+                        cache: 'no-store'
+                    });
+                    const pageHtml = await pageResponse.text();
+                    const refreshedPage = new DOMParser().parseFromString(pageHtml, 'text/html');
+                    ['#positionTable', '.mobile-list-view'].forEach(selector => {
+                        const current = document.querySelector(selector);
+                        const refreshed = refreshedPage.querySelector(selector);
+                        if (current && refreshed) current.replaceWith(refreshed);
+                    });
+                    const currentStats = document.querySelectorAll('.stat-value');
+                    const refreshedStats = refreshedPage.querySelectorAll('.stat-value');
+                    currentStats.forEach((stat, index) => {
+                        if (refreshedStats[index]) stat.textContent = refreshedStats[index].textContent;
+                    });
+                    const searchInput = document.getElementById('searchPosition');
+                    if (searchInput) searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+                } catch (error) {
+                    feedback.className = 'alert alert-danger';
+                    feedback.textContent = error.message || 'Could not save the position. Please try again.';
+                } finally {
+                    if (submitButton) {
+                        submitButton.disabled = false;
+                        submitButton.innerHTML = originalButtonHtml;
+                    }
+                }
+            });
+        });
 
         [
             ['addPositionReportsToInput', 'addPositionReportsTo', 'addPositionReportsToOptions'],

@@ -3730,7 +3730,6 @@ function getEvaluationTemplateTargetPositions($conn, $context, $department_id = 
     if (!$context || empty($context['can_create_templates'])) return [];
     $department_id = (int) $department_id;
     $is_ceo = !empty($context['is_ceo']);
-    if (!$is_ceo && $department_id !== (int)($context['department_id'] ?? 0)) return [];
 
     $creator_position_id = (int)($context['job_title_id'] ?? 0);
     if ($creator_position_id <= 0) return [];
@@ -3742,12 +3741,11 @@ function getEvaluationTemplateTargetPositions($conn, $context, $department_id = 
             ORDER BY department_id, job_title");
         $stmt->bind_param('iii', $department_id, $department_id, $creator_position_id);
     } else {
-        $parent_position_id = (int)($context['job_title_id'] ?? 0);
         $stmt = $conn->prepare("SELECT job_title_id, job_title, department_id
             FROM job_titles
             WHERE department_id = ? AND reports_to = ? AND is_active = 1
             ORDER BY job_title");
-        $stmt->bind_param('ii', $department_id, $parent_position_id);
+        $stmt->bind_param('ii', $department_id, $creator_position_id);
     }
     $stmt->execute();
     $positions = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
@@ -3760,7 +3758,6 @@ function getProbationaryTemplateTargetPositions($conn, $context, $department_id 
 {
     if (!$context || empty($context['can_create_templates'])) return [];
     $department_id = (int)$department_id;
-    if (empty($context['is_ceo']) && $department_id !== (int)($context['department_id'] ?? 0)) return [];
     $creator_position_id = (int)($context['job_title_id'] ?? 0);
     if ($creator_position_id <= 0) return [];
     $stmt = $conn->prepare("SELECT job_title_id, job_title, department_id FROM job_titles

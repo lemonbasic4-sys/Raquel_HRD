@@ -160,10 +160,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     redirectWith($template_list_url, 'success', "Template '$template_name' created successfully.");
 }
 
-// Limit non-CEO template creators to the department of their active position.
+// Expose departments containing the creator's configured direct-report
+// positions (which may be cross-department, e.g. GS Manager -> Procurement
+// Supervisor). Target positions remain restricted to that direct-report map.
 $dept_query = !empty($creator_context['is_ceo'])
     ? "SELECT department_id, department_name FROM departments WHERE deleted_at IS NULL AND is_active = 1 ORDER BY department_name"
-    : "SELECT department_id, department_name FROM departments WHERE department_id = " . (int)$creator_context['department_id'] . " AND deleted_at IS NULL AND is_active = 1";
+    : "SELECT DISTINCT d.department_id, d.department_name
+        FROM departments d
+        WHERE d.deleted_at IS NULL AND d.is_active = 1
+          AND (d.department_id = " . (int)$creator_context['department_id'] . "
+            OR EXISTS (
+                SELECT 1 FROM job_titles target_position
+                WHERE target_position.department_id = d.department_id
+                  AND target_position.reports_to = " . (int)$creator_context['job_title_id'] . "
+                  AND target_position.is_active = 1
+            ))
+        ORDER BY d.department_name";
 $departments = $conn->query($dept_query)->fetch_all(MYSQLI_ASSOC);
 $target_positions = [];
 foreach ($departments as $department) {

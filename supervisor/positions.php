@@ -225,9 +225,6 @@ $employeesWithManagedPositions = (int) $conn->query("SELECT COUNT(*) AS cnt FROM
                 <button class="btn btn-head" onclick="openAddPositionModal('general')">
                     <i class="fas fa-plus me-1"></i>Add Position
                 </button>
-                <button class="btn btn-staff" onclick="openAddPositionModal('staff')">
-                    <i class="fas fa-users me-1"></i>Add to Direct Report
-                </button>
             </div>
         </div>
     </div>
