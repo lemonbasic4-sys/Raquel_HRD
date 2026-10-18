@@ -84,6 +84,8 @@
       const data = {};
       
       for (let [key, value] of formData.entries()) {
+        // Session security tokens must always come from the current server page.
+        if (key === 'csrf_token') continue;
         data[key] = value;
       }
 
@@ -106,6 +108,12 @@
       if (!saved) return;
 
       const { data, timestamp } = JSON.parse(saved);
+      // Older drafts included the previous login's token. Remove it without
+      // discarding the employee's saved answers or touching the fresh form token.
+      if (Object.prototype.hasOwnProperty.call(data, 'csrf_token')) {
+        delete data.csrf_token;
+        localStorage.setItem(STORAGE_KEY_PREFIX + formId, JSON.stringify({data, timestamp}));
+      }
       
       // Only restore if saved within last 7 days
       const sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
@@ -116,6 +124,7 @@
 
       // Restore form values
       Object.keys(data).forEach(key => {
+        if (key === 'csrf_token') return;
         const input = form.elements[key];
         if (input) {
           if (input.type === 'checkbox') {
