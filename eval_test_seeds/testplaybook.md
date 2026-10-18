@@ -20,6 +20,7 @@ cd C:\xampp\htdocs\raquel_hrd
 & "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source eval_test_seeds/business_development_probationary_profiles.sql;"
 & "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source eval_test_seeds/remaining_department_probationary_profiles.sql;"
 & "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source database/create_missing_employee_portal_accounts.sql;"
+& "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source eval_test_seeds/hrd_annual_evaluation_templates.sql;"
 ```
 
 The Business Development seed is optional. Import it after the organization
