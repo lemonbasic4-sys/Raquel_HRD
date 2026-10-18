@@ -20,21 +20,40 @@ if (($_SESSION['role'] ?? '') === 'Employee' && !empty($_SESSION['employee_id'])
     }
 }
 $creator_context = getEvaluationTemplateCreatorContext($conn, (int)($_SESSION['user_id'] ?? 0));
+$is_employee_template_portal = basename(dirname($_SERVER['SCRIPT_NAME'])) === 'employee';
 if (!canViewEvaluationTemplates($creator_context)) {
     redirectWith(BASE_URL . '/employee/dashboard.php', 'danger', 'Your account is not authorized to view evaluation templates.');
 }
 if (!empty($creator_context['is_ceo']) && basename(dirname($_SERVER['SCRIPT_NAME'])) !== 'employee') {
     redirectWith(BASE_URL . '/employee/evaluation-templates.php', 'info', 'President and CEO template management is available in the Employee Portal.');
 }
+if (($_SESSION['role'] ?? '') === 'Employee'
+    && basename(dirname($_SERVER['SCRIPT_NAME'])) === 'manager'
+    && $_SERVER['REQUEST_METHOD'] === 'GET') {
+    $employee_template_url = BASE_URL . '/employee/evaluation-templates.php';
+    $employee_template_query = http_build_query($_GET);
+    header('Location: ' . $employee_template_url . ($employee_template_query !== '' ? '?' . $employee_template_query : ''));
+    exit;
+}
+if (($_SESSION['role'] ?? '') === 'HR Supervisor'
+    && basename(dirname($_SERVER['SCRIPT_NAME'])) === 'manager'
+    && $_SERVER['REQUEST_METHOD'] === 'GET') {
+    $supervisor_template_url = BASE_URL . '/supervisor/templates.php';
+    $supervisor_template_query = http_build_query($_GET);
+    header('Location: ' . $supervisor_template_url . ($supervisor_template_query !== '' ? '?' . $supervisor_template_query : ''));
+    exit;
+}
 $can_create_templates = !empty($creator_context['can_create_templates']);
 $current_user_id = (int)($_SESSION['user_id'] ?? 0);
-$template_list_url = !empty($creator_context['is_ceo'])
+$template_list_url = (!empty($creator_context['is_ceo']) || $is_employee_template_portal)
     ? BASE_URL . '/employee/evaluation-templates.php'
-    : BASE_URL . '/manager/templates.php';
-$template_create_url = !empty($creator_context['is_ceo'])
+    : ((($_SESSION['role'] ?? '') === 'HR Supervisor')
+        ? BASE_URL . '/supervisor/templates.php'
+        : BASE_URL . '/manager/templates.php');
+$template_create_url = (!empty($creator_context['is_ceo']) || $is_employee_template_portal)
     ? BASE_URL . '/employee/create-evaluation-template.php'
     : BASE_URL . '/manager/create-template.php';
-$template_archive_url = !empty($creator_context['is_ceo'])
+$template_archive_url = (!empty($creator_context['is_ceo']) || $is_employee_template_portal)
     ? BASE_URL . '/employee/evaluation-template-archive.php'
     : BASE_URL . '/manager/template-archive.php';
 $owned_template_scope_sql = 'et.created_by = ' . $current_user_id;
@@ -525,7 +544,7 @@ $used_template_count = (int) $conn->query("SELECT COUNT(DISTINCT ev.template_id)
                     <div class="card-footer bg-transparent border-top p-3">
                         <div class="d-flex gap-2 flex-wrap template-list-card-actions">
                             <?php if ($is_template_manager): ?>
-                            <a href="<?php echo (!empty($creator_context['is_ceo']) ? BASE_URL . '/employee/edit-evaluation-template.php?id=' : BASE_URL . '/manager/edit-template.php?id=') . (int)$t['template_id']; ?>" class="btn btn-sm btn-outline-primary flex-fill">
+                            <a href="<?php echo ((!empty($creator_context['is_ceo']) || $is_employee_template_portal) ? BASE_URL . '/employee/edit-evaluation-template.php?id=' : BASE_URL . '/manager/edit-template.php?id=') . (int)$t['template_id']; ?>" class="btn btn-sm btn-outline-primary flex-fill">
                                 <i class="fas fa-edit me-1"></i>Edit
                             </a>
                             <?php if ($is_template_owner): ?>
@@ -541,7 +560,7 @@ $used_template_count = (int) $conn->query("SELECT COUNT(DISTINCT ev.template_id)
                             </button>
                             <?php else: ?>
                             <?php
-                            $view_template_path = !empty($creator_context['is_ceo'])
+                            $view_template_path = (!empty($creator_context['is_ceo']) || $is_employee_template_portal)
                                 ? '/employee/view-evaluation-template.php?id='
                                 : (($creator_context['role'] ?? '') === 'HR Staff'
                                     ? '/staff/view-template.php?id='

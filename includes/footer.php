@@ -177,6 +177,7 @@ if (in_array($_ft_role, ['HR Manager', 'HR Supervisor', 'HR Staff', 'Admin'])):
         <i class="fas fa-ellipsis-h hr-nav-icon"></i>
         <span class="hr-nav-label">More</span>
         <div class="hr-nav-more-dropdown" id="hrNavMoreMenu" role="menu">
+            <a href="<?php echo BASE_URL; ?>/supervisor/templates.php"><i class="fas fa-file-alt"></i>Templates</a>
             <a href="<?php echo BASE_URL; ?>/supervisor/evaluation-history.php"><i class="fas fa-history"></i>Eval History</a>
             <a href="<?php echo BASE_URL; ?>/supervisor/analytics.php"><i class="fas fa-chart-bar"></i>Branch Analytics</a>
             <a href="<?php echo BASE_URL; ?>/supervisor/audit-trail.php"><i class="fas fa-clipboard-list"></i>My Audit Trail</a>

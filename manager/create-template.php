@@ -8,16 +8,19 @@ if (!ensureHierarchicalEvaluationSchema($conn)) {
 }
 checkRole(['HR Manager', 'HR Supervisor', 'Employee', 'President and CEO']);
 $creator_context = getEvaluationTemplateCreatorContext($conn, (int)($_SESSION['user_id'] ?? 0));
+$is_employee_template_portal = basename(dirname($_SERVER['SCRIPT_NAME'])) === 'employee';
 if (!$creator_context || empty($creator_context['can_create_templates'])) {
     redirectWith(BASE_URL . '/employee/dashboard.php', 'danger', 'Your active organizational role is not authorized to create evaluation templates.');
 }
 if (!empty($creator_context['is_ceo']) && basename(dirname($_SERVER['SCRIPT_NAME'])) !== 'employee') {
     redirectWith(BASE_URL . '/employee/evaluation-templates.php', 'info', 'President and CEO template creation is available in the Employee Portal.');
 }
-$template_list_url = !empty($creator_context['is_ceo'])
+$template_list_url = (!empty($creator_context['is_ceo']) || $is_employee_template_portal)
     ? BASE_URL . '/employee/evaluation-templates.php'
-    : BASE_URL . '/manager/templates.php';
-$template_create_url = !empty($creator_context['is_ceo'])
+    : ((($_SESSION['role'] ?? '') === 'HR Supervisor')
+        ? BASE_URL . '/supervisor/templates.php'
+        : BASE_URL . '/manager/templates.php');
+$template_create_url = (!empty($creator_context['is_ceo']) || $is_employee_template_portal)
     ? BASE_URL . '/employee/create-evaluation-template.php'
     : BASE_URL . '/manager/create-template.php';
 

@@ -8,16 +8,19 @@ if (!ensureHierarchicalEvaluationSchema($conn)) {
 }
 checkRole(['HR Manager', 'HR Supervisor', 'HR Staff', 'Employee', 'President and CEO']);
 $creator_context = getEvaluationTemplateCreatorContext($conn, (int)($_SESSION['user_id'] ?? 0));
+$is_employee_template_portal = basename(dirname($_SERVER['SCRIPT_NAME'])) === 'employee';
 if (!canViewEvaluationTemplates($creator_context)) {
     redirectWith(BASE_URL . '/employee/dashboard.php', 'danger', 'Your account is not authorized to access evaluation templates.');
 }
 if (!empty($creator_context['is_ceo']) && basename(dirname($_SERVER['SCRIPT_NAME'])) !== 'employee') {
     redirectWith(BASE_URL . '/employee/evaluation-templates.php', 'info', 'President and CEO template editing is available in the Employee Portal.');
 }
-$template_list_url = !empty($creator_context['is_ceo'])
+$template_list_url = (!empty($creator_context['is_ceo']) || $is_employee_template_portal)
     ? BASE_URL . '/employee/evaluation-templates.php'
-    : BASE_URL . '/manager/templates.php';
-$template_edit_url = !empty($creator_context['is_ceo'])
+    : ((($_SESSION['role'] ?? '') === 'HR Supervisor')
+        ? BASE_URL . '/supervisor/templates.php'
+        : BASE_URL . '/manager/templates.php');
+$template_edit_url = (!empty($creator_context['is_ceo']) || $is_employee_template_portal)
     ? BASE_URL . '/employee/edit-evaluation-template.php'
     : BASE_URL . '/manager/edit-template.php';
 

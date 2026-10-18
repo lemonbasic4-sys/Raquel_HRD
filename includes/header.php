@@ -154,7 +154,7 @@ switch ($effective_role) {
                 ['icon' => 'fas fa-briefcase', 'label' => 'Positions', 'url' => BASE_URL . '/supervisor/positions.php', 'page' => 'positions.php'],
             ],
             'EVALUATIONS' => [
-                ['icon' => 'fas fa-file-alt', 'label' => 'Templates', 'url' => BASE_URL . '/manager/templates.php', 'page' => 'templates.php'],
+                ['icon' => 'fas fa-file-alt', 'label' => 'Templates', 'url' => BASE_URL . '/supervisor/templates.php', 'page' => 'templates.php'],
                 ['icon' => 'fas fa-layer-group', 'label' => 'Performance Evaluation', 'url' => BASE_URL . '/employee/team-evaluation-packages.php', 'page' => 'team-evaluation-packages.php',
                  'badge' => $_sup_pkg_pending ?: null, 'badge_class' => 'bg-warning text-dark'],
                 ['icon' => 'fas fa-clipboard-check', 'label' => 'Pending Validations', 'url' => BASE_URL . '/supervisor/pending-endorsements.php', 'page' => 'pending-endorsements.php'],
@@ -382,12 +382,11 @@ switch ($effective_role) {
             $template_creator_context = getEvaluationTemplateCreatorContext($conn, (int)($_SESSION['user_id'] ?? 0));
         }
         if (!$is_hr_personnel && $template_creator_context && !empty($template_creator_context['can_create_templates'])) {
-            $is_ceo_template_creator = !empty($template_creator_context['is_ceo']);
             $menu_evaluations[] = [
                 'icon' => 'fas fa-file-alt',
                 'label' => 'Evaluation Templates',
-                'url' => BASE_URL . ($is_ceo_template_creator ? '/employee/evaluation-templates.php' : '/manager/templates.php'),
-                'page' => $is_ceo_template_creator ? 'evaluation-templates.php' : 'templates.php',
+                'url' => BASE_URL . '/employee/evaluation-templates.php',
+                'page' => 'evaluation-templates.php',
             ];
         }
 

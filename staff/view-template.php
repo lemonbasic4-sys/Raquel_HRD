@@ -11,11 +11,22 @@ $viewer_context = getEvaluationTemplateCreatorContext($conn, (int)($_SESSION['us
 if (!canViewEvaluationTemplates($viewer_context)) {
     redirectWith(BASE_URL . '/employee/dashboard.php', 'danger', 'Your account is not authorized to view evaluation templates.');
 }
+$template_list_url = !empty($viewer_context['is_ceo'])
+    ? BASE_URL . '/employee/evaluation-templates.php'
+    : ((basename(dirname($_SERVER['SCRIPT_NAME'])) === 'employee')
+        ? BASE_URL . '/employee/evaluation-templates.php'
+        : (in_array($viewer_context['role'] ?? '', ['HR Manager', 'HR Supervisor'], true)
+        ? ((($viewer_context['role'] ?? '') === 'HR Supervisor')
+            ? BASE_URL . '/supervisor/templates.php'
+            : BASE_URL . '/manager/templates.php')
+        : (($viewer_context['role'] ?? '') === 'HR Staff'
+            ? BASE_URL . '/staff/templates.php'
+            : BASE_URL . '/employee/dashboard.php')));
 
 // Validate template ID
 $tid = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 if ($tid <= 0) {
-    redirectWith(BASE_URL . '/staff/templates.php', 'danger', 'Invalid template ID.');
+    redirectWith($template_list_url, 'danger', 'Invalid template ID.');
 }
 
 // Fetch template
@@ -29,25 +40,18 @@ $template = $stmt->get_result()->fetch_assoc();
 $stmt->close();
 
 if (!$template) {
-    redirectWith(BASE_URL . '/staff/templates.php', 'danger', 'Template not found or is no longer active.');
+    redirectWith($template_list_url, 'danger', 'Template not found or is no longer active.');
 }
 $hris_template_role = (string)($viewer_context['role'] ?? '');
 if ((!empty($viewer_context['is_ceo']) || in_array($hris_template_role, ['HR Manager', 'HR Supervisor'], true))
     && (int)($template['created_by'] ?? 0) !== (int)($_SESSION['user_id'] ?? 0)) {
     $library_url = !empty($viewer_context['is_ceo'])
         ? BASE_URL . '/employee/evaluation-templates.php'
-        : BASE_URL . '/manager/templates.php';
+        : ((($viewer_context['role'] ?? '') === 'HR Supervisor')
+            ? BASE_URL . '/supervisor/templates.php'
+            : BASE_URL . '/manager/templates.php');
     redirectWith($library_url, 'danger', 'This template is not in your template library.');
 }
-$portal_dir = basename(dirname($_SERVER['SCRIPT_NAME']));
-$template_list_url = !empty($viewer_context['is_ceo'])
-    ? BASE_URL . '/employee/evaluation-templates.php'
-    : (in_array($viewer_context['role'] ?? '', ['HR Manager', 'HR Supervisor'], true)
-        ? BASE_URL . '/manager/templates.php'
-        : (($viewer_context['role'] ?? '') === 'HR Staff'
-            ? BASE_URL . '/staff/templates.php'
-            : BASE_URL . '/employee/dashboard.php'));
-
 $viewer_role = (string)($viewer_context['role'] ?? '');
 $can_view_all_departments = !empty($viewer_context['is_ceo'])
     || in_array($viewer_role, ['HR Manager', 'HR Supervisor', 'HR Staff'], true);
