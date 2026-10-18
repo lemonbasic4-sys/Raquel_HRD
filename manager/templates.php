@@ -249,6 +249,11 @@ $selected_department = trim($_GET['department'] ?? '');
 if (strlen($selected_department) > 100) {
     $selected_department = substr($selected_department, 0, 100);
 }
+$allowed_eval_types = ['Initial', 'Final', 'Quarterly', 'Annual'];
+$requested_type = $_GET['evaluation_type'] ?? '';
+$filter_type = is_string($requested_type) && in_array($requested_type, $allowed_eval_types, true)
+    ? $requested_type
+    : '';
 
 $department_scope = $is_cross_department_template_viewer
     ? '1 = 1'
@@ -264,6 +269,10 @@ $template_where = "WHERE et.status = 'Active' AND ($template_scope_sql)";
 if ($selected_department !== '') {
     $safe_department = $conn->real_escape_string($selected_department);
     $template_where .= " AND (et.target_department = '$safe_department' OR et.target_department = 'All Departments')";
+}
+if ($filter_type !== '') {
+    $safe_type = $conn->real_escape_string($filter_type);
+    $template_where .= " AND et.evaluation_type = '$safe_type'";
 }
 
 // Fetch active templates with criteria counts
@@ -369,10 +378,10 @@ $used_template_count = (int) $conn->query("SELECT COUNT(DISTINCT ev.template_id)
 
 <div class="content-card fadeup-1 mb-4">
     <div class="card-body">
-        <form method="GET" action="" class="row g-3 align-items-end">
-            <div class="col-md-8 col-lg-5">
+        <form method="GET" action="<?php echo e($template_list_url); ?>" class="row g-3 align-items-end">
+            <div class="col-md-6 col-lg-5">
                 <label class="form-label">Department</label>
-                <select class="form-select" name="department" onchange="this.form.submit()">
+                <select class="form-select" name="department">
                     <option value="">All Departments</option>
                     <?php while ($department = $department_options->fetch_assoc()): ?>
                         <option value="<?php echo e($department['department_name']); ?>" <?php echo $selected_department === $department['department_name'] ? 'selected' : ''; ?>>
@@ -381,21 +390,31 @@ $used_template_count = (int) $conn->query("SELECT COUNT(DISTINCT ev.template_id)
                     <?php endwhile; ?>
                 </select>
             </div>
-            <div class="col-md-4 col-lg-3 d-flex gap-2">
+            <div class="col-md-3 col-lg-3">
+                <label class="form-label">Evaluation Type</label>
+                <select class="form-select" name="evaluation_type">
+                    <option value="">All Types</option>
+                    <?php foreach ($allowed_eval_types as $type): ?>
+                        <option value="<?php echo e($type); ?>" <?php echo $filter_type === $type ? 'selected' : ''; ?>><?php echo e($type); ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="col-md-3 col-lg-4 d-flex flex-wrap gap-2">
                 <button type="submit" class="btn btn-primary">
                     <i class="fas fa-filter me-1"></i>Apply
                 </button>
-                <a href="<?php echo $template_list_url; ?>" class="btn btn-outline-secondary">
+                <a href="<?php echo e($template_list_url); ?>" class="btn btn-outline-secondary">
                     <i class="fas fa-rotate-left me-1"></i>Reset
                 </a>
             </div>
             <div class="col-12">
                 <div class="small text-muted">
-                    <?php if ($selected_department !== ''): ?>
-                        Showing <?php echo number_format($filtered_template_count); ?> template<?php echo $filtered_template_count === 1 ? '' : 's'; ?> for <?php echo e($selected_department); ?>.
-                    <?php else: ?>
-                        Showing all active department templates.
-                    <?php endif; ?>
+                    Showing <?php echo number_format($filtered_template_count); ?> active template<?php echo $filtered_template_count === 1 ? '' : 's'; ?><?php
+                    $active_filter_labels = [];
+                    if ($selected_department !== '') $active_filter_labels[] = e($selected_department);
+                    if ($filter_type !== '') $active_filter_labels[] = e($filter_type);
+                    echo $active_filter_labels ? ' matching ' . implode(' · ', $active_filter_labels) : ' across all available departments and evaluation types';
+                    ?>.
                 </div>
             </div>
         </form>
