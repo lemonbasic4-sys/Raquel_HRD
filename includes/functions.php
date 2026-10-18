@@ -610,6 +610,44 @@ function notifyHrStaffOfPackageProgress($conn, $package_id, $department, $stage,
     }
 }
 
+function ensureNotificationReminderDeliverySchema($conn): void
+{
+    static $ready=[];
+    $key=spl_object_id($conn);
+    if (isset($ready[$key])) return;
+    $conn->query(file_get_contents(__DIR__.'/../database/zLAST_notification_reminder_deliveries.sql'));
+    // Preserve delivery knowledge for reminders created before this change.
+    $conn->query("INSERT IGNORE INTO notification_reminder_deliveries (user_id,reminder_key,delivered_at)
+        SELECT user_id,SHA2(CONCAT_WS(CHAR(31),user_id,title,message,COALESCE(link,'')),256),created_at
+        FROM notifications WHERE title LIKE 'Probationary % Evaluation %'
+            OR title LIKE 'Your Probationary % Evaluation Is %'");
+    $ready[$key]=true;
+}
+
+/** Deleting an inbox row does not reset delivery of the same reminder. */
+function createProbationReminderOnce($conn, int $userId, string $title, string $message, string $link): void
+{
+    ensureNotificationReminderDeliverySchema($conn);
+    $key=hash('sha256',implode(chr(31),[$userId,$title,$message,$link]));
+    $conn->begin_transaction();
+    try {
+        $claim=$conn->prepare('INSERT IGNORE INTO notification_reminder_deliveries (user_id,reminder_key) VALUES (?,?)');
+        $claim->bind_param('is',$userId,$key);
+        $claim->execute();
+        $new=$claim->affected_rows===1;
+        $claim->close();
+        if ($new) {
+            $existing=$conn->prepare('SELECT 1 FROM notifications WHERE user_id=? AND title=? AND message=? AND link=? LIMIT 1');
+            $existing->bind_param('isss',$userId,$title,$message,$link);
+            $existing->execute();
+            $alreadyPresent=(bool)$existing->get_result()->fetch_row();
+            $existing->close();
+            if (!$alreadyPresent) createNotification($conn,$userId,$title,$message,$link,'probation',1);
+        }
+        $conn->commit();
+    } catch (Throwable $error) { $conn->rollback(); throw $error; }
+}
+
 /** One alert per milestone and staff account, generated when the staff portal is visited. */
 function sendStaffProbationReminders($conn, $staff_user_id): void
 {
@@ -626,7 +664,6 @@ function sendStaffProbationReminders($conn, $staff_user_id): void
     if (!$employees) return;
     $completed = $conn->prepare("SELECT 1 FROM evaluations WHERE employee_id = ? AND evaluation_type = ?
         AND status NOT IN ('Draft', 'Pending Self-Rating') AND deleted_at IS NULL LIMIT 1");
-    $already_sent = $conn->prepare('SELECT 1 FROM notifications WHERE user_id = ? AND title = ? AND link = ? AND message = ? LIMIT 1');
     $today = new DateTimeImmutable('today');
     while ($employee = $employees->fetch_assoc()) {
         $due = DateTimeImmutable::createFromFormat('!Y-m-d', (string) $employee['due_date']);
@@ -643,14 +680,9 @@ function sendStaffProbationReminders($conn, $staff_user_id): void
         $link = BASE_URL . '/staff/view-employee.php?id=' . $employee_id;
         $name = trim($employee['first_name'] . ' ' . $employee['last_name']);
         $message = "{$name}'s {$evaluation_type} probationary evaluation is due on " . $due->format('M j, Y') . '. Check the employee record and evaluation tracker.';
-        $already_sent->bind_param('isss', $staff_user_id, $title, $link, $message);
-        $already_sent->execute();
-        if (!$already_sent->get_result()->fetch_assoc()) {
-            createNotification($conn, $staff_user_id, $title, $message, $link, 'probation', 1);
-        }
+        createProbationReminderOnce($conn,$staff_user_id,$title,$message,$link);
     }
     $completed->close();
-    $already_sent->close();
 }
 
 /** Remind a probationary employee about their own upcoming Initial/Final evaluation. */
@@ -691,12 +723,7 @@ function sendEmployeeProbationReminder($conn, $user_id): void
     $message = "Your {$evaluation_type} probationary evaluation is due on " . $due->format('M j, Y')
         . '. Check your self-rating page. If no form is available, contact HR.';
     $link = BASE_URL . '/employee/self-rating.php';
-    $existing = $conn->prepare('SELECT 1 FROM notifications WHERE user_id = ? AND title = ? AND link = ? LIMIT 1');
-    $existing->bind_param('iss', $user_id, $title, $link);
-    $existing->execute();
-    $sent = (bool) $existing->get_result()->fetch_assoc();
-    $existing->close();
-    if (!$sent) createNotification($conn, $user_id, $title, $message, $link);
+    createProbationReminderOnce($conn,$user_id,$title,$message,$link);
 }
 
 /** Create one reminder per probation milestone for the actual HR immediate head. */
@@ -726,7 +753,6 @@ function sendSupervisorProbationReminders($conn, $supervisor_user_id): void
     if (!$employees) return;
     $completed = $conn->prepare("SELECT 1 FROM evaluations WHERE employee_id = ? AND evaluation_type = ?
         AND status NOT IN ('Draft', 'Pending Self-Rating') AND deleted_at IS NULL LIMIT 1");
-    $already_sent = $conn->prepare('SELECT 1 FROM notifications WHERE user_id = ? AND title = ? AND link = ? AND message = ? LIMIT 1');
     $today = new DateTimeImmutable('today');
     while ($employee = $employees->fetch_assoc()) {
         $route = getHRDirectReportByPosition($conn, (int) $employee['employee_id']);
@@ -745,13 +771,9 @@ function sendSupervisorProbationReminders($conn, $supervisor_user_id): void
         $link = BASE_URL . '/supervisor/view-employee.php?id=' . $employee_id;
         $name = trim($employee['first_name'] . ' ' . $employee['last_name']);
         $message = "{$name}'s {$evaluation_type} probationary evaluation is due on " . $due->format('M j, Y') . '. Please check the employee profile and evaluation workflow.';
-        $already_sent->bind_param('isss', $supervisor_user_id, $title, $link, $message);
-        $already_sent->execute();
-        if ($already_sent->get_result()->fetch_assoc()) continue;
-        createNotification($conn, $supervisor_user_id, $title, $message, $link, 'probation', 1);
+        createProbationReminderOnce($conn,$supervisor_user_id,$title,$message,$link);
     }
     $completed->close();
-    $already_sent->close();
 }
 
 function notifyHrSupervisorOfEmployeeRecordChange($conn, $employee_id, $employee_name): void

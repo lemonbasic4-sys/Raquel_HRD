@@ -104,6 +104,11 @@ automatically imported and is not part of the base/probationary seed sequence.
 
 #### Import the optional HRD Annual templates
 
+**After a fresh database import:** the base seed sequence does not create Annual
+templates. HR Manager and HR Supervisor will have no available Annual self-rating
+form until you import the optional template seed below or create forms manually.
+Creating Employee Portal accounts alone does not create evaluation forms.
+
 Back up any database you intend to restore first. Do not rerun the base schema or
 employee replacement seeds simply to add these templates.
 
@@ -128,6 +133,12 @@ Expected template output:
 | `[TEST HRD ANNUAL] HR Supervisor` | HR Manager | HR Supervisor direct reports |
 | `[TEST HRD ANNUAL] HR Staff` | HR Supervisor | HR Staff direct reports |
 
+**Creator is not the person being evaluated.** President/CEO creates the HR
+Manager's form, HR Manager creates HR Supervisor's form, and HR Supervisor creates
+HR Staff's form. The seed does **not** create the President/CEO's own Annual
+evaluation. That employee's immediate head/evaluator must be confirmed separately;
+do not configure the President/CEO to approve their own evaluation.
+
 The seed resolves IDs from the database and uses one active Regular head account
 per creator role. Confirm the accounts have roles `President and CEO`,
 `HR Manager`, and `HR Supervisor`, and the target positions are active and have
@@ -135,6 +146,24 @@ the correct **Reports To**. If the output has fewer than three templates, check
 those prerequisites. The seed does not repair reporting lines or create accounts.
 The KRAs are synthetic test content, not approved production job requirements.
 Re-import leaves existing seeded templates and their criterion IDs unchanged.
+
+#### Verify forms are available after import
+
+1. Check that the seed's verification output lists all three template names above.
+2. Sign in to the **Employee Portal** account of each Regular HR Manager,
+   HR Supervisor, and HR Staff member. Open **Self Rating** and confirm the
+   matching `[TEST HRD ANNUAL]` form appears. Use Employee Portal accounts for
+   self-rating, not the HRIS reviewer screen.
+3. Use HR Manager/HR Supervisor **HRIS** accounts for template management,
+   direct-report KRA approval, Annual progress, and department peer rating.
+   HR Staff uses its HRIS Annual & 360 Ratings entry for peer rating.
+4. If no form appears, verify the optional seed was imported into the intended
+   database, the template is Active, the employee is active and Regular, and the
+   employee's position is included in the template targets. Confirm the creator's
+   position is the target position's configured **Reports To**.
+5. A template is an available form, not a submitted evaluation. Annual cycles and
+   reviewer progress appear only after employees submit their self-ratings. Do not
+   import the seed expecting it to generate scores or completed evaluations.
 
 #### Manual Annual workflow checks
 
@@ -157,6 +186,17 @@ Run the isolated automated checks without importing any test data into your work
 ```
 
 See `annual_evaluation_design_notes.md` for confirmed rules and proposed HR exception policies.
+
+### Notification clearing regression check
+
+Probationary due/overdue reminders keep a delivery record in
+`notification_reminder_deliveries`, separate from the `notifications` inbox.
+The table initializes automatically when reminders run or notifications are deleted.
+After a reminder appears, delete it and refresh/reopen the staff, supervisor, or
+employee portal. The same reminder must not reappear. A new milestone (for example,
+Due Soon becoming Overdue) can still generate a new notification. Existing inbox
+rows are not automatically removed by this fix. Do not clear the delivery-history
+table when clearing the inbox, because that would reset reminder deduplication.
 
 ### Probationary workflow
 

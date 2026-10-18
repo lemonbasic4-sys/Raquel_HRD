@@ -19,6 +19,9 @@ $user_id = (int) $_SESSION['user_id'];
 $action = $_POST['action'] ?? '';
 $notif_id = isset($_POST['notification_id']) ? (int) $_POST['notification_id'] : 0;
 $context = $_POST['context'] ?? ''; // 'employee' or 'hr'
+if (in_array($action,['delete','delete_all_read'],true)) {
+    ensureNotificationReminderDeliverySchema($conn);
+}
 
 switch ($action) {
     case 'mark_read':

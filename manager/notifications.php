@@ -95,6 +95,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $owned->close();
         if ($owned_row) {
             if ($inbox_action === 'delete') {
+                ensureNotificationReminderDeliverySchema($conn);
                 $update = $conn->prepare('DELETE FROM notifications WHERE notification_id = ? AND user_id = ?');
                 $next_id = 0;
             } else {

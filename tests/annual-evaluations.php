@@ -283,6 +283,23 @@ try {
     $importHrdAnnualSeed();
     checkAnnual($criterionIds===annualQuery($conn,"SELECT ec.criterion_id FROM evaluation_criteria ec JOIN evaluation_templates t ON t.template_id=ec.template_id WHERE t.template_name LIKE '[TEST HRD ANNUAL] %' ORDER BY ec.criterion_id"),
         're-importing optional HRD seed preserves existing template criteria and IDs');
+    $reminderTitle='Probationary Initial Evaluation Due Soon';
+    $reminderLink=BASE_URL.'/staff/view-employee.php?id=9';
+    createProbationReminderOnce($conn,4,$reminderTitle,'Fixture reminder due on Oct 20, 2026.',$reminderLink);
+    createProbationReminderOnce($conn,4,$reminderTitle,'Fixture reminder due on Oct 20, 2026.',$reminderLink);
+    checkAnnual(count(annualQuery($conn,'SELECT notification_id FROM notifications WHERE user_id=4 AND title=? AND message=?',[$reminderTitle,'Fixture reminder due on Oct 20, 2026.']))===1,
+        'repeated portal reminder generation delivers the same milestone only once');
+    annualQuery($conn,'DELETE FROM notifications WHERE user_id=4 AND title=? AND message=?',[$reminderTitle,'Fixture reminder due on Oct 20, 2026.']);
+    createProbationReminderOnce($conn,4,$reminderTitle,'Fixture reminder due on Oct 20, 2026.',$reminderLink);
+    checkAnnual(!annualQuery($conn,'SELECT notification_id FROM notifications WHERE user_id=4 AND title=? AND message=?',[$reminderTitle,'Fixture reminder due on Oct 20, 2026.']),
+        'deleted automatic reminder does not reappear when the portal is visited again');
+    createProbationReminderOnce($conn,4,'Probationary Initial Evaluation Overdue','Fixture reminder due on Oct 20, 2026.',$reminderLink);
+    checkAnnual(count(annualQuery($conn,'SELECT notification_id FROM notifications WHERE user_id=4 AND title=? AND message=?',['Probationary Initial Evaluation Overdue','Fixture reminder due on Oct 20, 2026.']))===1,
+        'a new overdue milestone can notify after an earlier reminder was deleted');
+    createNotification($conn,4,'Probationary Final Evaluation Due Soon','Legacy fixture reminder',$reminderLink);
+    createProbationReminderOnce($conn,4,'Probationary Final Evaluation Due Soon','Legacy fixture reminder',$reminderLink);
+    checkAnnual(count(annualQuery($conn,'SELECT notification_id FROM notifications WHERE user_id=4 AND title=? AND message=?',['Probationary Final Evaluation Due Soon','Legacy fixture reminder']))===1,
+        'existing legacy reminder is registered without creating a duplicate');
     echo "SUCCESS: $checks checks passed in isolated database $testDb".PHP_EOL;
 } finally {
     if (isset($conn)) $conn->close();
