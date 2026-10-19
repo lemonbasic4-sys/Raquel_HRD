@@ -222,7 +222,9 @@ try {
     checkAnnual(strpos($html,'data-draft-key="annual-rating-3-8"')!==false
         && strpos($html,'sessionStorage.setItem(annualDraftKey')!==false
         && strpos($html,'sessionStorage.removeItem(annualDraftKey)')!==false
-        && strpos($html,'activePanel')!==false,
+        && strpos($html,'activePanel')!==false
+        && strpos($html,'document.addEventListener(\'DOMContentLoaded\',restoreAnnualRatingDraft')!==false
+        && strpos($html,'saveAnnualRatingDraft(trigger.dataset.bsTarget)')!==false,
         'rating drafts and active review tab survive refresh until submission is completed');
     annualQuery($conn,'UPDATE annual_evaluation_members SET evaluation_id=NULL WHERE cycle_id=? AND employee_id=3',[$cycle]);
     $awaitingHeadHtml=renderAnnualFixture(3,'HR Supervisor','supervisor',0,'peers');

@@ -353,14 +353,15 @@ function updateAnnualProgress() {
 }
 const annualRatingForm=document.getElementById('annualRatingForm');
 const annualDraftKey=annualRatingForm?.dataset.draftKey;
-function saveAnnualRatingDraft() {
+function saveAnnualRatingDraft(panelOverride=null) {
     if (!annualRatingForm || !annualDraftKey || annualRatingForm.dataset.submitted==='1') return;
     const values={};
     annualRatingForm.querySelectorAll('input[type="number"]').forEach(input=>{ values[input.name]=input.value; });
-    const activePanel=document.querySelector('.annual-review-tabs button.active')?.dataset.bsTarget || '#annualRateCorePanel';
+    const activePanel=panelOverride || document.querySelector('.annual-review-tabs button.active')?.dataset.bsTarget || '#annualRateKraPanel';
     try { sessionStorage.setItem(annualDraftKey,JSON.stringify({values,activePanel,signature:document.getElementById('annualRaterSignatureData')?.value || ''})); } catch (_) {}
 }
-if (annualRatingForm && annualDraftKey) {
+function restoreAnnualRatingDraft() {
+    if (!annualRatingForm || !annualDraftKey) return;
     try {
         if (annualRatingForm.dataset.submitted==='1') sessionStorage.removeItem(annualDraftKey);
         else {
@@ -372,8 +373,14 @@ if (annualRatingForm && annualDraftKey) {
             if (signature && draft?.signature) signature.value=draft.signature;
             const activeTrigger=draft?.activePanel && document.querySelector('.annual-review-tabs [data-bs-target="'+draft.activePanel+'"]');
             if (activeTrigger && window.bootstrap?.Tab) bootstrap.Tab.getOrCreateInstance(activeTrigger).show();
+            document.dispatchEvent(new Event('annualRatingDraftRestored'));
         }
     } catch (_) {}
+    updateAnnualProgress();
+}
+if (annualRatingForm && annualDraftKey) {
+    if (document.readyState==='loading') document.addEventListener('DOMContentLoaded',restoreAnnualRatingDraft,{once:true});
+    else restoreAnnualRatingDraft();
 }
 document.querySelectorAll('#annualRatingForm input[type="number"]').forEach(input=>{
     const enforceRatingScale=()=>{ if(input.value!=='' && Number.isFinite(Number(input.value)) && Number(input.value)>4) input.value='4'; updateAnnualProgress(); saveAnnualRatingDraft(); };
@@ -381,10 +388,13 @@ document.querySelectorAll('#annualRatingForm input[type="number"]').forEach(inpu
     input.addEventListener('change',enforceRatingScale);
 });
 updateAnnualProgress();
-document.querySelectorAll('.annual-review-tabs [data-bs-toggle="tab"]').forEach(trigger=>trigger.addEventListener('shown.bs.tab',saveAnnualRatingDraft));
+document.querySelectorAll('.annual-review-tabs [data-bs-toggle="tab"]').forEach(trigger=>{
+    trigger.addEventListener('click',()=>saveAnnualRatingDraft(trigger.dataset.bsTarget));
+    trigger.addEventListener('shown.bs.tab',()=>saveAnnualRatingDraft(trigger.dataset.bsTarget));
+});
 document.querySelectorAll('#annualRatingForm [data-annual-tab]').forEach(button=>button.addEventListener('click',()=>{
     const trigger=document.querySelector('.annual-review-tabs [data-bs-target="'+button.dataset.annualTab+'"]');
-    if (trigger) { bootstrap.Tab.getOrCreateInstance(trigger).show(); trigger.focus(); }
+    if (trigger) { bootstrap.Tab.getOrCreateInstance(trigger).show(); trigger.focus(); saveAnnualRatingDraft(button.dataset.annualTab); }
 }));
 function renderAnnualRatingPreview() {
     const form=document.getElementById('annualRatingForm');
@@ -431,7 +441,8 @@ function renderAnnualRatingTables(form,kraBodyId,kraTotalId,behaviorBodyId,behav
     context.strokeStyle='#14241a'; context.fillStyle='#14241a'; context.lineWidth=2.4; context.lineCap='round'; context.lineJoin='round';
     let drawing=false, hasInk=false;
     const point=event=>{ const rect=canvas.getBoundingClientRect(); return {x:(event.clientX-rect.left)*canvas.width/rect.width,y:(event.clientY-rect.top)*canvas.height/rect.height}; };
-    if (input.value) { const image=new Image(); image.onload=()=>{context.drawImage(image,0,0,canvas.width,canvas.height);hasInk=true;}; image.src=input.value; }
+    const restoreSignature=()=>{ if(input.value) { const image=new Image(); image.onload=()=>{context.drawImage(image,0,0,canvas.width,canvas.height);hasInk=true;}; image.src=input.value; } };
+    restoreSignature(); document.addEventListener('annualRatingDraftRestored',restoreSignature);
     canvas.addEventListener('pointerdown',event=>{ drawing=true; hasInk=true; canvas.setPointerCapture(event.pointerId); const p=point(event); context.beginPath(); context.arc(p.x,p.y,1.2,0,Math.PI*2); context.fill(); context.beginPath(); context.moveTo(p.x,p.y); event.preventDefault(); });
     canvas.addEventListener('pointermove',event=>{ if(!drawing) return; const p=point(event); context.lineTo(p.x,p.y); context.stroke(); event.preventDefault(); });
     const finish=()=>{ if(!drawing) return; drawing=false; input.value=hasInk ? canvas.toDataURL('image/png') : ''; document.getElementById('annualRaterSignatureError')?.setAttribute('hidden',''); saveAnnualRatingDraft(); };
@@ -494,15 +505,16 @@ document.getElementById('annualReviewRatings')?.addEventListener('click', () => 
         'annualSummaryBehaviorRows','annualSummaryBehaviorAverage');
     const kraSection=document.getElementById('annualSummaryKraSection');
     if (kraSection) kraSection.hidden=!form.querySelector('input.annual-rate-kra');
-    if (signature) {
-        const row=document.createElement('tr'), label=document.createElement('td'), value=document.createElement('td');
-        label.textContent='Rater signature'; value.textContent='Captured and will be included on the printed evaluation form.';
-        row.append(label,value); body.append(row);
-    }
+    // The signature is validated above and included in the POST. Keep it out of
+    // the behavior ratings table: that table's body only contains rating rows.
     new bootstrap.Modal(document.getElementById('annualRatingSummary')).show();
 });
 document.getElementById('annualConfirmSubmit')?.addEventListener('click', function() {
-    this.disabled=true; document.getElementById('annualConfirmed').value='1'; document.getElementById('annualRatingForm').requestSubmit();
+    const form=document.getElementById('annualRatingForm');
+    if (!form) return;
+    document.getElementById('annualConfirmed').value='1';
+    this.disabled=true;
+    form.requestSubmit();
 });
 </script>
 <?php require_once __DIR__ . '/footer.php'; ?>
