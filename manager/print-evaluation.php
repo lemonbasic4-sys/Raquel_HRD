@@ -4,6 +4,8 @@ require_once '../includes/session-check.php';
 checkRole(['HR Manager', 'HR Supervisor', 'HR Staff']);
 require_once '../includes/functions.php';
 ensureProbationaryEvaluationSchema($conn);
+require_once '../includes/annual-evaluations.php';
+ensureAnnualEvaluationSchema($conn);
 
 $id = isset($_GET['id']) ? (int) $_GET['id'] : 0;
 if (!$id)
@@ -19,8 +21,8 @@ $query = "SELECT ev.*,
     dm.full_name AS dept_manager_endorsed_by_name,
     CONCAT(ce.first_name, ' ', ce.last_name) AS consolidator_name,
     ce.job_title AS consolidator_job_title,
-    per.immediate_head_signature_data AS rater_signature_data,
-    rater.full_name AS rater_name,
+    COALESCE(per.immediate_head_signature_data, annual_rater_submission.rater_signature_data) AS rater_signature_data,
+    COALESCE(rater.full_name, annual_rater.full_name) AS rater_name,
     ep.package_id,
     ep.updated_at AS consolidated_at
     FROM evaluations ev
@@ -37,6 +39,16 @@ $query = "SELECT ev.*,
     LEFT JOIN employees ce ON ep.consolidator_employee_id = ce.employee_id
     LEFT JOIN probationary_evaluation_reviews per ON per.evaluation_id = ev.evaluation_id
     LEFT JOIN users rater ON rater.user_id = per.immediate_head_user_id
+    LEFT JOIN annual_evaluation_members annual_member ON annual_member.evaluation_id = ev.evaluation_id
+    LEFT JOIN annual_peer_submissions annual_rater_submission ON annual_rater_submission.submission_id = (
+        SELECT peer.submission_id FROM annual_peer_submissions peer
+        JOIN employees annual_head ON annual_head.employee_id = peer.rater_employee_id
+        WHERE peer.cycle_id = annual_member.cycle_id
+          AND peer.target_employee_id = annual_member.employee_id
+          AND annual_head.job_title_id = annual_member.reviewer_position_id
+        ORDER BY peer.submission_id DESC LIMIT 1
+    )
+    LEFT JOIN users annual_rater ON annual_rater.user_id = annual_rater_submission.submitted_by
     WHERE ev.evaluation_id = $id";
 
 $result = $conn->query($query);

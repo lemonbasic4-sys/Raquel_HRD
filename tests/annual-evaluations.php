@@ -71,6 +71,14 @@ try {
     foreach ([2=>2,3=>3,4=>4,5=>5,6=>4] as $employee=>$position) { $evals[$employee]=$employee; $makeEvaluation($employee,$position,$employee); }
     $actors=[]; foreach (range(1,7) as $id) $actors[$id]=annualActor($conn,$id);
     $m=annualMember($conn,4); $cycle=(int)$m['cycle_id'];
+    $submissionTitle='Annual self-rating ready for KRA review';
+    $staffReviewLink=annualUrl($actors[3],'?view=review&evaluation_id=4');
+    checkAnnual(count(annualQuery($conn,'SELECT notification_id FROM notifications WHERE user_id=3 AND title=? AND link=?',[$submissionTitle,$staffReviewLink]))===1,
+        'HR Staff Annual submission immediately notifies the configured HR Supervisor before peers complete');
+    checkAnnual(!annualQuery($conn,'SELECT notification_id FROM notifications WHERE user_id=2 AND title=? AND link LIKE ?',[$submissionTitle,'%evaluation_id=4']),
+        'staff Annual submission notification does not bypass the immediate head to HR Manager');
+    checkAnnual(annualPendingReviewCount($conn,$actors[3])===2,
+        'Performance Evaluation badge counts submitted direct-report Annual reviews');
     checkAnnual(count(annualQuery($conn,'SELECT member_id FROM annual_evaluation_members WHERE cycle_id=?',[$cycle]))===4,'department roster supports four members and multiple people in one position');
     checkAnnual((int)annualMember($conn,5)['cycle_id']!==$cycle,'same dates in a different department create a separate cycle');
     checkAnnual(annualCanFinalize($conn,$actors[3],$m),'HR Supervisor finalizes HR Staff');
@@ -129,16 +137,21 @@ try {
     annualApproveKra($conn,$actors[3],4,$ratings,'Rechecked original KRA.',annualReviewToken($conn,$m));
     annualSubmitPeers($conn,$actors[6],4,array_fill(0,8,3.67));
     $stale=annualReviewToken($conn,$m);
-    annualFinalize($conn,$actors[3],4,$ratings,'All expected raters submitted.',$stale);
+    annualFinalize($conn,$actors[3],4,$ratings,'All expected raters submitted; adjusted behavior scores during consolidation.',$stale,array_fill(0,8,3.5));
     $official=annualMember($conn,4);
-    checkAnnual((int)$official['current_version']===1 && (float)$official['official_score']===3.37,'first batch stores the official individual result');
+    $firstSnapshot=json_decode(annualQuery($conn,'SELECT snapshot_json FROM annual_evaluation_versions WHERE member_id=? AND version_number=1',[(int)$official['member_id']])[0]['snapshot_json'],true);
+    checkAnnual((int)$official['current_version']===1 && (float)$official['official_score']===3.34
+        && $firstSnapshot['core']===3.5 && $firstSnapshot['core_adjustments']===array_fill(0,8,3.5),
+        'immediate-head Core Values adjustments affect and persist in the finalized score version');
+    checkAnnual((bool)annualQuery($conn,"SELECT notification_id FROM notifications WHERE user_id=4 AND title='Annual evaluation finalized' AND link LIKE ?",['%evaluation_id=4']),
+        'employee receives an Annual finalization notification');
     $stale=annualReviewToken($conn,$official);
     annualQuery($conn,"INSERT INTO employees (employee_id,employee_code,first_name,last_name,hire_date,job_title_id,job_title,department_id,employment_status) VALUES (8,'TEST-8','Late','Joiner','2020-01-01',4,'HR Staff',1,'Regular')");
     annualQuery($conn,"INSERT INTO users (user_id,employee_id,username,email,password_hash,full_name,role) VALUES (8,8,'late','late@example.invalid','unused','Late Joiner','HR Staff')");
     $makeEvaluation(8,4,8);
     annualSubmitPeers($conn,annualActor($conn,8),4,array_fill(0,8,2.0));
     $revised=annualMember($conn,4);
-    checkAnnual((int)$revised['revision_pending']===1 && (float)$revised['official_score']===3.37,'late submission flags revision without changing the official result');
+    checkAnnual((int)$revised['revision_pending']===1 && (float)$revised['official_score']===3.34,'late submission flags revision without changing the official result');
     checkAnnual(annualCandidate($conn,$revised)['total']===3.31,'late peer data produces a separate revised candidate');
     $late=annualQuery($conn,'SELECT is_late FROM annual_peer_submissions WHERE cycle_id=? AND rater_employee_id=8 AND target_employee_id=4',[$cycle])[0];
     checkAnnual((int)$late['is_late']===1,'late is determined by first finalized batch rather than a calendar cutoff');
@@ -147,7 +160,7 @@ try {
     $final=annualMember($conn,4);
     checkAnnual((int)$final['current_version']===2 && !$final['revision_pending'] && (float)$final['official_score']===3.31,'immediate-head re-finalization makes revised score current');
     $history=annualQuery($conn,'SELECT snapshot_json FROM annual_evaluation_versions WHERE member_id=? ORDER BY version_number',[(int)$final['member_id']]);
-    checkAnnual(count($history)===2 && json_decode($history[0]['snapshot_json'],true)['total']===3.37,'previous finalized score is preserved in immutable version history');
+    checkAnnual(count($history)===2 && json_decode($history[0]['snapshot_json'],true)['total']===3.34,'previous finalized score is preserved in immutable version history');
     rejectsAnnual(fn()=>annualFinalize($conn,$actors[3],4,$ratings,'Repeat',annualReviewToken($conn,$final)),'an unchanged finalized result cannot be finalized repeatedly');
     annualQuery($conn,'UPDATE employees SET department_id=3 WHERE employee_id=6');
     rejectsAnnual(fn()=>annualSubmitPeers($conn,annualActor($conn,6),3,array_fill(0,8,3)),'a transfer cannot silently move the old department peer task');
@@ -176,28 +189,97 @@ try {
         && strpos(annualUrl(['role'=>'HR Supervisor'],'?view=peers'),'team-evaluation-packages.php?category=regular&view=peers')!==false,
         'HR Annual workflow uses Performance Evaluation while preserving peer actions');
     preg_match('/<form[^>]*id="annualRatingForm"[^>]*>(.*?)<\/form>/s',$html,$formHtml);
-    checkAnnual(isset($formHtml[1]) && substr_count($formHtml[1],'type="number"')===8 && strpos($formHtml[1],'type="radio"')===false,'rating page renders exactly eight numeric fields and no radio choices');
-    checkAnnual(strpos($html,'id="annualRatingSummary"')!==false && strpos($html,'After confirming, you cannot edit')!==false,'rating page renders confirmation summary and irreversible-submit notice');
+    checkAnnual(isset($formHtml[1]) && substr_count($formHtml[1],'name="scores[')===8
+        && strpos($formHtml[1],'name="kra[')!==false && strpos($formHtml[1],'type="radio"')===false,
+        'immediate-head rating page combines KRA inputs with eight numeric Core Values fields');
+    checkAnnual(substr_count($formHtml[1],'max="4"')>=10 && strpos($html,'Number(input.value)>4')!==false,
+        'KRA and Core Values inputs cap ratings at 4 while the server rejects out-of-range peer scores');
+    preg_match('/<table class="table align-middle annual-rating-table annual-score-table">(.*?)<\/table>/s',$formHtml[1],$behaviorRatingTable);
+    checkAnnual(isset($behaviorRatingTable[1]) && strpos($behaviorRatingTable[1],'<th class="text-end">Weight</th>')===false
+        && strpos($behaviorRatingTable[1],'2.50%')===false,
+        'Core Behaviors 360 rating table omits its per-item Weight column');
+    checkAnnual(strpos($formHtml[1],'data-bs-target="#annualRateKraPanel"')!==false
+          && strpos($formHtml[1],'data-bs-target="#annualRateCorePanel"')!==false
+          && strpos($formHtml[1],'data-bs-target="#annualRateReviewPanel"')!==false
+          && strpos($formHtml[1],'id="annualRatingPreviewKraRows"')!==false
+          && strpos($formHtml[1],'id="annualRatingPreviewBehaviorRows"')!==false
+          && strpos($formHtml[1],'id="annualRateKraNext"')!==false
+          && strpos($formHtml[1],'id="annualRateCoreBack"')!==false
+          && strpos($formHtml[1],'id="annualRateCoreNext"')!==false
+          && strpos($formHtml[1],'id="annualRateReviewBack"')!==false
+          && strpos($formHtml[1],'id="annualRaterSignatureCanvas"')!==false
+          && strpos($formHtml[1],'name="rater_signature_data"')!==false
+          && strpos($formHtml[1],'Employee self-rating')!==false
+          && strpos($formHtml[1],'leave the submitted ratings unchanged; the system will retain them as-is')!==false,
+          'immediate-head KRA review, self-rating comparison, 360 Core Values rating, and review/submit are shown in tabs');
+    checkAnnual(strpos($html,'id="annualRatingSummary"')!==false
+        && strpos($html,'Are you sure you want to submit?')!==false
+        && strpos($html,'This can’t be undone.')!==false
+        && strpos($html,'Yes, submit and lock')!==false
+        && strpos($html,'id="annualSummaryKraRows"')!==false
+        && strpos($html,'id="annualSummaryBehaviorRows"')!==false,
+        'confirmation separately summarizes KRA and behavior ratings and states submission cannot be undone');
+    checkAnnual(strpos($html,'data-draft-key="annual-rating-3-8"')!==false
+        && strpos($html,'sessionStorage.setItem(annualDraftKey')!==false
+        && strpos($html,'sessionStorage.removeItem(annualDraftKey)')!==false
+        && strpos($html,'activePanel')!==false,
+        'rating drafts and active review tab survive refresh until submission is completed');
+    annualQuery($conn,'UPDATE annual_evaluation_members SET evaluation_id=NULL WHERE cycle_id=? AND employee_id=3',[$cycle]);
+    $awaitingHeadHtml=renderAnnualFixture(3,'HR Supervisor','supervisor',0,'peers');
+    annualQuery($conn,'UPDATE annual_evaluation_members SET evaluation_id=3 WHERE cycle_id=? AND employee_id=3',[$cycle]);
+    checkAnnual(strpos($awaitingHeadHtml,'Self-rating required')!==false
+        && strpos($awaitingHeadHtml,'Submit your Annual self-rating first to unlock peer ratings.')!==false,
+        'peer action clearly explains that a head must submit their self-rating before Rate & review unlocks');
     $html=renderAnnualFixture(7,'Employee','employee',4,'results');
     checkAnnual(strpos($html,'Employee 1')!==false && strpos($html,'Test2 Employee')===false && strpos($html,'Test3 Employee')===false,'employee result HTML anonymizes peers and contains no rater names');
     $html=renderAnnualFixture(3,'HR Supervisor','supervisor',4,'review');
     checkAnnual(strpos($html,'Test2 Employee')!==false && strpos($html,'Version 2')!==false,'authorized consolidation HTML includes named ratings and previous result versions');
+    $managerView=renderAnnualFixture(3,'HR Supervisor','supervisor',2,'review');
+    checkAnnual(strpos($managerView,'Core Behaviors &amp; Values')!==false
+        && strpos($managerView,'Key Result Areas (KRA)')===false
+        && strpos($managerView,'Consolidation &amp; Final Score')===false
+        && strpos($managerView,'Employee 1')!==false && strpos($managerView,'Test3 Employee')===false,
+        'HR Supervisor sees only anonymous HR Manager behavior results and cannot change or finalize them');
+    $headView=renderAnnualFixture(2,'HR Manager','manager',3,'review');
+    checkAnnual(strpos($headView,'name="core_adjustments[0]"')!==false
+        && strpos($headView,'name="kra[')!==false,
+        'immediate-head consolidation allows KRA and Core Values adjustments together');
     checkAnnual((int)$conn->query('SELECT COUNT(*) n FROM notifications')->fetch_assoc()['n']===$noticeCount,'viewing rating and result pages does not generate duplicate notifications');
     $incompleteHtml=renderAnnualFixture(2,'HR Manager','manager',3,'review');
-    checkAnnual((bool)preg_match('/<button[^>]*type="submit"[^>]*disabled[^>]*>Finalize Annual evaluation<\/button>/', $incompleteHtml),
+    checkAnnual((bool)preg_match('/<button[^>]*type="submit"[^>]*disabled[^>]*>Approve &amp; finalize Annual evaluation<\/button>/', $incompleteHtml),
         'review disables finalization while expected peer ratings are missing');
-    checkAnnual((bool)preg_match('/<button[^>]*name="action" value="approve_kra"[^>]*>/', $incompleteHtml),
-        'review offers independent Approve KRA action while Annual finalization is disabled');
+    checkAnnual(strpos($incompleteHtml,'value="approve_kra"')===false
+        && strpos($incompleteHtml,'<label for="annualKraRemarks"')===false
+        && strpos($incompleteHtml,'Consolidation &amp; Final Score')!==false,
+        'consolidation uses a single final approval action without a separate KRA-only approval section');
+    checkAnnual(strpos($incompleteHtml,'Finalized versions')===false && strpos($incompleteHtml,'No finalized version yet.')===false,
+        'empty finalized-version history is hidden until a version exists');
     $progressHtml=renderAnnualFixture(3,'HR Supervisor','supervisor',0,'list');
     preg_match('/id="annualRoster"[^>]*>.*?<tbody>(.*?)<\/tbody>/s',$progressHtml,$progressRows);
     checkAnnual(isset($progressRows[1]) && strpos($progressRows[1],'Test4 Employee')!==false
-        && strpos($progressRows[1],'Test2 Employee')===false && strpos($progressRows[1],'Test3 Employee')===false,
-        'HR Supervisor Annual progress lists direct-report staff only, excluding manager and own evaluation');
+        && strpos($progressRows[1],'Test2 Employee')!==false && strpos($progressRows[1],'Test3 Employee')!==false,
+        'Annual default and former progress entry merge into the department peer list');
     $peerHtml=renderAnnualFixture(3,'HR Supervisor','supervisor',0,'peers');
     preg_match('/id="annualRoster"[^>]*>.*?<tbody>(.*?)<\/tbody>/s',$peerHtml,$peerRows);
     checkAnnual(isset($peerRows[1]) && strpos($peerRows[1],'Test2 Employee')!==false
         && strpos($peerRows[1],'Test3 Employee')!==false && strpos($peerRows[1],'Test4 Employee')!==false,
         '360 peer list still includes all department participants including the rater');
+    preg_match_all('/<tr[^>]*>.*?<\/tr>/s',$peerRows[1] ?? '',$allPeerRows);
+    $staffPeerRow=array_values(array_filter($allPeerRows[0] ?? [],static fn($row)=>strpos($row,'Test4 Employee')!==false));
+    checkAnnual(count($staffPeerRow)===1 && substr_count($staffPeerRow[0], 'class="btn btn-sm')===1
+        && strpos($staffPeerRow[0],'Consolidation &amp; result')!==false,
+        'a direct-report row shows one next-action button instead of separate rating and consolidation buttons');
+    $headReviewRows=[]; foreach (annualKraRows($conn,8) as $row) $headReviewRows[$row['score_id']]=$row['rating'];
+    $headReviewRows[array_key_first($headReviewRows)]=3.25;
+    $raterSignature='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/6wAAAABJRU5ErkJggg==';
+    rejectsAnnual(fn()=>annualReviewAndRate($conn,$actors[3],8,$headReviewRows,annualReviewToken($conn,annualMember($conn,8)),array_fill(0,8,3.5),''),
+        'immediate-head combined review requires a rater signature');
+    annualReviewAndRate($conn,$actors[3],8,$headReviewRows,annualReviewToken($conn,annualMember($conn,8)),array_fill(0,8,3.5),$raterSignature);
+    checkAnnual((float)annualKraRows($conn,8)[0]['rating']===3.25
+        && (annualQuery($conn,'SELECT rater_signature_data,rater_signed_at FROM annual_peer_submissions WHERE cycle_id=? AND rater_employee_id=3 AND target_employee_id=8',[$cycle])[0]['rater_signature_data'] ?? '')===$raterSignature,
+        'immediate head can submit adjusted KRA and 360 ratings with a saved printable rater signature');
+    checkAnnual(strpos(file_get_contents(__DIR__.'/../manager/print-evaluation.php'),'annual_rater_submission.rater_signature_data')!==false,
+        'traditional printed evaluation includes the immediate head Annual rater signature');
     $request=function(string $case) use ($testDb): string {
         $process=proc_open([PHP_BINARY,__DIR__.'/annual-request.php',$testDb,$case],[1=>['pipe','w'],2=>['pipe','w']],$pipes);
         if (!is_resource($process)) throw new RuntimeException('Cannot launch fixture request.');

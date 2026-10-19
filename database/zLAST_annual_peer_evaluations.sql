@@ -44,6 +44,8 @@ CREATE TABLE IF NOT EXISTS annual_peer_submissions (
     target_employee_id INT NOT NULL,
     submitted_by INT NOT NULL,
     scores_json TEXT NOT NULL,
+    rater_signature_data LONGTEXT NULL,
+    rater_signed_at DATETIME NULL,
     is_late TINYINT NOT NULL DEFAULT 0,
     submitted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY annual_peer_once (cycle_id, rater_employee_id, target_employee_id),

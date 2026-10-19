@@ -55,6 +55,14 @@ function ensureAnnualEvaluationSchema($conn): void
     foreach (explode(';', $sql) as $statement) {
         if (trim($statement) !== '') $conn->query($statement);
     }
+    foreach ([
+        'rater_signature_data' => 'LONGTEXT NULL',
+        'rater_signed_at' => 'DATETIME NULL',
+    ] as $column => $definition) {
+        if (!$conn->query("SHOW COLUMNS FROM annual_peer_submissions LIKE '{$column}'")->num_rows) {
+            $conn->query("ALTER TABLE annual_peer_submissions ADD COLUMN {$column} {$definition}");
+        }
+    }
     $ready[$key] = true;
 }
 
@@ -199,7 +207,7 @@ function annualCalculate(array $kraRows, array $self, array $peers): array
 
 function annualKraRows($conn, int $evaluationId): array
 {
-    return annualQuery($conn, "SELECT es.score_id, ec.criterion_name, ec.weight, es.score_value AS self_rating,
+    return annualQuery($conn, "SELECT es.score_id, ec.criterion_name, ec.kpi_description, ec.weight, es.score_value AS self_rating,
             COALESCE(es.supervisor_override_score,es.score_value) AS rating
         FROM evaluation_scores es JOIN evaluation_criteria ec ON ec.criterion_id=es.criterion_id
         WHERE es.evaluation_id=? AND ec.section='KRA' ORDER BY ec.sort_order, ec.criterion_id", [$evaluationId]);
@@ -220,6 +228,21 @@ function annualCandidate($conn, array $member): array
     $peers = annualPeers($conn, $member);
     return annualCalculate(annualKraRows($conn, (int)$member['evaluation_id']),
         json_decode($member['self_values_json'], true), array_map(static fn($p) => json_decode($p['scores_json'], true), $peers));
+}
+
+function annualApplyCoreAdjustments(array $candidate, array $adjustments): array
+{
+    if (!$adjustments) { $candidate['core_adjustments_changed']=false; return $candidate; }
+    $adjustments=annualValidateScores($adjustments);
+    $changed=false;
+    foreach ($adjustments as $i=>$score) {
+        if (abs((float)$candidate['item_averages'][$i]-(float)$score)>.00001) $changed=true;
+    }
+    $candidate['item_averages']=$adjustments;
+    $candidate['core']=round(array_sum($adjustments)/8,2);
+    $candidate['total']=round($candidate['kra']*.8+$candidate['core']*.2,2);
+    $candidate['core_adjustments_changed']=$changed;
+    return $candidate;
 }
 
 function annualReviewToken($conn, array $member): string
@@ -272,6 +295,9 @@ function annualRegisterSubmission($conn, int $evaluationId): void
     if ($member['self_values_json']) throw new DomainException('This Annual self-rating has already been submitted.');
     annualQuery($conn, 'UPDATE annual_evaluation_members SET evaluation_id=?,self_values_json=? WHERE member_id=?', [$evaluationId,$values,(int)$member['member_id']]);
     annualCandidate($conn,annualMember($conn,$evaluationId));
+    $submittedMember=annualMember($conn,$evaluationId);
+    annualNotifyHeads($conn,$submittedMember,'Annual self-rating ready for KRA review',
+        $submittedMember['first_name'].' '.$submittedMember['last_name'].' submitted an Annual self-rating. Review and approve the KRA in Performance Evaluation. Final Annual approval waits for all expected 360 ratings.');
     annualNotifyEmployee($conn,(int)$ev['employee_id'],'Annual self-rating submitted','Your department 360 rating tasks are available.');
     annualNotifyCycleRaters($conn,$cycleId,$evaluationId,(int)$ev['employee_id'],!empty($cycle['first_finalized_at']));
 }
@@ -318,12 +344,20 @@ function annualNotifyHeads($conn, array $member, string $title, string $message)
     }
 }
 
-function annualSubmitPeers($conn, array $actor, int $evaluationId, array $scores): void
+function annualSubmitPeers($conn, array $actor, int $evaluationId, array $scores, bool $manageTransaction = true, string $signature = ''): void
 {
     ensureAuditTrailSchema($conn);
     $scores = annualValidateScores($scores);
+    if ($signature !== '' && (!preg_match('/^data:image\/png;base64,/', $signature) || strlen($signature) > 100000)) {
+        throw new DomainException('The rater signature is invalid. Please sign again.');
+    }
+    if ($signature !== '') {
+        $signatureBytes=base64_decode(substr($signature,strpos($signature,',')+1),true);
+        $signatureInfo=$signatureBytes===false ? false : @getimagesizefromstring($signatureBytes);
+        if (!$signatureInfo || ($signatureInfo[2] ?? null)!==IMAGETYPE_PNG) throw new DomainException('The rater signature image is invalid. Please sign again.');
+    }
     if (!annualCanRate($actor)) throw new DomainException('Use your authorized department portal to submit 360 ratings.');
-    $conn->begin_transaction();
+    if ($manageTransaction) $conn->begin_transaction();
     try {
         $member = annualMember($conn,$evaluationId);
         if (!$member) throw new DomainException('This annual evaluation is unavailable.');
@@ -340,8 +374,8 @@ function annualSubmitPeers($conn, array $actor, int $evaluationId, array $scores
             [(int)$member['cycle_id'],(int)$actor['employee_id'],(int)$member['employee_id']]);
         if ($exists) throw new DomainException('Your submitted rating is locked and cannot be edited.');
         $late=$member['first_finalized_at'] ? 1 : 0;
-        annualQuery($conn,'INSERT INTO annual_peer_submissions (cycle_id,rater_employee_id,target_employee_id,submitted_by,scores_json,is_late) VALUES (?,?,?,?,?,?)',
-            [(int)$member['cycle_id'],(int)$actor['employee_id'],(int)$member['employee_id'],(int)$actor['user_id'],json_encode($scores),$late]);
+        annualQuery($conn,'INSERT INTO annual_peer_submissions (cycle_id,rater_employee_id,target_employee_id,submitted_by,scores_json,rater_signature_data,rater_signed_at,is_late) VALUES (?,?,?,?,?,?,?,?)',
+            [(int)$member['cycle_id'],(int)$actor['employee_id'],(int)$member['employee_id'],(int)$actor['user_id'],json_encode($scores),$signature !== '' ? $signature : null,$signature !== '' ? date('Y-m-d H:i:s') : null,$late]);
         annualQuery($conn,'UPDATE notifications SET needs_action=0 WHERE user_id=? AND link=?',
             [(int)$actor['user_id'],annualUrl($actor,'?view=rate&evaluation_id='.$evaluationId)]);
         $remaining=(int)annualQuery($conn,"SELECT COUNT(*) AS n FROM annual_evaluation_members m
@@ -360,15 +394,15 @@ function annualSubmitPeers($conn, array $actor, int $evaluationId, array $scores
         $received=(int)annualQuery($conn,'SELECT COUNT(*) AS n FROM annual_peer_submissions WHERE cycle_id=? AND target_employee_id=?',[(int)$member['cycle_id'],(int)$member['employee_id']])[0]['n'];
         $expected=annualExpectedPeers($conn,(int)$member['cycle_id'],(int)$member['employee_id']);
         if ($revisionNotice || $received===$expected) annualNotifyHeads($conn,$member,$revisionNotice ? 'Late annual 360 rating received' : 'Annual 360 summary ready','Review the updated 360 summary for '.$member['first_name'].' '.$member['last_name'].'.');
-        $conn->commit();
-    } catch (Throwable $e) { $conn->rollback(); throw $e; }
+        if ($manageTransaction) $conn->commit();
+    } catch (Throwable $e) { if ($manageTransaction) $conn->rollback(); throw $e; }
 }
 
 /** Approve KRAs independently of the pending department peer-rating phase. */
-function annualApproveKra($conn, array $actor, int $evaluationId, array $ratings, string $remarks, string $token): void
+function annualApproveKra($conn, array $actor, int $evaluationId, array $ratings, string $remarks, string $token, bool $manageTransaction = true, bool $requireRemarks = true): void
 {
     ensureAuditTrailSchema($conn);
-    $conn->begin_transaction();
+    if ($manageTransaction) $conn->begin_transaction();
     try {
         $member=annualMember($conn,$evaluationId);
         if (!$member) throw new DomainException('This Annual evaluation is unavailable.');
@@ -379,10 +413,23 @@ function annualApproveKra($conn, array $actor, int $evaluationId, array $ratings
         if ((int)$member['current_version']>0 && !$member['revision_pending']) throw new DomainException('This result is already finalized.');
         if (!$token || !hash_equals(annualReviewToken($conn,$member),$token)) throw new DomainException('Ratings changed while you were reviewing. Reload before approving KRA.');
         $changes=annualApplyKraRatings($conn,$actor,$evaluationId,$ratings);
-        if ($changes && $remarks==='') throw new DomainException('Explain your KRA adjustments before approving.');
+        if ($requireRemarks && $changes && $remarks==='') throw new DomainException('Explain your KRA adjustments before approving.');
         annualQuery($conn,'INSERT INTO annual_kra_approvals (member_id,approved_by,remarks,ratings_json) VALUES (?,?,?,?)',
             [(int)$member['member_id'],(int)$actor['user_id'],$remarks,json_encode(annualKraRows($conn,$evaluationId))]);
         logAudit($conn,(int)$actor['user_id'],'APPROVE','Annual KRA',$evaluationId,'Approved KRA ratings independently of Annual finalization. '.$remarks);
+        if ($manageTransaction) $conn->commit();
+    } catch (Throwable $e) { if ($manageTransaction) $conn->rollback(); throw $e; }
+}
+
+/** Save the head's KRA review and their own peer rating together, or neither. */
+function annualReviewAndRate($conn, array $actor, int $evaluationId, array $ratings, string $token, array $scores, string $signature): void
+{
+    if ($signature==='') throw new DomainException('Sign in the rater signature box before submitting.');
+    ensureAuditTrailSchema($conn);
+    $conn->begin_transaction();
+    try {
+        annualApproveKra($conn,$actor,$evaluationId,$ratings,'',$token,false,false);
+        annualSubmitPeers($conn,$actor,$evaluationId,$scores,false,$signature);
         $conn->commit();
     } catch (Throwable $e) { $conn->rollback(); throw $e; }
 }
@@ -404,7 +451,7 @@ function annualApplyKraRatings($conn, array $actor, int $evaluationId, array $ra
     return $changes;
 }
 
-function annualFinalize($conn, array $actor, int $evaluationId, array $ratings, string $remarks, string $token): void
+function annualFinalize($conn, array $actor, int $evaluationId, array $ratings, string $remarks, string $token, array $coreAdjustments = []): void
 {
     ensureAuditTrailSchema($conn);
     $conn->begin_transaction();
@@ -418,17 +465,17 @@ function annualFinalize($conn, array $actor, int $evaluationId, array $ratings, 
         if ((int)$member['current_version']>0 && !$member['revision_pending']) throw new DomainException('This result is already finalized.');
         if (!$token || !hash_equals(annualReviewToken($conn,$member),$token)) throw new DomainException('Ratings changed while you were reviewing. Reload the summary before finalizing.');
         $changes=annualApplyKraRatings($conn,$actor,$evaluationId,$ratings);
-        $candidate=annualCandidate($conn,$member);
+        $candidate=annualApplyCoreAdjustments(annualCandidate($conn,$member),$coreAdjustments);
         $expected=annualExpectedPeers($conn,(int)$member['cycle_id'],(int)$member['employee_id']);
         if ($candidate['peer_count']<$expected) {
             throw new DomainException('Finalization is unavailable until all expected raters have submitted their 360 ratings.');
         }
-        if (($changes || $member['revision_pending']) && trim($remarks)==='') {
-            throw new DomainException('Explain KRA adjustments, incomplete participation, or late-score revisions in the review remarks.');
+        if (($changes || $candidate['core_adjustments_changed'] || $member['revision_pending']) && trim($remarks)==='') {
+            throw new DomainException('Explain KRA or Core Values adjustments, or late-score revisions, in the review remarks.');
         }
         if ($expected>0 && $candidate['peer_count']===0) throw new DomainException('At least one submitted peer rating is needed before finalization.');
         $version=(int)$member['current_version']+1;
-        $snapshot=$candidate+['kra_rows'=>annualKraRows($conn,$evaluationId),'self_values'=>json_decode($member['self_values_json'],true),
+        $snapshot=$candidate+['core_adjustments'=>$coreAdjustments ? array_map(static fn($score)=>round((float)$score,2),$coreAdjustments) : null,'kra_rows'=>annualKraRows($conn,$evaluationId),'self_values'=>json_decode($member['self_values_json'],true),
             'peers'=>annualPeers($conn,$member), 'expected_peers'=>$expected,'previous_score'=>$member['official_score']];
         annualQuery($conn,'INSERT INTO annual_evaluation_versions (member_id,version_number,finalized_by,remarks,snapshot_json) VALUES (?,?,?,?,?)',
             [(int)$member['member_id'],$version,(int)$actor['user_id'],$remarks,json_encode($snapshot)]);
@@ -444,7 +491,7 @@ function annualFinalize($conn, array $actor, int $evaluationId, array $ratings, 
 }
 
 /** Counts work only; rendering navigation never creates notifications or cycles. */
-function annualPendingCount($conn, array $actor): int
+function annualPendingReviewCount($conn, array $actor): int
 {
     if (!$conn->query("SHOW TABLES LIKE 'annual_evaluation_members'")->num_rows) return 0;
     $reviews=annualQuery($conn,"SELECT m.evaluation_id FROM annual_evaluation_members m
@@ -455,6 +502,13 @@ function annualPendingCount($conn, array $actor): int
         $member=annualMember($conn,(int)$review['evaluation_id']);
         if ($member && annualCanFinalize($conn,$actor,$member)) $count++;
     }
+    return $count;
+}
+
+function annualPendingCount($conn, array $actor): int
+{
+    if (!$conn->query("SHOW TABLES LIKE 'annual_evaluation_members'")->num_rows) return 0;
+    $count=annualPendingReviewCount($conn,$actor);
     if (annualCanRate($actor)) {
         $row=annualQuery($conn,"SELECT COUNT(*) AS n FROM annual_evaluation_members target
             JOIN annual_evaluation_members own ON own.cycle_id=target.cycle_id AND own.employee_id=? AND own.evaluation_id IS NOT NULL

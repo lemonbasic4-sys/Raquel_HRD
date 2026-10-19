@@ -92,6 +92,8 @@ switch ($effective_role) {
             if ($r) $_mgr_career_pending = (int)($r->fetch_assoc()['c'] ?? 0);
         } catch (Exception $e) {}
         $_mgr_pkg_pending = countPendingOrganizationPackagesForUser($conn, (int)($_SESSION['user_id'] ?? 0));
+        $_annual_manager_actor=annualActor($conn,(int)($_SESSION['user_id'] ?? 0));
+        if ($_annual_manager_actor) $_mgr_pkg_pending+=annualPendingReviewCount($conn,$_annual_manager_actor);
         $_mgr_approvals_pending = countManagerPendingApprovals($conn);
 
         $sidebar_menus = [
@@ -139,6 +141,8 @@ switch ($effective_role) {
             if ($r) $_sup_career_pending = (int)($r->fetch_assoc()['c'] ?? 0);
         } catch (Exception $e) {}
         $_sup_pkg_pending = countPendingOrganizationPackagesForUser($conn, (int)($_SESSION['user_id'] ?? 0));
+        $_annual_supervisor_actor=annualActor($conn,(int)($_SESSION['user_id'] ?? 0));
+        if ($_annual_supervisor_actor) $_sup_pkg_pending+=annualPendingReviewCount($conn,$_annual_supervisor_actor);
 
         $sidebar_menus = [
             'MAIN' => [
