@@ -51,10 +51,23 @@ if ($evaluationId) {
     $sameDepartmentPeerView=$member && (int)$member['employee_id']!==(int)$actor['employee_id']
         && (int)$member['department_id']===(int)$actor['department_id'] && annualCanRate($actor);
     if (!$member || ((int)$member['employee_id']!==(int)$actor['employee_id'] && !annualCanSeeNames($conn,$actor,$member)
-        && $view!=='rate' && !($view==='review' && $sameDepartmentPeerView))) { http_response_code(403); exit('This Annual evaluation is unavailable to your account.'); }
+        && $view!=='rate' && !(in_array($view,['review','results'],true) && $sameDepartmentPeerView))) { http_response_code(403); exit('This Annual evaluation is unavailable to your account.'); }
     $cycleId=(int)$member['cycle_id'];
-    $named=annualCanSeeNames($conn,$actor,$member);
+    // The HRD workflow now displays rater names in 360 results. Keep
+    // authorization for viewing the evaluation itself separate from rating/finalization.
+    $named=(int)$actor['employee_id']!==(int)$member['employee_id'];
     $canFinalize=annualCanFinalize($conn,$actor,$member);
+}
+$headReviewSubmission=null;
+$headReviewKra=[];
+if ($view==='head-review') {
+    if (!$member || !$canFinalize) { http_response_code(403); exit('Only this employee\'s immediate head can view the submitted head review.'); }
+    $headReviewSubmission=annualQuery($conn,'SELECT scores_json,rater_signature_data,rater_signed_at,submitted_at FROM annual_peer_submissions WHERE cycle_id=? AND rater_employee_id=? AND target_employee_id=?',
+        [$cycleId,(int)$actor['employee_id'],(int)$member['employee_id']])[0] ?? null;
+    if (!$headReviewSubmission) { http_response_code(404); exit('The head review has not been submitted.'); }
+    $kraApproval=annualQuery($conn,'SELECT ratings_json FROM annual_kra_approvals WHERE member_id=? AND approved_by=? AND approved_at<=? ORDER BY approved_at DESC,approval_id DESC LIMIT 1',
+        [(int)$member['member_id'],(int)$actor['user_id'],$headReviewSubmission['submitted_at']])[0] ?? null;
+    $headReviewKra=$kraApproval ? (json_decode($kraApproval['ratings_json'],true) ?: []) : annualKraRows($conn,$evaluationId);
 }
 $cycle=null;
 foreach ($cycles as $c) if ((int)$c['cycle_id']===$cycleId) $cycle=$c;
@@ -159,7 +172,11 @@ require_once __DIR__ . '/header.php';
                         <?php if (empty($own[0]['evaluation_id'])): ?>
                             <button class="btn btn-sm btn-outline-secondary" type="button" disabled aria-disabled="true" title="Submit your Annual self-rating first to unlock peer ratings.">Self-rating required</button>
                         <?php elseif (annualCanFinalize($conn,$actor,$target) && $m['rated']): ?>
-                            <a class="btn btn-sm btn-outline-success" href="<?php echo annualUrl($actor,'?view=review&evaluation_id='.(int)$m['evaluation_id']); ?>">Consolidation &amp; result</a>
+                            <?php if (!empty($m['revision_pending'])): ?>
+                                <a class="btn btn-sm btn-outline-success" href="<?php echo annualUrl($actor,'?view=review&evaluation_id='.(int)$m['evaluation_id']); ?>">Review revised result</a>
+                            <?php else: ?>
+                                <a class="btn btn-sm btn-outline-success" href="<?php echo annualUrl($actor,'?view=head-review&evaluation_id='.(int)$m['evaluation_id']); ?>">View submitted review</a>
+                            <?php endif; ?>
                         <?php elseif (annualCanFinalize($conn,$actor,$target)): ?>
                             <a class="btn btn-sm btn-outline-success" href="<?php echo annualUrl($actor,'?view=rate&evaluation_id='.(int)$m['evaluation_id']); ?>">Rate &amp; review</a>
                         <?php elseif ($m['rated']): ?>
@@ -173,6 +190,37 @@ require_once __DIR__ . '/header.php';
                 </tr>
             <?php endforeach; ?></tbody>
         </table></div></div>
+    <?php elseif ($view==='head-review'): $headReviewScores=json_decode($headReviewSubmission['scores_json'],true) ?: []; $headReviewSelf=json_decode($member['self_values_json'] ?? '[]',true) ?: []; $headReviewScore=annualCalculate($headReviewKra,$headReviewScores,[]); ?>
+        <section class="content-card p-4 annual-head-review-view">
+            <div class="annual-peer-results-header">
+                <div><p class="small text-uppercase mb-1">Immediate-head submission · View only</p><h2 class="h4 mb-1"><?php echo e($member['first_name'].' '.$member['last_name']); ?></h2>
+                    <p class="mb-0"><?php echo e($member['position_name'].' · '.$member['period_start'].' to '.$member['period_end']); ?></p></div>
+                <span class="annual-status-pill is-complete">Submitted · Locked</span>
+            </div>
+            <section class="annual-head-review-score mb-4 p-3 rounded" aria-label="Provisional overall score from head submission">
+                <div class="annual-head-review-score-icon" aria-hidden="true"><i class="fas fa-chart-line"></i></div>
+                <div class="annual-head-review-score-details">
+                    <div class="annual-head-review-score-kicker">Weighted result · 80/20</div>
+                    <h3 class="h5 mb-3">Provisional overall score · Head submission</h3>
+                    <div class="annual-head-review-score-breakdown">
+                        <div class="annual-head-review-score-part"><span>KRA <b>80%</b></span><strong><?php echo number_format($headReviewScore['kra'],2); ?></strong></div>
+                        <i class="fas fa-plus annual-head-review-score-operator" aria-hidden="true"></i>
+                        <div class="annual-head-review-score-part annual-head-review-score-part--behavior"><span>Behavior <b>20%</b></span><strong><?php echo number_format($headReviewScore['core'],2); ?></strong></div>
+                    </div>
+                </div>
+                <div class="annual-head-review-score-total"><span>Weighted score</span><strong><?php echo number_format($headReviewScore['total'],2); ?></strong><small>Out of 4.00</small></div>
+            </section>
+            <h3 class="h5 annual-review-section"><span>Key Result Areas · Immediate-head review</span><small>80% KRA</small></h3>
+            <div class="table-responsive annual-score-table-wrap mb-4"><table class="table annual-score-table"><thead><tr><th>Criterion</th><th class="text-end">Weight</th><th class="text-end">Employee self-rating</th><th class="text-end">Head-reviewed rating</th></tr></thead><tbody>
+                <?php foreach ($headReviewKra as $row): ?><tr><td><strong><?php echo e($row['criterion_name']); ?></strong><?php if (!empty($row['kpi_description'])): ?><small><?php echo e($row['kpi_description']); ?></small><?php endif; ?></td><td class="text-end"><?php echo number_format((float)$row['weight'],2); ?>%</td><td class="text-end"><?php echo number_format((float)$row['self_rating'],2); ?></td><td class="text-end"><strong><?php echo number_format((float)$row['rating'],2); ?></strong></td></tr><?php endforeach; ?>
+            </tbody></table></div>
+            <h3 class="h5 annual-review-section"><span>Core Behaviors &amp; Values · Head's 360 rating</span><small>20% Core Values</small></h3>
+            <div class="table-responsive annual-score-table-wrap mb-4"><table class="table annual-score-table"><thead><tr><th>Behavior</th><th class="text-end">Employee self-rating</th><th class="text-end">Head's submitted rating</th></tr></thead><tbody>
+                <?php foreach (annualCoreValues() as $i=>$value): ?><tr><td><strong><?php echo e($value['name']); ?></strong><small><?php echo e($value['kpi']); ?></small></td><td class="text-end"><?php echo isset($headReviewSelf[$i]) ? number_format((float)$headReviewSelf[$i],2) : '—'; ?></td><td class="text-end"><strong><?php echo number_format((float)($headReviewScores[$i] ?? 0),2); ?></strong></td></tr><?php endforeach; ?>
+            </tbody></table></div>
+            <section class="annual-rater-signature"><h3 class="h6 fw-bold">Rater signature</h3><?php if (!empty($headReviewSubmission['rater_signature_data'])): ?><img src="<?php echo e($headReviewSubmission['rater_signature_data']); ?>" alt="Submitted immediate-head rater signature" style="display:block;max-width:560px;width:100%;max-height:150px;object-fit:contain;background:#fff;border:1px solid #d5ddd2;border-radius:8px;padding:8px;"><p class="small text-muted mt-2 mb-0">Signed <?php echo e($headReviewSubmission['rater_signed_at'] ?? ''); ?></p><?php else: ?><p class="text-muted mb-0">No signature was saved on this submission.</p><?php endif; ?></section>
+            <a class="btn btn-outline-success mt-4" href="<?php echo annualUrl($actor,'?view=peers&amp;cycle_id='.$cycleId); ?>">Back to Department Peers</a>
+        </section>
     <?php elseif ($view==='rate'): ?>
         <section class="content-card p-4">
             <h2 class="h4"><?php echo e($member['first_name'].' '.$member['last_name']); ?></h2>
@@ -257,15 +305,33 @@ require_once __DIR__ . '/header.php';
         $kra=annualKraRows($conn,$evaluationId);
         $submittedKraTotal=round(array_sum(array_map(static fn($row)=>(float)$row['weight']*(float)$row['self_rating']/100,$kra)),2);
         $versions=annualQuery($conn,'SELECT version_number,finalized_at,remarks,snapshot_json FROM annual_evaluation_versions WHERE member_id=? ORDER BY version_number DESC',[(int)$member['member_id']]);
-        $editable=$canFinalize && (!$member['current_version'] || $member['revision_pending']);
+        $editable=$view==='review' && $canFinalize && (!$member['current_version'] || $member['revision_pending']);
         $expected=max(0,count($members)-1);
         ?>
         <?php if (!$canFinalize && $sameDepartmentPeerView): ?>
         <section class="content-card p-4 mb-4" id="annual360">
-            <h2 class="h4"><?php echo e($member['first_name'].' '.$member['last_name']); ?> · Core Behaviors &amp; Values</h2>
-            <p><?php echo e($member['position_name'].' · '.$member['period_start'].' to '.$member['period_end']); ?></p>
-            <p class="small text-muted">Behavior results only. Peer identities are hidden; KRA and final approval are available to this employee’s immediate head.</p>
-            <div class="table-responsive annual-score-table-wrap"><table class="table align-middle annual-score-table annual-core-score-table"><thead><tr><th>Criterion</th><th class="text-end">Weight</th><th class="text-end">Self-rating</th><?php foreach ($peers as $i=>$p): ?><th class="text-end">Employee <?php echo $i+1; ?></th><?php endforeach; ?><th class="text-end">Combined average</th></tr></thead><tbody>
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+                <div>
+                    <h2 class="h4"><?php echo e($member['first_name'].' '.$member['last_name']); ?> · Core Behaviors &amp; Values</h2>
+                    <p><?php echo e($member['position_name'].' · '.$member['period_start'].' to '.$member['period_end']); ?></p>
+                    <p class="small text-muted mb-0">Behavior results include the names of employees who submitted each 360 rating.</p>
+                </div>
+                <?php if (count($peers)>=$expected): ?>
+                <aside class="annual-head-review-score annual-peer-live-score p-3 rounded" aria-label="Final live annual score after all department peer ratings">
+                    <div class="annual-head-review-score-icon" aria-hidden="true"><i class="fas fa-chart-line"></i></div>
+                    <div class="annual-head-review-score-details">
+                        <div class="annual-head-review-score-kicker">All department ratings received</div>
+                        <div class="annual-head-review-score-breakdown">
+                            <div class="annual-head-review-score-part"><span>KRA <b>80%</b></span><strong><?php echo number_format($candidate['kra'],2); ?></strong></div>
+                            <i class="fas fa-plus annual-head-review-score-operator" aria-hidden="true"></i>
+                            <div class="annual-head-review-score-part annual-head-review-score-part--behavior"><span>Behavior <b>20%</b></span><strong><?php echo number_format($candidate['core'],2); ?></strong></div>
+                        </div>
+                    </div>
+                    <div class="annual-head-review-score-total"><span>Overall score</span><strong><?php echo number_format($candidate['total'],2); ?></strong><small>KRA × 80% + Behavior × 20%</small></div>
+                </aside>
+                <?php endif; ?>
+            </div>
+            <div class="table-responsive annual-score-table-wrap"><table class="table align-middle annual-score-table annual-core-score-table"><thead><tr><th>Criterion</th><th class="text-end">Weight</th><th class="text-end">Self-rating</th><?php foreach ($peers as $i=>$p): ?><th class="text-end"><?php echo e($p['rater_name']); ?></th><?php endforeach; ?><th class="text-end">Combined average</th></tr></thead><tbody>
             <?php foreach (annualCoreValues() as $i=>$value): ?><tr><td><strong><?php echo e($value['name']); ?></strong><small><?php echo e($value['kpi']); ?></small></td><td class="text-end">2.50%</td><td class="text-end"><?php echo number_format((float)$self[$i],2); ?></td><?php foreach ($peers as $p): $peerScores=json_decode($p['scores_json'],true); ?><td class="text-end"><?php echo number_format((float)$peerScores[$i],2); ?></td><?php endforeach; ?><td class="text-end"><?php echo number_format($candidate['item_averages'][$i],2); ?></td></tr><?php endforeach; ?>
             </tbody><tfoot><tr><th colspan="<?php echo 3+count($peers); ?>">Core Behaviors &amp; Values total</th><td class="text-end"><strong><?php echo number_format($candidate['core'],2); ?></strong><small>Weight: 20%</small></td></tr></tfoot></table></div>
         </section>
@@ -283,8 +349,12 @@ require_once __DIR__ . '/header.php';
                     <?php if ($member['revision_pending']): ?><small>Pending candidate: <?php echo number_format($candidate['total'],2); ?></small><?php endif; ?></div></div>
             </div>
         </section>
+        <?php if ($editable): ?>
         <form method="post" class="content-card annual-review-card mb-4" id="annualConsolidationForm" data-core="<?php echo $candidate['core']; ?>">
             <?php echo csrfField(); ?><input type="hidden" name="action" value="finalize"><input type="hidden" name="review_token" value="<?php echo annualReviewToken($conn,$member); ?>">
+        <?php else: ?>
+        <section class="content-card annual-review-card mb-4" aria-label="Annual evaluation details">
+        <?php endif; ?>
             <div class="annual-review-tabs" role="tablist" aria-label="Evaluation sections">
                 <button class="active" id="annualKraTab" type="button" role="tab" data-bs-toggle="tab" data-bs-target="#annualKraPanel" aria-controls="annualKraPanel" aria-selected="true"><i class="fas fa-chart-pie me-2"></i>Key Result Areas (KRA) <span><?php echo count($kra); ?></span></button>
                 <button id="annualCoreTab" type="button" role="tab" data-bs-toggle="tab" data-bs-target="#annualCorePanel" aria-controls="annualCorePanel" aria-selected="false"><i class="fas fa-users me-2"></i>Core Behaviors &amp; Values <span>8</span></button>
@@ -312,10 +382,24 @@ require_once __DIR__ . '/header.php';
             </tbody><tfoot><tr><th colspan="<?php echo 3+count($peers); ?>">Core Behaviors &amp; Values total</th><td class="text-end"><strong id="annualReviewedCoreTotal"><?php echo number_format($candidate['core'],2); ?></strong><small>Weight: 20%</small></td></tr></tfoot></table></div>
             </div>
             <div class="tab-pane" id="annualDecisionPanel" role="tabpanel" aria-labelledby="annualDecisionTab" tabindex="0">
-            <h3 class="h5 annual-review-section">Consolidation &amp; Final Score</h3>
-            <p>Reviewed KRA (80%) + individual Core Values result (20%). Finalized results are preserved in the version history below.</p>
+            <h3 class="h5 annual-review-section"><?php echo $view==='results' && !(int)$member['current_version'] ? 'Submitted Ratings · View Only' : 'Consolidation &amp; Final Score'; ?></h3>
+            <p><?php echo $view==='results' && !(int)$member['current_version']
+                ? 'The immediate-head KRA review and submitted 360 ratings are locked. Annual finalization will be completed after department peer participation is complete.'
+                : 'Reviewed KRA (80%) + individual Core Values result (20%). Finalized results are preserved in the version history below.'; ?></p>
             <?php if ($editable): ?>
-                <div class="alert alert-info" id="annualProposedResult" aria-live="polite">Proposed score: <?php echo number_format($candidate['total'],2); ?></div>
+                <section class="annual-head-review-score mb-4 p-3 rounded" id="annualProposedResult" aria-label="Proposed weighted annual score" aria-live="polite">
+                    <div class="annual-head-review-score-icon" aria-hidden="true"><i class="fas fa-chart-line"></i></div>
+                    <div class="annual-head-review-score-details">
+                        <div class="annual-head-review-score-kicker">Weighted result · 80/20</div>
+                        <h4 class="h6 mb-2">Proposed overall score</h4>
+                        <div class="annual-head-review-score-breakdown">
+                            <div class="annual-head-review-score-part"><span>KRA <b>80%</b></span><strong id="annualProposedKra"><?php echo number_format($candidate['kra'],2); ?></strong></div>
+                            <i class="fas fa-plus annual-head-review-score-operator" aria-hidden="true"></i>
+                            <div class="annual-head-review-score-part annual-head-review-score-part--behavior"><span>Behavior <b>20%</b></span><strong id="annualProposedCore"><?php echo number_format($candidate['core'],2); ?></strong></div>
+                        </div>
+                    </div>
+                    <div class="annual-head-review-score-total"><span>Overall score</span><strong id="annualProposedTotal"><?php echo number_format($candidate['total'],2); ?></strong><small>KRA × 80% + Behavior × 20%</small></div>
+                </section>
                 <p class="small text-muted">Adjust each behavior’s combined score from 1.00 to 4.00 if needed. These reviewed Core Values scores and the reviewed KRA scores will be saved together in the finalized version.</p>
                 <label for="annualRemarks" class="form-label fw-bold">Review remarks</label>
                 <textarea id="annualRemarks" class="form-control mb-3" name="remarks" rows="3" placeholder="Explain adjustments, missing participation, or late revisions."><?php echo e($_POST['remarks'] ?? ''); ?></textarea>
@@ -323,7 +407,7 @@ require_once __DIR__ . '/header.php';
                 <button class="btn btn-success" type="submit" <?php echo count($peers)<$expected ? 'disabled aria-disabled="true" aria-describedby="annualParticipationNotice"' : ''; ?>><?php echo $member['current_version'] ? 'Approve &amp; finalize revised Annual result' : 'Approve &amp; finalize Annual evaluation'; ?></button>
             <?php endif; ?>
             </div></div>
-        </form>
+        <?php if ($editable): ?></form><?php else: ?></section><?php endif; ?>
         <?php if ($versions): ?><section class="content-card p-4" id="annualHistory"><h3 class="h5">Finalized versions</h3>
             <?php foreach ($versions as $v): $snapshot=json_decode($v['snapshot_json'],true); ?>
                 <div class="border rounded p-3 mb-2"><strong>Version <?php echo (int)$v['version_number']; ?> · <?php echo number_format($snapshot['total'],2); ?></strong>
@@ -464,7 +548,10 @@ function updateAnnualProposedResult() {
     const coreTotal=document.getElementById('annualReviewedCoreTotal');
     if (coreTotal) coreTotal.textContent=core.toFixed(2);
     const total=round2(kra*.8+core*.2);
-    result.textContent='Proposed result: KRA '+kra.toFixed(2)+' × 80% + Core Values '+core.toFixed(2)+' × 20% = '+total.toFixed(2);
+    document.getElementById('annualProposedKra').textContent=kra.toFixed(2);
+    document.getElementById('annualProposedCore').textContent=core.toFixed(2);
+    document.getElementById('annualProposedTotal').textContent=total.toFixed(2);
+    result.setAttribute('aria-label','Proposed overall score '+total.toFixed(2)+'. KRA '+kra.toFixed(2)+' times 80 percent plus Behavior '+core.toFixed(2)+' times 20 percent.');
 }
 document.querySelectorAll('#annualConsolidationForm input[data-weight]').forEach(input=>input.addEventListener('input',updateAnnualProposedResult));
 document.querySelectorAll('#annualConsolidationForm .annual-core-adjustment').forEach(input=>input.addEventListener('input',updateAnnualProposedResult));

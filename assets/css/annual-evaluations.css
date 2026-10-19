@@ -70,6 +70,32 @@
 .annual-summary .bg-light { background:#f4f7ef !important; border:1px solid var(--annual-border); border-radius:12px !important; height:100%; }
 .annual-summary strong { display:block; font-size:1.8rem; color:#294306; }
 .annual-summary small { display:block; }
+.annual-head-review-score { display:grid; grid-template-columns:58px minmax(0,1fr) auto; align-items:center; gap:16px; background:linear-gradient(115deg,#f2f6ec 0%,#fbfcf8 58%,#f8f2da 100%); border:1px solid #d5dfc8; box-shadow:0 5px 16px rgba(22,55,12,.08); color:#193b0b; }
+.annual-head-review-score-icon { display:grid; place-items:center; width:58px; height:58px; border-radius:15px; background:#174c18; color:#e5bd36; font-size:1.4rem; box-shadow:inset 0 0 0 1px rgba(255,255,255,.16); }
+.annual-head-review-score-kicker { color:#9a7510; font-size:.7rem; font-weight:800; letter-spacing:.09em; text-transform:uppercase; }
+.annual-head-review-score-details h3 { color:#173b0d; font-weight:800; }
+.annual-head-review-score-breakdown { display:flex; align-items:center; gap:10px; }
+.annual-head-review-score-part { display:flex; align-items:center; gap:12px; min-width:150px; padding:8px 12px; border:1px solid #d8e1ce; border-radius:10px; background:rgba(255,255,255,.82); }
+.annual-head-review-score-part span { color:#52634b; font-size:.78rem; font-weight:700; }
+.annual-head-review-score-part span b { display:block; margin-top:2px; color:#9a7510; font-size:.7rem; }
+.annual-head-review-score-part strong { margin-left:auto; color:#1d4b17; font-size:1.15rem; }
+.annual-head-review-score-part--behavior { border-color:#e8dfb7; }
+.annual-head-review-score-part--behavior strong { color:#806209; }
+.annual-head-review-score-operator { color:#aa8618; font-size:.9rem; }
+.annual-head-review-score-total { min-width:130px; padding-left:18px; border-left:1px solid #d4ddc7; text-align:center; }
+.annual-head-review-score-total span,.annual-head-review-score-total small { display:block; color:#5b6c55; font-size:.72rem; font-weight:700; }
+.annual-head-review-score-total strong { display:block; color:#174c18; font-size:2.25rem; font-weight:900; line-height:1.15; }
+.annual-peer-results-header { display:grid; grid-template-columns:minmax(250px,1fr) minmax(430px,520px); align-items:center; gap:16px; margin-bottom:1rem; }
+.annual-peer-live-score { grid-template-columns:42px minmax(0,1fr) auto; gap:10px; width:100%; min-width:0; margin:0; }
+.annual-peer-live-score .annual-head-review-score-icon { width:42px; height:42px; border-radius:11px; font-size:1rem; }
+.annual-peer-live-score .annual-head-review-score-kicker { font-size:.62rem; margin-bottom:5px; }
+.annual-peer-live-score .annual-head-review-score-part { min-width:90px; padding:5px 8px; gap:6px; }
+.annual-peer-live-score .annual-head-review-score-part strong { font-size:.95rem; }
+.annual-peer-live-score .annual-head-review-score-total { min-width:90px; padding-left:10px; }
+.annual-peer-live-score .annual-head-review-score-total strong { font-size:1.7rem; }
+.annual-peer-live-score .annual-head-review-score-total small { font-size:.58rem; }
+@media (max-width:640px) { .annual-head-review-score { grid-template-columns:48px minmax(0,1fr); gap:12px; } .annual-head-review-score-icon { width:48px; height:48px; } .annual-head-review-score-breakdown { align-items:stretch; flex-direction:column; } .annual-head-review-score-part { min-width:0; } .annual-head-review-score-operator { align-self:center; transform:rotate(90deg); } .annual-head-review-score-total { grid-column:1 / -1; padding:12px 0 0; border-top:1px solid #d4ddc7; border-left:0; } }
+@media (max-width:900px) { .annual-peer-results-header { grid-template-columns:1fr; } .annual-peer-live-score { max-width:560px; margin-left:auto; } }
 .annual-page--integrated .package-hero .badge { padding:.35em .65em; border-radius:.375rem; line-height:1; font-weight:700; }
 .annual-page--integrated .performance-category-tabs { line-height:1.6; }
 .annual-page .annual-review-card { padding:0 !important; }

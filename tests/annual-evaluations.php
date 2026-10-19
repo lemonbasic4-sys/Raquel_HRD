@@ -269,8 +269,15 @@ try {
     preg_match_all('/<tr[^>]*>.*?<\/tr>/s',$peerRows[1] ?? '',$allPeerRows);
     $staffPeerRow=array_values(array_filter($allPeerRows[0] ?? [],static fn($row)=>strpos($row,'Test4 Employee')!==false));
     checkAnnual(count($staffPeerRow)===1 && substr_count($staffPeerRow[0], 'class="btn btn-sm')===1
-        && strpos($staffPeerRow[0],'Consolidation &amp; result')!==false,
-        'a direct-report row shows one next-action button instead of separate rating and consolidation buttons');
+        && strpos($staffPeerRow[0],'View submitted review')!==false
+        && strpos($staffPeerRow[0],'view=head-review')!==false
+        && strpos($staffPeerRow[0],'Consolidation &amp; result')===false,
+        'a finalized direct report has one action to reopen the exact submitted head review');
+    $submittedReviewRow=array_values(array_filter($allPeerRows[0] ?? [],static fn($row)=>strpos($row,'Test6 Employee')!==false));
+    checkAnnual(count($submittedReviewRow)===1 && strpos($submittedReviewRow[0],'View submitted review')!==false
+        && strpos($submittedReviewRow[0],'view=head-review')!==false
+        && strpos($submittedReviewRow[0],'Consolidation &amp; result')===false,
+        'a submitted head review that awaits Annual finalization opens the submitted review, not the retired consolidation page');
     $headReviewRows=[]; foreach (annualKraRows($conn,8) as $row) $headReviewRows[$row['score_id']]=$row['rating'];
     $headReviewRows[array_key_first($headReviewRows)]=3.25;
     $raterSignature='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/6wAAAABJRU5ErkJggg==';
@@ -280,6 +287,28 @@ try {
     checkAnnual((float)annualKraRows($conn,8)[0]['rating']===3.25
         && (annualQuery($conn,'SELECT rater_signature_data,rater_signed_at FROM annual_peer_submissions WHERE cycle_id=? AND rater_employee_id=3 AND target_employee_id=8',[$cycle])[0]['rater_signature_data'] ?? '')===$raterSignature,
         'immediate head can submit adjusted KRA and 360 ratings with a saved printable rater signature');
+    $headReviewHtml=renderAnnualFixture(3,'HR Supervisor','supervisor',8,'head-review');
+    checkAnnual(strpos($headReviewHtml,'Immediate-head submission · View only')!==false
+        && strpos($headReviewHtml,'Head-reviewed rating')!==false
+        && strpos($headReviewHtml,'Head\'s submitted rating')!==false
+        && strpos($headReviewHtml,'src="'.$raterSignature.'"')!==false
+        && strpos($headReviewHtml,'Provisional overall score · Head submission')!==false
+        && strpos($headReviewHtml,'annual-head-review-score-icon')!==false
+        && strpos($headReviewHtml,'KRA <b>80%</b></span><strong>3.48</strong>')!==false
+        && strpos($headReviewHtml,'Behavior <b>20%</b></span><strong>3.50</strong>')!==false
+        && strpos($headReviewHtml,'<strong>3.48</strong><small>Out of 4.00</small>')!==false
+        && strpos($headReviewHtml,'name="kra[')===false
+        && strpos($headReviewHtml,'name="scores[')===false,
+        'head can reopen the exact read-only submission with reviewed KRAs, 360 ratings and saved signature');
+    $headSnapshotCandidate=annualCandidate($conn,annualMember($conn,8));
+    annualSubmitPeers($conn,$actors[4],8,array_fill(0,8,1.5));
+    $liveCandidateAfterPeer=annualCandidate($conn,annualMember($conn,8));
+    $headReviewAfterPeer=renderAnnualFixture(3,'HR Supervisor','supervisor',8,'head-review');
+    checkAnnual($headSnapshotCandidate['core']!==$liveCandidateAfterPeer['core']
+        && strpos($headReviewAfterPeer,'3.50')!==false
+        && strpos($headReviewAfterPeer,'1.50')===false
+        && strpos($headReviewAfterPeer,'Combined average')===false,
+        'later peer submissions change the live candidate but never alter the head review snapshot');
     checkAnnual(strpos(file_get_contents(__DIR__.'/../manager/print-evaluation.php'),'annual_rater_submission.rater_signature_data')!==false,
         'traditional printed evaluation includes the immediate head Annual rater signature');
     $request=function(string $case) use ($testDb): string {
