@@ -81,7 +81,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $inbox_action = (string)($_POST['inbox_action'] ?? '');
     $action_id = max(0, (int)($_POST['notification_id'] ?? 0));
     $next_id = $action_id;
-    if ($inbox_action === 'mark_all_read') {
+    if (in_array($inbox_action, ['bulk_read', 'bulk_delete'], true)) {
+        $ids = array_values(array_unique(array_filter(array_map('intval', (array)($_POST['notification_ids'] ?? [])), static fn($id) => $id > 0)));
+        $ids = array_slice($ids, 0, $per_page);
+        if ($ids) {
+            if ($inbox_action === 'bulk_delete') ensureNotificationReminderDeliverySchema($conn);
+            $placeholders = implode(',', array_fill(0, count($ids), '?'));
+            $sql = $inbox_action === 'bulk_delete' ? 'DELETE FROM notifications' : 'UPDATE notifications SET is_read=1';
+            $bulk = $conn->prepare($sql . " WHERE user_id=? AND notification_id IN ($placeholders)");
+            $bulkParams = [$user_id, ...$ids];
+            $bulk->bind_param(str_repeat('i', count($bulkParams)), ...$bulkParams);
+            $bulk->execute();
+            $bulk->close();
+        }
+        $next_id = 0;
+    } elseif ($inbox_action === 'mark_all_read') {
         $mark_all = $conn->prepare('UPDATE notifications SET is_read = 1 WHERE user_id = ? AND is_read = 0');
         $mark_all->bind_param('i', $user_id);
         $mark_all->execute();
@@ -198,6 +212,11 @@ if (!$selected && $selected_id > 0) {
 }
 if (!$selected) $selected = $manager_notif_items[0] ?? null;
 $selected_id = (int) ($selected['notification_id'] ?? 0);
+$notificationGroups = [];
+foreach ($manager_notif_items as $item) {
+    $groupKey = ($item['category'] ?? '') === 'probation' ? $item['title'] : 'item-' . $item['notification_id'];
+    $notificationGroups[$groupKey][] = $item;
+}
 
 function managerNotifUrl(array $overrides = []): string {
     $params = ['category' => $_GET['category'] ?? 'all', 'filter' => $_GET['filter'] ?? 'all', 'date' => $_GET['date'] ?? 'all', 'search' => $_GET['search'] ?? '', 'page' => $_GET['page'] ?? 1];
@@ -215,9 +234,10 @@ function managerNotifLink($link): ?string {
 require_once '../includes/header.php';
 ?>
 <link rel="stylesheet" href="<?php echo BASE_URL; ?>/assets/css/manager-notifications.css">
+<div class="notification-center-page">
 <div class="page-hero mn-hero">
-    <div><span class="mn-eyebrow"><?php echo e($notification_center_role); ?> · Inbox</span><h1><i class="fas fa-bell"></i> Notifications</h1><p>Stay updated with important activities, reviews, and system updates.</p></div>
-    <div class="mn-hero-count"><strong><?php echo $total_unread; ?></strong><span>unread</span></div>
+    <div><span class="mn-eyebrow"><?php echo e($notification_center_role); ?> · Inbox</span><h1><i class="fas fa-bell"></i> Notifications</h1><p>Updates, reminders, and actions in one place.</p></div>
+    <div class="mn-hero-actions"><div class="mn-hero-count"><strong><?php echo $total_unread; ?></strong><span>unread</span></div><form method="post"><?php echo csrfField(); ?><input type="hidden" name="inbox_action" value="mark_all_read"><button class="mn-mark-all" <?php echo $total_unread ? '' : 'disabled'; ?>><i class="fas fa-check-double"></i> Mark all as read</button></form></div>
 </div>
 <div class="mn-layout">
     <aside class="mn-categories" aria-label="Notification categories">
@@ -229,8 +249,9 @@ require_once '../includes/header.php';
     </aside>
     <section class="mn-list-panel" aria-label="Notification list">
         <form class="mn-search-row" method="get" action="<?php echo BASE_URL . '/' . $notification_center_portal; ?>/notifications.php">
-            <input type="hidden" name="category" value="<?php echo e($category); ?>"><input type="hidden" name="filter" value="<?php echo e($filter); ?>">
+            <input type="hidden" name="filter" value="<?php echo e($filter); ?>">
             <label class="mn-search"><i class="fas fa-search"></i><input name="search" value="<?php echo e($search); ?>" placeholder="Search notifications" aria-label="Search notifications"></label>
+            <select name="category" aria-label="Notification category" onchange="this.form.submit()"><?php foreach ($categories as $key => $meta): ?><option value="<?php echo e($key); ?>" <?php echo $category === $key ? 'selected' : ''; ?>><?php echo e($meta[0]); ?></option><?php endforeach; ?></select>
             <select name="date" aria-label="Date range" onchange="this.form.submit()"><option value="all" <?php echo $date_filter === 'all' ? 'selected' : ''; ?>>All time</option><option value="today" <?php echo $date_filter === 'today' ? 'selected' : ''; ?>>Today</option><option value="7" <?php echo $date_filter === '7' ? 'selected' : ''; ?>>Last 7 days</option><option value="30" <?php echo $date_filter === '30' ? 'selected' : ''; ?>>Last 30 days</option></select>
             <button type="submit" class="mn-search-submit" aria-label="Search"><i class="fas fa-arrow-right"></i></button>
         </form>
@@ -239,16 +260,21 @@ require_once '../includes/header.php';
         </nav><?php if ($total_unread > 0): ?><form method="post" onsubmit="return confirm('Mark all notifications as read?');"><input type="hidden" name="inbox_action" value="mark_all_read"><?php echo csrfField(); ?><button type="submit" class="mn-mark-all"><i class="fas fa-check-double"></i> Mark all as read</button></form><?php endif; ?></div>
         <?php if ($filter === 'action'): ?><p class="mn-action-note"><?php if ($notification_center_role === 'Admin'): ?>Unread security and access notices requiring administrative review. <a href="<?php echo BASE_URL; ?>/admin/employee-accounts.php">Review employee accounts</a>.<?php elseif ($notification_center_role === 'Employee'): ?>Unread self-rating reminders and returned evaluations needing your attention.<?php elseif ($notification_center_role === 'HR Staff'): ?>Unread returned work and approaching deadlines assigned to you. Open an item for its related page.<?php else: ?>Unread requests for your attention. <a href="<?php echo BASE_URL . '/' . $notification_center_portal . '/' . ($notification_center_role === 'HR Supervisor' ? 'pending-endorsements.php' : 'pending-approvals.php'); ?>">Check the current review queue</a> for open decisions.<?php endif; ?></p><?php endif; ?>
         <div class="mn-results-label"><?php echo $total_filtered; ?> notification<?php echo $total_filtered === 1 ? '' : 's'; ?></div>
+        <?php if ($manager_notif_items): ?><form method="post" id="mnBulkForm" class="mn-bulk-actions"><?php echo csrfField(); ?><label><input type="checkbox" id="mnSelectAll"> Select page</label><span id="mnSelectionCount">0 selected</span><button name="inbox_action" value="bulk_read" disabled>Mark read</button><button name="inbox_action" value="bulk_delete" disabled onclick="return confirm('Delete the selected notifications?');"><i class="fas fa-trash-alt"></i> Delete</button></form><?php endif; ?>
         <?php if (!$manager_notif_items): ?><div class="mn-empty"><i class="far fa-bell-slash"></i><strong>No notifications found</strong><p>Try another category, date range, or search.</p></div>
         <?php else: ?><div class="mn-list">
-            <?php foreach ($manager_notif_items as $item): $id = (int) $item['notification_id']; $meta = $categories[$item['category'] ?? 'system'] ?? $categories['system']; ?>
+            <?php foreach ($notificationGroups as $group): $grouped = count($group) > 1; if ($grouped): $groupHasSelected = in_array($selected_id, array_column($group, 'notification_id')); ?>
+            <details class="mn-reminder-group" <?php echo $groupHasSelected && isset($_GET['id']) ? 'open' : ''; ?>><summary><span class="mn-item-icon"><i class="fas fa-user-clock"></i></span><span><strong><?php echo count($group); ?> <?php echo e($group[0]['title']); ?></strong><small>Reminders on this page · Expand to view employees</small></span><i class="fas fa-chevron-down"></i></summary>
+            <?php endif; foreach ($group as $item): $id = (int) $item['notification_id']; $meta = $categories[$item['category'] ?? 'system'] ?? $categories['system']; ?>
             <form method="post" class="mn-item-form" data-notification-select-form><input type="hidden" name="inbox_action" value="open_or_select"><input type="hidden" name="notification_id" value="<?php echo $id; ?>"><input type="hidden" name="already_selected" value="<?php echo $selected_id === $id ? 1 : 0; ?>"><?php echo csrfField(); ?>
+                <input class="mn-select-item" type="checkbox" form="mnBulkForm" name="notification_ids[]" value="<?php echo $id; ?>" aria-label="Select <?php echo e($item['title'] . ': ' . $item['message']); ?>">
                 <button type="submit" class="mn-item <?php echo $selected_id === $id ? 'selected' : ''; ?> <?php echo $item['is_read'] ? '' : 'unread'; ?>" title="<?php echo $selected_id === $id && managerNotifLink($item['link']) ? 'Open related page' : 'View notification details'; ?>" data-notification-id="<?php echo $id; ?>" data-notification-title="<?php echo e($item['title']); ?>" data-notification-message="<?php echo e($item['message']); ?>" data-notification-category="<?php echo e($meta[0]); ?>" data-notification-icon="<?php echo e($meta[1]); ?>" data-notification-created="<?php echo e(date('M j, Y · g:i A', strtotime($item['created_at']))); ?>" data-notification-related-url="<?php echo e(managerNotifLink($item['link']) ?? ''); ?>"><span class="mn-item-icon"><i class="<?php echo $meta[1]; ?>"></i></span><span class="mn-item-content"><strong><?php echo e($item['title']); ?></strong><small><?php echo e($meta[0]); ?></small><span><?php echo e($item['message']); ?></span></span><span class="mn-item-meta"><time><?php echo e(timeAgoFormat($item['created_at'])); ?></time><?php if (!$item['is_read']): ?><i class="mn-unread-dot" aria-label="Unread"></i><?php endif; ?></span></button>
             </form>
-            <?php endforeach; ?>
+            <?php endforeach; if ($grouped): ?></details><?php endif; endforeach; ?>
         </div><?php if ($total_pages > 1): ?><nav class="mn-pages" aria-label="Notification pages"><?php if ($page > 1): ?><a href="<?php echo e(managerNotifUrl(['page' => $page - 1, 'id' => null])); ?>">Previous</a><?php endif; ?><span>Page <?php echo $page; ?> of <?php echo $total_pages; ?></span><?php if ($page < $total_pages): ?><a href="<?php echo e(managerNotifUrl(['page' => $page + 1, 'id' => null])); ?>">Next</a><?php endif; ?></nav><?php endif; ?><?php endif; ?>
     </section>
     <aside class="mn-detail" aria-label="Selected notification">
+        <button type="button" class="mn-mobile-back" onclick="document.querySelector('.mn-layout').classList.remove('mn-show-detail')"><i class="fas fa-arrow-left"></i> Back to notifications</button>
         <?php if ($selected): $meta = $categories[$selected['category'] ?? 'system'] ?? $categories['system']; $target = managerNotifLink($selected['link']); ?>
         <div class="mn-detail-head"><span class="mn-detail-icon"><i class="<?php echo $meta[1]; ?>"></i></span><div><h2><?php echo e($selected['title']); ?></h2><time><?php echo e(date('M j, Y · g:i A', strtotime($selected['created_at']))); ?></time></div><form method="post" onsubmit="return confirm('Delete this notification?');"><input type="hidden" name="inbox_action" value="delete"><input type="hidden" name="notification_id" value="<?php echo $selected_id; ?>"><?php echo csrfField(); ?><button type="submit" class="mn-close" title="Delete notification" aria-label="Delete notification">&times;</button></form></div>
         <div class="mn-detail-labels"><span><?php echo e($meta[0]); ?></span><span class="<?php echo $selected['is_read'] ? 'read' : 'unread'; ?>"><?php echo $selected['is_read'] ? 'Read' : 'Unread'; ?></span></div>
@@ -258,9 +284,19 @@ require_once '../includes/header.php';
         <?php else: ?><div class="mn-detail-empty"><i class="far fa-envelope-open"></i><strong>Select a notification</strong><p>Its full message and related action will appear here.</p></div><?php endif; ?>
     </aside>
 </div>
-<?php if ($notification_center_role === 'Employee'): ?>
+</div>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+    const selectionBoxes = [...document.querySelectorAll('.mn-select-item')];
+    function updateSelection() {
+        const count = selectionBoxes.filter(box => box.checked).length;
+        document.getElementById('mnSelectionCount')?.replaceChildren(document.createTextNode(count + ' selected'));
+        document.querySelectorAll('#mnBulkForm button').forEach(button => button.disabled = count === 0);
+        const all = document.getElementById('mnSelectAll');
+        if (all) { all.checked = count > 0 && count === selectionBoxes.length; all.indeterminate = count > 0 && count < selectionBoxes.length; }
+    }
+    document.getElementById('mnSelectAll')?.addEventListener('change', event => { selectionBoxes.forEach(box => box.checked = event.target.checked); updateSelection(); });
+    selectionBoxes.forEach(box => box.addEventListener('change', updateSelection));
     const detail = document.querySelector('.mn-detail');
     if (!detail) return;
 
@@ -298,6 +334,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function showNotification(button, csrf) {
         const data = button.dataset;
         detail.replaceChildren();
+        const back = document.createElement('button'); back.type = 'button'; back.className = 'mn-mobile-back'; back.textContent = '← Back to notifications'; back.onclick = () => document.querySelector('.mn-layout').classList.remove('mn-show-detail'); detail.appendChild(back);
         const header = document.createElement('div'); header.className = 'mn-detail-head';
         const iconWrap = document.createElement('span'); iconWrap.className = 'mn-detail-icon';
         const icon = document.createElement('i'); icon.className = data.notificationIcon; iconWrap.appendChild(icon); header.appendChild(iconWrap);
@@ -321,7 +358,8 @@ document.addEventListener('DOMContentLoaded', function () {
             detail.appendChild(link);
         }
         addPostForm(detail, 'mark_unread', data.notificationId, 'Mark as unread', 'fas fa-envelope', csrf);
-        detail.scrollIntoView({ behavior: 'auto', block: 'start' });
+        document.querySelector('.mn-layout').classList.add('mn-show-detail');
+        detail.scrollTop = 0;
     }
 
     document.querySelectorAll('[data-notification-select-form]').forEach(function (form) {
@@ -383,5 +421,4 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 });
 </script>
-<?php endif; ?>
 <?php require_once '../includes/footer.php'; ?>

@@ -191,6 +191,30 @@ See `annual_evaluation_design_notes.md` for confirmed rules and proposed HR exce
 
 ### Notification clearing regression check
 
+The notification inbox uses the same compact list/detail layout for Admin,
+HR Manager, HR Supervisor, HR Staff, and Employee Portal accounts. Categories
+adapt to the account role through the category dropdown.
+
+1. Open Notifications in each role. Search, category, date, and read-status
+   filters should work together and retain their values when opening details.
+2. With many notifications, the inbox list and detail pane scroll independently
+   on desktop. The page should not grow into a long list of reminders.
+3. Repeated probation reminders with the same title are collapsed into a group
+   for the current page. Expand it to see individual employee notifications.
+   Pagination still counts individual notifications, not groups.
+4. Select a notification and verify its full message, timestamp, related-page
+   action, and read state. The unread count should update without reloading.
+5. Select several rows or use **Select page**; check **Mark read** and **Delete**.
+   Only the signed-in account's selected notifications should be affected.
+6. On a narrow screen, selecting an item opens its detail view. **Back to
+   notifications** should return to the list with filters and selections intact.
+7. Check widths of 320, 375, 768, 1024, 1366, and 1920 pixels, including
+   landscape phones, browser zoom, and the desktop sidebar expanded/collapsed.
+   The inbox switches panels based on its available content width. Confirm no
+   horizontal page overflow, clipped filters, overlapping actions, or inaccessible
+   pagination. Long titles and messages must wrap; desktop panels should scroll
+   independently and narrow layouts should offer Back to notifications.
+
 Probationary due/overdue reminders keep a delivery record in
 `notification_reminder_deliveries`, separate from the `notifications` inbox.
 The table initializes automatically when reminders run or notifications are deleted.
