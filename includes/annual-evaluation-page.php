@@ -229,11 +229,14 @@ require_once __DIR__ . '/header.php';
             <p><?php echo e($member['position_name']); ?> · <?php echo e($member['period_start'].' to '.$member['period_end']); ?></p>
             <p id="annualRatingProgress" class="small fw-bold" aria-live="polite"></p>
             <?php if ($submitted): ?><div class="alert alert-success">Submitted and locked. These ratings cannot be edited.</div><?php endif; ?>
-            <form method="post" id="annualRatingForm" data-draft-key="annual-rating-<?php echo (int)$actor['user_id']; ?>-<?php echo $evaluationId; ?>" data-submitted="<?php echo $submitted ? '1' : '0'; ?>">
+            <form method="post" id="annualRatingForm" data-draft-key="annual-rating-<?php echo (int)$actor['user_id']; ?>-<?php echo $evaluationId; ?>" data-submitted="<?php echo $submitted ? '1' : '0'; ?>" data-behavior-prefill="<?php echo $canFinalize ? '1' : '0'; ?>">
+                <p class="small text-muted">Use ratings from 1.00 to 4.00. Decimals are allowed, up to two decimal places (for example, 3.25).</p>
+                <p id="annualRatingScaleNotice" class="alert alert-warning" role="status" hidden></p>
+                <?php if ($canFinalize && !$submitted): ?><p id="annualHeadOverallPreview" class="alert alert-success" aria-live="polite"></p><?php endif; ?>
                 <?php echo csrfField(); ?><input type="hidden" name="action" value="rate"><input type="hidden" name="cycle_id" value="<?php echo $cycleId; ?>"><input type="hidden" name="confirmed" id="annualConfirmed" value="0">
                 <?php if ($canFinalize && !$submitted): $rateKras=annualKraRows($conn,$evaluationId); ?>
                     <input type="hidden" name="review_token" value="<?php echo annualReviewToken($conn,$member); ?>">
-                    <div class="alert alert-info">You are this employee's immediate head. Review their KRA ratings and enter your own 360 Core Values ratings below. If no KRA changes are needed, leave the submitted ratings unchanged; the system will retain them as-is. Both will save together after confirmation.</div>
+                    <div class="alert alert-info">You are this employee's immediate head. KRA and behavior ratings start with the employee's submitted ratings. Review and adjust as needed. Both will save together after confirmation.</div>
                     <nav class="annual-review-tabs" role="tablist" aria-label="Rating sections">
                         <button class="active" id="annualRateKraTab" type="button" role="tab" data-bs-toggle="tab" data-bs-target="#annualRateKraPanel" aria-controls="annualRateKraPanel" aria-selected="true"><i class="fas fa-chart-pie me-2" aria-hidden="true"></i>Key Result Areas · Immediate-head review <span><?php echo count($rateKras); ?></span></button>
                         <button id="annualRateCoreTab" type="button" role="tab" data-bs-toggle="tab" data-bs-target="#annualRateCorePanel" aria-controls="annualRateCorePanel" aria-selected="false"><i class="fas fa-users me-2" aria-hidden="true"></i>Core Behaviors &amp; Values · Your 360 rating <span>8</span></button>
@@ -253,7 +256,9 @@ require_once __DIR__ . '/header.php';
                 <?php endif; ?>
                 <?php if (!$canFinalize || $submitted): ?><h3 class="h5 annual-review-section"><span><i class="fas fa-users me-2" aria-hidden="true"></i>Core Behaviors &amp; Values · Your 360 rating</span><small>20% Core Values</small></h3><?php endif; ?>
                 <div class="table-responsive annual-score-table-wrap"><table class="table align-middle annual-rating-table annual-score-table"><thead><tr><th>Criterion</th><th class="text-end">Employee self-rating</th><th class="text-end">Your 360 rating (1–4)</th></tr></thead><tbody>
-                <?php $scores=$submitted ? json_decode($submitted['scores_json'],true) : ($_POST['scores'] ?? []); $selfValues=json_decode($member['self_values_json'] ?? '[]',true) ?: [];
+                <?php if ($canFinalize && !$submitted): ?><p class="small text-muted">Ratings start with the employee's self-rating. Review and adjust as needed.</p><?php endif; ?>
+                <?php $selfValues=json_decode($member['self_values_json'] ?? '[]',true) ?: [];
+                $scores=$submitted ? json_decode($submitted['scores_json'],true) : ($_POST['scores'] ?? ($canFinalize ? $selfValues : []));
                 foreach (annualCoreValues() as $i=>$value): ?>
                     <tr><td><strong><?php echo e($value['name']); ?></strong><small><?php echo e($value['kpi']); ?></small></td><td class="text-end"><strong><?php echo isset($selfValues[$i]) ? number_format((float)$selfValues[$i],2) : '—'; ?></strong></td><td>
                         <input class="form-control annual-number" type="number" inputmode="decimal" min="1" max="4" step="0.01" required
@@ -435,6 +440,17 @@ function updateAnnualProgress() {
     const kraTotal=document.getElementById('annualRateKraTotal');
     if (kraTotal) kraTotal.textContent=kraInputs.length && kraInputs.every(input=>input.value!=='' && input.checkValidity())
         ? kraInputs.reduce((sum,input)=>sum+Number(input.dataset.weight)/100*Number(input.value),0).toFixed(2) : '—';
+    const overallPreview=document.getElementById('annualHeadOverallPreview');
+    if (overallPreview) {
+        const valid=kraInputs.length>0 && inputs.length===8 && [...kraInputs,...inputs].every(input=>input.value!=='' && input.checkValidity());
+        if (valid) {
+            const kra=Math.round((kraInputs.reduce((sum,input)=>sum+Math.round(Number(input.dataset.weight)/100*Number(input.value)*100)/100,0)+Number.EPSILON)*100)/100;
+            const core=Math.round((inputs.reduce((sum,input)=>sum+Number(input.value),0)/8+Number.EPSILON)*100)/100;
+            const total=Math.round((kra*.8+core*.2+Number.EPSILON)*100)/100;
+            const label=total>=3.6 ? 'Outstanding' : total>=2.6 ? 'Exceeds Expectations' : total>=2 ? 'Meets Expectations' : 'Needs Improvement';
+            overallPreview.textContent='Proposed overall score: '+total.toFixed(2)+' / 4.00 · '+label+' — (KRA '+kra.toFixed(2)+' × 80%) + (Behavior '+core.toFixed(2)+' × 20%).';
+        } else overallPreview.textContent='Complete all ratings from 1.00 to 4.00 to preview the overall score.';
+    }
     renderAnnualRatingPreview();
 }
 const annualRatingForm=document.getElementById('annualRatingForm');
@@ -444,7 +460,7 @@ function saveAnnualRatingDraft(panelOverride=null) {
     const values={};
     annualRatingForm.querySelectorAll('input[type="number"]').forEach(input=>{ values[input.name]=input.value; });
     const activePanel=panelOverride || document.querySelector('.annual-review-tabs button.active')?.dataset.bsTarget || '#annualRateKraPanel';
-    try { sessionStorage.setItem(annualDraftKey,JSON.stringify({values,activePanel,signature:document.getElementById('annualRaterSignatureData')?.value || ''})); } catch (_) {}
+    try { sessionStorage.setItem(annualDraftKey,JSON.stringify({values,activePanel,behaviorDefaultsVersion:1,signature:document.getElementById('annualRaterSignatureData')?.value || ''})); } catch (_) {}
 }
 function restoreAnnualRatingDraft() {
     if (!annualRatingForm || !annualDraftKey) return;
@@ -453,7 +469,13 @@ function restoreAnnualRatingDraft() {
         else {
             const draft=JSON.parse(sessionStorage.getItem(annualDraftKey) || 'null');
             if (draft && draft.values) annualRatingForm.querySelectorAll('input[type="number"]').forEach(input=>{
-                if (Object.prototype.hasOwnProperty.call(draft.values,input.name)) input.value=draft.values[input.name];
+                if (Object.prototype.hasOwnProperty.call(draft.values,input.name)) {
+                    // Older drafts saved empty behavior fields before head defaults existed.
+                    const legacyBlank=annualRatingForm.dataset.behaviorPrefill==='1'
+                        && !draft.behaviorDefaultsVersion && input.name.startsWith('scores[')
+                        && draft.values[input.name]==='';
+                    if (!legacyBlank) input.value=draft.values[input.name];
+                }
             });
             const signature=document.getElementById('annualRaterSignatureData');
             if (signature && draft?.signature) signature.value=draft.signature;
@@ -469,7 +491,20 @@ if (annualRatingForm && annualDraftKey) {
     else restoreAnnualRatingDraft();
 }
 document.querySelectorAll('#annualRatingForm input[type="number"]').forEach(input=>{
-    const enforceRatingScale=()=>{ if(input.value!=='' && Number.isFinite(Number(input.value)) && Number(input.value)>4) input.value='4'; updateAnnualProgress(); saveAnnualRatingDraft(); };
+    const enforceRatingScale=()=>{
+        const notice=document.getElementById('annualRatingScaleNotice');
+        let message='';
+        if(input.value!=='' && Number.isFinite(Number(input.value)) && Number(input.value)>4) {
+            input.value='4';
+            message='The maximum rating is 4.00. Your entry has been limited to 4.00.';
+        } else if(input.value!=='' && !input.checkValidity()) {
+            message='Enter a rating from 1.00 to 4.00 with no more than two decimal places.';
+        }
+        input.classList.toggle('is-invalid',input.value!=='' && !input.checkValidity());
+        input.setAttribute('aria-invalid',String(input.value!=='' && !input.checkValidity()));
+        if (notice) { notice.textContent=message; notice.hidden=!message; }
+        updateAnnualProgress(); saveAnnualRatingDraft();
+    };
     input.addEventListener('input',enforceRatingScale);
     input.addEventListener('change',enforceRatingScale);
 });
