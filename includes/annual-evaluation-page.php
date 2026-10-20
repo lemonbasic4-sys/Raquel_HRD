@@ -85,15 +85,15 @@ if (($view==='rate' && !$isDepartmentPeer) || ($view==='peers' && !$isDepartment
     http_response_code(403); exit('360 ratings are available only within your own department cycle.');
 }
 if ($view==='rate') {
-    if (!$member || !annualCanRate($actor) || !$own[0]['evaluation_id'] || (int)$member['employee_id']===(int)$actor['employee_id']) {
+    if (!$member || !annualCanRate($actor) || (empty($own[0]['evaluation_id']) && !$canFinalize) || (int)$member['employee_id']===(int)$actor['employee_id']) {
         http_response_code(403); exit('This peer-rating task is unavailable.');
     }
-    $raterMember=annualMember($conn,(int)$own[0]['evaluation_id']);
-    if (!$raterMember) {
+    $raterMember=!empty($own[0]['evaluation_id']) ? annualMember($conn,(int)$own[0]['evaluation_id']) : null;
+    if (!$raterMember && !$canFinalize) {
         http_response_code(409);
         exit('Your own Annual evaluation record is unavailable, so you cannot submit department peer ratings yet. Contact HR to restore or review your Annual record.');
     }
-    try { annualAssertSnapshotActive($member); annualAssertSnapshotActive($raterMember); }
+    try { annualAssertSnapshotActive($member); if ($raterMember) annualAssertSnapshotActive($raterMember); }
     catch (DomainException $e) { http_response_code(403); exit(e($e->getMessage())); }
     $submitted=annualQuery($conn,'SELECT scores_json FROM annual_peer_submissions WHERE cycle_id=? AND rater_employee_id=? AND target_employee_id=?',
         [$cycleId,(int)$actor['employee_id'],(int)$member['employee_id']])[0] ?? null;
@@ -169,7 +169,7 @@ require_once __DIR__ . '/header.php';
                     <td><?php if ($view==='peers' && $isOwnRow): ?>
                         <span class="annual-roster-action-muted">Cannot rate yourself</span>
                     <?php elseif ($view==='peers' && $isDepartmentPeer && annualCanRate($actor) && $m['evaluation_id']): ?>
-                        <?php if (empty($own[0]['evaluation_id'])): ?>
+                        <?php if (empty($own[0]['evaluation_id']) && !annualCanFinalize($conn,$actor,$target)): ?>
                             <button class="btn btn-sm btn-outline-secondary" type="button" disabled aria-disabled="true" title="Submit your Annual self-rating first to unlock peer ratings.">Self-rating required</button>
                         <?php elseif (annualCanFinalize($conn,$actor,$target) && $m['rated']): ?>
                             <?php if (!empty($m['revision_pending'])): ?>

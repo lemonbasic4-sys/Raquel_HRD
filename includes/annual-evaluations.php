@@ -365,8 +365,13 @@ function annualSubmitPeers($conn, array $actor, int $evaluationId, array $scores
         $member=annualMember($conn,$evaluationId);
         annualAssertSnapshotActive($member);
         $rater=annualQuery($conn,'SELECT evaluation_id FROM annual_evaluation_members WHERE cycle_id=? AND employee_id=?',[(int)$member['cycle_id'],(int)$actor['employee_id']])[0] ?? null;
-        if (!$rater || !$rater['evaluation_id']) throw new DomainException('Submit your Annual self-rating for this department period first.');
-        annualAssertSnapshotActive(annualMember($conn,(int)$rater['evaluation_id']));
+        $isImmediateHead=annualCanFinalize($conn,$actor,$member);
+        if ((!$rater || !$rater['evaluation_id']) && !$isImmediateHead) throw new DomainException('Submit your Annual self-rating for this department period first.');
+        if (!empty($rater['evaluation_id'])) {
+            $raterMember=annualMember($conn,(int)$rater['evaluation_id']);
+            if (!$raterMember) throw new DomainException('Your Annual evaluation record is unavailable. Contact HR.');
+            annualAssertSnapshotActive($raterMember);
+        }
         if ((int)$actor['employee_id']===(int)$member['employee_id'] || (int)$actor['department_id']!==(int)$member['department_id']) {
             throw new DomainException('Only coworkers in this department cycle can rate this employee.');
         }

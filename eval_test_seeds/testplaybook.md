@@ -168,6 +168,12 @@ Re-import leaves existing seeded templates and their criterion IDs unchanged.
 
 #### Manual Annual workflow checks
 
+Immediate-head review does not require the head to submit their own Annual
+self-rating first. As HR Supervisor with no submitted self-rating, open a
+direct-report HR Staff member's submitted Annual evaluation using **Rate & review**.
+Verify KRA editing, Core Values rating, signature, and confirmed submission work.
+Other coworker peer-rating tasks still require the rater's own self-rating.
+
 1. Use the seeded templates above **or** create Annual templates manually for the configured direct-report positions. Do not create duplicate templates for the same test. Confirm eight standard Core Values, KRA item weights totaling 100%, and the fixed 80/20 split. No framework code/version entry is required.
 2. Submit self-ratings from each Regular employee's Employee Portal using **identical start/end dates** for the department cycle. Employee count is dynamic, not fixed at three. Creating/importing templates alone does not create a cycle.
 3. As HR Manager or HR Supervisor, open **Performance Evaluation → Regular Employee**. The Regular Employee section opens the department peer list. All eligible employees appear; only a direct report's **Consolidation & result** action allows KRA/Core Values review. The President/CEO reviews and finalizes the HR Manager. Your own result remains available separately through Evaluation History; its **Audit Details** opens the traditional view.
