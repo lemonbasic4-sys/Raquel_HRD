@@ -114,6 +114,31 @@ if ($user_id_pkg > 0) {
     $pending_packages = $pkg_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $pkg_stmt->close();
 }
+// Annual reviews are stored independently from probationary packages.
+require_once '../includes/annual-evaluations.php';
+$annual_dashboard_actor = annualActor($conn, $user_id_pkg);
+if ($annual_dashboard_actor && $conn->query("SHOW TABLES LIKE 'annual_evaluation_members'")->num_rows) {
+    $annual_dashboard_rows = annualQuery($conn, "SELECT m.evaluation_id,d.department_name
+        FROM annual_evaluation_members m
+        JOIN annual_evaluation_cycles c ON c.cycle_id=m.cycle_id
+        JOIN departments d ON d.department_id=c.department_id
+        WHERE m.reviewer_position_id=? AND m.employee_id<>? AND m.evaluation_id IS NOT NULL
+          AND (m.current_version=0 OR m.revision_pending=1)
+        ORDER BY m.evaluation_id DESC", [(int)$annual_dashboard_actor['job_title_id'], (int)$annual_dashboard_actor['employee_id']]);
+    foreach ($annual_dashboard_rows as $annual_dashboard_row) {
+        $annual_dashboard_member = annualMember($conn, (int)$annual_dashboard_row['evaluation_id']);
+        if (!$annual_dashboard_member || !annualCanFinalize($conn, $annual_dashboard_actor, $annual_dashboard_member)) continue;
+        $pending_packages[] = [
+            'department_name' => $annual_dashboard_row['department_name'],
+            'template_name' => $annual_dashboard_member['first_name'].' '.$annual_dashboard_member['last_name'].' · Annual',
+            'period_start' => $annual_dashboard_member['period_start'],
+            'period_end' => $annual_dashboard_member['period_end'],
+            'action_status' => 'Pending',
+            'step_label' => $annual_dashboard_member['revision_pending'] ? 'Annual revision awaiting review' : 'Annual self-rating submitted',
+            'annual_url' => annualUrl($annual_dashboard_actor, '?view=peers&cycle_id='.(int)$annual_dashboard_member['cycle_id']),
+        ];
+    }
+}
 $pending_pkg_count = count($pending_packages);
 ?>
 
@@ -769,7 +794,7 @@ document.addEventListener('DOMContentLoaded', function () {
                                 <?php if ($is_waiting): ?>
                                     <a href="<?php echo BASE_URL; ?>/employee/team-evaluation-packages.php" class="btn dashboard-package-action">View Progress <i class="fas fa-chevron-down ms-1"></i></a>
                                 <?php else: ?>
-                                    <a href="<?php echo BASE_URL; ?>/employee/team-evaluation-packages.php" class="btn dashboard-package-action">Review <i class="fas fa-chevron-down ms-1"></i></a>
+                                    <a href="<?php echo e($pkg['annual_url'] ?? BASE_URL . '/employee/team-evaluation-packages.php'); ?>" class="btn dashboard-package-action">Review <i class="fas fa-chevron-down ms-1"></i></a>
                                 <?php endif; ?>
                             </div>
                         <?php endforeach; ?>
