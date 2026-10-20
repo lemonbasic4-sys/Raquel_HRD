@@ -39,7 +39,7 @@ $criteria_total = (int) ($conn->query("SELECT COUNT(*) as c FROM evaluation_crit
             <h4 class="text-white fw-bold mb-0 mt-1"><i class="fas fa-file-alt me-2" style="color:#BD9414;"></i>Template Viewing</h4>
         </div>
         <div class="badge bg-white text-dark border-0 py-2 px-3" style="border-radius:20px;font-size:.75rem;box-shadow:0 4px 10px rgba(0,0,0,.1);">
-            <i class="fas fa-lock me-1 text-primary"></i>Read-only access
+            <i class="fas fa-lock me-1"></i>Read-only access
         </div>
     </div>
     <p class="text-white-50 small mb-0"><i class="fas fa-eye me-1"></i>Browse active evaluation templates and review their scoring criteria before creating evaluations.</p>
@@ -71,8 +71,8 @@ $criteria_total = (int) ($conn->query("SELECT COUNT(*) as c FROM evaluation_crit
             <div class="stat-card">
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
-                        <div class="stat-value"><i class="fas fa-eye"></i></div>
-                        <div class="stat-label">View Details</div>
+                        <div class="stat-value" style="font-size:1.25rem;">Read only</div>
+                        <div class="stat-label">Template access</div>
                     </div>
                     <i class="fas fa-file-signature stat-icon" style="color:#ffc107;"></i>
                 </div>
@@ -90,29 +90,31 @@ $criteria_total = (int) ($conn->query("SELECT COUNT(*) as c FROM evaluation_crit
         </div>
     </div>
 <?php else: ?>
-    <div class="row g-4">
+    <div class="staff-template-grid">
         <?php while ($t = $templates->fetch_assoc()): 
             $tw = (float)($t['total_weight'] ?? 0);
             $wclass = abs($tw - 100) < 0.01 ? 'bg-success-subtle text-success border-success-subtle' : 'bg-warning-subtle text-warning border-warning-subtle';
         ?>
-            <div class="col-md-6 col-lg-4">
+            <div class="staff-template-grid-item">
                 <div class="content-card h-100 template-card">
                     <div class="card-body p-4">
-                        <div class="d-flex justify-content-between align-items-start mb-3">
+                        <div class="staff-template-card-header mb-3">
                             <div class="template-icon">
                                 <i class="fas fa-file-alt"></i>
                             </div>
+                            <div class="staff-template-tags">
                             <?php if (!empty($t['target_department'])): ?>
                                 <span class="badge bg-success-subtle text-success border border-success-subtle px-2"><?php echo e($t['target_department']); ?></span>
                             <?php endif; ?>
                             <?php if (!empty($t['target_position_name'])): ?>
                                 <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle px-2"><?php echo e($t['target_position_name']); ?></span>
                             <?php endif; ?>
+                            </div>
                         </div>
                         <h6 class="fw-bold text-dark mb-2"><?php echo e($t['template_name']); ?></h6>
-                        <p class="text-muted small mb-3" style="line-height: 1.5;"><?php echo e(substr($t['description'] ?? 'No description provided.', 0, 120)); ?><?php echo strlen($t['description'] ?? '') > 120 ? '...' : ''; ?></p>
+                        <p class="text-muted small mb-3 staff-template-description"><?php echo e($t['description'] ?: 'No description provided.'); ?></p>
                         
-                        <div class="d-flex gap-2 mb-3">
+                        <div class="d-flex flex-wrap gap-2 mb-3">
                             <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle px-2">
                                 <i class="fas fa-list-ul me-1"></i><?php echo $t['criteria_count']; ?> criteria
                             </span>
@@ -140,22 +142,34 @@ $criteria_total = (int) ($conn->query("SELECT COUNT(*) as c FROM evaluation_crit
 </div>
 
 <style>
-.staff-template-page .row.g-4 {
-    align-items: stretch;
-}
-.template-card { transition: transform 0.2s ease, box-shadow 0.2s ease; border: 1.5px solid #f0f0f0; }
-.template-card:hover { transform: translateY(-4px); box-shadow: 0 8px 25px rgba(0,0,0,0.08); }
-.template-icon { 
+.staff-template-page { min-width:0; width:100%; }
+.staff-template-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr)); gap:20px; }
+.staff-template-grid-item { min-width:0; }
+.staff-template-page .template-card { display:flex; flex-direction:column; min-width:0; padding:0; overflow:hidden; transition:box-shadow .2s ease; border:1px solid #e1e8dc; border-radius:14px; }
+.staff-template-page .template-card:hover { box-shadow:0 8px 25px rgba(20,59,18,.08); }
+.staff-template-page .template-card .card-body { flex:1; min-width:0; }
+.staff-template-card-header { display:flex; align-items:flex-start; gap:12px; }
+.staff-template-tags { display:flex; flex-wrap:wrap; gap:6px; min-width:0; flex:1; }
+.staff-template-tags .badge { max-width:100%; white-space:normal; overflow-wrap:anywhere; text-align:left; line-height:1.5; padding:5px 9px; }
+.staff-template-page .template-card h6 { line-height:1.45; overflow-wrap:anywhere; font-size:1rem; }
+.staff-template-description { line-height:1.6; overflow-wrap:anywhere; }
+.staff-template-page .template-card .card-footer { margin-top:auto; }
+.staff-template-page .template-icon {
     width: 44px; height: 44px; border-radius: 12px; 
-    background: linear-gradient(135deg, #e7f1ff, #c9dfff); 
+    flex:0 0 44px; background:#edf3e8;
     display: flex; align-items: center; justify-content: center; 
-    color: var(--primary-blue, #0d6efd); font-size: 1.1rem; 
+    color:#185425; font-size:1.1rem;
 }
-.bg-info-subtle { background-color: #e0f7fa; }
-.bg-secondary-subtle { background-color: #f5f5f5; }
-.bg-success-subtle { background-color: #e8f5e9; }
-.bg-warning-subtle { background-color: #fff9c4; }
-.badge { border-radius: 6px; font-weight: 600; font-size: 0.7rem; letter-spacing: 0; }
+.staff-template-page .bg-secondary-subtle { background-color:#f0f2ee; }
+.staff-template-page .bg-success-subtle { background-color:#e8f5e9; }
+.staff-template-page .bg-warning-subtle { background-color:#fff5d6; }
+.staff-template-page .badge { border-radius:6px; font-weight:600; font-size:.72rem; letter-spacing:0; }
+.staff-template-page .page-hero .stat-icon { color:#d7c77c!important; font-size:1.5rem; opacity:.8; }
+.staff-template-page .page-hero .stat-card { height:100%; padding:16px; }
+.staff-template-page .page-hero .stat-label { font-size:.75rem; white-space:normal; }
+.staff-template-page .page-hero .row { margin-top:8px!important; }
+@media(max-width:575px) { .staff-template-grid { gap:14px; } .staff-template-page .template-card .card-body { padding:18px!important; } .staff-template-page .template-card .card-footer { padding:0 18px 18px!important; } .staff-template-page .page-hero { padding:20px!important; } }
+@media(prefers-reduced-motion:reduce) { .staff-template-page .template-card { transition:none; } }
 </style>
 
 <?php require_once '../includes/footer.php'; ?>
