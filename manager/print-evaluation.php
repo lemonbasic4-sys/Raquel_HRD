@@ -882,6 +882,7 @@ if ((float)($row['total_score'] ?? 0) > 0 && (empty($pl) || $pl === '0')) {
       <div class="content"><?php echo !empty($row['staff_comments']) ? nl2br(e($row['staff_comments'])) : '&nbsp;'; ?></div>
       <div class="comment-signature">
         <div class="signature-line"></div>
+        <div style="font-weight:bold;font-size:10px;text-align:center;"><?php echo e(mb_strtoupper($row['employee_name'] ?? '')); ?></div>
         <div class="signature-caption">Signature over Printed Name</div>
       </div>
     </div>
@@ -892,12 +893,13 @@ if ((float)($row['total_score'] ?? 0) > 0 && (empty($pl) || $pl === '0')) {
       <div class="content"><?php echo !empty($supervisor_comments) ? nl2br(e($supervisor_comments)) : '&nbsp;'; ?></div>
       <div class="comment-signature">
         <div class="signature-line"></div>
+        <div style="font-weight:bold;font-size:10px;text-align:center;"><?php echo e(mb_strtoupper($row['rater_name'] ?: $supervisor_name)); ?></div>
         <div class="signature-caption">Signature over Printed Name</div>
       </div>
     </div>
 
     <!-- Department Manager's Comments -->
-    <?php if (!empty($dept_manager_name) && strcasecmp(trim($dept_manager_name), trim($supervisor_name)) !== 0): ?>
+    <?php if (!$annual_print_member && !empty($dept_manager_name) && strcasecmp(trim($dept_manager_name), trim($supervisor_name)) !== 0): ?>
     <div class="comment-box">
       <div class="label">Department Manager:</div>
       <div class="content"><?php echo !empty($dept_manager_comments) ? nl2br(e($dept_manager_comments)) : '&nbsp;'; ?></div>

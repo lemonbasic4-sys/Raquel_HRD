@@ -25,7 +25,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $withKra=$ratingTarget && annualCanFinalize($conn,$actor,$ratingTarget);
             if ($withKra) {
                 annualReviewAndRate($conn,$actor,$evaluationId,(array)($_POST['kra'] ?? []),
-                    (string)($_POST['review_token'] ?? ''),(array)($_POST['scores'] ?? []),trim($_POST['rater_signature_data'] ?? ''),(array)($_POST['plans'] ?? []));
+                    (string)($_POST['review_token'] ?? ''),(array)($_POST['scores'] ?? []),trim($_POST['rater_signature_data'] ?? ''),(array)($_POST['plans'] ?? []),(string)($_POST['head_comments'] ?? ''));
             } else {
                 if (!empty($_POST['kra'])) throw new DomainException('Only the immediate head may adjust KRA ratings.');
                 annualSubmitPeers($conn,$actor,$evaluationId,(array)($_POST['scores'] ?? []));
@@ -226,6 +226,7 @@ require_once __DIR__ . '/header.php';
                 <?php foreach ($headPlans as $plan): ?><div class="annual-plan-summary"><p><strong>Development area: </strong><?php echo e($plan['improvement_area']); ?></p><p><strong>Action / support: </strong><?php echo e($plan['support_needed']); ?></p><p><strong>Target time frame: </strong><?php echo e($plan['time_frame']); ?></p></div><?php endforeach; ?>
             </section>
             <section class="annual-rater-signature"><h3 class="h6 fw-bold">Rater signature</h3><?php if (!empty($headReviewSubmission['rater_signature_data'])): ?><img src="<?php echo e($headReviewSubmission['rater_signature_data']); ?>" alt="Submitted immediate-head rater signature" style="display:block;max-width:560px;width:100%;max-height:150px;object-fit:contain;background:#fff;border:1px solid #d5ddd2;border-radius:8px;padding:8px;"><p class="small text-muted mt-2 mb-0">Signed <?php echo e($headReviewSubmission['rater_signed_at'] ?? ''); ?></p><?php else: ?><p class="text-muted mb-0">No signature was saved on this submission.</p><?php endif; ?></section>
+            <section class="mt-4"><h3 class="h6 fw-bold"><i class="fas fa-comment-alt me-2" aria-hidden="true"></i>Immediate Head Comments</h3><p class="annual-plan-summary" style="white-space:pre-wrap;"><?php echo e($member['head_comments'] ?: 'No comments added.'); ?></p></section>
             <a class="btn btn-outline-success mt-4" href="<?php echo annualUrl($actor,'?view=peers&amp;cycle_id='.$cycleId); ?>">Back to Department Peers</a>
         </section>
     <?php elseif ($view==='rate'): ?>
@@ -306,6 +307,11 @@ require_once __DIR__ . '/header.php';
                             <input type="hidden" name="rater_signature_data" id="annualRaterSignatureData" value="<?php echo e($_POST['rater_signature_data'] ?? ''); ?>">
                             <div id="annualRaterSignatureError" class="small text-danger mt-1" role="alert" hidden>Please sign before submitting.</div>
                             <button class="btn btn-sm btn-outline-secondary mt-2" type="button" id="annualClearRaterSignature">Clear signature</button>
+                            <div class="mt-4">
+                                <label class="form-label fw-bold" for="annualHeadComments"><i class="fas fa-comment-alt me-2" aria-hidden="true"></i>Immediate Head Comments</label>
+                                <p class="small text-muted mb-2">Add feedback or recommendations for the employee. These comments will appear on the printed evaluation form.</p>
+                                <textarea class="form-control" id="annualHeadComments" name="head_comments" rows="4" maxlength="4000" placeholder="Enter your feedback or recommendations…"><?php echo e($_POST['head_comments'] ?? $member['head_comments'] ?? ''); ?></textarea>
+                            </div>
                         </div>
                         <div class="annual-rating-step-actions"><button class="btn btn-outline-success" type="button" id="annualRateReviewBack" data-annual-tab="#annualRatePlanPanel" aria-controls="annualRatePlanPanel"><i class="fas fa-arrow-left me-2" aria-hidden="true"></i>Back to Developmental Plan</button><button class="btn btn-success" type="button" id="annualReviewRatings">Review &amp; submit ratings</button></div>
                     </div></div><?php endif; ?>
@@ -317,7 +323,7 @@ require_once __DIR__ . '/header.php';
             <div class="modal-body"><p>For <?php echo e($member['first_name'].' '.$member['last_name']); ?></p>
                 <div id="annualSummaryKraSection"><h3 class="h6">Key Result Areas · 80%</h3><div class="table-responsive"><table class="table table-sm"><thead><tr><th>KRA item</th><th class="text-end">Weight</th><th class="text-end">Submitted</th><th class="text-end">Reviewed</th></tr></thead><tbody id="annualSummaryKraRows"></tbody><tfoot><tr><th colspan="3">Weighted KRA subtotal</th><td class="text-end"><strong id="annualSummaryKraTotal">—</strong></td></tr></tfoot></table></div></div>
                 <h3 class="h6 mt-3">Core Behaviors &amp; Values · 360 rating · 20%</h3><div class="table-responsive"><table class="table table-sm"><thead><tr><th>Behavior</th><th class="text-end">Employee self-rating</th><th class="text-end">Your 360 rating</th></tr></thead><tbody id="annualSummaryBehaviorRows"></tbody><tfoot><tr><th colspan="2">Your 360 average</th><td class="text-end"><strong id="annualSummaryBehaviorAverage">—</strong></td></tr></tfoot></table></div>
-                <?php if ($canFinalize): ?><section class="mt-3"><h3 class="h6">Developmental Plan</h3><div id="annualPlanConfirmation"></div></section><?php endif; ?>
+                <?php if ($canFinalize): ?><section class="mt-3"><h3 class="h6">Developmental Plan</h3><div id="annualPlanConfirmation"></div><h3 class="h6 mt-3">Immediate Head Comments</h3><p id="annualHeadCommentsConfirmation" style="white-space:pre-wrap;overflow-wrap:anywhere;"></p></section><?php endif; ?>
                 <div class="alert alert-warning"><strong>This can’t be undone.</strong> After confirmation, your ratings and rater signature are locked and cannot be edited. Please verify the summary before continuing.</div></div>
             <div class="modal-footer"><button class="btn btn-outline-secondary" data-bs-dismiss="modal">Back to edit</button><button class="btn btn-success" id="annualConfirmSubmit">Yes, submit and lock</button></div>
         </div></div></div>
@@ -485,6 +491,7 @@ function updateAnnualProgress() {
 }
 const annualRatingForm=document.getElementById('annualRatingForm');
 const annualDraftKey=annualRatingForm?.dataset.draftKey;
+document.getElementById('annualHeadComments')?.addEventListener('input',()=>saveAnnualRatingDraft());
 // Match the probationary form's separate section-total bars, retaining score IDs.
 [['annualRateKraPanel','Key Result Areas (KRA) Total','annualRateKraTotal'],['annualRateCorePanel','Core Behaviors & Values Total','annualPeerRatingAverage']].forEach(([panelId,title,scoreId])=>{
     const panel=document.getElementById(panelId), score=document.getElementById(scoreId);
@@ -565,7 +572,7 @@ function saveAnnualRatingDraft(panelOverride=null) {
     const values={};
     annualRatingForm.querySelectorAll('input[type="number"]').forEach(input=>{ values[input.name]=input.value; });
     const activePanel=panelOverride || document.querySelector('.annual-review-tabs button.active')?.dataset.bsTarget || '#annualRateKraPanel';
-    try { sessionStorage.setItem(annualDraftKey,JSON.stringify({values,activePanel,behaviorDefaultsVersion:1,plans:annualReadPlans(),signature:document.getElementById('annualRaterSignatureData')?.value || ''})); } catch (_) {}
+    try { sessionStorage.setItem(annualDraftKey,JSON.stringify({values,activePanel,behaviorDefaultsVersion:1,plans:annualReadPlans(),headComments:document.getElementById('annualHeadComments')?.value || '',signature:document.getElementById('annualRaterSignatureData')?.value || ''})); } catch (_) {}
 }
 function restoreAnnualRatingDraft() {
     if (!annualRatingForm || !annualDraftKey) return;
@@ -583,6 +590,8 @@ function restoreAnnualRatingDraft() {
                 draft.plans.forEach(plan=>annualAddPlanRow(plan));
                 annualUpdatePlanLayout();
             }
+            const comments=document.getElementById('annualHeadComments');
+            if(comments && typeof draft?.headComments==='string') comments.value=draft.headComments;
             const signature=document.getElementById('annualRaterSignatureData');
             if (signature && draft?.signature) signature.value=draft.signature;
             const navigationType=performance.getEntriesByType('navigation')[0]?.type;
@@ -723,6 +732,8 @@ document.getElementById('annualSearch')?.addEventListener('input',filterAnnualRo
 document.getElementById('annualStatus')?.addEventListener('change',filterAnnualRoster);
 document.getElementById('annualReviewRatings')?.addEventListener('click', () => {
     const form=document.getElementById('annualRatingForm');
+    const commentsPreview=document.getElementById('annualHeadCommentsConfirmation');
+    if(commentsPreview) commentsPreview.textContent=document.getElementById('annualHeadComments')?.value.trim() || 'No comments added.';
     annualValidatePlanFields();
     const invalid=[...form.querySelectorAll('input,textarea')].find(input=>!input.checkValidity());
     if (invalid) {

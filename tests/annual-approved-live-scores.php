@@ -74,7 +74,8 @@ try {
 
     $signature='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/6wAAAABJRU5ErkJggg==';
     $plans=[['improvement_area'=>'Employee records accuracy','support_needed'=>'Monthly coaching and checklist review','time_frame'=>'Within 3 months']];
-    annualReviewAndRate($conn,$actors[3],4,[],annualReviewToken($conn,annualMember($conn,4)),[],$signature,$plans);
+    annualReviewAndRate($conn,$actors[3],4,[],annualReviewToken($conn,annualMember($conn,4)),[],$signature,$plans,'Continue accuracy checks and attend monthly coaching.');
+    checkAnnual(annualMember($conn,4)['head_comments']==='Continue accuracy checks and attend monthly coaching.','Head comments save to the print-form comments field');
     checkAnnual(annualQuery($conn,'SELECT improvement_area,support_needed,time_frame FROM evaluation_dev_plans WHERE evaluation_id=4')===$plans,'Developmental plan saves with signed head approval');
     $approved=annualMember($conn,4);
     checkAnnual($approved['evaluation_status']==='Approved' && (int)$approved['current_version']===1,'Head submission immediately approves Annual evaluation before peers complete');
@@ -92,6 +93,7 @@ try {
     $v=json_decode(annualQuery($conn,'SELECT snapshot_json FROM annual_evaluation_versions WHERE member_id=? ORDER BY version_number DESC LIMIT 1',[(int)$complete['member_id']])[0]['snapshot_json'],true);
     checkAnnual($v['score_complete']===true && (float)$complete['official_score']===3.19,'Score becomes complete after every expected rater submits');
     checkAnnual($v['development_plans']===$plans,'Later peer score updates preserve the approved developmental plan');
+    checkAnnual($v['head_comments']==='Continue accuracy checks and attend monthly coaching.','Later peer updates preserve head comments in score history');
     checkAnnual(count(annualQuery($conn,'SELECT version_id FROM annual_evaluation_versions WHERE member_id=?',[(int)$complete['member_id']]))===3,'Every peer update preserves a score version');
     checkAnnual((bool)annualQuery($conn,"SELECT notification_id FROM notifications WHERE user_id=4 AND title='Annual score updated' AND message LIKE '%3.44%3.24%'"),'Employee receives previous-to-updated score notice');
     checkAnnual((bool)annualQuery($conn,"SELECT notification_id FROM notifications WHERE user_id=4 AND title='Annual score complete'"),'Employee receives score-complete notice');

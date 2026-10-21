@@ -115,6 +115,7 @@ function annualMember($conn, int $evaluationId): ?array
             e.is_active AS employee_active, e.employment_status, e.deleted_at AS employee_deleted_at,
             ev.status AS evaluation_status, ev.total_score AS official_score, et.template_name,
             ev.created_at AS evaluation_created_at, ev.submitted_date AS evaluation_submitted_at,
+            ev.supervisor_comments AS head_comments,
             reviewer_position.job_title AS reviewer_position_name
         FROM annual_evaluation_members m JOIN annual_evaluation_cycles c ON c.cycle_id=m.cycle_id
         JOIN employees e ON e.employee_id=m.employee_id JOIN evaluations ev ON ev.evaluation_id=m.evaluation_id
@@ -443,9 +444,11 @@ function annualResolveReviewOverrides(array $defaults, array $overrides): array
 }
 
 /** Save the head's KRA review and their own peer rating together, or neither. */
-function annualReviewAndRate($conn, array $actor, int $evaluationId, array $ratings, string $token, array $scores, string $signature, ?array $plans = null): void
+function annualReviewAndRate($conn, array $actor, int $evaluationId, array $ratings, string $token, array $scores, string $signature, ?array $plans = null, string $headComments = ''): void
 {
     if ($signature==='') throw new DomainException('Sign in the rater signature box before submitting.');
+    $headComments=trim($headComments);
+    if (mb_strlen($headComments)>4000) throw new DomainException('Immediate head comments must not exceed 4,000 characters.');
     ensureAuditTrailSchema($conn);
     $conn->begin_transaction();
     try {
@@ -459,6 +462,7 @@ function annualReviewAndRate($conn, array $actor, int $evaluationId, array $rati
         $scores=annualResolveReviewOverrides(json_decode($member['self_values_json'],true),$scores);
         annualApproveKra($conn,$actor,$evaluationId,$ratings,'',$token,false,false);
         annualSubmitPeers($conn,$actor,$evaluationId,$scores,false,$signature);
+        annualQuery($conn,'UPDATE evaluations SET supervisor_comments=? WHERE evaluation_id=?',[$headComments,$evaluationId]);
         if ($plans!==null) {
             $plans=annualValidateDevelopmentPlans($plans);
             annualQuery($conn,'DELETE FROM evaluation_dev_plans WHERE evaluation_id=?',[$evaluationId]);
@@ -504,6 +508,7 @@ function annualRefreshApprovedResult($conn, array $member, int $actorUserId, boo
     $snapshot=$candidate+['score_complete'=>$complete,'expected_peers'=>$expected,
         'previous_score'=>$member['official_score'],'kra_rows'=>annualKraRows($conn,(int)$member['evaluation_id']),
         'self_values'=>json_decode($member['self_values_json'],true),'peers'=>annualPeers($conn,$member),
+        'head_comments'=>$member['head_comments'] ?? '',
         'development_plans'=>annualQuery($conn,'SELECT improvement_area,support_needed,time_frame FROM evaluation_dev_plans WHERE evaluation_id=? ORDER BY sort_order,plan_id',[(int)$member['evaluation_id']])];
     annualQuery($conn,'INSERT INTO annual_evaluation_versions (member_id,version_number,finalized_by,remarks,snapshot_json) VALUES (?,?,?,?,?)',
         [(int)$member['member_id'],$version,$approve ? $actorUserId : (int)$approval['approved_by'],
