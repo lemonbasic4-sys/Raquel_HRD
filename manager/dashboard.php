@@ -29,8 +29,10 @@ $avg_score_result = $conn->query("SELECT AVG(total_score) as avg FROM evaluation
 $avg_score = round($avg_score_result->fetch_assoc()['avg'] ?? 0, 1);
 $new_evals_month = $conn->query("SELECT COUNT(*) as c FROM evaluations WHERE $dashboard_regular_eval_filter AND MONTH(submitted_date) = MONTH(CURRENT_DATE()) AND YEAR(submitted_date) = YEAR(CURRENT_DATE())")->fetch_assoc()['c'];
 $approved_evals = $conn->query("SELECT COUNT(*) as c FROM evaluations WHERE status = 'Approved' AND $dashboard_regular_eval_filter")->fetch_assoc()['c'];
-$total_branches_res = $conn->query("SELECT COUNT(*) as c FROM branches");
-$total_branches = $total_branches_res->fetch_assoc()['c'];
+$recent_hires = (int)$conn->query("SELECT COUNT(*) AS c FROM employees e
+    WHERE e.deleted_at IS NULL AND e.hire_date >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
+      AND e.hire_date <= CURDATE()
+      AND NOT EXISTS (SELECT 1 FROM users u WHERE u.employee_id=e.employee_id AND u.role='Admin')")->fetch_assoc()['c'];
 
 // Fetch branches with employee counts for the insights explorer
 $branches_insights_res = $conn->query("
@@ -596,7 +598,34 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
         width: 100%;
     }
 
+    .hr-manager-dashboard .dashboard-stats-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        grid-auto-rows: 1fr;
+        gap: 16px;
+        margin: 0;
+    }
+    .hr-manager-dashboard .dashboard-stats-grid > div {
+        width: auto;
+        min-width: 0;
+        padding: 0;
+        margin: 0;
+    }
+    .hr-manager-dashboard .dashboard-stats-grid > div > a {
+        display: block;
+        height: 100%;
+        color: inherit;
+    }
+    .hr-manager-dashboard .dashboard-stats-grid .stat-card {
+        height: 100%;
+        min-height: 110px;
+    }
+    .hr-manager-dashboard .dashboard-stats-grid .stat-card > .d-flex { gap: 10px; }
+    .hr-manager-dashboard .dashboard-stats-grid .stat-card > .d-flex > div { min-width: 0; flex: 1; }
+    .hr-manager-dashboard .dashboard-stats-grid .stat-icon { flex-shrink: 0; }
+    .hr-manager-dashboard .dashboard-stats-grid .stat-label { line-height: 1.4; }
     @media (max-width: 1199.98px) {
+        .hr-manager-dashboard .dashboard-stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         .hr-manager-dashboard .chart-container { height: clamp(220px, 30vw, 280px) !important; }
         .hr-manager-dashboard .dashboard-chart-wrap { height: clamp(220px, 30vw, 280px) !important; }
         .hr-manager-dashboard #topPerformerContainer { height: clamp(240px, 34vw, 320px) !important; }
@@ -659,7 +688,7 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
             <i class="fas fa-sync-alt me-1"></i>Data as of <?php echo date('F d, Y'); ?>
         </div>
     </div>
-    <div class="row g-3">
+    <div class="row g-3 dashboard-stats-grid">
     <div class="col-6 col-xl-3">
         <div class="stat-card">
             <div class="d-flex justify-content-between align-items-start">
@@ -694,14 +723,14 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
         </div>
     </div>
     <div class="col-6 col-xl-3">
-        <a href="branches.php" class="text-decoration-none">
+        <a href="analytics.php?tab=hiring#hiring-analytics" class="text-decoration-none" aria-label="View recently hired employee analytics">
             <div class="stat-card">
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
-                        <div class="stat-value"><?php echo $total_branches; ?></div>
-                        <div class="stat-label">Total Branches</div>
+                        <div class="stat-value"><?php echo number_format($recent_hires); ?></div>
+                        <div class="stat-label">Recently Hired<br><span style="text-transform:none;font-weight:400;">This month</span></div>
                     </div>
-                    <i class="fas fa-building stat-icon text-white-50"></i>
+                    <i class="fas fa-user-plus stat-icon" style="color:#BD9414;"></i>
                 </div>
             </div>
         </a>

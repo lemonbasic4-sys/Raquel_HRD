@@ -3919,18 +3919,18 @@ body.mobile-sidebar-active .sidebar {
     min-width: 0;
 }
 
-.analytics-page #analyticsTabs {
+.analytics-page #analyticsTabs:not(.analytics-nav) {
     display: flex;
     flex-wrap: wrap;
     gap: 4px;
 }
 
-.analytics-page #analyticsTabs .nav-item {
+.analytics-page #analyticsTabs:not(.analytics-nav) .nav-item {
     flex: 1 1 190px;
     min-width: 0;
 }
 
-.analytics-page #analyticsTabs .nav-link {
+.analytics-page #analyticsTabs:not(.analytics-nav) .nav-link {
     height: 100%;
     white-space: normal;
 }
@@ -3969,16 +3969,16 @@ body.mobile-sidebar-active .sidebar {
         min-width: 0;
     }
 
-    .analytics-page #analyticsTabs .nav-item {
+    .analytics-page #analyticsTabs:not(.analytics-nav) .nav-item {
         flex-basis: calc(50% - 4px);
     }
 
-    .analytics-page #analyticsTabs .nav-link {
+    .analytics-page #analyticsTabs:not(.analytics-nav) .nav-link {
         font-size: .78rem;
         padding: 10px 8px;
     }
 
-    .analytics-page #analyticsTabs .nav-link i {
+    .analytics-page #analyticsTabs:not(.analytics-nav) .nav-link i {
         margin-right: 5px !important;
     }
 
@@ -3994,11 +3994,11 @@ body.mobile-sidebar-active .sidebar {
 }
 
 @media (max-width: 479.98px) {
-    .analytics-page #analyticsTabs .nav-item {
+    .analytics-page #analyticsTabs:not(.analytics-nav) .nav-item {
         flex-basis: 100%;
     }
 
-    .analytics-page #analyticsTabs .nav-link {
+    .analytics-page #analyticsTabs:not(.analytics-nav) .nav-link {
         text-align: left;
     }
 

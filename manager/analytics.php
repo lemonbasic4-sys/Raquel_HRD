@@ -10,6 +10,7 @@ $date_from     = $_GET['date_from']  ?? '';
 $date_to       = $_GET['date_to']    ?? '';
 $filter_branch = $_GET['branch']     ?? '';
 $filter_dept   = $_GET['department'] ?? '';
+$hiringTabActive = ($_GET['tab'] ?? '') === 'hiring';
 $cohort        = (($_GET['cohort'] ?? 'regular') === 'probationary') ? 'probationary' : 'regular';
 $evaluation_type_filter = $cohort === 'probationary'
     ? "ev.evaluation_type IN ('Initial','Final')"
@@ -621,6 +622,7 @@ $yoy_emp    = formatYoYData($yoy_emp_raw, $yoy_years);
 
 <div class="analytics-page">
 
+
 <!-- ═══════════════════════  HERO  ═══════════════════════ -->
 <div class="page-hero fadeup">
     <div class="d-flex flex-wrap align-items-center justify-content-between mb-4 gap-3">
@@ -686,6 +688,7 @@ $yoy_emp    = formatYoYData($yoy_emp_raw, $yoy_years);
 <!-- ═══════════════════════  FILTERS  ═══════════════════════ -->
 <div class="filter-card fadeup fadeup-1">
     <form method="GET" action="" class="row align-items-end g-3">
+        <input type="hidden" name="tab" id="analytics-active-tab" value="hiring"<?php echo $hiringTabActive ? '' : ' disabled'; ?>>
         <div class="col-md-2 col-6">
             <label class="form-label fw-semibold" style="font-size:.78rem;">Evaluation Group</label>
             <select class="form-select form-select-sm" name="cohort">
@@ -735,36 +738,51 @@ $yoy_emp    = formatYoYData($yoy_emp_raw, $yoy_years);
 </div>
 
 <style>
-/* Custom Tab Styles matching brand colors */
-.approval-tabs {
-    border-bottom: 2px solid #eef2e8;
+/* Compact, horizontally scrollable section navigation. */
+.analytics-page .analytics-nav {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 6px;
+    padding: 7px;
+    margin: 0;
+    width: 100%;
+    overflow-x: auto;
+    background: #fff;
+    border: 1px solid #e2e8dd;
+    border-radius: 14px;
+    box-shadow: 0 3px 12px rgba(26, 49, 13, .04);
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5c0 transparent;
 }
-.approval-tabs .nav-link {
-    border: none;
-    padding: 12px 20px;
-    color: #666;
+.analytics-nav .nav-item { flex: 1 0 auto; min-width: 0; }
+.analytics-page .analytics-nav .nav-link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    height: 100%;
+    min-height: 48px;
+    padding: 11px 15px;
+    border: 0;
+    border-radius: 9px;
+    background: transparent;
+    color: #5d6757;
+    font-size: .8rem;
     font-weight: 600;
-    font-size: 0.9rem;
-    position: relative;
-    transition: all 0.3s;
-    background: transparent !important;
+    line-height: 1.4;
+    white-space: nowrap;
+    transition: background .18s, color .18s;
 }
-.approval-tabs .nav-link:hover {
-    color: #294306;
-}
-.approval-tabs .nav-link.active {
-    color: #294306 !important;
-    font-weight: 700;
-}
-.approval-tabs .nav-link.active::after {
-    content: '';
-    position: absolute;
-    bottom: -2px;
-    left: 15px;
-    right: 15px;
-    height: 3px;
-    background: #294306;
-    border-radius: 10px;
+.analytics-page .analytics-nav .nav-link i { margin: 0 !important; font-size: .95rem; }
+.analytics-page .analytics-nav .nav-link:hover { background: #f2f5ed; color: #294306; }
+.analytics-page .analytics-nav .nav-link.active { background: #294306; color: #fff; box-shadow: 0 2px 5px #29430620; }
+.analytics-page .analytics-nav .nav-link.active i { color: #efcf6b; }
+.analytics-page .analytics-nav .nav-link:focus-visible { outline: 3px solid #bd9414; outline-offset: -3px; }
+.analytics-page .analytics-nav .nav-link::after { display: none; }
+@media (max-width: 767.98px) {
+    .analytics-page .analytics-nav { border-radius: 12px; }
+    .analytics-page .analytics-nav .nav-link { padding: 10px 13px; min-height: 44px; }
 }
 .tab-pane {
     animation: fadeSlideUp 0.4s ease forwards;
@@ -906,9 +924,14 @@ $yoy_emp    = formatYoYData($yoy_emp_raw, $yoy_years);
 </style>
 
 <!-- ═══════════════════════  TABS NAVIGATION  ═══════════════════════ -->
-<ul class="nav nav-tabs approval-tabs mb-4 fadeup" id="analyticsTabs" role="tablist">
+<ul class="nav analytics-nav mb-4" id="analyticsTabs" role="tablist" aria-label="Analytics sections">
     <li class="nav-item">
-        <button class="nav-link active" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview" type="button" role="tab">
+        <button class="nav-link<?php echo $hiringTabActive ? ' active' : ''; ?>" id="hiring-tab" data-bs-toggle="tab" data-bs-target="#hiring" type="button" role="tab" aria-controls="hiring" aria-selected="<?php echo $hiringTabActive ? 'true' : 'false'; ?>">
+            <i class="fas fa-user-plus me-2"></i>Hiring Analytics
+        </button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link<?php echo $hiringTabActive ? '' : ' active'; ?>" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview" type="button" role="tab" aria-selected="<?php echo $hiringTabActive ? 'false' : 'true'; ?>">
             <i class="fas fa-eye me-2"></i>Performance Overview
         </button>
     </li>
@@ -935,8 +958,11 @@ $yoy_emp    = formatYoYData($yoy_emp_raw, $yoy_years);
 </ul>
 
 <div class="tab-content" id="analyticsTabsContent">
+    <div class="tab-pane fade<?php echo $hiringTabActive ? ' show active' : ''; ?>" id="hiring" role="tabpanel" aria-labelledby="hiring-tab">
+        <?php require __DIR__ . '/../includes/manager-hiring-analytics.php'; ?>
+    </div>
     <!-- ═══════════════════════ TAB 1: OVERVIEW ═══════════════════════ -->
-    <div class="tab-pane fade show active" id="overview" role="tabpanel">
+    <div class="tab-pane fade<?php echo $hiringTabActive ? '' : ' show active'; ?>" id="overview" role="tabpanel">
         <div class="row g-3 mb-3">
             <!-- Performance Distribution -->
             <div class="col-lg-5">
@@ -1674,6 +1700,18 @@ $yoy_emp    = formatYoYData($yoy_emp_raw, $yoy_years);
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+    const analyticsNav = document.getElementById('analyticsTabs');
+    analyticsNav?.addEventListener('shown.bs.tab', function (event) {
+        const hiringOpen = event.target.id === 'hiring-tab';
+        const activeTabInput = document.getElementById('analytics-active-tab');
+        if (activeTabInput) activeTabInput.disabled = !hiringOpen;
+        const url = new URL(window.location.href);
+        if (hiringOpen) url.searchParams.set('tab', 'hiring');
+        else url.searchParams.delete('tab');
+        url.hash = '';
+        window.history.replaceState(null, '', url);
+        event.target.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    });
     const SPINE = '#294306', GOLD = '#BD9414', RED = '#D71920';
     const gridColor = 'rgba(0,0,0,.04)';
 
