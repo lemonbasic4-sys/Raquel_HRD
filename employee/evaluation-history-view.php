@@ -38,6 +38,8 @@ if (!$evaluation) {
 $is_probationary_evaluation = in_array($evaluation['evaluation_type'] ?? '', ['Initial', 'Final'], true);
 $is_annual_peer_evaluation = ($evaluation['evaluation_type'] ?? '') === 'Annual'
     && annualUsesPeerWorkflow($conn, $evaluation_id);
+$annualResultMember=$is_annual_peer_evaluation ? annualMember($conn,$evaluation_id) : null;
+$annualResultComplete=$annualResultMember && count(annualPeers($conn,$annualResultMember))>=annualExpectedPeers($conn,(int)$annualResultMember['cycle_id'],(int)$annualResultMember['employee_id']);
 $criteria_stmt = $conn->prepare("SELECT ec.section, ec.criterion_name, ec.description, ec.weight, es.score_value,
         es.dept_manager_override_score, es.supervisor_override_score, es.manager_override_score,
         COALESCE(es.supervisor_override_score, es.dept_manager_override_score, es.manager_override_score, es.score_value) AS reviewed_score
@@ -63,9 +65,12 @@ $orig_kra_subtotal = 0.0;
 $orig_beh_total = 0.0;
 $orig_beh_count = 0;
 $has_any_adjustment = false;
+$annualBehaviorAverages=$annualResultMember && $show_reviewed_scores ? annualCandidate($conn,$annualResultMember)['item_averages'] : [];
+$annualBehaviorIndex=0;
 
 foreach ($criteria as &$c) {
     $val = (float)$c['score_value'];
+    if ($c['section']!=='KRA' && $annualBehaviorAverages) $c['reviewed_score']=$annualBehaviorAverages[$annualBehaviorIndex++];
     if (!$show_reviewed_scores) {
         $c['reviewed_score'] = $val;
     }
@@ -137,6 +142,9 @@ require_once '../includes/header.php';
             </div>
         </header>
         <div class="package-card__body">
+            <?php if ($annualResultMember && $evaluation['status']==='Approved'): ?>
+            <div class="alert <?php echo $annualResultComplete ? 'alert-success' : 'alert-info'; ?>" role="status"><strong>Approved · <?php echo $annualResultComplete ? 'Score complete' : 'Score provisional'; ?></strong><p class="mb-0"><?php echo $annualResultComplete ? 'All required department ratings have been received. Your score is complete.' : 'Your immediate head has approved your evaluation. Your overall score may change as remaining department members submit their 360 ratings. You will be notified when your score changes.'; ?></p></div>
+            <?php endif; ?>
             <?php if (!$is_package_completed): ?>
                 <div class="alert alert-info d-flex align-items-center gap-2 p-3 mb-3 rounded-3">
                     <i class="fas fa-info-circle fa-lg text-primary"></i>
@@ -152,8 +160,52 @@ require_once '../includes/header.php';
                 </div>
             <?php endif; ?>
 
+            <?php if ($is_annual_peer_evaluation):
+                $annualDisplayKra=$show_reviewed_scores ? (float)$evaluation['kra_subtotal'] : $orig_kra_subtotal;
+                $annualDisplayCore=$show_reviewed_scores ? (float)$evaluation['behavior_average'] : $orig_beh_average;
+                $annualDisplayTotal=$show_reviewed_scores && $evaluation['total_score']!==null ? (float)$evaluation['total_score'] : $orig_total_score;
+                $annualTier=$annualDisplayTotal>=3.6 ? 'outstanding' : ($annualDisplayTotal>=2.6 ? 'exceeds' : ($annualDisplayTotal>=2 ? 'meets' : 'needs'));
+            ?>
+            <div class="annual-result-cards" aria-label="Annual evaluation scores">
+                <section class="annual-result-card">
+                    <div class="annual-result-card-head"><span class="annual-result-icon"><i class="fas fa-chart-pie" aria-hidden="true"></i></span><span class="annual-result-weight">80% weight</span></div>
+                    <h3>Key Result Areas</h3>
+                    <div class="annual-result-number"><?php echo number_format($annualDisplayKra,2); ?><span>/ 4.00</span></div>
+                    <p><?php echo $show_reviewed_scores ? 'Approved KRA score' : 'Submitted KRA score'; ?></p>
+                </section>
+                <section class="annual-result-card annual-result-card--behavior">
+                    <div class="annual-result-card-head"><span class="annual-result-icon"><i class="fas fa-handshake" aria-hidden="true"></i></span><span class="annual-result-weight">20% weight</span></div>
+                    <h3>Core Behaviors &amp; Values</h3>
+                    <div class="annual-result-number"><?php echo number_format($annualDisplayCore,2); ?><span>/ 4.00</span></div>
+                    <p><?php echo $show_reviewed_scores ? 'Combined 360 average' : 'Submitted behavior score'; ?></p>
+                </section>
+                <section class="annual-result-card annual-result-card--total">
+                    <div class="annual-result-card-head"><span class="annual-result-icon"><i class="fas fa-chart-line" aria-hidden="true"></i></span><span class="annual-result-weight">Weighted overall</span></div>
+                    <h3>Final Score</h3>
+                    <div class="annual-result-number"><?php echo number_format($annualDisplayTotal,2); ?><span>/ 4.00</span></div>
+                    <span class="annual-result-level is-<?php echo $annualTier; ?>"><i class="fas fa-<?php echo $annualTier==='needs' ? 'exclamation-circle' : 'check-circle'; ?>" aria-hidden="true"></i> <?php echo e($show_reviewed_scores ? getPerformanceLevel($annualDisplayTotal) : 'Awaiting approval'); ?></span>
+                    <p>KRA × 80% + Behavior × 20%</p>
+                </section>
+            </div>
+            <?php else: ?>
             <div class="row g-3">
-                <div class="col-sm-6">
+                <?php if ($is_annual_peer_evaluation): ?>
+                <div class="col-12 col-md-4">
+                    <div class="package-stat h-100 d-flex flex-column gap-2" style="border:1px solid #d7e3d0;border-radius:10px;padding:18px;background:#f3f7ef;">
+                        <span class="small text-uppercase fw-bold" style="color:#36572b;"><i class="fas fa-chart-pie me-1" aria-hidden="true"></i> KRA</span>
+                        <strong class="tabular-nums" style="font-size:1.8rem;color:#185425;"><?php echo number_format($show_reviewed_scores ? (float)$evaluation['kra_subtotal'] : $orig_kra_subtotal,2); ?></strong>
+                        <span class="small text-muted">Weight: 80%</span>
+                    </div>
+                </div>
+                <div class="col-12 col-md-4">
+                    <div class="package-stat h-100 d-flex flex-column gap-2" style="border:1px solid #e6ddbc;border-radius:10px;padding:18px;background:#fcf9ef;">
+                        <span class="small text-uppercase fw-bold" style="color:#746018;"><i class="fas fa-users me-1" aria-hidden="true"></i> Core Behaviors &amp; Values</span>
+                        <strong class="tabular-nums" style="font-size:1.8rem;color:#846812;"><?php echo number_format($show_reviewed_scores ? (float)$evaluation['behavior_average'] : $orig_beh_average,2); ?></strong>
+                        <span class="small text-muted">Weight: 20%</span>
+                    </div>
+                </div>
+                <?php endif; ?>
+                <div class="<?php echo $is_annual_peer_evaluation ? 'col-12 col-md-4' : 'col-sm-6'; ?>">
                     <?php
                     $ts_val = $show_reviewed_scores && $evaluation['total_score'] !== null ? (float)$evaluation['total_score'] : (float)$orig_total_score;
                     if ($show_reviewed_scores && $ts_val !== null) {
@@ -174,11 +226,11 @@ require_once '../includes/header.php';
                     ?>
                     <div class="package-stat h-100 d-flex flex-column justify-content-between" style="<?php echo $score_card_style; ?>">
                         <span class="small text-uppercase fw-bold" style="<?php echo $score_label_style; ?>">
-                            <?php echo $is_package_completed ? 'Overall Score' : ($show_reviewed_scores ? 'Head-Reviewed Score' : 'Submitted Self Total'); ?>
+                            <?php echo $is_annual_peer_evaluation ? 'Final Score' : ($is_package_completed ? 'Overall Score' : ($show_reviewed_scores ? 'Head-Reviewed Score' : 'Submitted Self Total')); ?>
                         </span>
                         <div class="d-flex align-items-baseline gap-2 mt-1">
                             <strong class="tabular-nums" style="<?php echo $score_value_style; ?>"><?php echo number_format($ts_val, 2); ?></strong>
-                            <?php if ($show_reviewed_scores && abs($ts_val - $orig_total_score) > 0.001): ?>
+                            <?php if (!$is_annual_peer_evaluation && $show_reviewed_scores && abs($ts_val - $orig_total_score) > 0.001): ?>
                                 <span class="badge bg-light text-dark border small" title="Original Self Total: <?php echo number_format($orig_total_score, 2); ?>">
                                     Orig: <?php echo number_format($orig_total_score, 2); ?>
                                 </span>
@@ -190,6 +242,7 @@ require_once '../includes/header.php';
                     </div>
                 </div>
 
+                <?php if (!$is_annual_peer_evaluation): ?>
                 <div class="col-sm-6">
                     <div class="package-stat h-100 d-flex flex-column justify-content-between" style="border:2px solid var(--bs-border-color,#dee2e6);border-radius:10px;padding:14px 18px;">
                         <span class="text-muted small text-uppercase fw-bold"><?php echo $is_probationary_evaluation ? 'Individual Core Values' : 'Shared Team Behavior'; ?></span>
@@ -203,7 +256,10 @@ require_once '../includes/header.php';
                         </div>
                     </div>
                 </div>
+                <?php endif; ?>
             </div>
+
+            <?php endif; ?>
 
             <?php if ($has_any_adjustment): ?>
                 <div class="alert alert-warning d-flex align-items-center gap-2 p-3 mt-3 mb-0" style="border-radius:10px;">
@@ -218,6 +274,31 @@ require_once '../includes/header.php';
 
     <!-- ── Tabbed Sections ──────────────────────────────────────────────── -->
     <style>
+
+        .annual-result-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+        .annual-result-card{min-width:0;display:flex;flex-direction:column;align-items:flex-start;padding:22px;border:1px solid #dce5d7;border-radius:14px;background:#f6f9f2;box-shadow:0 3px 10px rgba(21,57,16,.04);text-align:left}
+        .annual-result-card-head{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;margin-bottom:16px}
+        .annual-result-icon{display:grid;place-items:center;width:42px;height:42px;flex:0 0 42px;border-radius:12px;background:#e1edda;color:#245523;font-size:1.2rem}
+        .annual-result-weight{font-size:.68rem;font-weight:700;color:#52694b;background:#e9f0e3;padding:5px 8px;border-radius:999px}
+        .annual-result-card h3{font-size:.85rem;font-weight:700;color:#36522e;margin:0 0 8px;line-height:1.45}
+        .annual-result-number{font-size:2.15rem;line-height:1.2;font-weight:800;color:#185425;font-variant-numeric:tabular-nums}
+        .annual-result-number>span{font-size:.75rem;font-weight:500;color:#6c7a66;margin-left:7px}
+        .annual-result-card p{font-size:.72rem;color:#6b7866;margin:10px 0 0;line-height:1.5}
+        .annual-result-card--behavior{background:#fcfaf2;border-color:#e8e0bf}
+        .annual-result-card--behavior .annual-result-icon{background:#f2ebcf;color:#92731a}
+        .annual-result-card--behavior .annual-result-weight{background:#f3edd7;color:#81671a}
+        .annual-result-card--behavior .annual-result-number{color:#816719}
+        .annual-result-card--total{background:linear-gradient(125deg,#123d28,#205b37);border-color:#1c4f31}
+        .annual-result-card--total h3,.annual-result-card--total .annual-result-number{color:#fff}
+        .annual-result-card--total .annual-result-number>span,.annual-result-card--total p{color:#d0dfce}
+        .annual-result-card--total .annual-result-icon{background:rgba(255,255,255,.12);color:#f1ce61}
+        .annual-result-card--total .annual-result-weight{background:rgba(255,255,255,.1);color:#f5dfa0}
+        .annual-result-level{display:inline-flex;align-items:center;gap:6px;font-size:.7rem;font-weight:700;padding:5px 9px;margin-top:10px;border-radius:7px;line-height:1.5;background:#e4f4e4;color:#215f2a}
+        .annual-result-level.is-needs{background:#fde7e3;color:#972f27}
+        .annual-result-level.is-meets{background:#fff1c9;color:#775600}
+        .annual-result-level.is-exceeds{background:#e0f1f5;color:#15586c}
+        @media(max-width:1050px){.annual-result-cards{gap:12px}.annual-result-card{padding:16px}.annual-result-card-head{flex-wrap:wrap}}
+        @media(max-width:600px){.annual-result-cards{grid-template-columns:1fr}.annual-result-card{padding:18px}.annual-result-card-head{margin-bottom:12px}.annual-result-number{font-size:2rem}}
         .eval-tabs-wrapper{background:#fff;border-radius:14px;border:1px solid var(--bs-border-color,#dee2e6);box-shadow:0 2px 12px rgba(0,0,0,.07);overflow:hidden;display:flex;flex-direction:column;}
         .eval-tab-nav{display:flex;gap:6px;padding:14px 16px 0;border-bottom:1px solid #e2e8f0;background:#f8fafc;flex-shrink:0;flex-wrap:wrap;}
         .eval-tab-btn{background:none;border:none;padding:8px 18px 10px;border-radius:8px 8px 0 0;font-size:.82rem;font-weight:600;color:#64748b;cursor:pointer;letter-spacing:.3px;transition:color .18s,background .18s,border-bottom .18s;border-bottom:3px solid transparent;position:relative;top:1px;}
@@ -457,7 +538,7 @@ require_once '../includes/header.php';
                                 <?php echo $show_reviewed_scores ? 'Original Self-Rating' : 'Submitted Rating'; ?>
                             </th>
                             <?php if ($show_reviewed_scores): ?>
-                                <th class="text-end" style="width:20%;">Reviewed / Adjusted</th>
+                                <th class="text-end" style="width:20%;"><?php echo $is_annual_peer_evaluation ? 'Combined 360 Average' : 'Reviewed / Adjusted'; ?></th>
                                 <th class="text-center" style="width:20%;">Variance</th>
                             <?php endif; ?>
                         </tr>
@@ -479,7 +560,7 @@ require_once '../includes/header.php';
                             </td>
                             <td data-label="<?php echo $show_reviewed_scores ? 'Original Self-Rating' : 'Submitted Rating'; ?>" class="text-end tabular-nums fw-semibold" style="font-size:1.05rem;"><?php echo number_format($orig, 2); ?></td>
                             <?php if ($show_reviewed_scores): ?>
-                                <td data-label="Reviewed / Adjusted" class="text-end tabular-nums fw-bold text-dark" style="font-size:1.1rem;"><?php echo number_format($rev, 2); ?></td>
+                                <td data-label="<?php echo $is_annual_peer_evaluation ? 'Combined 360 Average' : 'Reviewed / Adjusted'; ?>" class="text-end tabular-nums fw-bold text-dark" style="font-size:1.1rem;"><?php echo number_format($rev, 2); ?></td>
                                 <td data-label="Variance" class="text-center">
                                     <?php if ($is_adj): ?>
                                         <span class="badge <?php echo $diff > 0 ? 'bg-success' : 'bg-danger'; ?> px-2 py-1" style="font-size:.85rem;">

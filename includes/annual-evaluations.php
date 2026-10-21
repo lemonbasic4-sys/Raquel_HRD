@@ -390,15 +390,12 @@ function annualSubmitPeers($conn, array $actor, int $evaluationId, array $scores
             [(int)$member['cycle_id'],(int)$actor['employee_id'],(int)$actor['employee_id']])[0]['n'];
         if ($remaining===0) annualQuery($conn,'UPDATE notifications SET needs_action=0 WHERE user_id=? AND link=?',
             [(int)$actor['user_id'],annualUrl($actor,'?view=peers&cycle_id='.(int)$member['cycle_id'])]);
-        $revisionNotice=(int)$member['current_version']>0 && !$member['revision_pending'];
-        if ((int)$member['current_version']>0) {
-            annualQuery($conn,'UPDATE annual_evaluation_members SET revision_pending=1 WHERE member_id=?',[(int)$member['member_id']]);
-            if ($revisionNotice) annualNotifyEmployee($conn,(int)$member['employee_id'],'Annual rating revision pending','A late 360 submission has arrived. Your previous final score remains current until your immediate head re-finalizes.', $evaluationId);
-        }
-        logAudit($conn,(int)$actor['user_id'],'CREATE','Annual 360',$evaluationId, $late ? 'Submitted locked late peer rating; any final score revision requires immediate-head approval.' : 'Submitted locked peer rating.');
+        $revisionNotice=false;
+        if ((int)$member['current_version']>0 && $member['evaluation_status']==='Approved') annualRefreshApprovedResult($conn,$member,(int)$actor['user_id']);
+        logAudit($conn,(int)$actor['user_id'],'CREATE','Annual 360',$evaluationId,'Submitted locked peer rating. Approved Annual scores update automatically.');
         $received=(int)annualQuery($conn,'SELECT COUNT(*) AS n FROM annual_peer_submissions WHERE cycle_id=? AND target_employee_id=?',[(int)$member['cycle_id'],(int)$member['employee_id']])[0]['n'];
         $expected=annualExpectedPeers($conn,(int)$member['cycle_id'],(int)$member['employee_id']);
-        if ($revisionNotice || $received===$expected) annualNotifyHeads($conn,$member,$revisionNotice ? 'Late annual 360 rating received' : 'Annual 360 summary ready','Review the updated 360 summary for '.$member['first_name'].' '.$member['last_name'].'.');
+        if ($received===$expected && $member['evaluation_status']!=='Approved') annualNotifyHeads($conn,$member,'Annual 360 summary ready','Review the updated 360 summary for '.$member['first_name'].' '.$member['last_name'].'.');
         if ($manageTransaction) $conn->commit();
     } catch (Throwable $e) { if ($manageTransaction) $conn->rollback(); throw $e; }
 }
@@ -426,6 +423,24 @@ function annualApproveKra($conn, array $actor, int $evaluationId, array $ratings
     } catch (Throwable $e) { if ($manageTransaction) $conn->rollback(); throw $e; }
 }
 
+/** Resolve optional head overrides against original employee submissions. */
+function annualResolveReviewOverrides(array $defaults, array $overrides): array
+{
+    if (array_diff_key($overrides,$defaults)) throw new DomainException('An unknown rating item was submitted. Reload the evaluation.');
+    foreach ($defaults as $key => &$value) {
+        $override=$overrides[$key] ?? '';
+        if ($override !== '') {
+            if (!is_scalar($override) || !is_numeric($override) || !is_finite((float)$override)
+                || (float)$override<1 || (float)$override>4 || abs(round((float)$override,2)-(float)$override)>.00001) {
+                throw new DomainException('Rating overrides must be from 1.00 to 4.00 with at most two decimal places.');
+            }
+            $value=(float)$override;
+        }
+    }
+    unset($value);
+    return $defaults;
+}
+
 /** Save the head's KRA review and their own peer rating together, or neither. */
 function annualReviewAndRate($conn, array $actor, int $evaluationId, array $ratings, string $token, array $scores, string $signature): void
 {
@@ -433,10 +448,52 @@ function annualReviewAndRate($conn, array $actor, int $evaluationId, array $rati
     ensureAuditTrailSchema($conn);
     $conn->begin_transaction();
     try {
+        $member=annualMember($conn,$evaluationId);
+        if (!$member || !annualCanFinalize($conn,$actor,$member)) throw new DomainException('Only this employee\'s immediate head can review these ratings.');
+        annualQuery($conn,'SELECT cycle_id FROM annual_evaluation_cycles WHERE cycle_id=? FOR UPDATE',[(int)$member['cycle_id']]);
+        $member=annualMember($conn,$evaluationId);
+        $kraDefaults=[];
+        foreach (annualKraRows($conn,$evaluationId) as $row) $kraDefaults[(int)$row['score_id']]=$row['self_rating'];
+        $ratings=annualResolveReviewOverrides($kraDefaults,$ratings);
+        $scores=annualResolveReviewOverrides(json_decode($member['self_values_json'],true),$scores);
         annualApproveKra($conn,$actor,$evaluationId,$ratings,'',$token,false,false);
         annualSubmitPeers($conn,$actor,$evaluationId,$scores,false,$signature);
+        annualRefreshApprovedResult($conn,annualMember($conn,$evaluationId),(int)$actor['user_id'],true);
         $conn->commit();
     } catch (Throwable $e) { $conn->rollback(); throw $e; }
+}
+
+/** Caller holds the cycle lock. Approval stays locked; peer arrivals revise the score. */
+function annualRefreshApprovedResult($conn, array $member, int $actorUserId, bool $approve = false): void
+{
+    $candidate=annualCandidate($conn,$member);
+    $expected=annualExpectedPeers($conn,(int)$member['cycle_id'],(int)$member['employee_id']);
+    $complete=$candidate['peer_count']>=$expected;
+    $approval=annualQuery($conn,'SELECT approved_by FROM evaluations WHERE evaluation_id=?',[(int)$member['evaluation_id']])[0] ?? [];
+    $previous=annualQuery($conn,'SELECT snapshot_json FROM annual_evaluation_versions WHERE member_id=? ORDER BY version_number DESC LIMIT 1',[(int)$member['member_id']])[0] ?? [];
+    $previousSnapshot=json_decode($previous['snapshot_json'] ?? '{}',true) ?: [];
+    $scoreChanged=$member['official_score']===null || abs((float)$member['official_score']-$candidate['total'])>.00001;
+    $completeChanged=($previousSnapshot['score_complete'] ?? false)!==$complete;
+    $version=(int)$member['current_version']+1;
+    $snapshot=$candidate+['score_complete'=>$complete,'expected_peers'=>$expected,
+        'previous_score'=>$member['official_score'],'kra_rows'=>annualKraRows($conn,(int)$member['evaluation_id']),
+        'self_values'=>json_decode($member['self_values_json'],true),'peers'=>annualPeers($conn,$member)];
+    annualQuery($conn,'INSERT INTO annual_evaluation_versions (member_id,version_number,finalized_by,remarks,snapshot_json) VALUES (?,?,?,?,?)',
+        [(int)$member['member_id'],$version,$approve ? $actorUserId : (int)$approval['approved_by'],
+            $approve ? 'Approved by immediate head.' : 'Score updated automatically after a department peer submission.',json_encode($snapshot)]);
+    annualQuery($conn,'UPDATE annual_evaluation_members SET current_version=?,revision_pending=0,finalized_at=COALESCE(finalized_at,NOW()) WHERE member_id=?',[$version,(int)$member['member_id']]);
+    annualQuery($conn,"UPDATE evaluations SET kra_subtotal=?,behavior_average=?,total_score=?,performance_level=?,status='Approved',approved_by=COALESCE(approved_by,?),approved_date=COALESCE(approved_date,NOW()) WHERE evaluation_id=?",
+        [$candidate['kra'],$candidate['core'],$candidate['total'],getPerformanceLevel($candidate['total']),$actorUserId,(int)$member['evaluation_id']]);
+    annualQuery($conn,'UPDATE annual_evaluation_cycles SET first_finalized_at=COALESCE(first_finalized_at,NOW()) WHERE cycle_id=?',[(int)$member['cycle_id']]);
+    $notice=$complete ? 'All required department ratings have been received. Your score is complete.' : 'Your immediate head has approved your evaluation. Your overall score may change as remaining department members submit their 360 ratings.';
+    if ($approve || $scoreChanged || $completeChanged) annualNotifyEmployee($conn,(int)$member['employee_id'],
+        $approve ? 'Annual evaluation approved' : ($complete ? 'Annual score complete' : 'Annual score updated'),
+        ($approve ? 'Current overall score: '.number_format($candidate['total'],2).'. ' : 'Overall score: '.number_format((float)$member['official_score'],2).' → '.number_format($candidate['total'],2).'. ').$notice,(int)$member['evaluation_id']);
+    if ($approve) {
+        $head=annualActor($conn,$actorUserId);
+        annualQuery($conn,'UPDATE notifications SET needs_action=0 WHERE user_id=? AND link=?',[$actorUserId,annualUrl($head,'?view=review&evaluation_id='.(int)$member['evaluation_id'])]);
+    }
+    logAudit($conn,$actorUserId,$approve ? 'APPROVE' : 'UPDATE','Annual Evaluation',(int)$member['evaluation_id'],'Version '.$version.'. Score '.$candidate['total'].'. '.($complete ? 'Score complete.' : 'Score provisional.'));
 }
 
 function annualApplyKraRatings($conn, array $actor, int $evaluationId, array $ratings): array

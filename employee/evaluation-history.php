@@ -255,6 +255,8 @@ require_once '../includes/header.php';
                 <div class="eh-list">
                     <?php foreach ($evaluations as $ev): ?>
                     <?php
+                        $annualHistoryMember=$ev['evaluation_type']==='Annual' && annualUsesPeerWorkflow($conn,(int)$ev['evaluation_id']) ? annualMember($conn,(int)$ev['evaluation_id']) : null;
+                        $annualHistoryComplete=$annualHistoryMember && count(annualPeers($conn,$annualHistoryMember))>=annualExpectedPeers($conn,(int)$annualHistoryMember['cycle_id'],$employee_id);
                         $is_completed = ($ev['package_status'] === 'Approved and Applied' || $ev['status'] === 'Approved');
                         $has_total    = $is_completed && ($ev['total_score'] !== null);
                         $level        = $is_completed ? ($ev['performance_level'] ?: null) : null;
@@ -283,6 +285,7 @@ require_once '../includes/header.php';
                                     <span><i class="fas fa-paper-plane me-1"></i>Submitted <?php echo $submitted; ?></span>
                                 <?php endif; ?>
                             </div>
+                            <?php if ($annualHistoryMember && $ev['status']==='Approved'): ?><p class="small mt-2 mb-0 <?php echo $annualHistoryComplete ? 'text-success' : 'text-muted'; ?>"><strong>Approved · <?php echo $annualHistoryComplete ? 'Score complete' : 'Score provisional'; ?></strong><br><?php echo $annualHistoryComplete ? 'All required department ratings have been received.' : 'Your immediate head has approved your evaluation. Your overall score may change as remaining department members submit their 360 ratings. You will be notified when your score changes.'; ?></p><?php endif; ?>
                             <div class="eh-card__badges">
                                 <?php if (!empty($ev['package_id'])): ?>
                                     <?php echo renderOrganizationPipelineBadge($conn, (int)$ev['package_id'], '', (int)($ev['evaluation_id'] ?? 0)); ?>
