@@ -6,50 +6,51 @@ SET NAMES utf8mb4;
 DROP TEMPORARY TABLE IF EXISTS test_major_roster;
 CREATE TEMPORARY TABLE test_major_roster (
  employee_id INT PRIMARY KEY, employee_code VARCHAR(30), first_name VARCHAR(100),
- last_name VARCHAR(100), job_title_id INT, head_id INT NULL, hire_date DATE NOT NULL
+ last_name VARCHAR(100), job_title_id INT, head_id INT NULL, hire_date DATE NOT NULL,
+ gender ENUM('Male','Female') NOT NULL, education_level VARCHAR(40) NOT NULL
 );
 INSERT INTO test_major_roster VALUES
-(20100,'AP-001','Marisol','Santos',100,21100,'2015-03-02'),
-(20101,'AP-002','Adrian','Reyes',101,20100,'2018-06-04'),
-(20105,'AP-003','Nathan','Cruz',105,20101,'2019-08-12'),
-(20108,'AP-004','Bianca','Garcia',108,20105,'2026-01-12'),
-(20200,'AUD-001','Rafael','Mendoza',200,21100,'2016-04-11'),
-(20201,'AUD-002','Teresa','Santos',201,20200,'2018-09-03'),
-(20203,'AUD-003','Carlo','Reyes',203,20201,'2020-02-17'),
-(20206,'AUD-004','Diana','Cruz',206,20203,'2025-07-14'),
-(20300,'BD-001','Ernesto','Garcia',300,21100,'2017-05-08'),
-(20302,'BD-002','Fiona','Mendoza',302,20300,'2026-02-09'),
-(20400,'COM-001','Gabriel','Santos',400,21100,'2017-10-02'),
-(20401,'COM-002','Helena','Reyes',401,20400,'2022-04-18'),
-(20403,'COM-003','Ivan','Cruz',403,20401,'2026-03-16'),
-(20500,'FIN-001','Julia','Garcia',500,21100,'2015-07-06'),
-(20501,'FIN-002','Kevin','Mendoza',501,20500,'2018-01-15'),
-(20502,'FIN-003','Lara','Santos',502,20501,'2023-06-05'),
-(20506,'FIN-004','Marco','Reyes',506,20500,'2019-11-18'),
-(20511,'FIN-005','Nina','Cruz',511,20502,'2025-11-10'),
-(20516,'FIN-006','Oscar','Garcia',516,20506,'2026-04-20'),
-(20600,'GS-001','Paula','Mendoza',600,21100,'2015-09-07'),
-(20601,'GS-002','Quentin','Santos',601,20600,'2017-02-13'),
-(20605,'GS-003','Rosa','Reyes',605,20601,'2019-05-20'),
-(20609,'GS-004','Samuel','Cruz',609,20605,'2026-05-11'),
-(20700,'HRD-001','Elena','Delgado',700,21100,'2016-08-01'),
-(20705,'HRD-002','Patricia','Gomez',705,20700,'2019-03-11'),
-(20710,'HRD-003','Miguel','Torres',710,20705,'2026-06-08'),
-(20800,'IT-001','Tristan','Reyes',800,21000,'2017-07-10'),
-(20804,'IT-002','Una','Cruz',804,20800,'2020-10-19'),
-(20810,'IT-003','Victor','Garcia',810,20804,'2026-07-13'),
-(20900,'MKT-001','Wendy','Mendoza',900,21100,'2017-11-06'),
-(20902,'MKT-002','Xavier','Santos',902,20900,'2020-06-15'),
-(20904,'MKT-003','Yasmin','Reyes',904,20902,'2026-08-10'),
-(21100,'OP-001','Isabella','Cruz',1100,NULL,'2014-01-06'),
-(21101,'OP-002','Zachary','Garcia',1101,21100,'2026-09-14'),
-(21000,'OPS-001','Andres','Mendoza',1000,21100,'2015-11-09'),
-(21001,'OPS-002','Beatrice','Santos',1001,21000,'2018-04-16'),
-(21004,'OPS-003','Cesar','Reyes',1004,21001,'2021-09-06'),
-(21007,'OPS-004','Danica','Cruz',1007,21004,'2024-08-19'),
-(21012,'OPS-005','Emilio','Garcia',1012,21007,'2026-10-05'),
-(21200,'PUR-001','Flora','Mendoza',1200,20601,'2022-12-05'),
-(21202,'PUR-002','Gino','Santos',1202,21200,'2026-10-19');
+(20100,'AP-001','Marisol','Santos',100,21100,'2015-03-02','Female','Graduate Studies'),
+(20101,'AP-002','Adrian','Reyes',101,20100,'2018-06-04','Male','College'),
+(20105,'AP-003','Nathan','Cruz',105,20101,'2019-08-12','Male','College'),
+(20108,'AP-004','Bianca','Garcia',108,20105,'2026-01-12','Female','Vocational'),
+(20200,'AUD-001','Rafael','Mendoza',200,21100,'2016-04-11','Male','Graduate Studies'),
+(20201,'AUD-002','Teresa','Santos',201,20200,'2018-09-03','Female','College'),
+(20203,'AUD-003','Carlo','Reyes',203,20201,'2020-02-17','Male','College'),
+(20206,'AUD-004','Diana','Cruz',206,20203,'2025-07-14','Female','College'),
+(20300,'BD-001','Ernesto','Garcia',300,21100,'2017-05-08','Male','College'),
+(20302,'BD-002','Fiona','Mendoza',302,20300,'2026-02-09','Female','College'),
+(20400,'COM-001','Gabriel','Santos',400,21100,'2017-10-02','Male','College'),
+(20401,'COM-002','Helena','Reyes',401,20400,'2022-04-18','Female','College'),
+(20403,'COM-003','Ivan','Cruz',403,20401,'2026-03-16','Male','College'),
+(20500,'FIN-001','Julia','Garcia',500,21100,'2015-07-06','Female','Graduate Studies'),
+(20501,'FIN-002','Kevin','Mendoza',501,20500,'2018-01-15','Male','College'),
+(20502,'FIN-003','Lara','Santos',502,20501,'2023-06-05','Female','College'),
+(20506,'FIN-004','Marco','Reyes',506,20500,'2019-11-18','Male','College'),
+(20511,'FIN-005','Nina','Cruz',511,20502,'2025-11-10','Female','College'),
+(20516,'FIN-006','Oscar','Garcia',516,20506,'2026-04-20','Male','Vocational'),
+(20600,'GS-001','Paula','Mendoza',600,21100,'2015-09-07','Female','Graduate Studies'),
+(20601,'GS-002','Quentin','Santos',601,20600,'2017-02-13','Male','College'),
+(20605,'GS-003','Rosa','Reyes',605,20601,'2019-05-20','Female','College'),
+(20609,'GS-004','Samuel','Cruz',609,20605,'2026-05-11','Male','Vocational'),
+(20700,'HRD-001','Elena','Delgado',700,21100,'2016-08-01','Female','Graduate Studies'),
+(20705,'HRD-002','Patricia','Gomez',705,20700,'2019-03-11','Female','College'),
+(20710,'HRD-003','Miguel','Torres',710,20705,'2026-06-08','Male','College'),
+(20800,'IT-001','Tristan','Reyes',800,21000,'2017-07-10','Male','College'),
+(20804,'IT-002','Una','Cruz',804,20800,'2020-10-19','Female','College'),
+(20810,'IT-003','Victor','Garcia',810,20804,'2026-07-13','Male','Vocational'),
+(20900,'MKT-001','Wendy','Mendoza',900,21100,'2017-11-06','Female','Graduate Studies'),
+(20902,'MKT-002','Xavier','Santos',902,20900,'2020-06-15','Male','College'),
+(20904,'MKT-003','Yasmin','Reyes',904,20902,'2026-08-10','Female','College'),
+(21100,'OP-001','Isabella','Cruz',1100,NULL,'2014-01-06','Female','Graduate Studies'),
+(21101,'OP-002','Zachary','Garcia',1101,21100,'2026-09-14','Male','Secondary'),
+(21000,'OPS-001','Andres','Mendoza',1000,21100,'2015-11-09','Male','Graduate Studies'),
+(21001,'OPS-002','Beatrice','Santos',1001,21000,'2018-04-16','Female','College'),
+(21004,'OPS-003','Cesar','Reyes',1004,21001,'2021-09-06','Male','College'),
+(21007,'OPS-004','Danica','Cruz',1007,21004,'2024-08-19','Female','College'),
+(21012,'OPS-005','Emilio','Garcia',1012,21007,'2026-10-05','Male','Secondary'),
+(21200,'PUR-001','Flora','Mendoza',1200,20601,'2022-12-05','Female','College'),
+(21202,'PUR-002','Gino','Santos',1202,21200,'2026-10-19','Male','Vocational');
 
 START TRANSACTION;
 INSERT INTO employees (employee_id,employee_code,first_name,last_name,middle_name,
@@ -57,9 +58,9 @@ INSERT INTO employees (employee_id,employee_code,first_name,last_name,middle_nam
  department_id,rank_category_id,branch_id,reports_to,employment_status,employment_type,
  profile_picture,is_active)
 SELECT r.employee_id,r.employee_code,r.first_name,r.last_name,'Test',
- r.hire_date,'1985-06-15','Lucena City, Quezon','Male','Single',
+ r.hire_date,'1985-06-15','Lucena City, Quezon',r.gender,'Single',
  j.job_title_id,j.job_title,j.department_id,j.rank_category_id,102,r.head_id,
- 'Regular','Full-time','avatar_m.jpg',1
+ 'Regular','Full-time',IF(r.gender='Female','avatar_f.jpg','avatar_m.jpg'),1
 FROM test_major_roster r JOIN job_titles j ON j.job_title_id=r.job_title_id
 WHERE NOT EXISTS (SELECT 1 FROM employees e WHERE e.employee_id=r.employee_id AND e.employee_code=r.employee_code);
 -- A conflicting fixed ID/code fails instead of overwriting an existing person.
@@ -85,7 +86,13 @@ SELECT r.employee_id,r.last_name,'Alex','Test','1988-03-12' FROM test_major_rost
 WHERE NOT EXISTS (SELECT 1 FROM employee_siblings p WHERE p.employee_id=r.employee_id);
 
 INSERT INTO employee_education (employee_id,education_level,school_name,degree_course,period_from,period_to,year_graduated,honors_received)
-SELECT r.employee_id,'College','Mock Business College','Bachelor of Science in Business Administration','2002-06-01','2006-04-01','2006','None' FROM test_major_roster r
+SELECT r.employee_id,r.education_level,
+ CASE r.education_level WHEN 'Graduate Studies' THEN 'Mock State University' WHEN 'Vocational' THEN 'Mock Technical Institute' WHEN 'Secondary' THEN 'Mock Secondary School' ELSE 'Mock Business College' END,
+ CASE r.education_level WHEN 'Graduate Studies' THEN 'Master of Business Administration' WHEN 'Vocational' THEN 'Certificate in Office and Technical Services' WHEN 'Secondary' THEN NULL ELSE 'Bachelor of Science in Business Administration' END,
+ CASE r.education_level WHEN 'Graduate Studies' THEN '2007-06-01' WHEN 'Vocational' THEN '2003-06-01' WHEN 'Secondary' THEN '1997-06-01' ELSE '2002-06-01' END,
+ CASE r.education_level WHEN 'Graduate Studies' THEN '2009-04-01' WHEN 'Vocational' THEN '2005-04-01' WHEN 'Secondary' THEN '2001-04-01' ELSE '2006-04-01' END,
+ CASE r.education_level WHEN 'Graduate Studies' THEN '2009' WHEN 'Vocational' THEN '2005' WHEN 'Secondary' THEN '2001' ELSE '2006' END,
+ 'None' FROM test_major_roster r
 WHERE NOT EXISTS (SELECT 1 FROM employee_education p WHERE p.employee_id=r.employee_id);
 
 INSERT INTO employee_work_experience (employee_id,date_from,date_to,job_title,company_name,monthly_salary,appointment_status,reason_for_leaving)
@@ -147,7 +154,7 @@ FROM test_major_roster r WHERE NOT EXISTS (SELECT 1 FROM employee_addresses p WH
 -- Employee Portal account for EVERY roster member (including HR and CEO).
 INSERT INTO users (employee_id,username,email,password_hash,full_name,profile_picture,role,branch_id,is_active,first_login_completed,must_change_password)
 SELECT r.employee_id,r.employee_code,CONCAT(LOWER(r.employee_code),'@portal.example.invalid'),
-'$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi',CONCAT(r.first_name,' ',r.last_name),'avatar_m.jpg','Employee',102,1,1,0
+'$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi',CONCAT(r.first_name,' ',r.last_name),IF(r.gender='Female','avatar_f.jpg','avatar_m.jpg'),'Employee',102,1,1,0
 FROM test_major_roster r WHERE NOT EXISTS (SELECT 1 FROM users u WHERE u.employee_id=r.employee_id AND u.role='Employee');
 
 -- Separate work-role accounts; Employee Portal accounts remain available.
@@ -155,7 +162,7 @@ FROM test_major_roster r WHERE NOT EXISTS (SELECT 1 FROM users u WHERE u.employe
 INSERT INTO users (employee_id,username,email,password_hash,full_name,profile_picture,role,branch_id,is_active,first_login_completed,must_change_password)
 SELECT r.employee_id,LOWER(CONCAT(r.first_name,'.',r.last_name)),
 CONCAT(LOWER(r.employee_code),'@work.example.invalid'),'$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi',
-CONCAT(r.first_name,' ',r.last_name),'avatar_m.jpg',
+CONCAT(r.first_name,' ',r.last_name),IF(r.gender='Female','avatar_f.jpg','avatar_m.jpg'),
 CASE r.job_title_id WHEN 700 THEN 'HR Manager' WHEN 705 THEN 'HR Supervisor' WHEN 710 THEN 'HR Staff' ELSE 'President and CEO' END,102,1,1,0
 FROM test_major_roster r WHERE r.job_title_id IN (700,705,710,1100)
 AND NOT EXISTS (SELECT 1 FROM users u WHERE u.employee_id=r.employee_id AND u.role=

@@ -76,7 +76,7 @@ Evidence: [header.php](includes/header.php) and [auto-backup-check.php](includes
 
 ### W6. Test profiles have limited demographic variety
 
-Hire dates now vary across 2014–2026, but the major-employee seed still uses the same birth date, Male gender, and Single civil status for all 41 employees. These are synthetic test-data limitations, not conclusions about the real workforce. They limit the usefulness of demographic demonstrations and leave some chart/filter cases untested.
+Hire dates vary across 2014–2026, and the major-employee seed now includes Male and Female employees plus several education levels. Birth date and Single civil status are still uniform across all 41 records. These are synthetic test-data limitations, not conclusions about the real workforce. They leave age and civil-status chart/filter cases untested.
 
 Evidence: [major employee seed](test_database/major_employees_complete_profiles.sql).
 

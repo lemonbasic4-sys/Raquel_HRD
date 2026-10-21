@@ -116,11 +116,23 @@ This updates only exact seeded employee ID/code matches with the old hire date, 
 
 `restore_seeded_hire_dates_20261021.sql` is the recovery script for the original dates, captured before this update. It is **not** part of the normal import sequence.
 
+### Refresh demographics on an already imported baseline
+
+Fresh imports have a mix of **21 Male and 20 Female** employees. Educational attainment is **26 College, 8 Graduate Studies, 5 Vocational, and 2 Secondary**. These values are synthetic and assigned explicitly to the mock roster; they do not represent real employee records.
+
+To update the existing 41 seeded employees without resetting evaluations or accounts:
+
+```powershell
+& "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source test_database/update_seeded_demographics.sql;"
+```
+
+The update requires exact employee IDs and codes, and changes only untouched seed values. It can be rerun safely. `restore_seeded_demographics_20261021.sql` contains the original values and is for recovery only.
+
 The seed follows the existing position hierarchy, including cross-department heads: IT Manager reports to VP Operations, and Procurement Supervisor reports to GS Manager. Audit Manager II and Compliance Supervisor II are included because existing staff/supervisor chains require them. Departments without a manager position use their configured officer/supervisor; no nonexistent positions are invented. This seeds representative major levels, not every job grade or every branch.
 
 ## Complete employee profiles
 
-Each employee has identity/birth/employment details, contact information, physical details and citizenship, residential **and** permanent addresses, an emergency contact, family and sibling information, college education, previous employment, training, voluntary work, eligibility, skills, recognition, membership, government-ID placeholders, personal property, liabilities, references, and disclosure answers.
+Each employee has identity/birth/employment details, contact information, physical details and citizenship, residential **and** permanent addresses, an emergency contact, family and sibling information, an educational attainment record, previous employment, training, voluntary work, eligibility, skills, recognition, membership, government-ID placeholders, personal property, liabilities, references, and disclosure answers.
 
 All employees are marked Single, so spouse and children are not applicable; no fictitious dependent is required to complete those profiles. Property and financial information is synthetic. Names, phone numbers, eligibility, IDs, and `.invalid` email addresses are mock data, not valid government registrations or deliverable email addresses. Avatar placeholders are used; uploaded legal documents and signatures are not fabricated.
 
