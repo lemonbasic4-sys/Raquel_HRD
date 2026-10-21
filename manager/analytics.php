@@ -1314,45 +1314,6 @@ $yoy_emp    = formatYoYData($yoy_emp_raw, $yoy_years);
 
     <!-- ═══════════════════════ TAB 4: DEMOGRAPHICS INSIGHTS ═══════════════════════ -->
     <div class="tab-pane fade" id="demographics" role="tabpanel">
-        <div class="row g-3 mb-3">
-            <!-- Tenure Performance Cohorts -->
-            <div class="col-lg-6">
-                <div class="chart-card">
-                    <div class="cc-header">
-                        <h6><i class="fas fa-hourglass-half me-2" style="color:#294306;"></i>Tenure Bracket Performance Correlation</h6>
-                        <span class="badge bg-light text-muted" style="font-size:.7rem;">Score vs. Years of Service</span>
-                    </div>
-                    <div class="cc-body">
-                        <?php if (empty($tenure_data)): ?>
-                        <div class="empty-state"><i class="fas fa-calendar-alt" style="color:#ddd;"></i><div>No tenure data available.</div></div>
-                        <?php else: ?>
-                        <div class="chart-wrap" style="height:300px;">
-                            <canvas id="tenureChart"></canvas>
-                        </div>
-                        <?php endif; ?>
-                    </div>
-                </div>
-            </div>
-            <!-- Gender Performance Insights -->
-            <div class="col-lg-6">
-                <div class="chart-card">
-                    <div class="cc-header">
-                        <h6><i class="fas fa-venus-mars me-2" style="color:#294306;"></i>Gender Performance Insights</h6>
-                        <span class="badge bg-light text-muted" style="font-size:.7rem;">Averages by Gender</span>
-                    </div>
-                    <div class="cc-body">
-                        <?php if (empty($gender_data)): ?>
-                        <div class="empty-state"><i class="fas fa-users" style="color:#ddd;"></i><div>No gender performance data.</div></div>
-                        <?php else: ?>
-                        <div class="chart-wrap" style="height:300px;">
-                            <canvas id="genderPerfChart"></canvas>
-                        </div>
-                        <?php endif; ?>
-                    </div>
-                </div>
-            </div>
-        </div>
-
         <!-- ══════ DEMOGRAPHICS INSIGHTS SECTION ══════ -->
         <div class="demo-section-divider">
             <i class="fas fa-users me-2" style="color:#294306;"></i>Demographics Insights
@@ -1688,6 +1649,45 @@ $yoy_emp    = formatYoYData($yoy_emp_raw, $yoy_years);
                             <div class="demo-mini-hbar-cnt"><?php echo number_format($ob['cnt']); ?></div>
                         </div>
                         <?php endforeach; endif; ?>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-3 mb-3">
+            <!-- Tenure Performance Cohorts -->
+            <div class="col-lg-6">
+                <div class="chart-card">
+                    <div class="cc-header">
+                        <h6><i class="fas fa-hourglass-half me-2" style="color:#294306;"></i>Tenure Bracket Performance Correlation</h6>
+                        <span class="badge bg-light text-muted" style="font-size:.7rem;">Score vs. Years of Service</span>
+                    </div>
+                    <div class="cc-body">
+                        <?php if (empty($tenure_data)): ?>
+                        <div class="empty-state"><i class="fas fa-calendar-alt" style="color:#ddd;"></i><div>No tenure data available.</div></div>
+                        <?php else: ?>
+                        <div class="chart-wrap" style="height:300px;">
+                            <canvas id="tenureChart"></canvas>
+                        </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+            <!-- Gender Performance Insights -->
+            <div class="col-lg-6">
+                <div class="chart-card">
+                    <div class="cc-header">
+                        <h6><i class="fas fa-venus-mars me-2" style="color:#294306;"></i>Gender Performance Insights</h6>
+                        <span class="badge bg-light text-muted" style="font-size:.7rem;">Averages by Gender</span>
+                    </div>
+                    <div class="cc-body">
+                        <?php if (empty($gender_data)): ?>
+                        <div class="empty-state"><i class="fas fa-users" style="color:#ddd;"></i><div>No gender performance data.</div></div>
+                        <?php else: ?>
+                        <div class="chart-wrap" style="height:300px;">
+                            <canvas id="genderPerfChart"></canvas>
+                        </div>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>
