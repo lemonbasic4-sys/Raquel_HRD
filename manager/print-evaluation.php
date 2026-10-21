@@ -55,12 +55,11 @@ $result = $conn->query($query);
 if (!$result || $result->num_rows === 0)
   die("Evaluation not found.");
 $row = $result->fetch_assoc();
+$annual_print_member=null;
+$annual_print_candidate=null;
 if (($row['evaluation_type'] ?? '') === 'Annual') {
-    ensureAnnualEvaluationSchema($conn);
-    $annual_print_actor=annualActor($conn,(int)$_SESSION['user_id']);
-    if ($annual_print_actor && annualMember($conn,$id)) {
-        header('Location: '.annualUrl($annual_print_actor,'?view=results&evaluation_id='.$id)); exit;
-    }
+    $annual_print_member=annualMember($conn,$id);
+    if ($annual_print_member) $annual_print_candidate=annualCandidate($conn,$annual_print_member);
 }
 $is_probationary_hr_supervisor = ($row['employment_status'] ?? '') === 'Probationary'
     && (int)($row['rank_category_id'] ?? 0) === 4
@@ -745,6 +744,7 @@ if ((float)($row['total_score'] ?? 0) > 0 && (empty($pl) || $pl === '0')) {
           if ($k['manager_override_score'] !== null) {
               $effective_score = $k['manager_override_score'];
           }
+          if ($annual_print_member) $effective_score=$k['supervisor_override_score'] ?? $k['score_value'];
           $weighted_score = round(($k['weight'] / 100) * $effective_score, 2);
           ?>
           <tr>
@@ -823,6 +823,7 @@ if ((float)($row['total_score'] ?? 0) > 0 && (empty($pl) || $pl === '0')) {
           if ($b['manager_override_score'] !== null) {
               $effective_score = $b['manager_override_score'];
           }
+          if ($annual_print_candidate && $row['status']==='Approved') $effective_score=$annual_print_candidate['item_averages'][$idx-1];
           ?>
           <tr>
             <td><?php echo $idx++; ?>. <?php echo e($b['criterion_name']); ?></td>
