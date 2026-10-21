@@ -25,7 +25,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $withKra=$ratingTarget && annualCanFinalize($conn,$actor,$ratingTarget);
             if ($withKra) {
                 annualReviewAndRate($conn,$actor,$evaluationId,(array)($_POST['kra'] ?? []),
-                    (string)($_POST['review_token'] ?? ''),(array)($_POST['scores'] ?? []),trim($_POST['rater_signature_data'] ?? ''));
+                    (string)($_POST['review_token'] ?? ''),(array)($_POST['scores'] ?? []),trim($_POST['rater_signature_data'] ?? ''),(array)($_POST['plans'] ?? []));
             } else {
                 if (!empty($_POST['kra'])) throw new DomainException('Only the immediate head may adjust KRA ratings.');
                 annualSubmitPeers($conn,$actor,$evaluationId,(array)($_POST['scores'] ?? []));
@@ -220,6 +220,11 @@ require_once __DIR__ . '/header.php';
             <div class="table-responsive annual-score-table-wrap mb-4"><table class="table annual-score-table"><thead><tr><th>Behavior</th><th class="text-end">Employee self-rating</th><th class="text-end">Head's submitted rating</th></tr></thead><tbody>
                 <?php foreach (annualCoreValues() as $i=>$value): ?><tr><td><strong><?php echo e($value['name']); ?></strong><small><?php echo e($value['kpi']); ?></small></td><td class="text-end"><?php echo isset($headReviewSelf[$i]) ? number_format((float)$headReviewSelf[$i],2) : '—'; ?></td><td class="text-end"><strong><?php echo number_format((float)($headReviewScores[$i] ?? 0),2); ?></strong></td></tr><?php endforeach; ?>
             </tbody></table></div>
+            <section class="mb-4"><h3 class="h5 annual-review-section"><span><i class="fas fa-seedling me-2" aria-hidden="true"></i>Developmental Plan</span></h3>
+                <?php $headPlans=annualQuery($conn,'SELECT improvement_area,support_needed,time_frame FROM evaluation_dev_plans WHERE evaluation_id=? ORDER BY sort_order,plan_id',[$evaluationId]); ?>
+                <?php if (!$headPlans): ?><p class="small text-muted">No developmental plan items added.</p><?php endif; ?>
+                <?php foreach ($headPlans as $plan): ?><div class="annual-plan-summary"><p><strong>Development area: </strong><?php echo e($plan['improvement_area']); ?></p><p><strong>Action / support: </strong><?php echo e($plan['support_needed']); ?></p><p><strong>Target time frame: </strong><?php echo e($plan['time_frame']); ?></p></div><?php endforeach; ?>
+            </section>
             <section class="annual-rater-signature"><h3 class="h6 fw-bold">Rater signature</h3><?php if (!empty($headReviewSubmission['rater_signature_data'])): ?><img src="<?php echo e($headReviewSubmission['rater_signature_data']); ?>" alt="Submitted immediate-head rater signature" style="display:block;max-width:560px;width:100%;max-height:150px;object-fit:contain;background:#fff;border:1px solid #d5ddd2;border-radius:8px;padding:8px;"><p class="small text-muted mt-2 mb-0">Signed <?php echo e($headReviewSubmission['rater_signed_at'] ?? ''); ?></p><?php else: ?><p class="text-muted mb-0">No signature was saved on this submission.</p><?php endif; ?></section>
             <a class="btn btn-outline-success mt-4" href="<?php echo annualUrl($actor,'?view=peers&amp;cycle_id='.$cycleId); ?>">Back to Department Peers</a>
         </section>
@@ -229,7 +234,7 @@ require_once __DIR__ . '/header.php';
             <p><?php echo e($member['position_name']); ?> · <?php echo e($member['period_start'].' to '.$member['period_end']); ?></p>
             <p id="annualRatingProgress" class="small fw-bold" aria-live="polite"></p>
             <?php if ($submitted): ?><div class="alert alert-success">Submitted and locked. These ratings cannot be edited.</div><?php endif; ?>
-            <form method="post" id="annualRatingForm" data-draft-key="annual-rating-overrides-v2-<?php echo (int)$actor['user_id']; ?>-<?php echo $evaluationId; ?>" data-submitted="<?php echo $submitted ? '1' : '0'; ?>" data-override-only="<?php echo $canFinalize && !$submitted ? '1' : '0'; ?>">
+            <form method="post" id="annualRatingForm" data-draft-key="annual-rating-overrides-v3-<?php echo (int)$actor['user_id']; ?>-<?php echo $evaluationId; ?>-<?php echo substr(hash('sha256',json_encode([$member['employee_id'],$member['evaluation_created_at'],$member['evaluation_submitted_at'],$member['period_start'],$member['period_end']])),0,24); ?>" data-resume-tab="<?php echo $_SERVER['REQUEST_METHOD']==='POST' ? '1' : '0'; ?>" data-submitted="<?php echo $submitted ? '1' : '0'; ?>" data-override-only="<?php echo $canFinalize && !$submitted ? '1' : '0'; ?>">
                 <p class="small text-muted">Use ratings from 1.00 to 4.00. Decimals are allowed, up to two decimal places (for example, 3.25).</p>
                 <p id="annualRatingScaleNotice" class="alert alert-warning" role="status" hidden></p>
                 <?php if ($canFinalize && !$submitted): ?><p id="annualHeadOverallPreview" class="alert alert-success" aria-live="polite"></p><?php endif; ?>
@@ -240,21 +245,22 @@ require_once __DIR__ . '/header.php';
                     <nav class="annual-review-tabs" role="tablist" aria-label="Rating sections">
                         <button class="active" id="annualRateKraTab" type="button" role="tab" data-bs-toggle="tab" data-bs-target="#annualRateKraPanel" aria-controls="annualRateKraPanel" aria-selected="true"><i class="fas fa-chart-pie me-2" aria-hidden="true"></i>Key Result Areas · Immediate-head review <span><?php echo count($rateKras); ?></span></button>
                         <button id="annualRateCoreTab" type="button" role="tab" data-bs-toggle="tab" data-bs-target="#annualRateCorePanel" aria-controls="annualRateCorePanel" aria-selected="false"><i class="fas fa-users me-2" aria-hidden="true"></i>Core Behaviors &amp; Values · Your 360 rating <span>8</span></button>
+                        <button id="annualRatePlanTab" type="button" role="tab" data-bs-toggle="tab" data-bs-target="#annualRatePlanPanel" aria-controls="annualRatePlanPanel" aria-selected="false"><i class="fas fa-seedling me-2" aria-hidden="true"></i>Developmental Plan</button>
                         <button id="annualRateReviewTab" type="button" role="tab" data-bs-toggle="tab" data-bs-target="#annualRateReviewPanel" aria-controls="annualRateReviewPanel" aria-selected="false"><i class="fas fa-clipboard-check me-2" aria-hidden="true"></i>Review &amp; Submit</button>
                     </nav>
                     <div class="tab-content p-3">
-                    <div class="tab-pane show active" id="annualRateKraPanel" role="tabpanel" aria-labelledby="annualRateKraTab" tabindex="0">
-                    <h3 class="h5 annual-review-section"><span><i class="fas fa-chart-pie me-2" aria-hidden="true"></i>Key Result Areas · Immediate-head review</span><small>80% KRA</small></h3>
-                    <div class="table-responsive annual-score-table-wrap mb-3"><table class="table annual-score-table"><thead><tr><th>Criterion</th><th class="text-end">Weight</th><th class="text-end">Submitted rating</th><th class="text-end">Reviewed rating</th></tr></thead><tbody>
-                    <?php foreach ($rateKras as $r): ?><tr><td><strong><?php echo e($r['criterion_name']); ?></strong><?php if (!empty($r['kpi_description'])): ?><small><?php echo e($r['kpi_description']); ?></small><?php endif; ?></td><td class="text-end"><?php echo number_format((float)$r['weight'],2); ?>%</td><td class="text-end"><?php echo number_format((float)$r['self_rating'],2); ?></td><td><input class="form-control annual-number annual-rate-kra" type="number" inputmode="decimal" min="1" max="4" step="0.01" data-weight="<?php echo e($r['weight']); ?>" data-submitted-rating="<?php echo e($r['self_rating']); ?>" name="kra[<?php echo (int)$r['score_id']; ?>]" aria-label="Reviewed KRA: <?php echo e($r['criterion_name']); ?>" data-label="KRA · <?php echo e($r['criterion_name']); ?>" placeholder="Unchanged" value="<?php echo e($_POST['kra'][$r['score_id']] ?? ''); ?>"></td></tr><?php endforeach; ?>
+                    <div class="tab-pane show active annual-probation-section" id="annualRateKraPanel" role="tabpanel" aria-labelledby="annualRateKraTab" tabindex="0">
+                    <h3 class="h5 annual-review-section"><span><i class="fas fa-chart-pie me-2" aria-hidden="true"></i>Key Result Areas · Immediate-head review</span><small>KRA Weight: 80%</small></h3>
+                    <div class="table-responsive annual-score-table-wrap mb-3"><table class="table annual-score-table"><thead><tr><th>Criterion</th><th class="text-end">Weight</th><th class="text-end">Employee Self-Rating</th><th>Evaluator Adjusted Rating</th></tr></thead><tbody>
+                    <?php foreach ($rateKras as $r): ?><tr><td><strong><?php echo e($r['criterion_name']); ?></strong><?php if (!empty($r['kpi_description'])): ?><small><?php echo e($r['kpi_description']); ?></small><?php endif; ?></td><td class="text-end"><?php echo number_format((float)$r['weight'],2); ?>%</td><td class="text-end"><?php echo number_format((float)$r['self_rating'],2); ?></td><td><input class="form-control annual-number annual-rate-kra" type="number" inputmode="decimal" min="1" max="4" step="0.01" data-weight="<?php echo e($r['weight']); ?>" data-submitted-rating="<?php echo e($r['self_rating']); ?>" name="kra[<?php echo (int)$r['score_id']; ?>]" aria-label="Reviewed KRA: <?php echo e($r['criterion_name']); ?>" data-label="KRA · <?php echo e($r['criterion_name']); ?>" placeholder="Unchanged" value="<?php echo e($_POST['kra'][$r['score_id']] ?? ''); ?>"><span class="annual-rating-unit">/ 4.00</span></td></tr><?php endforeach; ?>
                     </tbody><tfoot><tr><th colspan="2">Key Result Areas (KRA) total</th><td class="text-end"><?php echo number_format(round(array_sum(array_map(static fn($r)=>(float)$r['weight']*(float)$r['self_rating']/100,$rateKras)),2),2); ?></td><td class="text-end"><strong id="annualRateKraTotal">—</strong><small>Weight: 80%</small></td></tr></tfoot></table></div>
                     <div class="annual-rating-step-actions"><span></span><button class="btn btn-success" type="button" id="annualRateKraNext" data-annual-tab="#annualRateCorePanel" aria-controls="annualRateCorePanel">Next: Core Behaviors <i class="fas fa-arrow-right ms-2" aria-hidden="true"></i></button></div>
-                    </div><div class="tab-pane" id="annualRateCorePanel" role="tabpanel" aria-labelledby="annualRateCoreTab" tabindex="0">
-                    <h3 class="h5 annual-review-section"><span><i class="fas fa-users me-2" aria-hidden="true"></i>Core Behaviors &amp; Values · Your 360 rating</span><small>20% Core Values</small></h3>
+                    </div><div class="tab-pane annual-probation-section" id="annualRateCorePanel" role="tabpanel" aria-labelledby="annualRateCoreTab" tabindex="0">
+                    <h3 class="h5 annual-review-section"><span><i class="fas fa-users me-2" aria-hidden="true"></i>Core Behaviors &amp; Values · Your 360 rating</span><small>Behavior Weight: 20%</small></h3>
                 <?php elseif ($canFinalize): ?>
                     <a class="btn btn-outline-success mb-3" href="<?php echo annualUrl($actor,'?view=review&evaluation_id='.$evaluationId); ?>">Review KRA &amp; consolidate Annual result</a>
                 <?php endif; ?>
-                <?php if (!$canFinalize || $submitted): ?><h3 class="h5 annual-review-section"><span><i class="fas fa-users me-2" aria-hidden="true"></i>Core Behaviors &amp; Values · Your 360 rating</span><small>20% Core Values</small></h3><?php endif; ?>
+                <?php if (!$canFinalize || $submitted): ?><h3 class="h5 annual-review-section"><span><i class="fas fa-users me-2" aria-hidden="true"></i>Core Behaviors &amp; Values · Your 360 rating</span><small>Behavior Weight: 20%</small></h3><?php endif; ?>
                 <div class="table-responsive annual-score-table-wrap"><table class="table align-middle annual-rating-table annual-score-table"><thead><tr><th>Criterion</th><th class="text-end">Employee self-rating</th><th class="text-end">Your 360 rating (1–4)</th></tr></thead><tbody>
                 <?php if ($canFinalize && !$submitted): ?><p class="small text-muted">Leave blank to retain the employee's self-rating. Enter a value only to override that item.</p><?php endif; ?>
                 <?php $selfValues=json_decode($member['self_values_json'] ?? '[]',true) ?: [];
@@ -263,11 +269,24 @@ require_once __DIR__ . '/header.php';
                     <tr><td><strong><?php echo e($value['name']); ?></strong><small><?php echo e($value['kpi']); ?></small></td><td class="text-end"><strong><?php echo isset($selfValues[$i]) ? number_format((float)$selfValues[$i],2) : '—'; ?></strong></td><td>
                         <input class="form-control annual-number" type="number" inputmode="decimal" min="1" max="4" step="0.01" <?php echo $canFinalize ? 'placeholder="Unchanged"' : 'required'; ?>
                             name="scores[<?php echo $i; ?>]" aria-label="Rating for <?php echo e($value['name']); ?>" data-label="<?php echo e($value['name']); ?>" data-self-rating="<?php echo e($selfValues[$i] ?? ''); ?>"
-                            value="<?php echo isset($scores[$i]) && is_numeric($scores[$i]) ? e(number_format((float)$scores[$i],2,'.','')) : e($scores[$i] ?? ''); ?>" <?php echo $submitted ? 'disabled' : ''; ?>>
+                            value="<?php echo isset($scores[$i]) && is_numeric($scores[$i]) ? e(number_format((float)$scores[$i],2,'.','')) : e($scores[$i] ?? ''); ?>" <?php echo $submitted ? 'disabled' : ''; ?>><span class="annual-rating-unit">/ 4.00</span>
                     </td></tr>
                 <?php endforeach; ?></tbody><tfoot><tr><th>Average</th><td class="text-end"><strong><?php echo count($selfValues) ? number_format(array_sum(array_map('floatval',$selfValues))/count($selfValues),2) : '—'; ?></strong><small>Self-rating</small></td><td class="text-end"><strong id="annualPeerRatingAverage">—</strong><small>Your 360</small></td></tr></tfoot></table></div>
-                <?php if ($canFinalize && !$submitted): ?><div class="annual-rating-step-actions"><button class="btn btn-outline-success" type="button" id="annualRateCoreBack" data-annual-tab="#annualRateKraPanel" aria-controls="annualRateKraPanel"><i class="fas fa-arrow-left me-2" aria-hidden="true"></i>Back to KRA</button><button class="btn btn-success" type="button" id="annualRateCoreNext" data-annual-tab="#annualRateReviewPanel" aria-controls="annualRateReviewPanel">Next: Review &amp; Submit <i class="fas fa-arrow-right ms-2" aria-hidden="true"></i></button></div><?php endif; ?>
+                <?php if ($canFinalize && !$submitted): ?><div class="annual-rating-step-actions"><button class="btn btn-outline-success" type="button" id="annualRateCoreBack" data-annual-tab="#annualRateKraPanel" aria-controls="annualRateKraPanel"><i class="fas fa-arrow-left me-2" aria-hidden="true"></i>Back to KRA</button><button class="btn btn-success" type="button" id="annualRateCoreNext" data-annual-tab="#annualRatePlanPanel" aria-controls="annualRatePlanPanel">Next: Developmental Plan <i class="fas fa-arrow-right ms-2" aria-hidden="true"></i></button></div><?php endif; ?>
                 <?php if ($canFinalize && !$submitted): ?></div>
+                    <div class="tab-pane annual-probation-section" id="annualRatePlanPanel" role="tabpanel" aria-labelledby="annualRatePlanTab" tabindex="0">
+                        <h3 class="h5 annual-review-section"><span><i class="fas fa-seedling me-2" aria-hidden="true"></i>Developmental Plan</span><small>Immediate-head recommendations</small></h3>
+                        <p class="text-muted small mb-3">Specify growth areas, required support, and target completion timelines for this employee. Complete each added item or leave the section blank.</p>
+                        <div class="table-responsive">
+                            <table class="table table-bordered align-middle annual-development-table">
+                                <thead class="table-light"><tr><th style="width:35%">Area for Improvement / Development</th><th style="width:35%">Support Needed / Action Plan</th><th style="width:20%">Target Time Frame</th><th style="width:10%" class="text-center">Action</th></tr></thead>
+                                <tbody id="annualPlanRows" data-initial="<?php echo e(json_encode($_POST['plans'] ?? annualQuery($conn,'SELECT improvement_area,support_needed,time_frame FROM evaluation_dev_plans WHERE evaluation_id=? ORDER BY sort_order,plan_id',[$evaluationId]))); ?>"></tbody>
+                            </table>
+                        </div>
+                        <p class="annual-plan-empty" id="annualPlanEmpty" hidden>No developmental items added.</p>
+                        <button type="button" class="btn btn-sm btn-outline-success mt-2" id="annualAddPlan"><i class="fas fa-plus me-1" aria-hidden="true"></i>Add Development Item</button>
+                        <div class="annual-rating-step-actions"><button type="button" class="btn btn-outline-success" data-annual-tab="#annualRateCorePanel">Back to Core Behaviors</button><button type="button" class="btn btn-success" data-annual-tab="#annualRateReviewPanel">Next: Review &amp; Submit <i class="fas fa-arrow-right ms-2" aria-hidden="true"></i></button></div>
+                    </div>
                     <div class="tab-pane" id="annualRateReviewPanel" role="tabpanel" aria-labelledby="annualRateReviewTab" tabindex="0">
                         <h3 class="h5 annual-review-section"><span><i class="fas fa-clipboard-check me-2" aria-hidden="true"></i>Review &amp; Submit Ratings</span></h3>
                         <p>Check the effective KRA and behavior ratings before approving. Blank overrides retain the employee's submitted ratings. Confirmation approves the employee's evaluation and locks your ratings. The overall score updates automatically as remaining department members submit their 360 ratings.</p>
@@ -279,6 +298,7 @@ require_once __DIR__ . '/header.php';
                             <h4 class="h6" id="annualReviewBehaviorHeading">Core Behaviors &amp; Values · 360 rating <span>20% of final score</span></h4>
                             <div class="table-responsive annual-score-table-wrap"><table class="table table-sm annual-score-table"><thead><tr><th>Behavior</th><th class="text-end">Employee self-rating</th><th class="text-end">Your 360 rating</th></tr></thead><tbody id="annualRatingPreviewBehaviorRows"><tr><td colspan="3" class="text-muted">Complete the behavior ratings in the previous tab to review them here.</td></tr></tbody><tfoot><tr><th colspan="2">Your 360 average</th><td class="text-end"><strong id="annualRatingPreviewBehaviorAverage">—</strong></td></tr></tfoot></table></div>
                         </section>
+                        <section class="annual-review-summary-group mt-4"><h4 class="h6"><i class="fas fa-seedling me-2" aria-hidden="true"></i>Developmental Plan</h4><div id="annualPlanPreview"></div></section>
                         <div class="annual-rater-signature mt-4">
                             <label class="form-label fw-bold" for="annualRaterSignatureCanvas">Rater signature <span class="text-danger">*</span></label>
                             <p class="small text-muted mb-2">Sign below. Your signature will appear in the Rater field on the printed evaluation form.</p>
@@ -287,7 +307,7 @@ require_once __DIR__ . '/header.php';
                             <div id="annualRaterSignatureError" class="small text-danger mt-1" role="alert" hidden>Please sign before submitting.</div>
                             <button class="btn btn-sm btn-outline-secondary mt-2" type="button" id="annualClearRaterSignature">Clear signature</button>
                         </div>
-                        <div class="annual-rating-step-actions"><button class="btn btn-outline-success" type="button" id="annualRateReviewBack" data-annual-tab="#annualRateCorePanel" aria-controls="annualRateCorePanel"><i class="fas fa-arrow-left me-2" aria-hidden="true"></i>Back to Core Behaviors</button><button class="btn btn-success" type="button" id="annualReviewRatings">Review &amp; submit ratings</button></div>
+                        <div class="annual-rating-step-actions"><button class="btn btn-outline-success" type="button" id="annualRateReviewBack" data-annual-tab="#annualRatePlanPanel" aria-controls="annualRatePlanPanel"><i class="fas fa-arrow-left me-2" aria-hidden="true"></i>Back to Developmental Plan</button><button class="btn btn-success" type="button" id="annualReviewRatings">Review &amp; submit ratings</button></div>
                     </div></div><?php endif; ?>
                 <?php if (!$submitted && !$canFinalize): ?><button class="btn btn-success" type="button" id="annualReviewRatings">Review &amp; submit ratings</button><?php endif; ?>
             </form>
@@ -297,6 +317,7 @@ require_once __DIR__ . '/header.php';
             <div class="modal-body"><p>For <?php echo e($member['first_name'].' '.$member['last_name']); ?></p>
                 <div id="annualSummaryKraSection"><h3 class="h6">Key Result Areas · 80%</h3><div class="table-responsive"><table class="table table-sm"><thead><tr><th>KRA item</th><th class="text-end">Weight</th><th class="text-end">Submitted</th><th class="text-end">Reviewed</th></tr></thead><tbody id="annualSummaryKraRows"></tbody><tfoot><tr><th colspan="3">Weighted KRA subtotal</th><td class="text-end"><strong id="annualSummaryKraTotal">—</strong></td></tr></tfoot></table></div></div>
                 <h3 class="h6 mt-3">Core Behaviors &amp; Values · 360 rating · 20%</h3><div class="table-responsive"><table class="table table-sm"><thead><tr><th>Behavior</th><th class="text-end">Employee self-rating</th><th class="text-end">Your 360 rating</th></tr></thead><tbody id="annualSummaryBehaviorRows"></tbody><tfoot><tr><th colspan="2">Your 360 average</th><td class="text-end"><strong id="annualSummaryBehaviorAverage">—</strong></td></tr></tfoot></table></div>
+                <?php if ($canFinalize): ?><section class="mt-3"><h3 class="h6">Developmental Plan</h3><div id="annualPlanConfirmation"></div></section><?php endif; ?>
                 <div class="alert alert-warning"><strong>This can’t be undone.</strong> After confirmation, your ratings and rater signature are locked and cannot be edited. Please verify the summary before continuing.</div></div>
             <div class="modal-footer"><button class="btn btn-outline-secondary" data-bs-dismiss="modal">Back to edit</button><button class="btn btn-success" id="annualConfirmSubmit">Yes, submit and lock</button></div>
         </div></div></div>
@@ -460,15 +481,91 @@ function updateAnnualProgress() {
         } else overallPreview.textContent='Complete all ratings from 1.00 to 4.00 to preview the overall score.';
     }
     renderAnnualRatingPreview();
+    annualRenderPlanSummary();
 }
 const annualRatingForm=document.getElementById('annualRatingForm');
 const annualDraftKey=annualRatingForm?.dataset.draftKey;
+// Match the probationary form's separate section-total bars, retaining score IDs.
+[['annualRateKraPanel','Key Result Areas (KRA) Total','annualRateKraTotal'],['annualRateCorePanel','Core Behaviors & Values Total','annualPeerRatingAverage']].forEach(([panelId,title,scoreId])=>{
+    const panel=document.getElementById(panelId), score=document.getElementById(scoreId);
+    const footer=score?.closest('tfoot'); if(!panel || !footer) return;
+    const self=Number.parseFloat(footer.rows[0].cells[1].textContent);
+    const bar=document.createElement('div'); bar.className='annual-section-total';
+    const label=document.createElement('strong'); label.textContent=title+':';
+    const values=document.createElement('div'); values.className='annual-section-total-values';
+    const selfLabel=document.createElement('span'); selfLabel.textContent='Self-Rating: '+self.toFixed(2);
+    const box=document.createElement('span'); box.className='annual-section-total-box';
+    box.append(document.createTextNode('Total Score: '),score,document.createTextNode(' / 4.00'));
+    values.append(selfLabel,box); bar.append(label,values);
+    const wrap=footer.closest('.table-responsive'); footer.remove(); wrap.after(bar);
+});
+let annualPlanIndex=0;
+function annualReadPlans() {
+    return [...document.querySelectorAll('#annualPlanRows .annual-plan-row')].map(row=>Object.fromEntries(
+        [...row.querySelectorAll('[data-annual-plan-field]')].map(input=>[input.dataset.annualPlanField,input.value])
+    ));
+}
+function annualValidatePlanFields() {
+    document.querySelectorAll('#annualPlanRows .annual-plan-row').forEach(row=>{
+        const fields=[...row.querySelectorAll('[data-annual-plan-field]')];
+        const hasContent=fields.some(field=>field.value.trim()!=='');
+        fields.forEach(field=>{ field.required=hasContent; field.setCustomValidity(hasContent && field.value.trim()==='' ? 'Complete this field or remove this development goal.' : ''); });
+    });
+}
+function annualUpdatePlanLayout() {
+    const rows=[...document.querySelectorAll('#annualPlanRows .annual-plan-row')];
+    rows.forEach((row,index)=>{ row.setAttribute('aria-label','Development item '+(index+1)); });
+    const add=document.getElementById('annualAddPlan');
+    if(add) add.disabled=rows.length>=20;
+    const empty=document.getElementById('annualPlanEmpty');
+    if(empty) empty.hidden=rows.length>0;
+}
+function annualAddPlanRow(plan={}) {
+    const container=document.getElementById('annualPlanRows');
+    if (!container || container.children.length>=20) return;
+    const index=annualPlanIndex++;
+    const row=document.createElement('tr'); row.className='annual-plan-row';
+    [['improvement_area','Area for Improvement / Development',2000,'e.g. Advanced Excel / Financial Analysis'],['support_needed','Support Needed / Action Plan',4000,'e.g. External Training / Peer Mentoring'],['time_frame','Target Time Frame',100,'e.g. Q3 2026 / 3 Months']].forEach(([name,label,limit,placeholder])=>{
+        const cell=document.createElement('td'); cell.dataset.label=label;
+        const input=document.createElement('input'); input.type='text'; input.className='form-control';
+        input.id='annualPlan-'+index+'-'+name; input.name='plans['+index+']['+name+']'; input.dataset.annualPlanField=name;
+        input.setAttribute('aria-label',label); input.maxLength=limit; input.value=plan[name] || ''; input.placeholder=placeholder;
+        input.addEventListener('input',()=>{annualValidatePlanFields(); annualRenderPlanSummary(); saveAnnualRatingDraft();});
+        cell.appendChild(input); row.appendChild(cell);
+    });
+    const actions=document.createElement('td'); actions.className='text-center'; actions.dataset.label='Action';
+    const remove=document.createElement('button'); remove.type='button'; remove.className='btn btn-sm btn-outline-danger';
+    remove.title='Remove Row'; remove.setAttribute('aria-label','Remove developmental item');
+    const trash=document.createElement('i'); trash.className='fas fa-trash-alt'; trash.setAttribute('aria-hidden','true'); remove.appendChild(trash);
+    remove.addEventListener('click',()=>{row.remove(); annualUpdatePlanLayout(); annualRenderPlanSummary(); saveAnnualRatingDraft();});
+    actions.appendChild(remove); row.appendChild(actions); container.appendChild(row); annualUpdatePlanLayout();
+}
+function annualRenderPlanSummary() {
+    const plans=annualReadPlans().filter(plan=>Object.values(plan).some(value=>value.trim()!==''));
+    ['annualPlanPreview','annualPlanConfirmation'].forEach(id=>{
+        const target=document.getElementById(id); if(!target) return;
+        target.replaceChildren();
+        if(!plans.length) { const note=document.createElement('p'); note.className='small text-muted mb-0'; note.textContent='No developmental plan items added.'; target.appendChild(note); return; }
+        plans.forEach((plan,index)=>{
+            const block=document.createElement('div'); block.className='annual-plan-summary';
+            [['Goal '+(index+1),plan.improvement_area],['Action / support',plan.support_needed],['Target time frame',plan.time_frame]].forEach(([label,value])=>{
+                const line=document.createElement('p'); const title=document.createElement('strong'); title.textContent=label+': ';
+                line.append(title,document.createTextNode(value || 'Not entered')); block.appendChild(line);
+            }); target.appendChild(block);
+        });
+    });
+}
+const annualPlanRows=document.getElementById('annualPlanRows');
+if (annualPlanRows) {
+    try { const initial=Object.values(JSON.parse(annualPlanRows.dataset.initial || '[]')); (initial.length ? initial : [{}]).forEach(plan=>annualAddPlanRow(plan)); } catch (_) { annualAddPlanRow(); }
+    document.getElementById('annualAddPlan')?.addEventListener('click',()=>{ annualAddPlanRow(); saveAnnualRatingDraft(); });
+}
 function saveAnnualRatingDraft(panelOverride=null) {
     if (!annualRatingForm || !annualDraftKey || annualRatingForm.dataset.submitted==='1') return;
     const values={};
     annualRatingForm.querySelectorAll('input[type="number"]').forEach(input=>{ values[input.name]=input.value; });
     const activePanel=panelOverride || document.querySelector('.annual-review-tabs button.active')?.dataset.bsTarget || '#annualRateKraPanel';
-    try { sessionStorage.setItem(annualDraftKey,JSON.stringify({values,activePanel,behaviorDefaultsVersion:1,signature:document.getElementById('annualRaterSignatureData')?.value || ''})); } catch (_) {}
+    try { sessionStorage.setItem(annualDraftKey,JSON.stringify({values,activePanel,behaviorDefaultsVersion:1,plans:annualReadPlans(),signature:document.getElementById('annualRaterSignatureData')?.value || ''})); } catch (_) {}
 }
 function restoreAnnualRatingDraft() {
     if (!annualRatingForm || !annualDraftKey) return;
@@ -481,9 +578,16 @@ function restoreAnnualRatingDraft() {
                     input.value=draft.values[input.name];
                 }
             });
+            if (Array.isArray(draft?.plans) && document.getElementById('annualPlanRows')) {
+                document.getElementById('annualPlanRows').replaceChildren();
+                draft.plans.forEach(plan=>annualAddPlanRow(plan));
+                annualUpdatePlanLayout();
+            }
             const signature=document.getElementById('annualRaterSignatureData');
             if (signature && draft?.signature) signature.value=draft.signature;
-            const activeTrigger=draft?.activePanel && document.querySelector('.annual-review-tabs [data-bs-target="'+draft.activePanel+'"]');
+            const navigationType=performance.getEntriesByType('navigation')[0]?.type;
+            const resumeTab=annualRatingForm.dataset.resumeTab==='1' || navigationType==='reload' || navigationType==='back_forward';
+            const activeTrigger=resumeTab && draft?.activePanel && document.querySelector('.annual-review-tabs [data-bs-target="'+draft.activePanel+'"]');
             if (activeTrigger && window.bootstrap?.Tab) bootstrap.Tab.getOrCreateInstance(activeTrigger).show();
             document.dispatchEvent(new Event('annualRatingDraftRestored'));
         }
@@ -619,7 +723,8 @@ document.getElementById('annualSearch')?.addEventListener('input',filterAnnualRo
 document.getElementById('annualStatus')?.addEventListener('change',filterAnnualRoster);
 document.getElementById('annualReviewRatings')?.addEventListener('click', () => {
     const form=document.getElementById('annualRatingForm');
-    const invalid=[...form.querySelectorAll('input[type="number"],input[required]')].find(input=>!input.checkValidity());
+    annualValidatePlanFields();
+    const invalid=[...form.querySelectorAll('input,textarea')].find(input=>!input.checkValidity());
     if (invalid) {
         const panel=invalid.closest('.tab-pane');
         const trigger=panel && document.querySelector('[data-bs-target="#'+panel.id+'"]');

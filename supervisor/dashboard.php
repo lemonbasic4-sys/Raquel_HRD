@@ -140,6 +140,8 @@ if ($annual_dashboard_actor && $conn->query("SHOW TABLES LIKE 'annual_evaluation
     }
 }
 $pending_pkg_count = count($pending_packages);
+$dashboard_evaluation_category = !$pending_packages || array_filter($pending_packages, static fn($package) => empty($package['annual_url'])) ? 'probationary' : 'regular';
+$dashboard_evaluation_url = BASE_URL . '/employee/team-evaluation-packages.php?category=' . $dashboard_evaluation_category;
 ?>
 
 <style>
@@ -684,7 +686,7 @@ document.addEventListener('DOMContentLoaded', function () {
     <div class="row g-3 mb-3">
         <!-- Performance Evaluation -->
         <div class="col-6 col-md-3">
-            <a href="<?php echo BASE_URL; ?>/employee/team-evaluation-packages.php" class="stat-card text-decoration-none d-block">
+            <a href="<?php echo e($dashboard_evaluation_url); ?>" class="stat-card text-decoration-none d-block">
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
                         <div class="stat-value"><?php echo $pending_pkg_count > 0 ? $pending_pkg_count : $pending_validations; ?></div>
@@ -767,7 +769,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     <?php elseif ($queue_employee_count > 0): ?>
                         <span class="badge bg-light text-muted border"><?php echo number_format($queue_employee_count); ?> employee<?php echo $queue_employee_count === 1 ? '' : 's'; ?></span>
                     <?php endif; ?>
-                    <a href="<?php echo BASE_URL; ?>/employee/team-evaluation-packages.php" class="btn btn-sm btn-outline-primary rounded-pill px-3">View All</a>
+                    <a href="<?php echo e($dashboard_evaluation_url); ?>" class="btn btn-sm btn-outline-primary rounded-pill px-3">View All</a>
                 </div>
             </div>
             <div class="cc-body p-0">
@@ -792,9 +794,9 @@ document.addEventListener('DOMContentLoaded', function () {
                                     <span class="dashboard-package-step"><?php echo $is_waiting ? 'Team self-ratings are still in progress' : e($pkg['step_label']) . ' — you are the next reviewer'; ?></span>
                                 </div>
                                 <?php if ($is_waiting): ?>
-                                    <a href="<?php echo BASE_URL; ?>/employee/team-evaluation-packages.php" class="btn dashboard-package-action">View Progress <i class="fas fa-chevron-down ms-1"></i></a>
+                                    <a href="<?php echo BASE_URL; ?>/employee/team-evaluation-packages.php?category=probationary" class="btn dashboard-package-action">View Progress <i class="fas fa-chevron-down ms-1"></i></a>
                                 <?php else: ?>
-                                    <a href="<?php echo e($pkg['annual_url'] ?? BASE_URL . '/employee/team-evaluation-packages.php'); ?>" class="btn dashboard-package-action">Review <i class="fas fa-chevron-down ms-1"></i></a>
+                                    <a href="<?php echo e($pkg['annual_url'] ?? BASE_URL . '/employee/team-evaluation-packages.php?category=probationary'); ?>" class="btn dashboard-package-action">Review <i class="fas fa-chevron-down ms-1"></i></a>
                                 <?php endif; ?>
                             </div>
                         <?php endforeach; ?>

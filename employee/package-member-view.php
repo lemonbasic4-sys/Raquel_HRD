@@ -8,8 +8,16 @@ ensureProbationaryEvaluationSchema($conn);
 $user_id = (int) ($_SESSION['user_id'] ?? 0);
 $package_id = (int) ($_GET['package_id'] ?? 0);
 $evaluation_id = (int) ($_GET['evaluation_id'] ?? 0);
+$package_back_stmt=$conn->prepare('SELECT evaluation_type FROM evaluation_packages WHERE package_id=? LIMIT 1');
+$package_back_stmt->bind_param('i',$package_id);
+$package_back_stmt->execute();
+$package_back_row=$package_back_stmt->get_result()->fetch_assoc();
+$package_back_stmt->close();
+$package_back_category=$package_back_row && !in_array($package_back_row['evaluation_type'],['Initial','Final'],true) ? 'regular' : 'probationary';
+$package_back_url=BASE_URL.'/employee/team-evaluation-packages.php?category='.$package_back_category;
+
 if ($package_id <= 0 || $evaluation_id <= 0) {
-    redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'Choose a package member to view.');
+    redirectWith($package_back_url, 'danger', 'Choose a package member to view.');
 }
 
 // Sequential turn-based check: A reviewer can view member details ONLY if:
@@ -61,12 +69,12 @@ if (!$access_row) {
         $peer_access_stmt->close();
     }
     if (!$access_row) {
-        redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'You are not a designated reviewer or same-level department peer for this package.');
+        redirectWith($package_back_url, 'danger', 'You are not a designated reviewer or same-level department peer for this package.');
     }
 }
 
 if ($access_row['action_status'] === 'Waiting' && $access_row['package_status'] !== 'Approved and Applied') {
-    redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'warning', 'This package is currently with prior evaluators and has not reached your review stage yet.');
+    redirectWith($package_back_url, 'warning', 'This package is currently with prior evaluators and has not reached your review stage yet.');
 }
 
 $evaluation_stmt = $conn->prepare("SELECT ev.*, emp.first_name, emp.last_name, emp.job_title, et.template_name, ep.shared_behavior_score, ep.status AS package_status,
@@ -84,7 +92,7 @@ $evaluation = $evaluation_stmt->get_result()->fetch_assoc();
 $evaluation_stmt->close();
 
 if (!$evaluation) {
-    redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'That package member evaluation is unavailable.');
+    redirectWith($package_back_url, 'danger', 'That package member evaluation is unavailable.');
 }
 
 $criteria_stmt = $conn->prepare("SELECT ec.section, ec.criterion_name, ec.description, ec.weight, es.score_value,
@@ -143,7 +151,7 @@ require_once '../includes/header.php';
 ?>
 <main class="evaluation-packages container-fluid py-4">
     <section class="package-hero">
-        <a class="history-back-link" href="<?php echo BASE_URL; ?>/employee/team-evaluation-packages.php">
+        <a class="history-back-link" href="<?php echo e($package_back_url); ?>">
             <i class="fas fa-arrow-left"></i> Back to evaluation reviews
         </a>
         <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">

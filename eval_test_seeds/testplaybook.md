@@ -182,6 +182,14 @@ confirmation. Old prefilled drafts use a separate storage key. Ordinary peers
 still must enter all eight behavior ratings. Run the focused check with
 `C:\xampp\php\php.exe tests/annual-review-overrides.php`.
 
+Annual immediate-head review now follows **KRA → Core Behaviors → Developmental
+Plan → Review & Submit**. Development goals are optional; each nonblank goal
+requires an improvement area, support/action plan, and target time frame. Check
+adding/removing goals, draft and active-tab recovery after refresh, confirmation
+preview, and saving with the signed approval. The employee's traditional
+Developmental Plan tab and the head's View submitted review must show the saved
+goals as view-only. Later peer ratings must not change those goals.
+
 1. Use the seeded templates above **or** create Annual templates manually for the configured direct-report positions. Do not create duplicate templates for the same test. Confirm eight standard Core Values, KRA item weights totaling 100%, and the fixed 80/20 split. No framework code/version entry is required.
 2. Submit self-ratings from each Regular employee's Employee Portal using **identical start/end dates** for the department cycle. Employee count is dynamic, not fixed at three. Creating/importing templates alone does not create a cycle.
 3. As HR Manager or HR Supervisor, open **Performance Evaluation → Regular Employee**. The department peer list shows eligible participants. Use **Rate & review** for a submitted direct-report Annual evaluation; your own self-rating is not a prerequisite. President/CEO approves the HR Manager. Audit Details in Evaluation History retains the traditional evaluation layout.

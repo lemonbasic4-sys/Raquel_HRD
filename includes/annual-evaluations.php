@@ -114,6 +114,7 @@ function annualMember($conn, int $evaluationId): ?array
             e.first_name, e.last_name, e.department_id AS current_department_id, e.job_title_id AS current_position_id,
             e.is_active AS employee_active, e.employment_status, e.deleted_at AS employee_deleted_at,
             ev.status AS evaluation_status, ev.total_score AS official_score, et.template_name,
+            ev.created_at AS evaluation_created_at, ev.submitted_date AS evaluation_submitted_at,
             reviewer_position.job_title AS reviewer_position_name
         FROM annual_evaluation_members m JOIN annual_evaluation_cycles c ON c.cycle_id=m.cycle_id
         JOIN employees e ON e.employee_id=m.employee_id JOIN evaluations ev ON ev.evaluation_id=m.evaluation_id
@@ -442,7 +443,7 @@ function annualResolveReviewOverrides(array $defaults, array $overrides): array
 }
 
 /** Save the head's KRA review and their own peer rating together, or neither. */
-function annualReviewAndRate($conn, array $actor, int $evaluationId, array $ratings, string $token, array $scores, string $signature): void
+function annualReviewAndRate($conn, array $actor, int $evaluationId, array $ratings, string $token, array $scores, string $signature, ?array $plans = null): void
 {
     if ($signature==='') throw new DomainException('Sign in the rater signature box before submitting.');
     ensureAuditTrailSchema($conn);
@@ -458,9 +459,34 @@ function annualReviewAndRate($conn, array $actor, int $evaluationId, array $rati
         $scores=annualResolveReviewOverrides(json_decode($member['self_values_json'],true),$scores);
         annualApproveKra($conn,$actor,$evaluationId,$ratings,'',$token,false,false);
         annualSubmitPeers($conn,$actor,$evaluationId,$scores,false,$signature);
+        if ($plans!==null) {
+            $plans=annualValidateDevelopmentPlans($plans);
+            annualQuery($conn,'DELETE FROM evaluation_dev_plans WHERE evaluation_id=?',[$evaluationId]);
+            foreach ($plans as $index=>$plan) annualQuery($conn,'INSERT INTO evaluation_dev_plans (evaluation_id,improvement_area,support_needed,time_frame,sort_order) VALUES (?,?,?,?,?)',
+                [$evaluationId,$plan['improvement_area'],$plan['support_needed'],$plan['time_frame'],$index]);
+        }
         annualRefreshApprovedResult($conn,annualMember($conn,$evaluationId),(int)$actor['user_id'],true);
         $conn->commit();
     } catch (Throwable $e) { $conn->rollback(); throw $e; }
+}
+
+function annualValidateDevelopmentPlans(array $plans): array
+{
+    if (count($plans)>20) throw new DomainException('Use no more than 20 developmental plan items.');
+    $validated=[];
+    foreach ($plans as $plan) {
+        if (!is_array($plan)) throw new DomainException('Invalid developmental plan item.');
+        $row=[];
+        foreach (['improvement_area'=>2000,'support_needed'=>4000,'time_frame'=>100] as $field=>$limit) {
+            $value=$plan[$field] ?? '';
+            if (!is_string($value) || mb_strlen($value)>$limit) throw new DomainException('Check the developmental plan field lengths.');
+            $row[$field]=trim($value);
+        }
+        if (!array_filter($row)) continue;
+        if (in_array('',$row,true)) throw new DomainException('Complete the development area, action/support, and time frame for each plan item, or remove the row.');
+        $validated[]=$row;
+    }
+    return $validated;
 }
 
 /** Caller holds the cycle lock. Approval stays locked; peer arrivals revise the score. */
@@ -477,7 +503,8 @@ function annualRefreshApprovedResult($conn, array $member, int $actorUserId, boo
     $version=(int)$member['current_version']+1;
     $snapshot=$candidate+['score_complete'=>$complete,'expected_peers'=>$expected,
         'previous_score'=>$member['official_score'],'kra_rows'=>annualKraRows($conn,(int)$member['evaluation_id']),
-        'self_values'=>json_decode($member['self_values_json'],true),'peers'=>annualPeers($conn,$member)];
+        'self_values'=>json_decode($member['self_values_json'],true),'peers'=>annualPeers($conn,$member),
+        'development_plans'=>annualQuery($conn,'SELECT improvement_area,support_needed,time_frame FROM evaluation_dev_plans WHERE evaluation_id=? ORDER BY sort_order,plan_id',[(int)$member['evaluation_id']])];
     annualQuery($conn,'INSERT INTO annual_evaluation_versions (member_id,version_number,finalized_by,remarks,snapshot_json) VALUES (?,?,?,?,?)',
         [(int)$member['member_id'],$version,$approve ? $actorUserId : (int)$approval['approved_by'],
             $approve ? 'Approved by immediate head.' : 'Score updated automatically after a department peer submission.',json_encode($snapshot)]);

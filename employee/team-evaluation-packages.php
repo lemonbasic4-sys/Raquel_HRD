@@ -68,6 +68,17 @@ $package_claim_department_id = $package_claim_rank_category > 0 ? (int)($claim_p
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verifyCsrfToken();
     $package_id = (int) ($_POST['package_id'] ?? 0);
+    // Keep post-action navigation on the category of the review just acted on.
+    $return_category = ($_GET['category'] ?? '') === 'regular' ? 'regular' : 'probationary';
+    if ($package_id > 0) {
+        $category_stmt = $conn->prepare('SELECT evaluation_type FROM evaluation_packages WHERE package_id=? LIMIT 1');
+        $category_stmt->bind_param('i', $package_id);
+        $category_stmt->execute();
+        $package_category_row = $category_stmt->get_result()->fetch_assoc();
+        $category_stmt->close();
+        if ($package_category_row) $return_category = in_array($package_category_row['evaluation_type'], ['Initial','Final'], true) ? 'probationary' : 'regular';
+    }
+    $package_return_url = BASE_URL . '/employee/team-evaluation-packages.php?category=' . $return_category;
     $action = $_POST['package_action'] ?? '';
     $comments = trim($_POST['comments'] ?? '');
 
@@ -77,7 +88,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $claim_employee_id = (int) ($_SESSION['employee_id'] ?? 0);
         if ((!in_array($claim_role, ['HR Supervisor', 'HR Manager', 'President and CEO'], true) && !in_array($claim_rank_category, [1, 3, 4], true))
             || $claim_employee_id <= 0 || $package_id <= 0) {
-            redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'Only an eligible HR reviewer or department supervisor/manager can claim this evaluation review.');
+            redirectWith($package_return_url, 'danger', 'Only an eligible HR reviewer or department supervisor/manager can claim this evaluation review.');
         }
 
         if ($claim_role !== '') {
@@ -99,7 +110,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $is_eligible = (bool) $eligible_user->get_result()->fetch_assoc();
         $eligible_user->close();
         if (!$is_eligible) {
-            redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'Your account is not eligible to accept this review stage.');
+            redirectWith($package_return_url, 'danger', 'Your account is not eligible to accept this review stage.');
         }
 
         try {
@@ -140,7 +151,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             if (!$claimed) {
                 $conn->rollback();
-                redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'warning', 'Another eligible reviewer has already claimed this evaluation review, or it is no longer awaiting a reviewer.');
+                redirectWith($package_return_url, 'warning', 'Another eligible reviewer has already claimed this evaluation review, or it is no longer awaiting a reviewer.');
             }
 
             $step_info = $conn->prepare('SELECT step_type FROM evaluation_package_route_steps WHERE package_id = ? AND reviewer_user_id = ? AND claimed_at IS NOT NULL LIMIT 1');
@@ -166,10 +177,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } catch (Throwable $e) {
             $conn->rollback();
             error_log('Unable to claim evaluation package: ' . $e->getMessage());
-            redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'The evaluation review could not be claimed. Refresh the page and try again.');
+            redirectWith($package_return_url, 'danger', 'The evaluation review could not be claimed. Refresh the page and try again.');
         }
 
-        redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'success', 'Evaluation review claimed. It is now assigned to you.');
+        redirectWith($package_return_url, 'success', 'Evaluation review claimed. It is now assigned to you.');
     }
 
     // Late Member Catch-Up Endorsement (Supervisor -> HR Manager -> Active Pipeline)
@@ -198,14 +209,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $res = endorseLatePackageMember($conn, $catchup_pkg_id, $catchup_eval_id, $endorser_role, $current_emp_id, $catchup_remarks);
         if ($res['ok']) {
-            redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'success', $res['message']);
+            redirectWith($package_return_url, 'success', $res['message']);
         } else {
-            redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', $res['message']);
+            redirectWith($package_return_url, 'danger', $res['message']);
         }
     }
 
     if (isOrganizationPackageLocked($conn, $package_id)) {
-        redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'This evaluation review is locked after Board approval. Scores and route actions can no longer be changed.');
+        redirectWith($package_return_url, 'danger', 'This evaluation review is locked after Board approval. Scores and route actions can no longer be changed.');
     }
 
     $step_stmt = $conn->prepare("SELECT rs.*, ep.department_id, ep.template_id, ep.evaluation_type, ep.period_start, ep.period_end, ep.status AS package_status, d.department_name
@@ -218,7 +229,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $step = $step_stmt->get_result()->fetch_assoc();
     $step_stmt->close();
     if (!$step) {
-        redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'This evaluation review is not currently assigned to you for action.');
+        redirectWith($package_return_url, 'danger', 'This evaluation review is not currently assigned to you for action.');
     }
 
     $is_probationary_step = in_array($step['evaluation_type'] ?? '', ['Initial', 'Final'], true);
@@ -251,7 +262,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             || isHumanResourcesPackageDepartment($conn, (int)$step['department_id'])
             || ($probationary_review['recommendation'] ?? '') !== 'Recommend regularization'
             || $decision_reason === '') {
-            redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'A reason is required to decline this staff regularization recommendation.');
+            redirectWith($package_return_url, 'danger', 'A reason is required to decline this staff regularization recommendation.');
         }
         $reject_request = $conn->prepare("UPDATE regularization_requests
             SET status = 'Rejected', decided_by = ?, decided_at = NOW(), decision_reason = ?
@@ -261,7 +272,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $rejected = $reject_request->affected_rows === 1;
         $reject_request->close();
         if (!$rejected) {
-            redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'The regularization request is no longer pending.');
+            redirectWith($package_return_url, 'danger', 'The regularization request is no longer pending.');
         }
         $action = 'approve';
         $comments = $decision_reason;
@@ -271,7 +282,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!$is_probationary_step
             || $step['evaluation_type'] !== 'Final'
             || (int)($step['step_order'] ?? 0) !== 1 || $probationary_eval_id <= 0) {
-            redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'Only the assigned reviewer can record the probationary recommendation.');
+            redirectWith($package_return_url, 'danger', 'Only the assigned reviewer can record the probationary recommendation.');
         }
         $recommendation = trim($_POST['recommendation'] ?? '');
         $recommendation_reason = trim($_POST['recommendation_reason'] ?? '');
@@ -295,7 +306,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'Immediate head saved a probationary recommendation and digital signature.',
             ['module' => 'Performance & Evaluation', 'target_employee_id' => $probationary_employee_id,
                 'new_value' => $recommendation]);
-        redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'success', 'Reviewer recommendation and signature saved. You can now approve the evaluation.');
+        redirectWith($package_return_url, 'success', 'Reviewer recommendation and signature saved. You can now approve the evaluation.');
     }
 
     if ($action === 'save_initial_rater_signature') {
@@ -305,7 +316,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             || (int)($step['step_order'] ?? 0) !== 1
             || !in_array((int)($probationary_review['rank_category_id'] ?? 0), [1, 2, 3, 4, 5], true)
             || $probationary_eval_id <= 0) {
-            redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'Only the assigned reviewer can sign this probationary Initial evaluation.');
+            redirectWith($package_return_url, 'danger', 'Only the assigned reviewer can sign this probationary Initial evaluation.');
         }
         if (!preg_match('/^data:image\/png;base64,/', $head_signature) || strlen($head_signature) > 100000) {
             redirectWith($decision_review_url, 'danger', 'Sign in the rater signature box before saving.');
@@ -322,7 +333,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         logAudit($conn, $user_id, 'SIGN', 'Evaluation', $probationary_eval_id,
             'Assigned immediate head saved the rater signature for an Initial probationary evaluation.',
             ['module' => 'Performance & Evaluation', 'target_employee_id' => $probationary_employee_id]);
-        redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'success', 'Rater signature saved. It will appear on the printed evaluation form.');
+        redirectWith($package_return_url, 'success', 'Rater signature saved. It will appear on the printed evaluation form.');
     }
 
     // F7 Action: Consolidator returns individual member self-rating back to employee
@@ -330,13 +341,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $member_eval_id = (int) ($_POST['member_evaluation_id'] ?? 0);
         $comments = trim((string)($_POST['return_reason'] ?? $comments));
         if ($member_eval_id <= 0) {
-            redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'Select a member evaluation to return.');
+            redirectWith($package_return_url, 'danger', 'Select a member evaluation to return.');
         }
         if ((int)$step['step_order'] !== 1) {
-            redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'Only the initial consolidator can return individual member evaluations to employees.');
+            redirectWith($package_return_url, 'danger', 'Only the initial consolidator can return individual member evaluations to employees.');
         }
         if (in_array($step['evaluation_type'], ['Initial', 'Final'], true) && $comments === '') {
-            redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'A return reason is required for the probationary employee.');
+            redirectWith($package_return_url, 'danger', 'A return reason is required for the probationary employee.');
         }
 
         $member_check = $conn->prepare('SELECT 1 FROM evaluation_package_members WHERE package_id = ? AND evaluation_id = ? LIMIT 1');
@@ -345,7 +356,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $belongs_to_package = (bool)$member_check->get_result()->fetch_assoc();
         $member_check->close();
         if (!$belongs_to_package) {
-            redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'This evaluation is not part of the current review.');
+            redirectWith($package_return_url, 'danger', 'This evaluation is not part of the current review.');
         }
         $conn->query("UPDATE evaluations SET status = 'Returned' WHERE evaluation_id = $member_eval_id");
         if (!in_array($step['evaluation_type'], ['Initial', 'Final'], true)) {
@@ -376,7 +387,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($emp_user) {
             createNotification($conn, (int)$emp_user['user_id'], 'Self-Rating Returned for Revision', 'Your reviewer returned your self-rating for revision. Remarks: ' . ($comments ?: 'Please review and resubmit.'), BASE_URL . '/employee/self-rating.php?edit=' . $member_eval_id);
         }
-        redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'success', $msg);
+        redirectWith($package_return_url, 'success', $msg);
     }
 
 
@@ -389,7 +400,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $endorser_emp_id  = (int) ($_SESSION['employee_id'] ?? 0);
 
         if ($catchup_eval_id <= 0 || $catchup_pkg_id <= 0) {
-            redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'Invalid catch-up endorsement request.');
+            redirectWith($package_return_url, 'danger', 'Invalid catch-up endorsement request.');
         }
 
         // Determine endorser role
@@ -400,23 +411,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Must be the package consolidator (supervisor)
             $is_consolidator = (bool)$conn->query("SELECT package_id FROM evaluation_packages WHERE package_id = $catchup_pkg_id AND consolidator_employee_id = $endorser_emp_id LIMIT 1")->fetch_assoc();
             if (!$is_consolidator) {
-                redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'You are not authorized to endorse this catch-up member.');
+                redirectWith($package_return_url, 'danger', 'You are not authorized to endorse this catch-up member.');
             }
             $endorser_role = 'supervisor';
         }
 
         $result = endorseLatePackageMember($conn, $catchup_pkg_id, $catchup_eval_id, $endorser_role, $endorser_emp_id, $catchup_comments);
         $type = $result['ok'] ? 'success' : 'danger';
-        redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', $type, $result['message']);
+        redirectWith($package_return_url, $type, $result['message']);
     }
 
     if ($action === 'return') {
 
         if ($comments === '') {
-            redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'A return reason is required.');
+            redirectWith($package_return_url, 'danger', 'A return reason is required.');
         }
         if ((int) $step['step_order'] <= 1) {
-            redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'The consolidator cannot return the whole evaluation review. Use Return on an individual member row or Cancel Review.');
+            redirectWith($package_return_url, 'danger', 'The consolidator cannot return the whole evaluation review. Use Return on an individual member row or Cancel Review.');
         }
         $update = $conn->prepare("UPDATE evaluation_package_route_steps SET action_status = 'Returned', acted_at = NOW(), comments = ? WHERE package_route_step_id = ?");
         $update->bind_param('si', $comments, $step['package_route_step_id']);
@@ -430,7 +441,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $previous = $previous_stmt->get_result()->fetch_assoc();
         $previous_stmt->close();
         if (!$previous) {
-            redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'The previous reviewer could not be found in the route.');
+            redirectWith($package_return_url, 'danger', 'The previous reviewer could not be found in the route.');
         }
 
         $reopen = $conn->prepare("UPDATE evaluation_package_route_steps SET action_status = 'Pending', acted_at = NULL WHERE package_route_step_id = ?");
@@ -466,7 +477,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 BASE_URL . '/employee/evaluation-history.php');
         }
 
-        redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'success', 'Evaluation review returned to ' . $prev_name . ' (' . $previous['step_label'] . ') for revision.');
+        redirectWith($package_return_url, 'success', 'Evaluation review returned to ' . $prev_name . ' (' . $previous['step_label'] . ') for revision.');
     }
 
     if ($step['step_type'] === 'Consolidation') {
@@ -478,7 +489,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action === 'approve' && $is_probationary_step && $step['evaluation_type'] === 'Final') {
         if ($step['evaluation_type'] === 'Final'
             && !hasApprovedInitialProbationaryEvaluation($conn, $probationary_employee_id)) {
-            redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger',
+            redirectWith($package_return_url, 'danger',
                 'Approve this employee’s Initial evaluation before reviewing the Final evaluation.');
         }
         if ((int)$step['step_order'] === 1) {
@@ -502,7 +513,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $next_check = checkNextPackageStepIsAssigned($conn, $package_id, (int)$step['step_order']);
     if (!$next_check['ok']) {
-        redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', $next_check['message']);
+        redirectWith($package_return_url, 'danger', $next_check['message']);
     }
 
     $approve = $conn->prepare("UPDATE evaluation_package_route_steps SET action_status = 'Approved', acted_at = NOW(), comments = ? WHERE package_route_step_id = ?");
@@ -584,14 +595,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ['module' => 'Performance & Evaluation']);
 
         if ($was_merged) {
-            redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'success', 'Evaluation approved. This member\'s evaluation has been merged into the main ' . $step['department_name'] . ' team evaluation review (Review #' . $merged_into . ') at the same approval stage.');
+            redirectWith($package_return_url, 'success', 'Evaluation approved. This member\'s evaluation has been merged into the main ' . $step['department_name'] . ' team evaluation review (Review #' . $merged_into . ') at the same approval stage.');
         }
         notifyHrStaffOfPackageProgress($conn, $package_id, (string) $step['department_name'], (string) $next['step_label']);
-        redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'success', 'Evaluation review successfully adjusted and forwarded to ' . $next_name . ' (' . $next['step_label'] . ').');
+        redirectWith($package_return_url, 'success', 'Evaluation review successfully adjusted and forwarded to ' . $next_name . ' (' . $next['step_label'] . ').');
     } else {
         // Final governance step (Board of Directors) locks and applies.
         if (!$is_final_board && !$is_final_probationary) {
-            redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'Final application requires Board of Directors approval. Please contact an administrator.');
+            redirectWith($package_return_url, 'danger', 'Final application requires Board of Directors approval. Please contact an administrator.');
         }
 
         $conn->begin_transaction();
@@ -697,14 +708,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
 
-            redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'success', $is_final_probationary ? 'Probationary evaluation approved and finalized.' : 'Evaluation review approved, locked, and applied to all team members. HR personnel and team members have been notified.');
+            redirectWith($package_return_url, 'success', $is_final_probationary ? 'Probationary evaluation approved and finalized.' : 'Evaluation review approved, locked, and applied to all team members. HR personnel and team members have been notified.');
         } else {
             $conn->rollback();
             $restore = $conn->prepare("UPDATE evaluation_package_route_steps SET action_status = 'Pending', acted_at = NULL WHERE package_route_step_id = ? AND action_status = 'Approved'");
             $restore->bind_param('i', $step['package_route_step_id']);
             $restore->execute();
             $restore->close();
-            redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', $is_probationary ? 'The individual probationary evaluation could not be applied.' : 'The evaluation review could not be applied because its shared behavior score is incomplete.');
+            redirectWith($package_return_url, 'danger', $is_probationary ? 'The individual probationary evaluation could not be applied.' : 'The evaluation review could not be applied because its shared behavior score is incomplete.');
         }
     }
 }

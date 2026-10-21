@@ -143,3 +143,59 @@
     font-weight:500;
     text-align:center;
 }
+.annual-page .annual-plan-rows{display:grid;gap:14px}
+.annual-page .annual-plan-row{padding:0;background:#fff;border:1px solid #dce6d5;border-radius:12px;overflow:hidden;container-type:inline-size;box-shadow:0 3px 12px rgba(25,55,15,.04)}
+.annual-page .annual-plan-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;padding:20px}
+.annual-page .annual-plan-fields>div{min-width:0}
+.annual-page .annual-plan-fields label{display:block;font-size:.8rem;color:#244b20;margin:0 0 8px;line-height:1.5}
+.annual-page .annual-plan-fields .form-control{width:100%;min-width:0;max-width:100%;font-size:.85rem;line-height:1.6;padding:11px 13px;border:1px solid #cdd9c7;border-radius:8px;background:#fff;box-shadow:none}
+.annual-page .annual-plan-fields .form-control:focus{border-color:#527c42;box-shadow:0 0 0 3px rgba(50,100,30,.1)}
+.annual-page .annual-plan-fields textarea{resize:vertical;min-height:120px;height:auto}
+.annual-page .annual-plan-field--time_frame{grid-column:1/-1;border-top:1px solid #edf1e9;padding-top:16px}
+.annual-page .annual-plan-field--time_frame input{max-width:360px}
+.annual-page .annual-plan-row-header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 20px;background:#f3f7ee;border-bottom:1px solid #dfe8d8}
+.annual-page .annual-plan-goal-name{font-size:.88rem;color:#234b1b;font-weight:800;margin:0;line-height:1.5}
+.annual-page .annual-plan-remove{display:inline-flex;align-items:center;gap:6px;flex-shrink:0;padding:7px 10px;border:1px solid #e6ded9;border-radius:7px;background:#fff;color:#86524a;font-size:.75rem;font-weight:600;min-height:36px}
+.annual-page .annual-plan-remove:hover{background:#fff0ed;color:#a43125;border-color:#e3bcb3}
+.annual-page .annual-plan-intro{display:flex;align-items:flex-start;gap:12px;padding:14px 16px;margin:0 0 20px;background:#fbf8ec;border:1px solid #ece3be;border-radius:10px;color:#6d5b20}
+.annual-page .annual-plan-intro>i{margin-top:3px;color:#a68a26}
+.annual-page .annual-plan-intro p{margin:0;font-size:.85rem;line-height:1.6}
+.annual-page .annual-plan-intro span{display:block;font-size:.76rem;color:#7d7350}
+.annual-page #annualAddPlan{width:100%;min-height:46px;border:1px dashed #9db98c;background:#f8fbf5;border-radius:10px;color:#27561c;font-size:.83rem;box-shadow:none}
+.annual-page #annualAddPlan:hover{background:#edf5e7}
+.annual-page .annual-plan-empty{padding:20px;border:1px dashed #cfdbc7;border-radius:10px;color:#697561;font-size:.83rem;text-align:center;margin:0}
+.annual-page .annual-plan-summary{padding:12px 16px;border:1px solid #e0e8db;border-radius:10px;background:#f8faf6;margin-bottom:10px;overflow-wrap:anywhere}
+.annual-page .annual-plan-summary p{font-size:.83rem;white-space:pre-wrap;margin:0 0 6px}
+@container(max-width:560px){.annual-page .annual-plan-fields{grid-template-columns:1fr;padding:16px;gap:16px}.annual-page .annual-plan-row-header{padding:12px 16px}.annual-page .annual-plan-field--time_frame input{max-width:100%}}
+/* Annual rating sections follow the probationary Review and Decide form. */
+.annual-page .annual-probation-section .annual-review-section{font-size:1.15rem;font-weight:700;color:#0f5132;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;padding-bottom:10px;margin-bottom:16px;border-bottom:1px solid #e2e8f0}
+.annual-page .annual-probation-section .annual-review-section small{font-size:.85rem;font-weight:600;color:#64748b;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:8px 12px}
+.annual-page .annual-probation-section .annual-score-table-wrap{border:0;border-radius:0}
+.annual-page .annual-probation-section .annual-score-table{min-width:700px;border-collapse:collapse;border-spacing:0}
+.annual-page .annual-probation-section .annual-score-table thead th{background:#f1f5f9;color:#0f172a;border-bottom:2px solid #cbd5e1;padding:12px;font-size:.8rem;white-space:normal}
+.annual-page .annual-probation-section .annual-score-table tbody td{padding:14px 12px;vertical-align:middle}
+.annual-page .annual-probation-section .annual-score-table tbody td:first-child{width:42%}
+.annual-page .annual-probation-section .annual-score-table tbody td:last-child{width:28%;white-space:nowrap;text-align:left}
+.annual-page .annual-probation-section .annual-rating-table tbody td:first-child{width:48%}
+.annual-page .annual-probation-section .annual-score-table tbody strong{font-size:1.05rem;color:#0f172a}
+.annual-page .annual-probation-section .annual-score-table tbody td small{font-size:.8rem;line-height:1.5;color:#64748b;margin-top:4px}
+.annual-page #annualRatingForm .annual-probation-section .annual-number{display:inline-block;width:140px;min-width:140px;height:44px;padding:8px 10px;margin:0;border:2px solid #0f5132;border-radius:8px;background:#fff;color:#0f172a;font-size:1.25rem;font-weight:700;text-align:center;box-shadow:none;vertical-align:middle}
+.annual-page #annualRatingForm .annual-probation-section .annual-number.is-invalid{border-color:#b42318}
+.annual-page .annual-rating-unit{display:inline-block;margin-left:8px;color:#64748b;font-weight:700;font-size:1rem;vertical-align:middle}
+.annual-page .annual-probation-section .annual-score-table tfoot{background:#f8fafc;border-top:1px solid #e2e8f0}
+.annual-page .annual-probation-section .annual-score-table tfoot th{font-size:.9rem;text-transform:none;color:#0f172a;padding:16px 12px}
+.annual-page .annual-probation-section .annual-score-table tfoot td{padding:16px 12px}
+.annual-page .annual-probation-section .annual-score-table tfoot td strong{font-size:1.25rem;color:#0f5132}
+.annual-page #annualRatePlanPanel .annual-plan-row{display:table-row;container-type:normal;border-radius:0;box-shadow:none;background:#fff}
+.annual-page #annualRatePlanPanel .annual-development-table{width:100%;min-width:780px;border-collapse:collapse;border:1px solid #dee2e6}
+.annual-page #annualRatePlanPanel .annual-development-table th{font-size:.82rem;font-weight:700;padding:12px;background:#f8f9fa;color:#283b32;border:1px solid #dee2e6}
+.annual-page #annualRatePlanPanel .annual-development-table td{padding:12px;border:1px solid #dee2e6;vertical-align:middle}
+.annual-page #annualRatePlanPanel .annual-development-table input{width:100%;min-width:0;border:1px solid #ced4da;border-radius:6px;padding:10px 12px;font-size:.85rem;min-height:42px;background:#fff;box-shadow:none}
+.annual-page #annualRatePlanPanel .annual-development-table input:focus{border-color:#0f5132;box-shadow:0 0 0 3px rgba(15,81,50,.1)}
+.annual-page #annualRatePlanPanel #annualAddPlan{width:auto;min-height:38px;background:#fff;border:1px solid #198754;border-radius:6px;font-size:.8rem;padding:8px 12px;color:#198754}
+.annual-page #annualRatePlanPanel #annualAddPlan:hover{background:#198754;color:#fff}
+.annual-page .annual-section-total{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;padding:12px 16px;margin:0 0 14px;border:1px solid #e2e8f0;border-radius:10px;background:#f8fafc;box-shadow:0 2px 5px rgba(15,23,42,.04)}
+.annual-page .annual-section-total>strong{color:#0f172a;font-size:1rem}
+.annual-page .annual-section-total-values{display:flex;align-items:center;flex-wrap:wrap;gap:12px;color:#64748b;font-size:.8rem;font-weight:600}
+.annual-page .annual-section-total-box{display:inline-flex;align-items:center;gap:7px;padding:6px 12px;border:1px solid #0f5132;border-radius:6px;background:#fff}
+.annual-page .annual-section-total-box strong{color:#198754;font-size:1.25rem;font-variant-numeric:tabular-nums}

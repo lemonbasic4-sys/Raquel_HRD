@@ -8,6 +8,14 @@ ensureProbationaryEvaluationSchema($conn);
 $user_id = (int) $_SESSION['user_id'];
 $package_id = (int) ($_GET['package_id'] ?? $_POST['package_id'] ?? 0);
 $evaluation_id = (int) ($_GET['evaluation_id'] ?? $_POST['evaluation_id'] ?? 0);
+$package_back_stmt=$conn->prepare('SELECT evaluation_type FROM evaluation_packages WHERE package_id=? LIMIT 1');
+$package_back_stmt->bind_param('i',$package_id);
+$package_back_stmt->execute();
+$package_back_row=$package_back_stmt->get_result()->fetch_assoc();
+$package_back_stmt->close();
+$package_back_category=$package_back_row && !in_array($package_back_row['evaluation_type'],['Initial','Final'],true) ? 'regular' : 'probationary';
+$package_back_url=BASE_URL.'/employee/team-evaluation-packages.php?category='.$package_back_category;
+
 
 $reviewer_identity = $conn->prepare("SELECT employee_id FROM users
     WHERE user_id = ? AND is_active = 1 AND COALESCE(account_hold, 0) = 0 AND deleted_at IS NULL
@@ -105,7 +113,7 @@ if (!$review_step) {
 }
 
 if (!$review_step) {
-    redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'This team-member evaluation is not currently assigned to you for review.');
+    redirectWith($package_back_url, 'danger', 'This team-member evaluation is not currently assigned to you for review.');
 }
 $is_probationary_head_review = in_array($review_step['evaluation_type'] ?? '', ['Initial', 'Final'], true)
     && (int)($review_step['step_order'] ?? 0) === 1;
@@ -118,13 +126,13 @@ if (($eval_status_check['status'] ?? '') === 'Approved') {
 }
 
 if (!$is_catchup_review && (($review_step['status'] ?? '') === 'Approved and Applied' || isOrganizationPackageLocked($conn, $package_id))) {
-    redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'This evaluation review is locked after Board approval. Ratings can no longer be adjusted.');
+    redirectWith($package_back_url, 'danger', 'This evaluation review is locked after Board approval. Ratings can no longer be adjusted.');
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verifyCsrfToken();
     if (($eval_status_check['status'] ?? '') === 'Approved' || (!$is_catchup_review && isOrganizationPackageLocked($conn, $package_id))) {
-        redirectWith(BASE_URL . '/employee/team-evaluation-packages.php', 'danger', 'This evaluation is locked and can no longer be edited.');
+        redirectWith($package_back_url, 'danger', 'This evaluation is locked and can no longer be edited.');
     }
     $ratings = $_POST['rating'] ?? [];
     $score_stmt = $conn->prepare("SELECT es.score_id, es.score_value, es.supervisor_override_score, ec.criterion_id, ec.criterion_name FROM evaluation_scores es JOIN evaluation_criteria ec ON ec.criterion_id = es.criterion_id WHERE es.evaluation_id = ?");
@@ -298,7 +306,7 @@ $devplan_count = count($existing_dev_plans);
 ?>
 <main class="evaluation-packages container-fluid py-4">
     <section class="package-hero">
-        <a class="history-back-link" href="<?php echo BASE_URL; ?>/employee/team-evaluation-packages.php">
+        <a class="history-back-link" href="<?php echo e($package_back_url); ?>">
             <i class="fas fa-arrow-left"></i> Back to evaluation review
         </a>
         <p class="mb-1 text-uppercase fw-bold" style="letter-spacing:1px; color:var(--rp-primary-gold-light); font-size:0.85rem;">
@@ -706,9 +714,9 @@ $devplan_count = count($existing_dev_plans);
                     <?php endif; ?>
                     <div class="col-12"><label class="form-label fw-semibold" for="headSignatureCanvas">Immediate head signature</label><div class="border rounded bg-white p-2" style="max-width:620px;"><canvas id="headSignatureCanvas" width="560" height="120" style="display:block;width:100%;height:120px;touch-action:none;border:1px dashed #94a3b8;border-radius:6px;"></canvas><input type="hidden" name="immediate_head_signature_data" id="headSignatureData" value="<?php echo e($evaluation['immediate_head_signature_data'] ?? ''); ?>"><button class="btn btn-sm btn-outline-secondary mt-2" type="button" id="clearHeadSignature">Clear signature</button></div><div class="small text-muted mt-1">Saving changed ratings clears the previous immediate-head signature. The employee’s original self-rating signature remains on file.</div></div>
                     <?php if ($show_probationary_decision): ?>
-                    <div class="col-12"><button class="btn btn-success fw-semibold" type="submit" name="package_action" value="save_probationary_decision" formaction="<?php echo BASE_URL; ?>/employee/team-evaluation-packages.php" formnovalidate><i class="fas fa-file-signature me-1"></i>Save Decision &amp; Signature</button></div>
+                    <div class="col-12"><button class="btn btn-success fw-semibold" type="submit" name="package_action" value="save_probationary_decision" formaction="<?php echo e($package_back_url); ?>" formnovalidate><i class="fas fa-file-signature me-1"></i>Save Decision &amp; Signature</button></div>
                     <?php else: ?>
-                    <div class="col-12"><button class="btn btn-success fw-semibold" type="submit" name="package_action" value="save_initial_rater_signature" formaction="<?php echo BASE_URL; ?>/employee/team-evaluation-packages.php" formnovalidate><i class="fas fa-file-signature me-1"></i>Save Signature</button></div>
+                    <div class="col-12"><button class="btn btn-success fw-semibold" type="submit" name="package_action" value="save_initial_rater_signature" formaction="<?php echo e($package_back_url); ?>" formnovalidate><i class="fas fa-file-signature me-1"></i>Save Signature</button></div>
                     <?php endif; ?>
                 </div>
             </div>
@@ -719,7 +727,7 @@ $devplan_count = count($existing_dev_plans);
                 <button class="btn-action-primary btn" type="submit">
                     <i class="fas fa-save me-1"></i>Save Adjustments &amp; Developmental Plan
                 </button>
-                <a class="btn btn-outline-secondary px-4 py-2 fw-semibold" href="<?php echo BASE_URL; ?>/employee/team-evaluation-packages.php" style="min-height:46px; border-radius:8px;">
+                <a class="btn btn-outline-secondary px-4 py-2 fw-semibold" href="<?php echo e($package_back_url); ?>" style="min-height:46px; border-radius:8px;">
                     Back to Evaluation Review
                 </a>
             </div>
