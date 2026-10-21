@@ -63,7 +63,7 @@ $hiringLink = static function (int $page) use ($hiringYear, $hiringMonth): strin
     return 'analytics.php?' . http_build_query(array_merge($query, ['tab'=>'hiring','hire_year'=>$hiringYear,'hire_month'=>$hiringMonth,'hire_page'=>$page])) . '#hiring-analytics';
 };
 ?>
-<link rel="stylesheet" href="../assets/css/manager-hiring-analytics.css?v=2">
+<link rel="stylesheet" href="../assets/css/manager-hiring-analytics.css?v=3">
 <section id="hiring-analytics" class="hiring-workspace" aria-labelledby="hiring-title">
     <header class="hiring-heading">
         <div>
@@ -80,7 +80,7 @@ $hiringLink = static function (int $page) use ($hiringYear, $hiringMonth): strin
             ['This year', (int)$hiringSummary['this_year'], (string)$hiringCurrentYear . ' to date', 'fa-user-plus', 'year'],
             ['Selected year', $hiringSelectedTotal, (string)$hiringYear . ' total hires', 'fa-chart-line', 'selected']
         ] as [$hiringLabel,$hiringValue,$hiringCaption,$hiringIcon,$hiringTone]): ?>
-        <article class="hiring-kpi hiring-kpi--<?php echo e($hiringTone); ?>">
+        <article class="hiring-kpi hiring-kpi--<?php echo e($hiringTone); ?> page-hero fadeup">
             <div class="hiring-kpi-top"><span><?php echo e($hiringLabel); ?></span><span class="hiring-kpi-icon"><i class="fas <?php echo e($hiringIcon); ?>" aria-hidden="true"></i></span></div>
             <div class="hiring-kpi-value"><?php echo number_format($hiringValue); ?><span>new <?php echo $hiringValue === 1 ? 'hire' : 'hires'; ?></span></div>
             <div class="hiring-kpi-caption"><?php echo e($hiringCaption); ?></div>

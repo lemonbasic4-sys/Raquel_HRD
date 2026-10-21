@@ -21,9 +21,18 @@
 .hiring-kpi-value { display:flex; flex-wrap:wrap; align-items:baseline; gap:10px; font-size:2.35rem; font-weight:750; line-height:1.3; letter-spacing:-.04em; margin:5px 0; }
 .hiring-kpi-value > span { color:#7c8774; font-size:.73rem; font-weight:500; letter-spacing:0; }
 .hiring-kpi-caption { color:var(--hire-muted); font-size:.72rem; }
-.hiring-kpi--selected { background:linear-gradient(120deg,#294306,#3c5617); border-color:#3c5617; color:#fff; }
-.hiring-kpi--selected .hiring-kpi-top,.hiring-kpi--selected .hiring-kpi-caption,.hiring-kpi--selected .hiring-kpi-value > span { color:#d6e0c7; }
-.hiring-kpi--selected .hiring-kpi-icon { color:#f3d678; background:#ffffff18; }
+.hiring-kpi.page-hero {
+    background:linear-gradient(135deg,var(--hero-from) 0%,var(--hero-mid) 50%,var(--hero-to) 100%);
+    border-color:transparent;
+    color:#fff;
+    padding:20px 22px;
+    margin-bottom:0 !important;
+}
+.hiring-kpi.page-hero > div { position:relative; z-index:1; }
+.hiring-kpi.page-hero .hiring-kpi-top,
+.hiring-kpi.page-hero .hiring-kpi-caption,
+.hiring-kpi.page-hero .hiring-kpi-value > span { color:#d6e0c7; }
+.hiring-kpi.page-hero .hiring-kpi-icon { color:#f3d678; background:#ffffff18; }
 .hiring-toolbar { display:flex; flex-wrap:wrap; align-items:center; gap:14px; padding:16px 20px; margin-bottom:20px; background:#fff; border:1px solid var(--hire-line); border-radius:14px; }
 .hiring-toolbar-title { display:flex; align-items:center; gap:12px; margin-right:auto; }
 .hiring-toolbar-icon { color:#7d8d6d; font-size:1rem; }
@@ -94,7 +103,7 @@
 @media (max-width: 767.98px) {
     .hiring-heading { align-items:flex-start; flex-direction:column; gap:10px; }
     .hiring-kpis { gap:10px; }
-    .hiring-kpi { padding:15px; border-radius:12px; }
+    .hiring-kpi,.hiring-kpi.page-hero { padding:15px; border-radius:12px; }
     .hiring-kpi-top { font-size:.7rem; }
     .hiring-kpi-icon { width:28px; height:28px; font-size:.75rem; }
     .hiring-kpi-value { font-size:1.8rem; gap:4px; }
@@ -120,5 +129,6 @@
 }
 @media (prefers-reduced-motion: reduce) {
     .analytics-page .analytics-nav .nav-link { transition:none; }
+    .hiring-kpi.fadeup { animation:none; }
 }
 
