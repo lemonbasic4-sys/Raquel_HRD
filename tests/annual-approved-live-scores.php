@@ -97,6 +97,10 @@ try {
     checkAnnual(count(annualQuery($conn,'SELECT version_id FROM annual_evaluation_versions WHERE member_id=?',[(int)$complete['member_id']]))===3,'Every peer update preserves a score version');
     checkAnnual((bool)annualQuery($conn,"SELECT notification_id FROM notifications WHERE user_id=4 AND title='Annual score updated' AND message LIKE '%3.44%3.24%'"),'Employee receives previous-to-updated score notice');
     checkAnnual((bool)annualQuery($conn,"SELECT notification_id FROM notifications WHERE user_id=4 AND title='Annual score complete'"),'Employee receives score-complete notice');
+    annualQuery($conn,'UPDATE annual_evaluation_members SET evaluation_id=NULL,self_values_json=NULL WHERE cycle_id=? AND employee_id=2',[$cycle]);
+    annualSubmitPeers($conn,$actors[2],6,array_fill(0,8,3.0));
+    checkAnnual((bool)annualQuery($conn,'SELECT submission_id FROM annual_peer_submissions WHERE cycle_id=? AND target_employee_id=6 AND rater_employee_id=2',[$cycle]),'HR Manager can rate a department peer before submitting their own self-rating');
+    rejectsAnnual(fn()=>annualReviewAndRate($conn,$actors[2],6,[],annualReviewToken($conn,annualMember($conn,6)),[],$signature),'HR Manager peer access does not grant KRA approval over HR Staff');
     echo "Approved Annual live-score integration checks passed.\n";
 } finally {
     if (isset($conn) && $conn instanceof mysqli) $conn->close();

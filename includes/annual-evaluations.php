@@ -116,6 +116,7 @@ function annualMember($conn, int $evaluationId): ?array
             ev.status AS evaluation_status, ev.total_score AS official_score, et.template_name,
             ev.created_at AS evaluation_created_at, ev.submitted_date AS evaluation_submitted_at,
             ev.supervisor_comments AS head_comments,
+            ev.kra_subtotal, ev.behavior_average,
             reviewer_position.job_title AS reviewer_position_name
         FROM annual_evaluation_members m JOIN annual_evaluation_cycles c ON c.cycle_id=m.cycle_id
         JOIN employees e ON e.employee_id=m.employee_id JOIN evaluations ev ON ev.evaluation_id=m.evaluation_id
@@ -157,6 +158,11 @@ function annualCanFinalize($conn, array $actor, array $member): bool
     if (annualIsHrDepartment($actor) && !in_array($actor['role'], ['HR Manager', 'HR Supervisor'], true)) return false;
     return (int)$member['reviewer_position_id'] > 0
         && (int)$actor['job_title_id'] === (int)$member['reviewer_position_id'];
+}
+
+function annualCanRateBeforeSelf($conn, array $actor, array $member): bool
+{
+    return annualCanRate($actor) && ($actor['role']==='HR Manager' || annualCanFinalize($conn,$actor,$member));
 }
 
 function annualCanSeeNames($conn, array $actor, array $member): bool
@@ -367,8 +373,7 @@ function annualSubmitPeers($conn, array $actor, int $evaluationId, array $scores
         $member=annualMember($conn,$evaluationId);
         annualAssertSnapshotActive($member);
         $rater=annualQuery($conn,'SELECT evaluation_id FROM annual_evaluation_members WHERE cycle_id=? AND employee_id=?',[(int)$member['cycle_id'],(int)$actor['employee_id']])[0] ?? null;
-        $isImmediateHead=annualCanFinalize($conn,$actor,$member);
-        if ((!$rater || !$rater['evaluation_id']) && !$isImmediateHead) throw new DomainException('Submit your Annual self-rating for this department period first.');
+        if ((!$rater || !$rater['evaluation_id']) && !annualCanRateBeforeSelf($conn,$actor,$member)) throw new DomainException('Submit your Annual self-rating for this department period first.');
         if (!empty($rater['evaluation_id'])) {
             $raterMember=annualMember($conn,(int)$rater['evaluation_id']);
             if (!$raterMember) throw new DomainException('Your Annual evaluation record is unavailable. Contact HR.');

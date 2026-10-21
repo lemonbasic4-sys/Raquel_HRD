@@ -173,6 +173,9 @@ self-rating first. As HR Supervisor with no submitted self-rating, open a
 direct-report HR Staff member's submitted Annual evaluation using **Rate & review**.
 Verify KRA editing, Core Values rating, signature, and confirmed submission work.
 Other coworker peer-rating tasks still require the rater's own self-rating.
+HR Manager is also allowed to rate submitted department peers before completing
+their own self-rating. This grants behavior peer-rating access only; KRA review
+and approval still require the configured immediate-head relationship.
 
 Immediate-head KRA and behavior inputs start blank. Blank means retain the
 employee's original submitted rating; an entered decimal overrides only that

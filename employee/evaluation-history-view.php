@@ -105,6 +105,7 @@ $remarks = array_filter([
 
 require_once '../includes/header.php';
 ?>
+<link rel="stylesheet" href="<?php echo BASE_URL; ?>/assets/css/annual-result-cards.css?v=<?php echo filemtime(__DIR__.'/../assets/css/annual-result-cards.css'); ?>">
 <main class="evaluation-packages evaluation-history-view container-fluid py-4">
     <section class="package-hero">
         <a class="history-back-link" href="<?php echo BASE_URL; ?>/employee/evaluation-history.php">
@@ -166,27 +167,7 @@ require_once '../includes/header.php';
                 $annualDisplayTotal=$show_reviewed_scores && $evaluation['total_score']!==null ? (float)$evaluation['total_score'] : $orig_total_score;
                 $annualTier=$annualDisplayTotal>=3.6 ? 'outstanding' : ($annualDisplayTotal>=2.6 ? 'exceeds' : ($annualDisplayTotal>=2 ? 'meets' : 'needs'));
             ?>
-            <div class="annual-result-cards" aria-label="Annual evaluation scores">
-                <section class="annual-result-card">
-                    <div class="annual-result-card-head"><span class="annual-result-icon"><i class="fas fa-chart-pie" aria-hidden="true"></i></span><span class="annual-result-weight">80% weight</span></div>
-                    <h3>Key Result Areas</h3>
-                    <div class="annual-result-number"><?php echo number_format($annualDisplayKra,2); ?><span>/ 4.00</span></div>
-                    <p><?php echo $show_reviewed_scores ? 'Approved KRA score' : 'Submitted KRA score'; ?></p>
-                </section>
-                <section class="annual-result-card annual-result-card--behavior">
-                    <div class="annual-result-card-head"><span class="annual-result-icon"><i class="fas fa-handshake" aria-hidden="true"></i></span><span class="annual-result-weight">20% weight</span></div>
-                    <h3>Core Behaviors &amp; Values</h3>
-                    <div class="annual-result-number"><?php echo number_format($annualDisplayCore,2); ?><span>/ 4.00</span></div>
-                    <p><?php echo $show_reviewed_scores ? 'Combined 360 average' : 'Submitted behavior score'; ?></p>
-                </section>
-                <section class="annual-result-card annual-result-card--total">
-                    <div class="annual-result-card-head"><span class="annual-result-icon"><i class="fas fa-chart-line" aria-hidden="true"></i></span><span class="annual-result-weight">Weighted overall</span></div>
-                    <h3>Final Score</h3>
-                    <div class="annual-result-number"><?php echo number_format($annualDisplayTotal,2); ?><span>/ 4.00</span></div>
-                    <span class="annual-result-level is-<?php echo $annualTier; ?>"><i class="fas fa-<?php echo $annualTier==='needs' ? 'exclamation-circle' : 'check-circle'; ?>" aria-hidden="true"></i> <?php echo e($show_reviewed_scores ? getPerformanceLevel($annualDisplayTotal) : 'Awaiting approval'); ?></span>
-                    <p>KRA × 80% + Behavior × 20%</p>
-                </section>
-            </div>
+            <?php $annualScoresApproved=$show_reviewed_scores; require __DIR__.'/../includes/annual-result-cards.php'; ?>
             <?php else: ?>
             <div class="row g-3">
                 <?php if ($is_annual_peer_evaluation): ?>
@@ -275,30 +256,6 @@ require_once '../includes/header.php';
     <!-- ── Tabbed Sections ──────────────────────────────────────────────── -->
     <style>
 
-        .annual-result-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
-        .annual-result-card{min-width:0;display:flex;flex-direction:column;align-items:flex-start;padding:22px;border:1px solid #dce5d7;border-radius:14px;background:#f6f9f2;box-shadow:0 3px 10px rgba(21,57,16,.04);text-align:left}
-        .annual-result-card-head{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;margin-bottom:16px}
-        .annual-result-icon{display:grid;place-items:center;width:42px;height:42px;flex:0 0 42px;border-radius:12px;background:#e1edda;color:#245523;font-size:1.2rem}
-        .annual-result-weight{font-size:.68rem;font-weight:700;color:#52694b;background:#e9f0e3;padding:5px 8px;border-radius:999px}
-        .annual-result-card h3{font-size:.85rem;font-weight:700;color:#36522e;margin:0 0 8px;line-height:1.45}
-        .annual-result-number{font-size:2.15rem;line-height:1.2;font-weight:800;color:#185425;font-variant-numeric:tabular-nums}
-        .annual-result-number>span{font-size:.75rem;font-weight:500;color:#6c7a66;margin-left:7px}
-        .annual-result-card p{font-size:.72rem;color:#6b7866;margin:10px 0 0;line-height:1.5}
-        .annual-result-card--behavior{background:#fcfaf2;border-color:#e8e0bf}
-        .annual-result-card--behavior .annual-result-icon{background:#f2ebcf;color:#92731a}
-        .annual-result-card--behavior .annual-result-weight{background:#f3edd7;color:#81671a}
-        .annual-result-card--behavior .annual-result-number{color:#816719}
-        .annual-result-card--total{background:linear-gradient(125deg,#123d28,#205b37);border-color:#1c4f31}
-        .annual-result-card--total h3,.annual-result-card--total .annual-result-number{color:#fff}
-        .annual-result-card--total .annual-result-number>span,.annual-result-card--total p{color:#d0dfce}
-        .annual-result-card--total .annual-result-icon{background:rgba(255,255,255,.12);color:#f1ce61}
-        .annual-result-card--total .annual-result-weight{background:rgba(255,255,255,.1);color:#f5dfa0}
-        .annual-result-level{display:inline-flex;align-items:center;gap:6px;font-size:.7rem;font-weight:700;padding:5px 9px;margin-top:10px;border-radius:7px;line-height:1.5;background:#e4f4e4;color:#215f2a}
-        .annual-result-level.is-needs{background:#fde7e3;color:#972f27}
-        .annual-result-level.is-meets{background:#fff1c9;color:#775600}
-        .annual-result-level.is-exceeds{background:#e0f1f5;color:#15586c}
-        @media(max-width:1050px){.annual-result-cards{gap:12px}.annual-result-card{padding:16px}.annual-result-card-head{flex-wrap:wrap}}
-        @media(max-width:600px){.annual-result-cards{grid-template-columns:1fr}.annual-result-card{padding:18px}.annual-result-card-head{margin-bottom:12px}.annual-result-number{font-size:2rem}}
         .eval-tabs-wrapper{background:#fff;border-radius:14px;border:1px solid var(--bs-border-color,#dee2e6);box-shadow:0 2px 12px rgba(0,0,0,.07);overflow:hidden;display:flex;flex-direction:column;}
         .eval-tab-nav{display:flex;gap:6px;padding:14px 16px 0;border-bottom:1px solid #e2e8f0;background:#f8fafc;flex-shrink:0;flex-wrap:wrap;}
         .eval-tab-btn{background:none;border:none;padding:8px 18px 10px;border-radius:8px 8px 0 0;font-size:.82rem;font-weight:600;color:#64748b;cursor:pointer;letter-spacing:.3px;transition:color .18s,background .18s,border-bottom .18s;border-bottom:3px solid transparent;position:relative;top:1px;}
