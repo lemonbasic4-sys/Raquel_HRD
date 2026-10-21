@@ -94,6 +94,128 @@ The performance trend code loops over available years and months, running an agg
 
 Evidence: the per-year monthly score-trend loop in [analytics.php](manager/analytics.php).
 
+### W9. CSV reimports still need broader data-protection checks
+
+The CSV template and importer now support all six education levels. Blank education fields preserve existing qualifications, sample employee codes use department prefixes, and import instructions explain that Admin provisions login accounts separately. These changes passed PHP syntax checks; an end-to-end import test has not yet established their behavior against representative employee profiles.
+
+Other profile sections still contain delete-and-reinsert operations. Reimporting a partial CSV can therefore remove information outside education. Education matching also needs tests for multiple degrees and renamed schools to establish when an import updates a record or adds another one.
+
+Evidence: [CSV importer](manager/add-employee.php), [CSV preview](manager/ajax/preview-csv.php), [downloadable template](manager/download-sample.php), and [static sample](misc/sample_employees.csv).
+
+### W10. Education analytics can count one employee in several categories
+
+The Educational Attainment query counts distinct employees within each education level. An employee with Secondary, College, and Graduate Studies records can appear in all three categories. That does not represent one highest attainment per employee, and category totals can exceed the workforce count. The current single-education-record seed does not expose this case.
+
+Evidence: the `employee_education` aggregation in [analytics.php](manager/analytics.php).
+
+## Weakness remediation checklist
+
+Unchecked tasks remain open. Checked tasks record completed changes, not proof that the whole weakness is resolved. P0 means before deployment with real employee data; P1 means before wider department rollout; P2 covers maintainability and measured performance improvements. Owners below are suggested roles, not assignments.
+
+### P0: Protect records and recovery
+
+#### W4. Deployment configuration | Open | Developer / system administrator
+
+- [ ] Move credentials into environment-specific configuration and keep secrets out of version control.
+- [ ] Replace the root connection with an application database account limited to required privileges.
+- [ ] Review the runtime `SET GLOBAL max_allowed_packet` call so normal requests do not require server-administration privileges.
+- [ ] Test login, employee updates, evaluations, and reporting with the restricted account. Use a separately controlled account for installation or migration work where required.
+
+Completion evidence: the normal application runs without root privileges, and the tested deployment configuration contains no blank database password.
+
+#### W5 / T1 / T3. Backup scheduling and restore | Open; deployment protections unverified | System administrator
+
+- [ ] Verify whether an operating-system scheduler already exists. If absent, configure backups independently of Admin page visits.
+- [ ] Define retry behavior for failed backups and test failure notifications.
+- [ ] Verify that unauthenticated requests cannot download backup files; move storage outside the web root or enforce access restrictions.
+- [ ] Define retention and keep a recovery copy separate from the application host.
+- [ ] Restore a backup into an isolated database and check employee records, accounts, evaluations, and relevant uploaded files.
+
+Completion evidence: a backup runs without an active Admin session; a simulated failure is reported; an isolated restore succeeds. Record the test date and recovery procedure.
+
+#### W7. Safe installation and updates | Open | Developer
+
+- [ ] Correct the README seed-directory reference.
+- [ ] Separate fresh-install instructions from update instructions and label destructive schema imports clearly.
+- [ ] Provide incremental migrations with preflight checks, backup instructions, and recovery steps.
+- [ ] Test migrations against a populated test database and verify that unrelated employee and evaluation records survive.
+
+Completion evidence: an existing installation can receive an update without importing the drop-and-recreate schema.
+
+#### W9. Safe CSV reimports | Partially addressed | Developer / HR tester
+
+- [x] Add Senior High School, Vocational, and Graduate Studies columns and import mappings.
+- [x] Preserve existing education when education fields are blank or absent.
+- [x] Synchronize sample CSVs, use department-prefix sample codes, and explain separate Admin account provisioning.
+- [x] Add UTF-8 BOM handling to preview and import; pass PHP syntax checks.
+- [ ] Define preserve, replace, and explicit-clear behavior for every related profile section before changing the remaining delete-and-reinsert operations.
+- [ ] Test old and new templates, blank fields, duplicate Company IDs, multiple degrees, renamed schools, and repeated imports in an isolated database.
+- [ ] Verify preview and final-import validation agree on required fields, accepted values, and rejected rows.
+- [ ] Verify failed rows roll back all their changes and that success counts reflect committed records.
+- [ ] Add a regression test that compares an existing complete profile before and after a partial reimport.
+
+Completion evidence: partial imports preserve unrelated data, repeated identical imports do not create duplicate qualifications, and invalid rows leave no partial changes. These checks do not authorize automatic creation of privileged accounts.
+
+### P1: Correct reports and verify workflows
+
+#### W1. Support and Operations grouping | Confirmed query issue | HR process owner / developer
+
+- [ ] Agree on the classification of Main Office departments, branches, and exceptional positions.
+- [ ] Replace branch-ID-presence checks with the agreed organizational mapping across summary and breakdown queries.
+- [ ] Test Main Office support employees, branch Operations employees, and unassigned records.
+
+Completion evidence: each eligible employee belongs to one defined group, and group counts reconcile with the eligible workforce total.
+
+#### W10. Educational attainment totals | Confirmed query issue | HR process owner / developer
+
+- [ ] Decide whether the chart means highest completed attainment or all recorded education; document treatment of unfinished studies and missing data.
+- [ ] If highest attainment is intended, select one qualifying level per employee using an explicit ordering.
+- [ ] Add fixtures with several education records per employee and compare chart totals with the underlying employee list.
+
+Completion evidence: chart labels match the calculation, with one employee counted once if the chart reports highest attainment.
+
+#### W2 / T5. Role and department journeys | Regression coverage needed | HR testers / developer
+
+- [ ] Test annual and probationary journeys for HR Manager, HR Supervisor, HR Staff, employee, and President/CEO where authorized.
+- [ ] Verify notification and dashboard links open the correct category, employee, and review step.
+- [ ] Cover cross-department heads, changed reporting lines, and multiple holders of a position.
+- [ ] Verify blank head-rating overrides use employee defaults and submitted reviews remain locked.
+- [ ] Test cycle completion, history placement, and a newly regularized participant joining after finalization.
+- [ ] Check provisional notices, rater counts, final-score updates, and print-form names/comments against saved records.
+- [ ] Verify unauthorized users cannot view or submit another employee's restricted review through a direct URL.
+- [ ] Record results by role and department, including expected outcome, actual outcome, and any unresolved defect.
+
+Completion evidence: the agreed role/department matrix passes with no unresolved blocking routing, authorization, or scoring defects. Earlier fixes alone do not establish this coverage.
+
+#### W6. Representative demographic fixtures | Partially addressed | Developer / HR tester
+
+- [x] Vary seeded hire dates, genders, and education levels.
+- [ ] Add varied birth dates and civil statuses to synthetic profiles, keeping age and employment dates plausible.
+- [ ] Add missing-data cases and multiple education records without changing real employee profiles for demonstration purposes.
+- [ ] Verify chart counts and percentages against the fixture's expected results.
+
+Completion evidence: fixtures exercise the intended age and civil-status categories, missing data, and highest-education rules with documented expected counts.
+
+### P2: Reduce maintenance cost and measure performance
+
+#### W3. Shared components and large PHP files | Open | Developer
+
+- [ ] Identify duplicated review panels, employee views, navigation, and notification-link logic.
+- [ ] Extract one shared component at a time, preserving role authorization and existing behavior.
+- [ ] Separate analytics queries and evaluation business rules from page rendering where practical.
+- [ ] Run role-specific regression checks after each extraction, including narrow-screen layouts.
+
+Completion evidence: targeted pages share the same implementation and pass the same behavior checks; file-size reduction alone is insufficient.
+
+#### W8. Analytics query volume | Measurement needed | Developer
+
+- [ ] Measure query count and page response time with several years of representative test data.
+- [ ] Replace per-month queries with grouped aggregates where the measurements justify it.
+- [ ] Inspect query plans before adding indexes and compare old/new results for identical filters.
+- [ ] Record before-and-after timings and an agreed response-time target.
+
+Completion evidence: reported values remain unchanged and measurements demonstrate whether the target is met. No production slowdown has been established by this assessment.
+
 ## Opportunities
 
 ### O1. Validate and extend workflows across departments
