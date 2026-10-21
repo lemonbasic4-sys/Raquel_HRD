@@ -42,6 +42,7 @@ if (!$headers) {
     exit;
 }
 
+$headers[0] = preg_replace('/^\xEF\xBB\xBF/', '', $headers[0]);
 $headerMap = array_flip(array_map('trim', $headers));
 
 // ── Date parser ───────────────────────────────────────────────────────────────

@@ -25,7 +25,7 @@ $pds_sections = [
     "Mother's Maiden Name" => ['Mother Maiden Surname', 'Mother First Name', 'Mother Middle Name', 'Mother Occupation'],
     'Children' => ['Child 1 Surname', 'Child 1 First Name', 'Child 1 Middle Name', 'Child 1 Birthday'],
     'Siblings' => ['Sibling 1 Surname', 'Sibling 1 First Name', 'Sibling 1 Middle Name', 'Sibling 1 Birthday'],
-    'Educational Background' => ['Elementary School', 'Elementary Year Graduated', 'High School', 'High School Year Graduated', 'College School', 'College Degree/Course', 'College Year Graduated'],
+    'Educational Background' => ['Elementary School', 'Elementary Year Graduated', 'High School', 'High School Year Graduated', 'Senior High School', 'Senior High School Degree/Course', 'Senior High School Year Graduated', 'Vocational School', 'Vocational Degree/Course', 'Vocational Year Graduated', 'College School', 'College Degree/Course', 'College Year Graduated', 'Graduate Studies School', 'Graduate Studies Degree/Course', 'Graduate Studies Year Graduated'],
     'Service Eligibility / Licenses' => ['Eligibility License Title 1', 'Eligibility License No 1'],
     'Special Skills & Hobbies' => ['Skill/Hobby 1'],
     'Non-Academic Distinctions / Recognition' => ['Recognition 1 Title'],
@@ -44,6 +44,9 @@ fputcsv($output, $headers);
 // ── LEGEND / HINT ROW ────────────────────────────────────────────────────────
 // This row explains accepted values for key fields. DELETE THIS ROW before uploading.
 $legend = array_fill_keys($headers, '');
+$legend['Company ID'] = 'Unique employee code, e.g. HRD-001 or AP-001. Existing codes update that employee. Login accounts are provisioned separately by Admin.';
+$legend['Job Title'] = '[Required] Use the configured job title';
+$legend['Graduate Studies School'] = 'Optional. Blank education fields preserve existing records on reimport.';
 $legend['First Name']                      = '[Required] Employee first name';
 $legend['Last Name']                       = '[Required] Employee last name';
 $legend['Birthday']                        = '[Required] Format: MM/DD/YYYY';
@@ -128,7 +131,7 @@ $samples = [
         'SSS No' => '01-2345678-9', 'PhilHealth No' => '12-345678901-2',
         'Pag-IBIG No' => '1234-5678-9012', 'TIN No' => '123-456-789-000',
         'Mobile No' => '09171000001', 'Email' => 'maria.reyes@example.com',
-        'Company ID' => 'EMP-2026-0001', 'Hire Date' => '01/15/2020',
+        'Company ID' => 'HRD-001', 'Hire Date' => '01/15/2020',
         'Job Title' => 'HR Specialist', 'Rank' => 'R&F', 'Department' => 'Human Resources',
         'Employment Status' => 'Regular',
         'Contract Start Date' => '', 'Contract End Date' => '',
@@ -147,7 +150,7 @@ $samples = [
         'SSS No' => '01-3456789-0', 'PhilHealth No' => '12-456789012-3',
         'Pag-IBIG No' => '2345-6789-0123', 'TIN No' => '',
         'Mobile No' => '09171000002', 'Email' => 'carlo.santos@example.com',
-        'Company ID' => 'EMP-2026-0002', 'Hire Date' => '06/01/2026',
+        'Company ID' => 'HRD-002', 'Hire Date' => '06/01/2026',
         'Job Title' => 'OJT - Business Administration', 'Rank' => 'R&F',
         'Department' => 'Human Resources',
         'Employment Status' => 'OJT',
@@ -166,7 +169,7 @@ $samples = [
         'SSS No' => '01-4567890-1', 'PhilHealth No' => '12-567890123-4',
         'Pag-IBIG No' => '3456-7890-1234', 'TIN No' => '234-567-890-000',
         'Mobile No' => '09171000003', 'Email' => 'ana.bautista@example.com',
-        'Company ID' => 'EMP-2026-0003', 'Hire Date' => '05/01/2026',
+        'Company ID' => 'OPS-001', 'Hire Date' => '05/01/2026',
         'Job Title' => 'Operations Trainee', 'Rank' => 'R&F',
         'Department' => 'Operations',
         'Employment Status' => 'Trainee',
@@ -185,7 +188,7 @@ $samples = [
         'SSS No' => '01-5678901-2', 'PhilHealth No' => '12-678901234-5',
         'Pag-IBIG No' => '4567-8901-2345', 'TIN No' => '345-678-901-000',
         'Mobile No' => '09171000004', 'Email' => 'ramon.cruz@example.com',
-        'Company ID' => 'EMP-2026-0004', 'Hire Date' => '03/01/2026',
+        'Company ID' => 'FIN-001', 'Hire Date' => '03/01/2026',
         'Job Title' => 'Accounting Clerk', 'Rank' => 'R&F',
         'Department' => 'Finance',
         'Employment Status' => 'Probationary',
@@ -205,7 +208,7 @@ $samples = [
         'SSS No' => '01-6789012-3', 'PhilHealth No' => '12-789012345-6',
         'Pag-IBIG No' => '5678-9012-3456', 'TIN No' => '456-789-012-000',
         'Mobile No' => '09171000005', 'Email' => 'liza.mendoza@example.com',
-        'Company ID' => 'EMP-2026-0005', 'Hire Date' => '07/01/2026',
+        'Company ID' => 'AP-001', 'Hire Date' => '07/01/2026',
         'Job Title' => 'Project Coordinator', 'Rank' => 'Supervisor',
         'Department' => 'Acquired Properties',
         'Employment Status' => 'Project Based',

@@ -70,6 +70,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['import_csv'])) {
     }
 
     // Map headers to indices
+    $headers[0] = preg_replace('/^\xEF\xBB\xBF/', '', $headers[0]);
     $headerMap = array_flip(array_map('trim', $headers));
 
     $created = 0;
@@ -582,29 +583,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['import_csv'])) {
                 $stmt->execute(); $stmt->close();
             }
 
-            // Education
-            $conn->query("DELETE FROM employee_education WHERE employee_id = $eid");
-            $elem_school = $getV('Elementary School', 62);
-            $elem_grad   = $getV('Elementary Year Graduated', 63);
-            if (!empty($elem_school)) {
-                $stmt = $conn->prepare("INSERT INTO employee_education (employee_id, education_level, school_name, degree_course, period_from, period_to, highest_level_units, year_graduated, honors_received) VALUES (?, 'Elementary', ?, '', NULL, NULL, '', ?, '')");
-                $stmt->bind_param("iss", $eid, $elem_school, $elem_grad);
-                $stmt->execute(); $stmt->close();
-            }
-            $hs_school = $getV('High School', 64);
-            $hs_grad   = $getV('High School Year Graduated', 65);
-            if (!empty($hs_school)) {
-                $stmt = $conn->prepare("INSERT INTO employee_education (employee_id, education_level, school_name, degree_course, period_from, period_to, highest_level_units, year_graduated, honors_received) VALUES (?, 'Secondary', ?, '', NULL, NULL, '', ?, '')");
-                $stmt->bind_param("iss", $eid, $hs_school, $hs_grad);
-                $stmt->execute(); $stmt->close();
-            }
-            $col_school = $getV('College School', 66);
-            $col_course = $getV('College Degree/Course', 67);
-            $col_grad   = $getV('College Year Graduated', 68);
-            if (!empty($col_school)) {
-                $stmt = $conn->prepare("INSERT INTO employee_education (employee_id, education_level, school_name, degree_course, period_from, period_to, highest_level_units, year_graduated, honors_received) VALUES (?, 'College', ?, ?, NULL, NULL, '', ?, '')");
-                $stmt->bind_param("isss", $eid, $col_school, $col_course, $col_grad);
-                $stmt->execute(); $stmt->close();
+            // Merge supplied schools only: blank/omitted levels never erase qualifications.
+            $educationColumns = [
+                'Elementary' => ['Elementary School', null, 'Elementary Year Graduated'],
+                'Secondary' => ['High School', null, 'High School Year Graduated'],
+                'Senior High School' => ['Senior High School', 'Senior High School Degree/Course', 'Senior High School Year Graduated'],
+                'Vocational' => ['Vocational School', 'Vocational Degree/Course', 'Vocational Year Graduated'],
+                'College' => ['College School', 'College Degree/Course', 'College Year Graduated'],
+                'Graduate Studies' => ['Graduate Studies School', 'Graduate Studies Degree/Course', 'Graduate Studies Year Graduated'],
+            ];
+            foreach ($educationColumns as $level => [$schoolColumn, $courseColumn, $yearColumn]) {
+                $school = $getV($schoolColumn);
+                if ($school === '') continue;
+                $course = $courseColumn ? $getV($courseColumn) : '';
+                $year = $getV($yearColumn);
+                $stmt = $conn->prepare("SELECT education_id FROM employee_education WHERE employee_id = ? AND education_level = ? AND school_name = ? AND (degree_course = ? OR ? = '') ORDER BY education_id LIMIT 1");
+                $stmt->bind_param("issss", $eid, $level, $school, $course, $course);
+                $stmt->execute();
+                $education = $stmt->get_result()->fetch_assoc();
+                $stmt->close();
+                if ($education) {
+                    $stmt = $conn->prepare("UPDATE employee_education SET degree_course = COALESCE(NULLIF(?, ''), degree_course), year_graduated = COALESCE(NULLIF(?, ''), year_graduated) WHERE education_id = ?");
+                    $stmt->bind_param("ssi", $course, $year, $education['education_id']);
+                } else {
+                    $stmt = $conn->prepare("INSERT INTO employee_education (employee_id, education_level, school_name, degree_course, year_graduated) VALUES (?, ?, ?, ?, NULLIF(?, ''))");
+                    $stmt->bind_param("issss", $eid, $level, $school, $course, $year);
+                }
+                $stmt->execute();
+                $stmt->close();
             }
 
             // Work Experience
@@ -753,7 +759,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['import_csv'])) {
             }
             // ─────────────────────────────────────────────────────────────────
 
-            // Auto-provision portal account and check for governance title linkage
+            // Link governance approvers; login accounts remain Admin-provisioned.
             autoDetectAndLinkGovernanceApprover($conn, $eid);
 
             logAudit($conn, $_SESSION['user_id'], ($existing_id ? 'UPDATE' : 'CREATE'), 'Employee', $eid, "Imported/Updated via CSV: $first_name $last_name");
@@ -1520,7 +1526,7 @@ $stepLabels = [
                     <div class="alert alert-info d-flex align-items-center py-2 px-3 small mb-0 rounded-3">
                         <i class="fas fa-info-circle me-2 fs-5 flex-shrink-0"></i>
                         <div>
-                            Need the official template?
+                            Use Company ID codes such as HRD-001 or AP-001. Login accounts are created separately by Admin. Blank education fields preserve existing qualifications; other profile sections may be replaced on reimport. Need the official template?
                             <a href="<?php echo BASE_URL; ?>/manager/download-sample.php" class="alert-link fw-semibold">Download CSV Template</a> with sample records and column guidelines.
                         </div>
                     </div>
