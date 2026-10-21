@@ -42,13 +42,13 @@ Every employee's **Employee Portal username equals their employee code**, shown 
 
 | Work role | Username |
 | --- | --- |
-| Admin | `TDB-admin` |
+| Admin | `admin` |
 | HR Manager | `elena.delgado` |
 | HR Supervisor | `patricia.gomez` |
 | HR Staff | `miguel.torres` |
 | President and CEO | `isabella.cruz` |
 
-Work-role accounts use `firstname.lastname`; Employee Portal accounts across every department retain their department codes (for example, `HRD-001` and `AP-001`). Other departments use their Employee Portal accounts for evaluation work; no unsupported HRIS roles are created. The standalone Admin username remains `TDB-admin`.
+Work-role accounts use `firstname.lastname`; Employee Portal accounts across every department retain their department codes (for example, `HRD-001` and `AP-001`). Other departments use their Employee Portal accounts for evaluation work; no unsupported HRIS roles are created. The standalone Admin username is `admin`.
 
 The Admin account is standalone (`employee_id = NULL`): it has no employee profile and does not participate in department evaluations. Its password is also `password`.
 
@@ -100,7 +100,21 @@ These usernames apply to a fresh import. Rerunning the seed preserves existing a
 | Purchasing | Flora Mendoza | Procurement Supervisor I | `PUR-001` | `GS-002` |
 | Purchasing | Gino Santos | Purchasing Staff I | `PUR-002` | `PUR-001` |
 
-Employee-facing IDs and portal usernames use department initials plus a three-digit sequence (for example, `HRD-001` and `AP-001`). Internal numeric database keys remain `20000 + job_title_id` to preserve relational links. All employees are active, Regular, Full-time, based at Main Office (branch 102), and hired January 6, 2020.
+Employee-facing IDs and portal usernames use department initials plus a three-digit sequence (for example, `HRD-001` and `AP-001`). Internal numeric database keys remain `20000 + job_title_id` to preserve relational links. All employees are active, Regular, Full-time, based at Main Office (branch 102).
+
+Hire dates vary across **2014–2026**, with 11 hires spread across January–October 2026, including two in October, as of October 21, 2026. Senior reporting levels generally joined earlier than their staff. Mock previous employment ends the day before each hire date. The exact dates are listed in the SQL roster and stay fixed on reruns; they are synthetic dates for analytics, not actual employment histories. Recent employees are deliberately seeded directly as Regular for annual-workflow tests; this does not simulate their probation/regularization process.
+
+### Update an already imported baseline without resetting it
+
+Fresh imports already use the varied dates. If your existing 41 seeded employees still have the old January 6, 2020 hire date, run only:
+
+```powershell
+& "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source test_database/update_seeded_hire_dates.sql;"
+```
+
+This updates only exact seeded employee ID/code matches with the old hire date, plus their untouched mock previous-employment dates. Existing custom dates, accounts, statuses, evaluation records, and reporting lines are preserved. Rerunning this update changes zero already-updated rows. Do not reimport the base schema for this change.
+
+`restore_seeded_hire_dates_20261021.sql` is the recovery script for the original dates, captured before this update. It is **not** part of the normal import sequence.
 
 The seed follows the existing position hierarchy, including cross-department heads: IT Manager reports to VP Operations, and Procurement Supervisor reports to GS Manager. Audit Manager II and Compliance Supervisor II are included because existing staff/supervisor chains require them. Departments without a manager position use their configured officer/supervisor; no nonexistent positions are invented. This seeds representative major levels, not every job grade or every branch.
 
