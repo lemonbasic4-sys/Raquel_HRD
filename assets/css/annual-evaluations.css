@@ -225,3 +225,16 @@
 .annual-page .annual-submitted-plan-table th:nth-child(2){width:34%}
 .annual-page .annual-submitted-plan-table th:last-child{width:23%}
 .annual-page .annual-submitted-plan-table .badge{font-size:.73rem;font-weight:500;border-radius:5px;white-space:normal;line-height:1.5}
+.annual-page .annual-submission-heading{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:20px}
+.annual-page .annual-submission-heading>div{min-width:0}
+.annual-page .annual-submission-heading>.annual-status-pill{display:inline-flex;flex:0 0 auto;width:auto;max-width:100%;align-self:center;white-space:nowrap;padding:5px 12px}
+.annual-page .annual-rating-employee-header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;padding-bottom:16px;margin-bottom:16px;border-bottom:1px solid #e2e8f0}
+.annual-page .annual-rating-employee-header>div{min-width:0}
+.annual-page .annual-rating-employee-header h2{margin-bottom:5px;overflow-wrap:anywhere}
+.annual-page .annual-rating-employee-header p{font-size:.85rem;color:#64748b;margin:0}
+.annual-page .annual-rating-employee-header>.annual-status-pill{flex:0 0 auto;width:auto;max-width:100%;white-space:normal}
+.annual-page .annual-peer-rate-view #annualRatingProgress{display:inline-flex;align-items:center;padding:7px 12px;border:1px solid #dce6d5;border-radius:8px;color:#28531d;background:#f4f8ef;font-size:.8rem}
+.annual-page .annual-peer-rating-section{margin-top:18px;padding:20px;border:1px solid #e2e8f0;border-radius:12px;background:#fff;min-width:0}
+.annual-page .annual-peer-rating-section .annual-number::placeholder{font-size:.85rem;font-weight:500;color:#64748b;opacity:1}
+.annual-page .annual-peer-rate-view .annual-rating-step-actions{padding-top:18px;margin-top:18px;border-top:1px solid #e2e8f0}
+@media(max-width:640px){.annual-page .annual-peer-rating-section{padding:12px}.annual-page .annual-peer-rate-view .annual-rating-step-actions{flex-direction:column;align-items:stretch}.annual-page .annual-peer-rate-view .annual-rating-step-actions .btn{width:100%;white-space:normal}}

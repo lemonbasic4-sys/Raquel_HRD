@@ -13,6 +13,8 @@ if ($_SERVER['REQUEST_METHOD']==='GET' && !$annual_in_performance_page
     header('Location: '.annualUrl($actor, $_GET ? '?'.http_build_query($_GET) : '')); exit;
 }
 $view = (string)($_GET['view'] ?? 'list');
+$historyView=$view==='history';
+if ($historyView) $view='peers';
 $evaluationId = (int)($_GET['evaluation_id'] ?? 0);
 if (!$evaluationId && $view==='list') $view='peers';
 $cycleId = (int)($_GET['cycle_id'] ?? 0);
@@ -44,7 +46,8 @@ $cycles = annualQuery($conn,"SELECT DISTINCT c.*,d.department_name FROM annual_e
     JOIN departments d ON d.department_id=c.department_id JOIN annual_evaluation_members m ON m.cycle_id=c.cycle_id
     WHERE m.employee_id=? OR m.reviewer_position_id=?
     ORDER BY c.period_end DESC,c.cycle_id DESC",[(int)$actor['employee_id'],(int)$actor['job_title_id']]);
-if (!$cycleId && $cycles) $cycleId=(int)$cycles[0]['cycle_id'];
+$cycleOptions=array_values(array_filter($cycles,static fn($c)=>!empty($c['completed_at'])===$historyView));
+if (!$cycleId && $cycleOptions) $cycleId=(int)$cycleOptions[0]['cycle_id'];
 $member=null; $named=false; $canFinalize=false;
 if ($evaluationId) {
     $member=annualMember($conn,$evaluationId);
@@ -57,6 +60,15 @@ if ($evaluationId) {
     // authorization for viewing the evaluation itself separate from rating/finalization.
     $named=(int)$actor['employee_id']!==(int)$member['employee_id'];
     $canFinalize=annualCanFinalize($conn,$actor,$member);
+}
+// Existing inbox links may still target the retired consolidation review.
+if ($_SERVER['REQUEST_METHOD']==='GET' && $member && $canFinalize && $view==='review'
+    && in_array($actor['role'],['HR Manager','HR Supervisor'],true)) {
+    $hasHeadReview=(bool)annualQuery($conn,'SELECT 1 FROM annual_peer_submissions WHERE cycle_id=? AND target_employee_id=? AND rater_employee_id=? LIMIT 1',
+        [(int)$member['cycle_id'],(int)$member['employee_id'],(int)$actor['employee_id']]);
+    if ($hasHeadReview || !(int)$member['current_version']) {
+        header('Location: '.annualUrl($actor,'?view='.($hasHeadReview ? 'head-review' : 'rate').'&evaluation_id='.$evaluationId)); exit;
+    }
 }
 $headReviewSubmission=null;
 $headReviewKra=[];
@@ -72,6 +84,16 @@ if ($view==='head-review') {
 $cycle=null;
 foreach ($cycles as $c) if ((int)$c['cycle_id']===$cycleId) $cycle=$c;
 if ($cycleId && !$cycle) { http_response_code(403); exit('This department cycle is unavailable.'); }
+if ($cycle && !empty($cycle['completed_at'])) {
+    $historyView=true;
+    $cycleOptions=array_values(array_filter($cycles,static fn($c)=>!empty($c['completed_at'])));
+}
+if ($historyView && $cycle && empty($cycle['completed_at']) && !$evaluationId) {
+    header('Location: '.annualUrl($actor,'?view=peers&cycle_id='.$cycleId)); exit;
+}
+if ($cycle && !empty($cycle['completed_at']) && $view==='rate') {
+    header('Location: '.annualUrl($actor,'?view='.($canFinalize ? 'head-review' : 'review').'&evaluation_id='.$evaluationId)); exit;
+}
 $members=$cycle ? annualQuery($conn,"SELECT m.*,e.first_name,e.last_name,ev.total_score,
         (SELECT COUNT(*) FROM annual_peer_submissions s WHERE s.cycle_id=m.cycle_id AND s.target_employee_id=m.employee_id) AS received,
         (SELECT COUNT(*) FROM annual_peer_submissions s WHERE s.cycle_id=m.cycle_id AND s.target_employee_id=m.employee_id AND s.rater_employee_id=?) AS rated
@@ -81,7 +103,7 @@ $members=$cycle ? annualQuery($conn,"SELECT m.*,e.first_name,e.last_name,ev.tota
 $own=array_values(array_filter($members,static fn($m)=>(int)$m['employee_id']===(int)$actor['employee_id']));
 $directReportCycle=(bool)array_filter($members,static fn($m)=>(int)$m['employee_id']!==(int)$actor['employee_id'] && (int)$m['reviewer_position_id']>0 && (int)$m['reviewer_position_id']===(int)$actor['job_title_id']);
 $isDepartmentPeer=$own && (int)$cycle['department_id']===(int)$actor['department_id'];
-if (($view==='rate' && !$isDepartmentPeer) || ($view==='peers' && !$isDepartmentPeer && !$directReportCycle && $cycle)) {
+if (($view==='rate' && !$isDepartmentPeer && !$canFinalize) || ($view==='peers' && !$isDepartmentPeer && !$directReportCycle && $cycle)) {
     http_response_code(403); exit('360 ratings are available only within your own department cycle.');
 }
 if ($view==='rate') {
@@ -113,33 +135,36 @@ require_once __DIR__ . '/header.php';
     <?php if ($error): ?><div role="alert" class="alert alert-danger"><?php echo e($error); ?></div><?php endif; ?>
     <?php if ($cycles): ?>
     <nav class="annual-workflow-nav d-flex flex-wrap gap-2 mb-4" aria-label="Annual workflow">
-        <a class="btn btn-outline-success active" aria-current="page" href="<?php echo annualUrl($actor,'?view=peers&cycle_id='.$cycleId); ?>"><i class="fas fa-users me-2" aria-hidden="true"></i>360 · Department peers</a>
+        <a class="btn btn-outline-success <?php echo !$historyView ? 'active' : ''; ?>" <?php echo !$historyView ? 'aria-current="page"' : ''; ?> href="<?php echo annualUrl($actor,'?view=peers'); ?>"><i class="fas fa-users me-2" aria-hidden="true"></i>360 · Department peers</a>
+        <a class="btn btn-outline-success <?php echo $historyView ? 'active' : ''; ?>" <?php echo $historyView ? 'aria-current="page"' : ''; ?> href="<?php echo annualUrl($actor,'?view=history'); ?>"><i class="fas fa-history me-2" aria-hidden="true"></i>Annual Evaluation History</a>
     </nav>
     <?php endif; ?>
-    <?php if (!$cycles): ?>
+    <?php if (!$cycles || (!$evaluationId && !$cycleOptions)): ?>
         <div class="annual-note-card" role="status">
             <i class="fas fa-layer-group annual-note-icon" aria-hidden="true"></i>
-            <h2 class="h5 fw-bold">No annual evaluations submitted yet</h2>
-            <p class="mb-0">Annual cycles appear when regular employees submit their Annual self-rating. Use the same period dates across the department's position-specific templates.</p>
+            <h2 class="h5 fw-bold"><?php echo $historyView ? 'No completed Annual cycles yet' : 'No active Annual evaluations'; ?></h2>
+            <p class="mb-0"><?php echo $historyView ? 'Completed department cycles appear here after all required approvals and 360 ratings are submitted.' : 'Submitted Annual cycles appear here while reviews and ratings are in progress. Completed cycles are available in Annual Evaluation History.'; ?></p>
         </div>
     <?php elseif (!$evaluationId): ?>
         <form class="content-card annual-cycle-filter p-3 mb-4 d-flex gap-2 flex-wrap" method="get">
             <?php if ($annual_in_performance_page): ?><input type="hidden" name="category" value="regular"><?php endif; ?>
-            <input type="hidden" name="view" value="<?php echo e($view); ?>">
+            <input type="hidden" name="view" value="<?php echo $historyView ? 'history' : e($view); ?>">
             <label for="annualCycle" class="align-self-center">Department / period</label>
             <select id="annualCycle" name="cycle_id" class="form-select annual-cycle">
-            <?php foreach ($cycles as $c): ?>
+            <?php foreach ($cycleOptions as $c): ?>
                 <option value="<?php echo (int)$c['cycle_id']; ?>" <?php echo (int)$c['cycle_id']===$cycleId ? 'selected' : ''; ?>><?php echo e($c['department_name'].' · '.$c['period_start'].' to '.$c['period_end']); ?></option>
             <?php endforeach; ?>
             </select><button class="btn btn-success">Show cycle</button>
         </form>
-        <?php if ($view==='peers'): ?>
+        <?php if ($historyView): ?>
+            <div class="alert alert-success" role="status"><i class="fas fa-check-circle me-2" aria-hidden="true"></i>All required Annual approvals and 360 ratings are complete. This cycle is archived for viewing. Completed <?php echo e($cycle['completed_at']); ?>.</div>
+        <?php elseif ($view==='peers'): ?>
             <div class="alert alert-info">Rate coworkers on Core Behaviors &amp; Values. For your direct reports, review KRA and submit your Core Values rating on the same screen. Your self-rating is included once. Confirmed peer ratings are locked.</div>
             <?php if (!annualCanRate($actor)): ?><div class="alert alert-warning">HR department peer ratings are completed through your HRIS account. Your Employee Portal remains available for self-rating and your results.</div><?php endif; ?>
             <?php if ($own && !$own[0]['evaluation_id']): ?><div class="alert alert-warning"><?php echo $actor['role']==='HR Manager' ? 'Your own Annual self-rating is pending. You may rate submitted department evaluations now and complete your self-rating separately.' : 'Your own Annual self-rating is pending. Direct-report Rate & Review remains available; submit your self-rating before rating other coworkers.'; ?></div><?php endif; ?>
         <?php endif; ?>
         <div class="content-card p-3">
-            <header class="annual-section-heading <?php echo $view==='peers' ? 'annual-peer-heading' : ''; ?>"><div><h2 class="h5 mb-1"><?php echo $view==='peers' ? '360 Rating — Department Peers' : 'Annual Evaluation Progress'; ?></h2><p class="text-muted small mb-0"><?php echo $view==='peers' ? 'Rate your coworkers on the eight Core Behaviors & Values items.' : 'Review submitted self-ratings, department 360 participation, and annual results.'; ?></p></div>
+            <header class="annual-section-heading <?php echo $view==='peers' ? 'annual-peer-heading' : ''; ?>"><div><h2 class="h5 mb-1"><?php echo $historyView ? 'Annual Evaluation History' : ($view==='peers' ? '360 Rating — Department Peers' : 'Annual Evaluation Progress'); ?></h2><p class="text-muted small mb-0"><?php echo $historyView ? 'Completed department evaluations and their approved results. View only.' : ($view==='peers' ? 'Rate your coworkers on the eight Core Behaviors & Values items.' : 'Review submitted self-ratings, department 360 participation, and annual results.'); ?></p></div>
                 <?php if ($view==='peers'): ?>
                 <div class="annual-peer-size">
                     <div class="package-stat" aria-label="Department size: <?php echo count($members); ?> employees in this Annual cycle">
@@ -170,11 +195,13 @@ require_once __DIR__ . '/header.php';
                     <?php endif; ?>
                     <td><span class="annual-status-pill <?php echo $m['revision_pending'] ? 'is-revision' : ($m['current_version'] ? 'is-complete' : 'is-pending'); ?>"><?php echo e($state); ?></span>
                         <?php if ($m['current_version']): ?><div class="small mt-1">Current final: <?php echo number_format((float)$m['total_score'],2); ?></div><?php endif; ?></td>
-                    <td><?php if ($view==='peers' && $isOwnRow): ?>
+                    <td><?php if ($historyView && $target): ?>
+                        <a class="btn btn-sm btn-outline-success" href="<?php echo annualUrl($actor,'?view='.(annualCanFinalize($conn,$actor,$target) && $m['rated'] ? 'head-review' : 'review').'&evaluation_id='.(int)$m['evaluation_id']); ?>">View completed evaluation</a>
+                    <?php elseif ($view==='peers' && $isOwnRow): ?>
                         <span class="annual-roster-action-muted"><?php echo $m['evaluation_id'] ? 'Cannot rate yourself' : 'Your self-rating is not yet submitted'; ?></span>
                     <?php elseif (!$m['evaluation_id']): ?>
                         <span class="annual-roster-action-muted">Awaiting employee self-rating</span>
-                    <?php elseif ($view==='peers' && $isDepartmentPeer && annualCanRate($actor) && $m['evaluation_id']): ?>
+                    <?php elseif ($view==='peers' && ($isDepartmentPeer || ($target && annualCanFinalize($conn,$actor,$target))) && annualCanRate($actor) && $m['evaluation_id']): ?>
                         <?php if (empty($own[0]['evaluation_id']) && !annualCanRateBeforeSelf($conn,$actor,$target)): ?>
                             <button class="btn btn-sm btn-outline-secondary" type="button" disabled aria-disabled="true" title="Submit your Annual self-rating first to unlock peer ratings.">Self-rating required</button>
                         <?php elseif (annualCanFinalize($conn,$actor,$target) && $m['rated']): ?>
@@ -198,7 +225,7 @@ require_once __DIR__ . '/header.php';
         </table></div></div>
     <?php elseif ($view==='head-review'): $headReviewScores=json_decode($headReviewSubmission['scores_json'],true) ?: []; $headReviewSelf=json_decode($member['self_values_json'] ?? '[]',true) ?: []; $headReviewScore=annualCalculate($headReviewKra,$headReviewScores,[]); ?>
         <section class="content-card p-4 annual-head-review-view">
-            <div class="annual-peer-results-header">
+            <div class="annual-submission-heading">
                 <div><p class="small text-uppercase mb-1">Immediate-head submission · View only</p><h2 class="h4 mb-1"><?php echo e($member['first_name'].' '.$member['last_name']); ?></h2>
                     <p class="mb-0"><?php echo e($member['position_name'].' · '.$member['period_start'].' to '.$member['period_end']); ?></p></div>
                 <span class="annual-status-pill is-complete">Submitted · Locked</span>
@@ -264,9 +291,12 @@ require_once __DIR__ . '/header.php';
             <a class="btn btn-outline-success mt-4" href="<?php echo annualUrl($actor,'?view=peers&amp;cycle_id='.$cycleId); ?>">Back to Department Peers</a>
         </section>
     <?php elseif ($view==='rate'): ?>
-        <section class="content-card p-4">
-            <h2 class="h4"><?php echo e($member['first_name'].' '.$member['last_name']); ?></h2>
-            <p><?php echo e($member['position_name']); ?> · <?php echo e($member['period_start'].' to '.$member['period_end']); ?></p>
+        <section class="content-card p-4 annual-rate-view <?php echo !$canFinalize ? 'annual-peer-rate-view' : ''; ?>">
+            <header class="annual-rating-employee-header">
+                <div><h2 class="h4"><?php echo e($member['first_name'].' '.$member['last_name']); ?></h2>
+            <p><?php echo e($member['position_name']); ?> · <?php echo e($member['period_start'].' to '.$member['period_end']); ?></p></div>
+                <span class="annual-status-pill <?php echo $submitted ? 'is-complete' : 'is-self'; ?>"><i class="fas fa-users me-1" aria-hidden="true"></i><?php echo $submitted ? 'Submitted · Locked' : ($canFinalize ? 'Immediate-head review' : 'Department peer rating'); ?></span>
+            </header>
             <p id="annualRatingProgress" class="small fw-bold" aria-live="polite"></p>
             <?php if ($submitted): ?><div class="alert alert-success">Submitted and locked. These ratings cannot be edited.</div><?php endif; ?>
             <form method="post" id="annualRatingForm" data-draft-key="annual-rating-overrides-v3-<?php echo (int)$actor['user_id']; ?>-<?php echo $evaluationId; ?>-<?php echo substr(hash('sha256',json_encode([$member['employee_id'],$member['evaluation_created_at'],$member['evaluation_submitted_at'],$member['period_start'],$member['period_end']])),0,24); ?>" data-resume-tab="<?php echo $_SERVER['REQUEST_METHOD']==='POST' ? '1' : '0'; ?>" data-submitted="<?php echo $submitted ? '1' : '0'; ?>" data-override-only="<?php echo $canFinalize && !$submitted ? '1' : '0'; ?>">
@@ -295,18 +325,20 @@ require_once __DIR__ . '/header.php';
                 <?php elseif ($canFinalize): ?>
                     <a class="btn btn-outline-success mb-3" href="<?php echo annualUrl($actor,'?view=review&evaluation_id='.$evaluationId); ?>">Review KRA &amp; consolidate Annual result</a>
                 <?php endif; ?>
-                <?php if (!$canFinalize || $submitted): ?><h3 class="h5 annual-review-section"><span><i class="fas fa-users me-2" aria-hidden="true"></i>Core Behaviors &amp; Values · Your 360 rating</span><small>Behavior Weight: 20%</small></h3><?php endif; ?>
-                <div class="table-responsive annual-score-table-wrap"><table class="table align-middle annual-rating-table annual-score-table"><thead><tr><th>Criterion</th><th class="text-end">Employee self-rating</th><th class="text-end">Your 360 rating (1–4)</th></tr></thead><tbody>
+                <?php if (!$canFinalize || $submitted): ?><section class="annual-probation-section annual-peer-rating-section" id="annualRateCorePanel"><h3 class="h5 annual-review-section"><span><i class="fas fa-users me-2" aria-hidden="true"></i>Core Behaviors &amp; Values · Your 360 rating</span><small>Behavior Weight: 20%</small></h3><?php endif; ?>
                 <?php if ($canFinalize && !$submitted): ?><p class="small text-muted">Leave blank to retain the employee's self-rating. Enter a value only to override that item.</p><?php endif; ?>
+                <?php if (!$canFinalize && !$submitted): ?><p class="small text-muted">Enter your rating for each behavior below. Use the employee’s self-rating as a reference. All eight ratings are required.</p><?php endif; ?>
+                <div class="table-responsive annual-score-table-wrap"><table class="table align-middle annual-rating-table annual-score-table"><thead><tr><th>Criterion</th><th class="text-end">Employee self-rating</th><th class="text-end">Your 360 rating (1–4)</th></tr></thead><tbody>
                 <?php $selfValues=json_decode($member['self_values_json'] ?? '[]',true) ?: [];
                 $scores=$submitted ? json_decode($submitted['scores_json'],true) : ($_POST['scores'] ?? []);
                 foreach (annualCoreValues() as $i=>$value): ?>
                     <tr><td><strong><?php echo e($value['name']); ?></strong><small><?php echo e($value['kpi']); ?></small></td><td class="text-end"><strong><?php echo isset($selfValues[$i]) ? number_format((float)$selfValues[$i],2) : '—'; ?></strong></td><td>
-                        <input class="form-control annual-number" type="number" inputmode="decimal" min="1" max="4" step="0.01" <?php echo $canFinalize ? 'placeholder="Unchanged"' : 'required'; ?>
+                        <input class="form-control annual-number" type="number" inputmode="decimal" min="1" max="4" step="0.01" <?php echo $canFinalize ? 'placeholder="Unchanged"' : 'placeholder="1.00–4.00" required'; ?>
                             name="scores[<?php echo $i; ?>]" aria-label="Rating for <?php echo e($value['name']); ?>" data-label="<?php echo e($value['name']); ?>" data-self-rating="<?php echo e($selfValues[$i] ?? ''); ?>"
                             value="<?php echo isset($scores[$i]) && is_numeric($scores[$i]) ? e(number_format((float)$scores[$i],2,'.','')) : e($scores[$i] ?? ''); ?>" <?php echo $submitted ? 'disabled' : ''; ?>><span class="annual-rating-unit">/ 4.00</span>
                     </td></tr>
                 <?php endforeach; ?></tbody><tfoot><tr><th>Average</th><td class="text-end"><strong><?php echo count($selfValues) ? number_format(array_sum(array_map('floatval',$selfValues))/count($selfValues),2) : '—'; ?></strong><small>Self-rating</small></td><td class="text-end"><strong id="annualPeerRatingAverage">—</strong><small>Your 360</small></td></tr></tfoot></table></div>
+                <?php if (!$canFinalize || $submitted): ?></section><?php endif; ?>
                 <?php if ($canFinalize && !$submitted): ?><div class="annual-rating-step-actions"><button class="btn btn-outline-success" type="button" id="annualRateCoreBack" data-annual-tab="#annualRateKraPanel" aria-controls="annualRateKraPanel"><i class="fas fa-arrow-left me-2" aria-hidden="true"></i>Back to KRA</button><button class="btn btn-success" type="button" id="annualRateCoreNext" data-annual-tab="#annualRatePlanPanel" aria-controls="annualRatePlanPanel">Next: Developmental Plan <i class="fas fa-arrow-right ms-2" aria-hidden="true"></i></button></div><?php endif; ?>
                 <?php if ($canFinalize && !$submitted): ?></div>
                     <div class="tab-pane annual-probation-section" id="annualRatePlanPanel" role="tabpanel" aria-labelledby="annualRatePlanTab" tabindex="0">
@@ -349,7 +381,7 @@ require_once __DIR__ . '/header.php';
                         </div>
                         <div class="annual-rating-step-actions"><button class="btn btn-outline-success" type="button" id="annualRateReviewBack" data-annual-tab="#annualRatePlanPanel" aria-controls="annualRatePlanPanel"><i class="fas fa-arrow-left me-2" aria-hidden="true"></i>Back to Developmental Plan</button><button class="btn btn-success" type="button" id="annualReviewRatings">Review &amp; submit ratings</button></div>
                     </div></div><?php endif; ?>
-                <?php if (!$submitted && !$canFinalize): ?><button class="btn btn-success" type="button" id="annualReviewRatings">Review &amp; submit ratings</button><?php endif; ?>
+                <?php if (!$canFinalize): ?><div class="annual-rating-step-actions"><a class="btn btn-outline-success" href="<?php echo e(annualUrl($actor,'?view=peers&cycle_id='.$cycleId)); ?>"><i class="fas fa-arrow-left me-2" aria-hidden="true"></i>Back to Department Peers</a><?php if (!$submitted): ?><button class="btn btn-success" type="button" id="annualReviewRatings"><i class="fas fa-clipboard-check me-2" aria-hidden="true"></i>Review &amp; submit ratings</button><?php endif; ?></div><?php endif; ?>
             </form>
         </section>
         <div class="modal fade" id="annualRatingSummary" tabindex="-1" aria-labelledby="annualSummaryTitle" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content">
@@ -374,7 +406,7 @@ require_once __DIR__ . '/header.php';
         $submittedKraTotal=round(array_sum(array_map(static fn($row)=>(float)$row['weight']*(float)$row['self_rating']/100,$kra)),2);
         $versions=annualQuery($conn,'SELECT version_number,finalized_at,remarks,snapshot_json FROM annual_evaluation_versions WHERE member_id=? ORDER BY version_number DESC',[(int)$member['member_id']]);
         $editable=$view==='review' && $canFinalize && (!$member['current_version'] || $member['revision_pending']);
-        $expected=max(0,count($members)-1);
+        $expected=annualExpectedPeers($conn,$cycleId,(int)$member['employee_id']);
         ?>
         <?php if (!$canFinalize && $sameDepartmentPeerView): ?>
         <section class="content-card p-4 mb-4" id="annual360">
@@ -384,21 +416,16 @@ require_once __DIR__ . '/header.php';
                     <p><?php echo e($member['position_name'].' · '.$member['period_start'].' to '.$member['period_end']); ?></p>
                     <p class="small text-muted mb-0">Behavior results include the names of employees who submitted each 360 rating.</p>
                 </div>
-                <?php if (count($peers)>=$expected): ?>
-                <aside class="annual-head-review-score annual-peer-live-score p-3 rounded" aria-label="Final live annual score after all department peer ratings">
-                    <div class="annual-head-review-score-icon" aria-hidden="true"><i class="fas fa-chart-line"></i></div>
-                    <div class="annual-head-review-score-details">
-                        <div class="annual-head-review-score-kicker">All department ratings received</div>
-                        <div class="annual-head-review-score-breakdown">
-                            <div class="annual-head-review-score-part"><span>KRA <b>80%</b></span><strong><?php echo number_format($candidate['kra'],2); ?></strong></div>
-                            <i class="fas fa-plus annual-head-review-score-operator" aria-hidden="true"></i>
-                            <div class="annual-head-review-score-part annual-head-review-score-part--behavior"><span>Behavior <b>20%</b></span><strong><?php echo number_format($candidate['core'],2); ?></strong></div>
-                        </div>
-                    </div>
-                    <div class="annual-head-review-score-total"><span>Overall score</span><strong><?php echo number_format($candidate['total'],2); ?></strong><small>KRA × 80% + Behavior × 20%</small></div>
-                </aside>
-                <?php endif; ?>
             </div>
+            <?php if (count($peers)>=$expected):
+                $annualScoresApproved=$member['evaluation_status']==='Approved';
+                $annualDisplayKra=$annualScoresApproved ? (float)$member['kra_subtotal'] : $candidate['kra'];
+                $annualDisplayCore=$annualScoresApproved ? (float)$member['behavior_average'] : $candidate['core'];
+                $annualDisplayTotal=$annualScoresApproved ? (float)$member['official_score'] : $candidate['total'];
+                $annualTier=$annualDisplayTotal>=3.6 ? 'outstanding' : ($annualDisplayTotal>=2.6 ? 'exceeds' : ($annualDisplayTotal>=2 ? 'meets' : 'needs'));
+            ?>
+            <div class="mb-4"><?php require __DIR__.'/annual-result-cards.php'; ?></div>
+            <?php endif; ?>
             <div class="table-responsive annual-score-table-wrap"><table class="table align-middle annual-score-table annual-core-score-table"><thead><tr><th>Criterion</th><th class="text-end">Weight</th><th class="text-end">Self-rating</th><?php foreach ($peers as $i=>$p): ?><th class="text-end"><?php echo e($p['rater_name']); ?></th><?php endforeach; ?><th class="text-end">Combined average</th></tr></thead><tbody>
             <?php foreach (annualCoreValues() as $i=>$value): ?><tr><td><strong><?php echo e($value['name']); ?></strong><small><?php echo e($value['kpi']); ?></small></td><td class="text-end">2.50%</td><td class="text-end"><?php echo number_format((float)$self[$i],2); ?></td><?php foreach ($peers as $p): $peerScores=json_decode($p['scores_json'],true); ?><td class="text-end"><?php echo number_format((float)$peerScores[$i],2); ?></td><?php endforeach; ?><td class="text-end"><?php echo number_format($candidate['item_averages'][$i],2); ?></td></tr><?php endforeach; ?>
             </tbody><tfoot><tr><th colspan="<?php echo 3+count($peers); ?>">Core Behaviors &amp; Values total</th><td class="text-end"><strong><?php echo number_format($candidate['core'],2); ?></strong><small>Weight: 20%</small></td></tr></tfoot></table></div>

@@ -4573,7 +4573,7 @@ function notifyOrganizationPackageStepAssignees($conn, $package_id, $step_order,
 {
     $package_id = (int) $package_id;
     $step_order = (int) $step_order;
-    $stmt = $conn->prepare('SELECT rs.reviewer_user_id, rs.reviewer_employee_id, rs.eligible_role, rs.eligible_rank_category_id, rs.claimed_at, ep.department_id
+    $stmt = $conn->prepare('SELECT rs.reviewer_user_id, rs.reviewer_employee_id, rs.eligible_role, rs.eligible_rank_category_id, rs.claimed_at, ep.department_id, ep.evaluation_type
         FROM evaluation_package_route_steps rs JOIN evaluation_packages ep ON ep.package_id = rs.package_id
         WHERE rs.package_id = ? AND rs.step_order = ? LIMIT 1');
     $stmt->bind_param('ii', $package_id, $step_order);
@@ -4583,7 +4583,7 @@ function notifyOrganizationPackageStepAssignees($conn, $package_id, $step_order,
     if (!$step) {
         return 0;
     }
-    $link = BASE_URL . '/employee/team-evaluation-packages.php';
+    $link = BASE_URL . '/employee/team-evaluation-packages.php?category=' . (in_array($step['evaluation_type'] ?? '', ['Initial','Final'], true) ? 'probationary' : 'regular');
     $notified_users = [];
     $notify = static function ($user_id) use ($conn, $title, $message, $link, $dedupe_recent) {
         $user_id = (int)$user_id;

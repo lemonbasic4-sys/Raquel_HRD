@@ -6,6 +6,22 @@ require_once '../includes/functions.php';
 // An Annual-only workload must not land on the empty legacy package screen.
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && !isset($_GET['category'])
     && in_array($_SESSION['role'] ?? '', ['HR Manager','HR Supervisor'],true)) {
+    ensureOrganizationEvaluationPackageSchema($conn);
+    $entry_user_id=(int)($_SESSION['user_id'] ?? 0);
+    $entry_role=(string)$_SESSION['role'];
+    $entry_reviewer_match=organizationPackageReviewerMatchSql('rs');
+    $entry_probationary=$conn->prepare("SELECT 1 FROM evaluation_packages ep
+        JOIN evaluation_package_route_steps rs ON rs.package_id=ep.package_id
+        WHERE ep.evaluation_type IN ('Initial','Final') AND ep.status NOT IN ('Approved and Applied','Cancelled')
+          AND ($entry_reviewer_match OR (rs.eligible_role=? AND rs.claimed_at IS NULL))
+          AND ((rs.step_order=1 AND rs.action_status IN ('Pending','Waiting')) OR (rs.step_order>1 AND rs.action_status='Pending')) LIMIT 1");
+    $entry_probationary->bind_param('iis',$entry_user_id,$entry_user_id,$entry_role);
+    $entry_probationary->execute();
+    $has_pending_probationary=(bool)$entry_probationary->get_result()->fetch_row();
+    $entry_probationary->close();
+    if ($has_pending_probationary) {
+        header('Location: '.BASE_URL.'/employee/team-evaluation-packages.php?category=probationary'); exit;
+    }
     ensureAnnualEvaluationSchema($conn);
     $entry_actor = annualActor($conn,(int)($_SESSION['user_id'] ?? 0));
     if ($entry_actor && $entry_actor['employment_status'] === 'Regular'

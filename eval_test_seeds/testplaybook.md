@@ -214,6 +214,38 @@ Run the isolated automated checks without importing any test data into your work
 
 See `annual_evaluation_design_notes.md` for confirmed rules and proposed HR exception policies.
 
+### Annual cycle completion and history
+
+**Late participation starts only after the department cycle first fully completes.**
+One employee's immediate-head approval does not establish a late cutoff.
+Original roster members submitting later in an active cycle receive ordinary
+360 notifications. After a completed cycle, a newly regularized employee who
+submits an Annual self-rating for that department/period becomes a late
+participant. Coworkers are notified to rate the newcomer; the newcomer can see
+and rate the original department members. These reciprocal ratings update the
+approved scores and the cycle returns to history once all new tasks are complete.
+Run `C:\xampp\php\php.exe scripts/reconcile-annual-late-flags.php` once after
+upgrading to correct old false late flags/notifications without deleting ratings.
+
+An active department cycle moves to **Performance Evaluation → Regular Employee
+→ Annual Evaluation History** only after every eligible participant has submitted
+self-rating, received immediate-head approval, and received all required 360
+ratings. Department coworkers count once; an immediate head outside the department
+(for example, President/CEO reviewing HR Manager) is an additional required rater.
+The CEO can open Rate & Review for that direct report without a department
+self-rating and cannot review unrelated employees.
+
+Verify the last required submission sends one **Department Annual evaluation
+complete** notification to participants and the assigned heads. It links to the
+completed cycle's history view. The cycle disappears from the active selector,
+and the historical table offers view-only evaluation links. Rechecking completion
+must not repeat notifications. If a new eligible participant joins that same
+cycle later, the cycle becomes active again and sends a reopening notice.
+
+For existing data after upgrading, run
+`C:\xampp\php\php.exe scripts/reconcile-annual-cycle-completion.php` once to
+classify already-completed cycles. It preserves evaluations and ratings.
+
 ### Notification clearing regression check
 
 The notification inbox uses the same compact list/detail layout for Admin,
@@ -250,6 +282,13 @@ rows are not automatically removed by this fix. Do not clear the delivery-histor
 table when clearing the inbox, because that would reset reminder deduplication.
 
 ### Probationary workflow
+
+After a probationary self-rating is submitted, open its notification as the
+assigned HR Manager or HR Supervisor. It must open **Probationary Employee**
+(`category=probationary`), even when Annual evaluations also exist. Check the
+manager dashboard Approval Queue Review/View Progress links as well. Older
+category-less links should prioritize pending probationary reviews; claiming,
+saving signatures, and returning from member review must retain that category.
 
 After creating the templates, sign in to each probationary employee account and
 confirm the self-rating page offers the Initial evaluation for that employee's

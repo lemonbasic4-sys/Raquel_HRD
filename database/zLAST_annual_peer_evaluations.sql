@@ -5,6 +5,8 @@ CREATE TABLE IF NOT EXISTS annual_evaluation_cycles (
     period_start DATE NOT NULL,
     period_end DATE NOT NULL,
     first_finalized_at DATETIME NULL,
+    completed_at DATETIME NULL,
+    first_completed_at DATETIME NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY annual_department_period (department_id, period_start, period_end)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -31,6 +33,7 @@ CREATE TABLE IF NOT EXISTS annual_evaluation_members (
     current_version INT NOT NULL DEFAULT 0,
     revision_pending TINYINT NOT NULL DEFAULT 0,
     finalized_at DATETIME NULL,
+    is_late_participant TINYINT NOT NULL DEFAULT 0,
     UNIQUE KEY annual_member (cycle_id, employee_id),
     UNIQUE KEY annual_evaluation (evaluation_id),
     CONSTRAINT annual_member_cycle FOREIGN KEY (cycle_id) REFERENCES annual_evaluation_cycles(cycle_id),

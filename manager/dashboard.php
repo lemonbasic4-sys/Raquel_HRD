@@ -121,6 +121,8 @@ if (ensureOrganizationEvaluationPackageSchema($conn)) {
     }
 }
 $pending_package_count = count($pending_packages);
+$dashboard_package_category=array_filter($pending_packages,static fn($package)=>in_array($package['evaluation_type'] ?? '',['Initial','Final'],true)) ? 'probationary' : 'regular';
+$dashboard_package_url=BASE_URL.'/employee/team-evaluation-packages.php?category='.$dashboard_package_category;
 $dashboard_queue_count = $queue_employee_count + $pending_package_count;
 
 // 1. Performance Distribution Data
@@ -812,7 +814,7 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
                         </a>
                     </div>
                     <div class="col-6 col-md-4 col-xl-3 col-xxl-2">
-                        <a href="<?php echo BASE_URL; ?>/employee/team-evaluation-packages.php" class="text-decoration-none">
+                        <a href="<?php echo e($dashboard_package_url); ?>" class="text-decoration-none">
                             <div class="p-3 rounded-3 text-center bg-white bg-opacity-10 border border-white border-opacity-10 text-white hover-zoom hub-link-card" style="transition: all 0.2s;">
                                 <i class="fas fa-layer-group fa-2x mb-2" style="color:#f5a3ab;"></i>
                                 <div class="fw-bold small hub-link-title">Performance Evaluation</div>
@@ -838,7 +840,7 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
                     <?php endif; ?>
                 </h5>
                 <div class="d-flex align-items-center gap-2">
-                    <a href="<?php echo BASE_URL; ?>/<?php echo $pending_package_count > 0 ? 'employee/team-evaluation-packages.php' : 'manager/pending-approvals.php'; ?>" class="queue-view-all">
+                    <a href="<?php echo e($pending_package_count > 0 ? $dashboard_package_url : BASE_URL.'/manager/pending-approvals.php'); ?>" class="queue-view-all">
                         View All <i class="fas fa-arrow-right ms-1"></i>
                     </a>
                 </div>
@@ -862,7 +864,7 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
                                         <div class="fw-bold text-dark"><?php echo $package_waiting ? 'Waiting for submissions' : 'Pending HR Manager'; ?></div>
                                         <div class="x-small"><?php echo e($package['step_label']); ?> &middot; You are the next reviewer</div>
                                     </div>
-                                    <a href="<?php echo BASE_URL; ?>/employee/team-evaluation-packages.php" class="btn btn-primary btn-review"><?php echo $package_waiting ? 'View Progress' : 'Review'; ?></a>
+                                    <a href="<?php echo BASE_URL; ?>/employee/team-evaluation-packages.php?category=<?php echo in_array($package['evaluation_type'] ?? '',['Initial','Final'],true) ? 'probationary' : 'regular'; ?>" class="btn btn-primary btn-review"><?php echo $package_waiting ? 'View Progress' : 'Review'; ?></a>
                                 </div>
                             <?php endforeach; ?>
                             <?php if (empty($queue_preview_groups) && empty($pending_packages)): ?>

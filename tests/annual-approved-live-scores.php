@@ -71,6 +71,8 @@ try {
     foreach ([2=>2,3=>3,4=>4,5=>5,6=>4] as $employee=>$position) { $evals[$employee]=$employee; $makeEvaluation($employee,$position,$employee); }
     $actors=[]; foreach (range(1,7) as $id) $actors[$id]=annualActor($conn,$id);
     $m=annualMember($conn,4); $cycle=(int)$m['cycle_id'];
+    checkAnnual((bool)annualQuery($conn,'SELECT notification_id FROM notifications WHERE user_id=2 AND title=? AND link=?',
+        ['Annual self-rating ready for KRA review',annualUrl($actors[2],'?view=rate&evaluation_id=3')]),'HR Supervisor self-rating notification opens HR Manager Rate & Review');
 
     $signature='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/6wAAAABJRU5ErkJggg==';
     $plans=[['improvement_area'=>'Employee records accuracy','support_needed'=>'Monthly coaching and checklist review','time_frame'=>'Within 3 months']];
@@ -83,7 +85,14 @@ try {
     checkAnnual(annualPendingReviewCount($conn,$actors[3])===1,'Approved employee no longer waits for another head review');
     $v=json_decode(annualQuery($conn,'SELECT snapshot_json FROM annual_evaluation_versions WHERE member_id=? ORDER BY version_number DESC LIMIT 1',[(int)$approved['member_id']])[0]['snapshot_json'],true);
     checkAnnual($v['score_complete']===false,'Initial approval is explicitly provisional');
+    $conn->begin_transaction();
+    annualQuery($conn,'UPDATE annual_evaluation_members SET evaluation_id=NULL,self_values_json=NULL WHERE cycle_id=? AND employee_id=2',[$cycle]);
+    annualRegisterSubmission($conn,2);
+    $conn->commit();
+    checkAnnual(!annualMember($conn,2)['is_late_participant'],'Submitting after an individual approval is not late while the department cycle remains active');
+    checkAnnual(!annualQuery($conn,"SELECT notification_id FROM notifications WHERE title='Late participant: annual peer rating available'"),'Original active-cycle submissions do not send late-participant notices');
     annualSubmitPeers($conn,$actors[2],4,array_fill(0,8,1.0));
+    checkAnnual((int)annualQuery($conn,'SELECT is_late FROM annual_peer_submissions WHERE cycle_id=? AND rater_employee_id=2 AND target_employee_id=4',[$cycle])[0]['is_late']===0,'Ordinary peer rating after head approval is not marked late');
     $updated=annualMember($conn,4);
     checkAnnual($updated['evaluation_status']==='Approved' && !$updated['revision_pending'],'Later peers keep approval and require no new review');
     checkAnnual((float)$updated['official_score']===3.24,'Later peer score automatically changes the official overall score');
@@ -97,10 +106,41 @@ try {
     checkAnnual(count(annualQuery($conn,'SELECT version_id FROM annual_evaluation_versions WHERE member_id=?',[(int)$complete['member_id']]))===3,'Every peer update preserves a score version');
     checkAnnual((bool)annualQuery($conn,"SELECT notification_id FROM notifications WHERE user_id=4 AND title='Annual score updated' AND message LIKE '%3.44%3.24%'"),'Employee receives previous-to-updated score notice');
     checkAnnual((bool)annualQuery($conn,"SELECT notification_id FROM notifications WHERE user_id=4 AND title='Annual score complete'"),'Employee receives score-complete notice');
+    annualReviewAndRate($conn,$actors[3],6,[],annualReviewToken($conn,annualMember($conn,6)),[],$signature);
+    $managerSelf=annualMember($conn,2)['self_values_json'];
     annualQuery($conn,'UPDATE annual_evaluation_members SET evaluation_id=NULL,self_values_json=NULL WHERE cycle_id=? AND employee_id=2',[$cycle]);
     annualSubmitPeers($conn,$actors[2],6,array_fill(0,8,3.0));
     checkAnnual((bool)annualQuery($conn,'SELECT submission_id FROM annual_peer_submissions WHERE cycle_id=? AND target_employee_id=6 AND rater_employee_id=2',[$cycle]),'HR Manager can rate a department peer before submitting their own self-rating');
     rejectsAnnual(fn()=>annualReviewAndRate($conn,$actors[2],6,[],annualReviewToken($conn,annualMember($conn,6)),[],$signature),'HR Manager peer access does not grant KRA approval over HR Staff');
+    annualQuery($conn,'UPDATE annual_evaluation_members SET evaluation_id=2,self_values_json=? WHERE cycle_id=? AND employee_id=2',[$managerSelf,$cycle]);
+    annualSubmitPeers($conn,$actors[4],6,array_fill(0,8,3.0));
+    annualReviewAndRate($conn,$actors[2],3,[],annualReviewToken($conn,annualMember($conn,3)),[],$signature);
+    foreach ([4,6] as $rater) annualSubmitPeers($conn,$actors[$rater],3,array_fill(0,8,3.0));
+    foreach ([3,4,6] as $rater) annualSubmitPeers($conn,$actors[$rater],2,array_fill(0,8,3.0));
+    checkAnnual(annualExpectedPeers($conn,$cycle,2)===4,'HR Manager requires all department peers plus the external CEO rating');
+    checkAnnual(!annualQuery($conn,'SELECT completed_at FROM annual_evaluation_cycles WHERE cycle_id=?',[$cycle])[0]['completed_at'],'Department stays active until CEO review is submitted');
+    annualReviewAndRate($conn,$actors[1],2,[],annualReviewToken($conn,annualMember($conn,2)),[],$signature);
+    checkAnnual((bool)annualQuery($conn,'SELECT completed_at FROM annual_evaluation_cycles WHERE cycle_id=?',[$cycle])[0]['completed_at'],'Final required CEO submission completes the department cycle');
+    checkAnnual((bool)annualQuery($conn,'SELECT notification_id FROM notifications WHERE user_id=3 AND title=? AND link=?',
+        ['Department Annual evaluation complete',annualUrl($actors[3],'?view=history&cycle_id='.$cycle)]),'Completion notification opens dedicated Annual Evaluation History');
+    $completionCount=count(annualQuery($conn,"SELECT notification_id FROM notifications WHERE title='Department Annual evaluation complete'"));
+    $conn->begin_transaction();
+    annualQuery($conn,'SELECT cycle_id FROM annual_evaluation_cycles WHERE cycle_id=? FOR UPDATE',[$cycle]);
+    annualUpdateCycleCompletion($conn,$cycle);
+    $conn->commit();
+    checkAnnual(count(annualQuery($conn,"SELECT notification_id FROM notifications WHERE title='Department Annual evaluation complete'"))===$completionCount,'Repeated completion checks do not duplicate notifications');
+    checkAnnual((bool)annualQuery($conn,"SELECT notification_id FROM notifications WHERE user_id=1 AND title='Department Annual evaluation complete'"),'External CEO also receives the department completion notification');
+    annualQuery($conn,"INSERT INTO employees (employee_id,employee_code,first_name,last_name,hire_date,job_title_id,job_title,department_id,employment_status) VALUES (8,'TEST-8','Late','Participant','2020-01-01',4,'HR Staff',1,'Regular')");
+    annualQuery($conn,"INSERT INTO users (user_id,employee_id,username,email,password_hash,full_name,role) VALUES (8,8,'late_participant','late@example.invalid','unused','Late Participant','HR Staff')");
+    $makeEvaluation(8,4,8);
+    checkAnnual((int)annualMember($conn,8)['is_late_participant']===1,'New participant is late only after the department cycle previously completed');
+    checkAnnual((bool)annualQuery($conn,'SELECT notification_id FROM notifications WHERE user_id=3 AND title=? AND link=?',
+        ['Late participant: annual peer rating available',annualUrl($actors[3],'?view=rate&evaluation_id=8')]),'Original department participants are notified to rate the genuine late participant');
+    checkAnnual(!annualQuery($conn,'SELECT completed_at FROM annual_evaluation_cycles WHERE cycle_id=?',[$cycle])[0]['completed_at'],'A late participant reopens the archived cycle for additional required ratings');
+    checkAnnual((bool)annualQuery($conn,"SELECT notification_id FROM notifications WHERE user_id=3 AND title='Department Annual evaluation reopened'"),'Reopening notifies the assigned head');
+    annualSubmitPeers($conn,annualActor($conn,8),4,array_fill(0,8,3.0));
+    annualSubmitPeers($conn,$actors[4],8,array_fill(0,8,3.0));
+    checkAnnual(count(annualQuery($conn,'SELECT submission_id FROM annual_peer_submissions WHERE cycle_id=? AND is_late=1 AND ((rater_employee_id=8 AND target_employee_id=4) OR (rater_employee_id=4 AND target_employee_id=8))',[$cycle]))===2,'Late participant and original coworker can rate each other, with genuine late flags');
     echo "Approved Annual live-score integration checks passed.\n";
 } finally {
     if (isset($conn) && $conn instanceof mysqli) $conn->close();
