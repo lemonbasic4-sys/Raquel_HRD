@@ -18,3 +18,5 @@ catch (DomainException $error) {}
 $self=[4.0,3.0,4.0,4.0,4.0,4.0,4.0,4.0];
 assertOverrides(annualValidateScores(annualResolveReviewOverrides($self,[1=>'3.25']))===[4.0,3.25,4.0,4.0,4.0,4.0,4.0,4.0],'Behavior defaults must resolve into eight valid scores.');
 echo "Annual review override checks passed.\n";
+assertOverrides(annualValidateScores(annualResolveReviewOverrides($self,array_fill(0,8,'')))===$self,'All blank peer fields must retain employee scores.');
+assertOverrides(annualValidateScores(annualResolveReviewOverrides($self,[0=>'2.75']))===[2.75,3.0,4.0,4.0,4.0,4.0,4.0,4.0],'A peer changing only Positive Attitude must retain the other seven scores.');

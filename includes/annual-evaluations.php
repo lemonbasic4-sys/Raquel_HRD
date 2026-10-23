@@ -315,6 +315,15 @@ function annualRegisterSubmission($conn, int $evaluationId): void
     if ($member['evaluation_id'] && (int)$member['evaluation_id'] !== $evaluationId) throw new DomainException('An Annual evaluation already exists for this department period.');
     if ((int)$member['position_id'] !== (int)$ev['job_title_id']) throw new DomainException('Transfer review required before submitting this evaluation.');
     if ($member['self_values_json']) throw new DomainException('This Annual self-rating has already been submitted.');
+    if (!empty($member['revision_pending'])) {
+        $previous=annualPeers($conn,annualMember($conn,$evaluationId));
+        logAudit($conn,(int)($_SESSION['user_id'] ?? $ev['submitted_by'] ?? 0),'UPDATE','Annual Evaluation',$evaluationId,'Resubmission reset earlier 360 ratings: '.json_encode($previous));
+        annualQuery($conn,'DELETE FROM annual_peer_submissions WHERE cycle_id=? AND target_employee_id=?',[$cycleId,(int)$ev['employee_id']]);
+        foreach (annualQuery($conn,'SELECT u.user_id FROM users u JOIN annual_evaluation_members m ON m.employee_id=u.employee_id WHERE m.cycle_id=? AND m.employee_id<>?',[$cycleId,(int)$ev['employee_id']]) as $user) {
+            $raterActor=annualActor($conn,(int)$user['user_id']);
+            if ($raterActor && annualCanRate($raterActor)) createNotification($conn,(int)$user['user_id'],'Annual evaluation resubmitted: rate again','Earlier 360 ratings for this employee were cleared. Submit a new rating.',annualUrl($raterActor,'?view=rate&evaluation_id='.$evaluationId),'evaluations',true);
+        }
+    }
     $isLateParticipant=!empty($cycle['first_completed_at']);
     annualQuery($conn, 'UPDATE annual_evaluation_members SET evaluation_id=?,self_values_json=?,is_late_participant=? WHERE member_id=?', [$evaluationId,$values,$isLateParticipant ? 1 : 0,(int)$member['member_id']]);
     annualCandidate($conn,annualMember($conn,$evaluationId));
@@ -324,6 +333,28 @@ function annualRegisterSubmission($conn, int $evaluationId): void
     annualNotifyEmployee($conn,(int)$ev['employee_id'],'Annual self-rating submitted','Your department 360 rating tasks are available.');
     annualNotifyCycleRaters($conn,$cycleId,$evaluationId,(int)$ev['employee_id'],$isLateParticipant);
     annualUpdateCycleCompletion($conn,$cycleId);
+}
+
+function annualReturnEvaluation($conn, array $actor, int $evaluationId, string $reason): void
+{
+    $reason=trim($reason);
+    if ($reason==='') throw new DomainException('Enter a reason for returning the evaluation.');
+    $conn->begin_transaction();
+    try {
+        $member=annualMember($conn,$evaluationId);
+        if (!$member || !annualCanFinalize($conn,$actor,$member)) throw new DomainException('Only the immediate head can return this evaluation.');
+        annualQuery($conn,'SELECT cycle_id FROM annual_evaluation_cycles WHERE cycle_id=? FOR UPDATE',[(int)$member['cycle_id']]);
+        $member=annualMember($conn,$evaluationId);
+        if (!$member['self_values_json']) throw new DomainException('This evaluation is already awaiting resubmission.');
+        annualQuery($conn,"UPDATE evaluations SET status='Returned',supervisor_comments=? WHERE evaluation_id=?",[$reason,$evaluationId]);
+        annualQuery($conn,'UPDATE annual_evaluation_members SET self_values_json=NULL,revision_pending=1 WHERE member_id=?',[(int)$member['member_id']]);
+        annualQuery($conn,'UPDATE annual_evaluation_cycles SET completed_at=NULL WHERE cycle_id=?',[(int)$member['cycle_id']]);
+        logAudit($conn,(int)$actor['user_id'],'UPDATE','Annual Evaluation',$evaluationId,'Returned for self-rating revision: '.$reason);
+        foreach (annualQuery($conn,'SELECT user_id FROM users WHERE employee_id=? AND is_active=1',[(int)$member['employee_id']]) as $user) {
+            createNotification($conn,(int)$user['user_id'],'Annual evaluation returned',$reason.' Revise and resubmit your self-rating. Earlier 360 ratings will be cleared on resubmission.',BASE_URL.'/employee/self-rating.php','evaluations',true);
+        }
+        $conn->commit();
+    } catch (Throwable $error) { $conn->rollback(); throw $error; }
 }
 
 function annualNotifyCycleRaters($conn, int $cycleId, int $evaluationId, int $joiningEmployeeId, bool $late): void
@@ -371,7 +402,6 @@ function annualNotifyHeads($conn, array $member, string $title, string $message)
 function annualSubmitPeers($conn, array $actor, int $evaluationId, array $scores, bool $manageTransaction = true, string $signature = ''): void
 {
     ensureAuditTrailSchema($conn);
-    $scores = annualValidateScores($scores);
     if ($signature !== '' && (!preg_match('/^data:image\/png;base64,/', $signature) || strlen($signature) > 100000)) {
         throw new DomainException('The rater signature is invalid. Please sign again.');
     }
@@ -388,6 +418,7 @@ function annualSubmitPeers($conn, array $actor, int $evaluationId, array $scores
         annualQuery($conn,'SELECT cycle_id FROM annual_evaluation_cycles WHERE cycle_id=? FOR UPDATE',[(int)$member['cycle_id']]);
         $member=annualMember($conn,$evaluationId);
         annualAssertSnapshotActive($member);
+        if (!$member['self_values_json']) throw new DomainException('Wait for the employee to resubmit their self-rating.');
         $rater=annualQuery($conn,'SELECT evaluation_id,is_late_participant FROM annual_evaluation_members WHERE cycle_id=? AND employee_id=?',[(int)$member['cycle_id'],(int)$actor['employee_id']])[0] ?? null;
         if (!$rater && !annualCanFinalize($conn,$actor,$member)) throw new DomainException('Only assigned department participants and the immediate head may rate this employee.');
         if ((!$rater || !$rater['evaluation_id']) && !annualCanRateBeforeSelf($conn,$actor,$member)) throw new DomainException('Submit your Annual self-rating for this department period first.');
@@ -402,6 +433,9 @@ function annualSubmitPeers($conn, array $actor, int $evaluationId, array $scores
         $exists=annualQuery($conn,'SELECT submission_id FROM annual_peer_submissions WHERE cycle_id=? AND rater_employee_id=? AND target_employee_id=?',
             [(int)$member['cycle_id'],(int)$actor['employee_id'],(int)$member['employee_id']]);
         if ($exists) throw new DomainException('Your submitted rating is locked and cannot be edited.');
+        // Resolve omitted peer ratings from the employee submission, never from browser defaults.
+        $scores=annualValidateScores(annualResolveReviewOverrides(
+            annualValidateScores(json_decode($member['self_values_json'] ?? '[]',true) ?: []),$scores));
         $late=!empty($member['is_late_participant']) || !empty($rater['is_late_participant']) ? 1 : 0;
         annualQuery($conn,'INSERT INTO annual_peer_submissions (cycle_id,rater_employee_id,target_employee_id,submitted_by,scores_json,rater_signature_data,rater_signed_at,is_late) VALUES (?,?,?,?,?,?,?,?)',
             [(int)$member['cycle_id'],(int)$actor['employee_id'],(int)$member['employee_id'],(int)$actor['user_id'],json_encode($scores),$signature !== '' ? $signature : null,$signature !== '' ? date('Y-m-d H:i:s') : null,$late]);
