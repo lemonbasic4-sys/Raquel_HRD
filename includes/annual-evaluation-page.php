@@ -297,6 +297,26 @@ require_once __DIR__ . '/header.php';
             <p><?php echo e($member['position_name']); ?> · <?php echo e($member['period_start'].' to '.$member['period_end']); ?></p></div>
                 <span class="annual-status-pill <?php echo $submitted ? 'is-complete' : 'is-self'; ?>"><i class="fas fa-users me-1" aria-hidden="true"></i><?php echo $submitted ? 'Submitted · Locked' : ($canFinalize ? 'Immediate-head review' : 'Department peer rating'); ?></span>
             </header>
+            <?php if ($canFinalize && !$submitted):
+                // Reference only: exclude head overrides and department peer ratings.
+                $selfSummaryKras=annualKraRows($conn,$evaluationId);
+                foreach ($selfSummaryKras as &$selfSummaryRow) {
+                    $selfSummaryRow['rating']=$selfSummaryRow['self_rating'];
+                }
+                unset($selfSummaryRow);
+                $selfSummary=annualCalculate($selfSummaryKras,json_decode($member['self_values_json'] ?? '[]',true) ?: [],[]);
+                $annualScoresApproved=false;
+                $annualDisplayKra=$selfSummary['kra'];
+                $annualDisplayCore=$selfSummary['core'];
+                $annualDisplayTotal=$selfSummary['total'];
+                $annualTier='meets';
+            ?>
+                <section class="mb-4" aria-label="Employee submitted self-rating summary">
+                    <h3 class="h6 fw-bold mb-2">Employee self-rating</h3>
+                    <p class="small text-muted mb-3">Submitted scores for reference. Your review changes and department peer ratings are not included here.</p>
+                    <?php require __DIR__.'/annual-result-cards.php'; ?>
+                </section>
+            <?php endif; ?>
             <p id="annualRatingProgress" class="small fw-bold" aria-live="polite"></p>
             <?php if ($submitted): ?><div class="alert alert-success">Submitted and locked. These ratings cannot be edited.</div><?php endif; ?>
             <form method="post" id="annualRatingForm" data-draft-key="annual-rating-overrides-v3-<?php echo (int)$actor['user_id']; ?>-<?php echo $evaluationId; ?>-<?php echo substr(hash('sha256',json_encode([$member['employee_id'],$member['evaluation_created_at'],$member['evaluation_submitted_at'],$member['period_start'],$member['period_end']])),0,24); ?>" data-resume-tab="<?php echo $_SERVER['REQUEST_METHOD']==='POST' ? '1' : '0'; ?>" data-submitted="<?php echo $submitted ? '1' : '0'; ?>" data-override-only="<?php echo $canFinalize && !$submitted ? '1' : '0'; ?>">
