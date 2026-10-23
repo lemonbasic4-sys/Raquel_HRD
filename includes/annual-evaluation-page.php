@@ -104,6 +104,12 @@ $members=$cycle ? annualQuery($conn,"SELECT m.*,e.first_name,e.last_name,ev.tota
     LEFT JOIN evaluations ev ON ev.evaluation_id=m.evaluation_id WHERE m.cycle_id=? AND ".annualRosterEligibilitySql()." ORDER BY e.last_name,e.first_name",
     [(int)$actor['employee_id'],$cycleId]) : [];
 $own=array_values(array_filter($members,static fn($m)=>(int)$m['employee_id']===(int)$actor['employee_id']));
+$annualOutgoing=[];
+if ($cycle) {
+    foreach (annualQuery($conn,'SELECT rater_employee_id,target_employee_id FROM annual_peer_submissions WHERE cycle_id=?',[$cycleId]) as $submission) {
+        $annualOutgoing[(int)$submission['rater_employee_id']][(int)$submission['target_employee_id']]=true;
+    }
+}
 $directReportCycle=(bool)array_filter($members,static fn($m)=>(int)$m['employee_id']!==(int)$actor['employee_id'] && (int)$m['reviewer_position_id']>0 && (int)$m['reviewer_position_id']===(int)$actor['job_title_id']);
 $isDepartmentPeer=$own && (int)$cycle['department_id']===(int)$actor['department_id'];
 if (($view==='rate' && !$isDepartmentPeer && !$canFinalize) || ($view==='peers' && !$isDepartmentPeer && !$directReportCycle && $cycle)) {
@@ -180,7 +186,7 @@ require_once __DIR__ . '/header.php';
             <div class="row g-2 mb-3"><div class="col-md-7"><label for="annualSearch" class="form-label">Find employee</label><input id="annualSearch" class="form-control" type="search" placeholder="Employee name or position"></div>
                 <div class="col-md-5"><label for="annualStatus" class="form-label">Status</label><select id="annualStatus" class="form-select"><option value="">All</option><option value="submitted">Self-rating submitted</option><option value="pending">For consolidation</option><option value="finalized">Finalized</option><option value="revision">Revision pending</option></select></div></div>
             <div class="table-responsive"><table class="table align-middle" id="annualRoster">
-            <thead><tr><th>Employee</th><th>Position</th><th>Self-rating</th><th><?php echo $view==='peers' ? 'Your 360 rating' : '360 received'; ?></th><?php if ($view==='peers'): ?><th class="text-center">360 received</th><?php endif; ?><th>Annual result</th><th class="text-center">Final score</th><th>Action</th></tr></thead>
+            <thead><tr><th>Task status</th><th>Employee</th><th>Position</th><th>Self-rating</th><th><?php echo $view==='peers' ? 'Your 360 rating' : '360 received'; ?></th><?php if ($view==='peers'): ?><th class="text-center">360 received</th><?php endif; ?><th>Annual result</th><th class="text-center">Final score</th><th>Action</th></tr></thead>
             <tbody><?php foreach ($members as $m):
                 $isOwnRow=(int)$m['employee_id']===(int)$actor['employee_id'];
                 $target=$m['evaluation_id'] ? annualMember($conn,(int)$m['evaluation_id']) : null;
@@ -189,8 +195,22 @@ require_once __DIR__ . '/header.php';
                 if ($view==='peers' && !$isDepartmentPeer && (!$target || !annualCanFinalize($conn,$actor,$target))) continue;
                 if ($view!=='peers' && (!$target || !annualCanFinalize($conn,$actor,$target))) continue;
                 $state=$m['current_version'] ? ((int)$m['received']>=annualExpectedPeers($conn,$cycleId,(int)$m['employee_id']) ? 'Approved · Score complete' : 'Approved · Score provisional') : 'Awaiting immediate-head approval';
+                $taskTotal=0; $taskDone=0; $headTaskTotal=0; $headTaskDone=0;
+                foreach ($members as $taskMember) {
+                    if ((int)$taskMember['employee_id']===(int)$m['employee_id']) continue;
+                    $taskTotal++;
+                    if (!empty($annualOutgoing[(int)$m['employee_id']][(int)$taskMember['employee_id']]) && !empty($taskMember['self_values_json'])) $taskDone++;
+                    if ((int)$taskMember['reviewer_position_id']>0 && (int)$taskMember['reviewer_position_id']===(int)$m['position_id']) {
+                        $headTaskTotal++;
+                        if ($taskMember['current_version'] && !$taskMember['revision_pending'] && !empty($taskMember['self_values_json'])) $headTaskDone++;
+                    }
+                }
+                $dutiesComplete=$taskDone===$taskTotal && $headTaskDone===$headTaskTotal;
                 ?>
-                <tr data-annual-state="<?php echo $m['revision_pending'] ? 'revision' : ($m['current_version'] ? 'finalized' : 'pending'); ?>" data-annual-submitted="<?php echo $m['evaluation_id'] ? '1' : '0'; ?>"><td><?php echo e($m['first_name'].' '.$m['last_name']); ?><?php if ($view==='peers' && $isOwnRow): ?> <span class="badge bg-secondary">You</span><?php endif; ?></td><td><?php echo e($m['position_name']); ?></td>
+                <tr data-annual-state="<?php echo $m['revision_pending'] ? 'revision' : ($m['current_version'] ? 'finalized' : 'pending'); ?>" data-annual-submitted="<?php echo $m['evaluation_id'] ? '1' : '0'; ?>"><td class="text-nowrap">
+                        <?php if ($headTaskTotal): ?><span class="d-block small" title="<?php echo $headTaskDone.' of '.$headTaskTotal; ?> assigned KRA reviews completed"><i class="fas fa-<?php echo $headTaskDone===$headTaskTotal ? 'check-circle text-success' : 'times-circle text-danger'; ?> me-1" aria-hidden="true"></i>KRA <span class="visually-hidden"><?php echo $headTaskDone===$headTaskTotal ? 'completed' : 'pending'; ?></span></span><?php endif; ?>
+                        <span class="d-block small" title="<?php echo $taskDone.' of '.$taskTotal; ?> department behavior ratings submitted"><i class="fas fa-<?php echo $taskDone===$taskTotal ? 'check-circle text-success' : 'times-circle text-danger'; ?> me-1" aria-hidden="true"></i>Behavior <span class="visually-hidden"><?php echo $taskDone===$taskTotal ? 'completed' : 'pending'; ?></span></span>
+                    </td><td><?php echo e($m['first_name'].' '.$m['last_name']); ?><?php if ($view==='peers' && $isOwnRow): ?> <span class="badge bg-secondary">You</span><?php endif; ?></td><td><?php echo e($m['position_name']); ?></td>
                     <td><span class="annual-status-pill <?php echo $m['evaluation_id'] ? 'is-complete' : 'is-waiting'; ?>"><?php echo $m['evaluation_id'] ? 'Submitted' : 'Awaiting self-rating'; ?></span></td>
                     <td><?php if ($view==='peers'): ?><span class="annual-status-pill <?php echo $isOwnRow ? ($m['evaluation_id'] ? 'is-self' : 'is-waiting') : ($m['rated'] ? 'is-complete' : 'is-waiting'); ?>"><?php echo $isOwnRow ? ($m['evaluation_id'] ? 'Self-rating included' : 'Awaiting self-rating') : ($m['rated'] ? 'Submitted · Locked' : 'Not submitted'); ?></span><?php else: echo (int)$m['received'].' / '.max(0,count($members)-1); endif; ?></td>
                     <?php if ($view==='peers'): $receivedCount=(int)$m['received']; $expectedCount=annualExpectedPeers($conn,$cycleId,(int)$m['employee_id']); ?>
