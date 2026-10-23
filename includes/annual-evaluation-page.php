@@ -285,7 +285,7 @@ require_once __DIR__ . '/header.php';
                     <?php elseif ($canRead): ?>
                         <a class="btn btn-sm btn-outline-success" href="<?php echo annualUrl($actor,'?view=review&evaluation_id='.(int)$m['evaluation_id']); ?>">View evaluation</a>
                     <?php else: ?>—<?php endif; ?>
-                    <?php if ($target && !empty($target['self_values_json']) && annualCanFinalize($conn,$actor,$target)): ?>
+                    <?php if (!$historyView && empty($cycle['completed_at']) && $target && !empty($target['self_values_json']) && annualCanFinalize($conn,$actor,$target)): ?>
                         <button type="button" class="btn btn-sm btn-outline-danger flex-shrink-0" title="Return evaluation" aria-label="Return evaluation" data-bs-toggle="modal" data-bs-target="#annualReturnModal" data-return-id="<?php echo (int)$target['evaluation_id']; ?>" data-return-name="<?php echo e($target['first_name'].' '.$target['last_name']); ?>"><i class="fas fa-undo-alt" aria-hidden="true"></i></button>
                     <?php endif; ?></div></td>
                 </tr>

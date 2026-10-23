@@ -348,7 +348,8 @@ function annualReturnEvaluation($conn, array $actor, int $evaluationId, string $
     try {
         $member=annualMember($conn,$evaluationId);
         if (!$member || !annualCanFinalize($conn,$actor,$member)) throw new DomainException('Only the immediate head can return this evaluation.');
-        annualQuery($conn,'SELECT cycle_id FROM annual_evaluation_cycles WHERE cycle_id=? FOR UPDATE',[(int)$member['cycle_id']]);
+        $returnCycle=annualQuery($conn,'SELECT cycle_id,completed_at FROM annual_evaluation_cycles WHERE cycle_id=? FOR UPDATE',[(int)$member['cycle_id']])[0] ?? null;
+        if (!$returnCycle || !empty($returnCycle['completed_at'])) throw new DomainException('Archived annual evaluations are view only and cannot be returned.');
         $member=annualMember($conn,$evaluationId);
         if (!$member['self_values_json']) throw new DomainException('This evaluation is already awaiting resubmission.');
         annualQuery($conn,"UPDATE evaluations SET status='Returned',supervisor_comments=? WHERE evaluation_id=?",[$reason,$evaluationId]);
