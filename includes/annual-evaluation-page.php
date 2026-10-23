@@ -33,6 +33,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 annualSubmitPeers($conn,$actor,$evaluationId,(array)($_POST['scores'] ?? []));
             }
             redirectWith(annualUrl($actor,'?view=peers&cycle_id='.(int)$_POST['cycle_id']),'success',$withKra ? 'KRA review approved and your 360 ratings submitted. Peer ratings are locked.' : 'Your 360 ratings were submitted and locked.');
+        } elseif (($_POST['action'] ?? '') === 'approve_cycle') {
+            $approveCycleId=(int)($_POST['cycle_id'] ?? 0);
+            $conn->begin_transaction();
+            try {
+                annualQuery($conn,'SELECT cycle_id FROM annual_evaluation_cycles WHERE cycle_id=? FOR UPDATE',[$approveCycleId]);
+                annualUpdateCycleCompletion($conn,$approveCycleId,(int)$actor['user_id']);
+                $conn->commit();
+            } catch (Throwable $approvalError) { $conn->rollback(); throw $approvalError; }
+            redirectWith(annualUrl($actor,'?view=history&cycle_id='.$approveCycleId),'success','Annual cycle approved and moved to history.');
         } elseif (($_POST['action'] ?? '') === 'return') {
             annualReturnEvaluation($conn,$actor,(int)($_POST['return_evaluation_id'] ?? 0),(string)($_POST['return_reason'] ?? ''));
             redirectWith(annualUrl($actor,'?view=peers'),'success','Evaluation returned. Earlier 360 ratings will be cleared when the employee resubmits.');
@@ -73,12 +82,19 @@ if ($_SERVER['REQUEST_METHOD']==='GET' && $member && $canFinalize && $view==='re
         header('Location: '.annualUrl($actor,'?view='.($hasHeadReview ? 'head-review' : 'rate').'&evaluation_id='.$evaluationId)); exit;
     }
 }
+$executiveKraOnly=$member && $canFinalize && (int)$actor['department_id']!==(int)$member['department_id'];
 $headReviewSubmission=null;
 $headReviewKra=[];
 if ($view==='head-review') {
     if (!$member || !$canFinalize) { http_response_code(403); exit('Only this employee\'s immediate head can view the submitted head review.'); }
     $headReviewSubmission=annualQuery($conn,'SELECT scores_json,rater_signature_data,rater_signed_at,submitted_at FROM annual_peer_submissions WHERE cycle_id=? AND rater_employee_id=? AND target_employee_id=?',
         [$cycleId,(int)$actor['employee_id'],(int)$member['employee_id']])[0] ?? null;
+    if (!$headReviewSubmission && $executiveKraOnly) {
+        $approval=annualQuery($conn,'SELECT approved_at,rater_signature_data,rater_signed_at FROM annual_kra_approvals WHERE member_id=? AND approved_by=? ORDER BY approval_id DESC LIMIT 1',[(int)$member['member_id'],(int)$actor['user_id']])[0] ?? null;
+        if ($approval) {
+            $headReviewSubmission=['scores_json'=>$member['self_values_json'],'submitted_at'=>$approval['approved_at'],'rater_signature_data'=>$approval['rater_signature_data'],'rater_signed_at'=>$approval['rater_signed_at']];
+        }
+    }
     if (!$headReviewSubmission) { http_response_code(404); exit('The head review has not been submitted.'); }
     $kraApproval=annualQuery($conn,'SELECT ratings_json FROM annual_kra_approvals WHERE member_id=? AND approved_by=? AND approved_at<=? ORDER BY approved_at DESC,approval_id DESC LIMIT 1',
         [(int)$member['member_id'],(int)$actor['user_id'],$headReviewSubmission['submitted_at']])[0] ?? null;
@@ -87,6 +103,15 @@ if ($view==='head-review') {
 $cycle=null;
 foreach ($cycles as $c) if ((int)$c['cycle_id']===$cycleId) $cycle=$c;
 if ($cycleId && !$cycle) { http_response_code(403); exit('This department cycle is unavailable.'); }
+if ($cycle && empty($cycle['completed_at'])) {
+    $conn->begin_transaction();
+    try {
+        annualQuery($conn,'SELECT cycle_id FROM annual_evaluation_cycles WHERE cycle_id=? FOR UPDATE',[$cycleId]);
+        annualUpdateCycleCompletion($conn,$cycleId);
+        $cycle=array_merge($cycle,annualQuery($conn,'SELECT ready_for_approval_at,completed_at FROM annual_evaluation_cycles WHERE cycle_id=?',[$cycleId])[0]);
+        $conn->commit();
+    } catch (Throwable $cycleError) { $conn->rollback(); throw $cycleError; }
+}
 if ($cycle && !empty($cycle['completed_at'])) {
     $historyView=true;
     $cycleOptions=array_values(array_filter($cycles,static fn($c)=>!empty($c['completed_at'])));
@@ -98,12 +123,18 @@ if ($cycle && !empty($cycle['completed_at']) && $view==='rate') {
     header('Location: '.annualUrl($actor,'?view='.($canFinalize ? 'head-review' : 'review').'&evaluation_id='.$evaluationId)); exit;
 }
 $members=$cycle ? annualQuery($conn,"SELECT m.*,e.first_name,e.last_name,ev.total_score,
-        (SELECT COUNT(*) FROM annual_peer_submissions s WHERE s.cycle_id=m.cycle_id AND s.target_employee_id=m.employee_id) AS received,
+        (SELECT COUNT(*) FROM annual_peer_submissions s JOIN employees rater ON rater.employee_id=s.rater_employee_id WHERE s.cycle_id=m.cycle_id AND s.target_employee_id=m.employee_id AND rater.department_id=e.department_id) AS received,
         (SELECT COUNT(*) FROM annual_peer_submissions s WHERE s.cycle_id=m.cycle_id AND s.target_employee_id=m.employee_id AND s.rater_employee_id=?) AS rated
     FROM annual_evaluation_members m JOIN employees e ON e.employee_id=m.employee_id
     LEFT JOIN evaluations ev ON ev.evaluation_id=m.evaluation_id WHERE m.cycle_id=? AND ".annualRosterEligibilitySql()." ORDER BY e.last_name,e.first_name",
     [(int)$actor['employee_id'],$cycleId]) : [];
 $own=array_values(array_filter($members,static fn($m)=>(int)$m['employee_id']===(int)$actor['employee_id']));
+if ($cycle && (int)$actor['department_id']!==(int)$cycle['department_id']) {
+    foreach ($members as &$executiveMember) {
+        $executiveMember['rated']=(bool)annualQuery($conn,'SELECT 1 FROM annual_kra_approvals WHERE member_id=? AND approved_by=? LIMIT 1',[(int)$executiveMember['member_id'],(int)$actor['user_id']]);
+    }
+    unset($executiveMember);
+}
 $annualOutgoing=[];
 if ($cycle) {
     foreach (annualQuery($conn,'SELECT rater_employee_id,target_employee_id FROM annual_peer_submissions WHERE cycle_id=?',[$cycleId]) as $submission) {
@@ -155,6 +186,12 @@ require_once __DIR__ . '/header.php';
             <p class="mb-0"><?php echo $historyView ? 'Completed department cycles appear here after all required approvals and 360 ratings are submitted.' : 'Submitted Annual cycles appear here while reviews and ratings are in progress. Completed cycles are available in Annual Evaluation History.'; ?></p>
         </div>
     <?php elseif (!$evaluationId): ?>
+        <?php if ($cycle && empty($cycle['completed_at']) && !empty($cycle['ready_for_approval_at'])): ?>
+            <div class="alert alert-success d-flex flex-wrap align-items-center justify-content-between gap-3">
+                <div><strong>Ready for HR Manager approval</strong><div>All annual requirements are complete. The cycle will move to history after approval.</div></div>
+                <?php if ($actor['role']==='HR Manager'): ?><form method="post"><?php echo csrfField(); ?><input type="hidden" name="action" value="approve_cycle"><input type="hidden" name="cycle_id" value="<?php echo (int)$cycleId; ?>"><button class="btn btn-success" type="submit"><i class="fas fa-check-circle me-2" aria-hidden="true"></i>Approve cycle</button></form><?php endif; ?>
+            </div>
+        <?php endif; ?>
         <form class="content-card annual-cycle-filter p-3 mb-4 d-flex gap-2 flex-wrap" method="get">
             <?php if ($annual_in_performance_page): ?><input type="hidden" name="category" value="regular"><?php endif; ?>
             <input type="hidden" name="view" value="<?php echo $historyView ? 'history' : e($view); ?>">
@@ -239,11 +276,11 @@ require_once __DIR__ . '/header.php';
                                 <a class="btn btn-sm btn-outline-success" href="<?php echo annualUrl($actor,'?view=head-review&evaluation_id='.(int)$m['evaluation_id']); ?>">View submitted review</a>
                             <?php endif; ?>
                         <?php elseif (annualCanFinalize($conn,$actor,$target)): ?>
-                            <a class="btn btn-sm btn-outline-success" href="<?php echo annualUrl($actor,'?view=rate&evaluation_id='.(int)$m['evaluation_id']); ?>">Rate &amp; review</a>
+                            <a class="btn btn-sm btn-outline-success annual-rate-pending" href="<?php echo annualUrl($actor,'?view=rate&evaluation_id='.(int)$m['evaluation_id']); ?>">Rate &amp; review</a>
                         <?php elseif ($m['rated']): ?>
                             <a class="btn btn-sm btn-outline-success" href="<?php echo annualUrl($actor,'?view=review&evaluation_id='.(int)$m['evaluation_id']); ?>">View behavior</a>
                         <?php else: ?>
-                            <a class="btn btn-sm btn-outline-success" href="<?php echo annualUrl($actor,'?view=rate&evaluation_id='.(int)$m['evaluation_id']); ?>">Rate</a>
+                            <a class="btn btn-sm btn-outline-success annual-rate-pending" href="<?php echo annualUrl($actor,'?view=rate&evaluation_id='.(int)$m['evaluation_id']); ?>">Rate</a>
                         <?php endif; ?>
                     <?php elseif ($canRead): ?>
                         <a class="btn btn-sm btn-outline-success" href="<?php echo annualUrl($actor,'?view=review&evaluation_id='.(int)$m['evaluation_id']); ?>">View evaluation</a>
@@ -611,6 +648,24 @@ require_once __DIR__ . '/header.php';
     </div></div>
 </div>
 <script>
+<?php if ($executiveKraOnly && $view==='rate'): ?>
+// Executives approve KRAs; department coworkers provide behavior ratings.
+['annualRateCoreTab','annualRatePlanTab','annualRateCorePanel','annualRatePlanPanel'].forEach(id=>document.getElementById(id)?.remove());
+['annualRatingProgress','annualHeadOverallPreview'].forEach(id=>document.getElementById(id)?.remove());
+const executiveNext=document.getElementById('annualRateKraNext');
+if (executiveNext) { executiveNext.dataset.annualTab='#annualRateReviewPanel'; executiveNext.setAttribute('aria-controls','annualRateReviewPanel'); executiveNext.textContent='Next: Review & Submit'; }
+const executiveBack=document.getElementById('annualRateReviewBack');
+if (executiveBack) { executiveBack.dataset.annualTab='#annualRateKraPanel'; executiveBack.setAttribute('aria-controls','annualRateKraPanel'); executiveBack.textContent='Back to KRA'; }
+document.getElementById('annualReviewBehaviorHeading')?.closest('section')?.remove();
+document.getElementById('annualSummaryBehaviorRows')?.closest('.table-responsive')?.previousElementSibling?.remove();
+document.getElementById('annualSummaryBehaviorRows')?.closest('.table-responsive')?.remove();
+document.getElementById('annualPlanConfirmation')?.previousElementSibling?.remove();
+document.getElementById('annualPlanConfirmation')?.remove();
+const executiveNotice=document.querySelector('#annualRatingForm > .alert-info');
+if (executiveNotice) executiveNotice.textContent='Review the employee’s KRA ratings, add comments, and sign to approve. Core Behaviors ratings are submitted within the employee’s department.';
+const executiveReviewNotice=document.querySelector('#annualRateReviewPanel > p');
+if (executiveReviewNotice) executiveReviewNotice.textContent='Check the effective KRA ratings before approving. Blank fields retain the employee’s submitted ratings. The annual result includes the department’s combined behavior ratings.';
+<?php endif; ?>
 document.getElementById('annualReturnModal')?.addEventListener('show.bs.modal',event=>{
     const trigger=event.relatedTarget;
     document.getElementById('annualReturnEvaluationId').value=trigger?.dataset.returnId || '';

@@ -7,6 +7,8 @@ CREATE TABLE IF NOT EXISTS annual_evaluation_cycles (
     first_finalized_at DATETIME NULL,
     completed_at DATETIME NULL,
     first_completed_at DATETIME NULL,
+    ready_for_approval_at DATETIME NULL,
+    cycle_approved_by INT NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY annual_department_period (department_id, period_start, period_end)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -18,6 +20,8 @@ CREATE TABLE IF NOT EXISTS annual_kra_approvals (
     approved_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     remarks TEXT NOT NULL,
     ratings_json LONGTEXT NOT NULL,
+    rater_signature_data LONGTEXT NULL,
+    rater_signed_at DATETIME NULL,
     INDEX annual_kra_member (member_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 

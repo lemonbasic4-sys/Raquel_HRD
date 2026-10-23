@@ -238,3 +238,7 @@
 .annual-page .annual-peer-rating-section .annual-number::placeholder{font-size:.85rem;font-weight:500;color:#64748b;opacity:1}
 .annual-page .annual-peer-rate-view .annual-rating-step-actions{padding-top:18px;margin-top:18px;border-top:1px solid #e2e8f0}
 @media(max-width:640px){.annual-page .annual-peer-rating-section{padding:12px}.annual-page .annual-peer-rate-view .annual-rating-step-actions{flex-direction:column;align-items:stretch}.annual-page .annual-peer-rate-view .annual-rating-step-actions .btn{width:100%;white-space:normal}}
+.annual-page .annual-rate-pending{display:inline-flex;align-items:center;gap:6px;border:2px solid #43812c;background:#edf7e6;color:#214d16;animation:annual-rate-breathe 2s ease-in-out infinite;transform-origin:center}
+.annual-page .annual-rate-pending::before{content:'';display:inline-block;width:7px;height:7px;flex-shrink:0;border-radius:50%;background:#43812c;animation:annual-rate-dot 2s ease-in-out infinite}
+@keyframes annual-rate-dot{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(67,129,44,.4)}50%{opacity:.65;box-shadow:0 0 0 4px rgba(67,129,44,.12)}}
+@keyframes annual-rate-breathe{0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(67,129,44,0);background-color:#edf7e6}50%{transform:scale(1.12);box-shadow:0 0 0 6px rgba(67,129,44,.3);background-color:#c8e6b7}}
