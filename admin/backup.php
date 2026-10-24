@@ -27,17 +27,24 @@ if (isset($_GET['download'])) {
     }
 }
 
-// Handle Delete
-if (isset($_GET['delete'])) {
-    $file = basename($_GET['delete']);
-    $path = dirname(__DIR__) . '/backups/' . $file;
-    if (file_exists($path)) {
-        unlink($path);
+// Handle deletion through a CSRF-protected POST request.
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'delete_backup') {
+    verifyCsrfToken();
+    $requested_file = (string) ($_POST['filename'] ?? '');
+    $file = basename($requested_file);
+    $backup_root = realpath(dirname(__DIR__) . '/backups');
+    $path = $backup_root ? realpath($backup_root . DIRECTORY_SEPARATOR . $file) : false;
+    $valid_path = $file === $requested_file
+        && strtolower(pathinfo($file, PATHINFO_EXTENSION)) === 'sql'
+        && $path !== false
+        && dirname($path) === $backup_root;
+    if ($valid_path && is_file($path) && unlink($path)) {
         logAudit($conn, $_SESSION['user_id'], 'DELETE', 'Backup', 0, 'Deleted backup file: ' . $file);
         notifyOtherAdmins($conn, (int) $_SESSION['user_id'], 'Backup Deleted',
             "An administrator deleted backup {$file}.", BASE_URL . '/admin/backup.php', 'backups');
         redirectWith(BASE_URL . '/admin/backup.php', 'success', 'Backup deleted successfully.');
     }
+    redirectWith(BASE_URL . '/admin/backup.php', 'danger', 'Backup could not be deleted.');
 }
 
 require_once '../includes/header.php';
@@ -312,6 +319,12 @@ $days_of_week = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Sa
     </div>
 </div>
 
+<form method="post" id="deleteBackupForm" class="d-none">
+    <?php echo csrfField(); ?>
+    <input type="hidden" name="action" value="delete_backup">
+    <input type="hidden" name="filename" id="deleteBackupFilename" value="">
+</form>
+
 <!-- Progress Modal -->
 <div class="modal fade" id="backupProgressModal" data-bs-backdrop="static" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
@@ -356,7 +369,8 @@ document.getElementById('btnDataBackup').addEventListener('click',   () => runBa
 
 function confirmDeleteBackup(filename) {
     if (confirm(`Are you sure you want to delete backup "${filename}"? This cannot be undone.`)) {
-        window.location.href = `?delete=${encodeURIComponent(filename)}`;
+        document.getElementById('deleteBackupFilename').value = filename;
+        document.getElementById('deleteBackupForm').submit();
     }
 }
 

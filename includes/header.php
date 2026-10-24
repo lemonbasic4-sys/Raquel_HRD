@@ -17,8 +17,8 @@ if (isset($_SESSION['role']) && $_SESSION['role'] === 'Admin') {
 }
 
 // Get dynamic branding settings
-$sys_pawnshop_name = getSetting($conn, 'company_name', 'Raquel Pawnshop');
-$sys_logo = getSetting($conn, 'system_logo', 'assets/img/logo/logo.png');
+$sys_pawnshop_name = 'Raquel Pawnshop';
+$sys_logo = 'assets/img/logo/logo.png';
 
 // Determine current page for active nav highlighting
 $current_page = basename($_SERVER['PHP_SELF']);

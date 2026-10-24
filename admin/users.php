@@ -5,31 +5,51 @@ checkRole(['Admin']);
 require_once '../includes/functions.php';
 ensureUserAccountSecuritySchema($conn);
 
-// Handle toggle active status   
-if (isset($_GET['toggle']) && is_numeric($_GET['toggle'])) {
-    $uid = (int) $_GET['toggle'];
-    if ($uid !== (int) $_SESSION['user_id']) {
-        $before = $conn->query("SELECT is_active FROM users WHERE user_id = $uid LIMIT 1")->fetch_assoc();
-        $conn->query("UPDATE users SET is_active = NOT is_active WHERE user_id = $uid");
-        if ($before && $conn->affected_rows > 0) {
-            $new_status = (int) $before['is_active'] === 1 ? 'Inactive' : 'Active';
-            logAudit($conn, $_SESSION['user_id'], 'UPDATE', 'User', $uid, 'Changed user account status to ' . $new_status . '.',
-                ['previous_value' => (int) $before['is_active'] === 1 ? 'Active' : 'Inactive', 'new_value' => $new_status]);
+// State-changing account actions must be POST requests protected by CSRF.
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && in_array($_POST['action'] ?? '', ['toggle_status', 'delete_user'], true)) {
+    verifyCsrfToken();
+    $action = $_POST['action'];
+    $uid = filter_input(INPUT_POST, 'user_id', FILTER_VALIDATE_INT);
+    if (!$uid) redirectWith(BASE_URL . '/admin/users.php', 'danger', 'Invalid user account.');
+    if ($uid === (int) $_SESSION['user_id']) redirectWith(BASE_URL . '/admin/users.php', 'danger', 'You cannot disable or delete your own account.');
+
+    $target_stmt = $conn->prepare("SELECT user_id, username, role, employee_id, is_active FROM users WHERE user_id = ? LIMIT 1");
+    $target_stmt->bind_param('i', $uid);
+    $target_stmt->execute();
+    $target = $target_stmt->get_result()->fetch_assoc();
+    $target_stmt->close();
+    if (!$target) redirectWith(BASE_URL . '/admin/users.php', 'danger', 'User account was not found.');
+
+    if ($target['role'] === 'Admin' && empty($target['employee_id']) && (int) $target['is_active'] === 1) {
+        $admin_count = (int) ($conn->query("SELECT COUNT(*) AS c FROM users WHERE role = 'Admin' AND employee_id IS NULL AND is_active = 1")->fetch_assoc()['c'] ?? 0);
+        if ($admin_count <= 1) redirectWith(BASE_URL . '/admin/users.php', 'danger', 'The last active administrator cannot be disabled or deleted.');
+    }
+
+    if ($action === 'toggle_status') {
+        $new_active = (int) $target['is_active'] === 1 ? 0 : 1;
+        $stmt = $conn->prepare('UPDATE users SET is_active = ? WHERE user_id = ?');
+        $stmt->bind_param('ii', $new_active, $uid);
+        $stmt->execute();
+        $changed = $stmt->affected_rows > 0;
+        $stmt->close();
+        if ($changed) {
+            $old_label = $new_active ? 'Inactive' : 'Active';
+            $new_label = $new_active ? 'Active' : 'Inactive';
+            logAudit($conn, $_SESSION['user_id'], 'UPDATE', 'User', $uid, 'Changed user account status to ' . $new_label . '.', ['previous_value' => $old_label, 'new_value' => $new_label]);
         }
         redirectWith(BASE_URL . '/admin/users.php', 'success', 'User status updated successfully.');
     }
-}
 
-// Handle delete     
-if (isset($_GET['delete']) && is_numeric($_GET['delete'])) {
-    $uid = (int) $_GET['delete'];
-    if ($uid !== (int) $_SESSION['user_id']) {
-        $conn->query("DELETE FROM users WHERE user_id = $uid");
-        if ($conn->affected_rows > 0) logAudit($conn, $_SESSION['user_id'], 'DELETE', 'User', $uid, 'Deleted user account');
+    $stmt = $conn->prepare('DELETE FROM users WHERE user_id = ?');
+    $stmt->bind_param('i', $uid);
+    $stmt->execute();
+    $deleted = $stmt->affected_rows > 0;
+    $stmt->close();
+    if ($deleted) {
+        logAudit($conn, $_SESSION['user_id'], 'DELETE', 'User', $uid, 'Deleted user account: ' . $target['username']);
         redirectWith(BASE_URL . '/admin/users.php', 'success', 'User deleted successfully.');
-    } else {
-        redirectWith(BASE_URL . '/admin/users.php', 'danger', 'You cannot delete your own account.');
     }
+    redirectWith(BASE_URL . '/admin/users.php', 'danger', 'User could not be deleted.');
 }
 
 require_once '../includes/header.php';
@@ -50,9 +70,21 @@ $total_users_result = $conn->query("
            AND e.department_id = (SELECT department_id FROM departments WHERE department_name = 'Human Resources' LIMIT 1))
 ");
 $total_users = (int) ($total_users_result->fetch_assoc()['total'] ?? 0);
-$active_users_result = $conn->query("\n    SELECT COUNT(*) AS total\n    FROM users u\n    LEFT JOIN employees e ON u.employee_id = e.employee_id\n    WHERE u.is_active = 1\n      AND ((u.role = 'Admin')\n       OR (u.role IN ('HR Manager', 'HR Supervisor', 'HR Staff')\n           AND e.employee_id IS NOT NULL\n           AND e.department_id = (SELECT department_id FROM departments WHERE department_name = 'Human Resources' LIMIT 1)))\n");
+$active_users_result = $conn->query("\n    SELECT COUNT(*) AS total\n    FROM users u\n    LEFT JOIN employees e ON u.employee_id = e.employee_id\n    WHERE u.is_active = 1 AND COALESCE(u.account_hold, 0) = 0\n      AND ((u.role = 'Admin')\n       OR (u.role IN ('HR Manager', 'HR Supervisor', 'HR Staff')\n           AND e.employee_id IS NOT NULL\n           AND e.department_id = (SELECT department_id FROM departments WHERE department_name = 'Human Resources' LIMIT 1)))\n");
 $active_users_count = (int) ($active_users_result->fetch_assoc()['total'] ?? 0);
-$inactive_users_count = max(0, $total_users - $active_users_count);
+$inactive_users_result = $conn->query("\n    SELECT COUNT(*) AS total\n    FROM users u\n    LEFT JOIN employees e ON u.employee_id = e.employee_id\n    WHERE u.is_active = 0\n      AND ((u.role = 'Admin')\n       OR (u.role IN ('HR Manager', 'HR Supervisor', 'HR Staff')\n           AND e.employee_id IS NOT NULL\n           AND e.department_id = (SELECT department_id FROM departments WHERE department_name = 'Human Resources' LIMIT 1)))\n");
+$inactive_users_count = (int) ($inactive_users_result->fetch_assoc()['total'] ?? 0);
+$held_users_result = $conn->query("
+    SELECT COUNT(*) AS total
+    FROM users u
+    LEFT JOIN employees e ON u.employee_id = e.employee_id
+    WHERE u.account_hold = 1
+      AND ((u.role = 'Admin')
+       OR (u.role IN ('HR Manager', 'HR Supervisor', 'HR Staff')
+           AND e.employee_id IS NOT NULL
+           AND e.department_id = (SELECT department_id FROM departments WHERE department_name = 'Human Resources' LIMIT 1)))
+");
+$held_users_count = (int) ($held_users_result->fetch_assoc()['total'] ?? 0);
 $total_pages = max(1, (int) ceil($total_users / $per_page));
 
 if ($current_page > $total_pages) {
@@ -76,16 +108,15 @@ $users = $conn->query("
     LIMIT $per_page OFFSET $offset
 ");
 
-// Fetch branches for the add form
-$branches = $conn->query("SELECT * FROM branches ORDER BY branch_name");
-
 // Only regular, active HR employees are eligible for a new HRIS account.
 $eligible_employees = $conn->query("
-    SELECT e.employee_id, e.employee_code, e.first_name, e.last_name, e.job_title, rc.rank_name, ec.personal_email
+    SELECT e.employee_id, e.employee_code, e.first_name, e.last_name, e.job_title, e.branch_id, e.profile_picture,
+           rc.rank_name, ec.personal_email, b.branch_name
     FROM employees e
     JOIN departments d ON e.department_id = d.department_id
     LEFT JOIN rank_categories rc ON e.rank_category_id = rc.rank_category_id
     LEFT JOIN employee_contacts ec ON e.employee_id = ec.employee_id
+    LEFT JOIN branches b ON e.branch_id = b.branch_id
     LEFT JOIN users u ON e.employee_id = u.employee_id AND u.role != 'Employee'
     WHERE u.user_id IS NULL
       AND e.is_active = 1
@@ -170,27 +201,65 @@ document.addEventListener('DOMContentLoaded', () => new bootstrap.Modal(document
     .user-management .page-hero { position: relative; overflow: hidden; }
     .user-management .page-hero::after { content: ''; position: absolute; width: 190px; height: 190px; right: -78px; top: -100px; border: 1px solid rgba(255,255,255,.13); border-radius: 50%; box-shadow: 0 0 0 26px rgba(255,255,255,.035), 0 0 0 52px rgba(255,255,255,.02); pointer-events: none; }
     .user-management .hero-content { position: relative; z-index: 1; }
-    .user-management .access-overview { background: linear-gradient(135deg, #f7faf8 0%, #fff 100%); border: 1px solid #e3ece5; border-radius: 14px; }
-    .user-management .overview-stat { padding: .15rem 1rem; }
-    .user-management .overview-stat + .overview-stat { border-left: 1px solid #dde8df; }
-    .user-management .overview-value { color: var(--text-dark); font-size: 1.55rem; font-weight: 800; line-height: 1.1; letter-spacing: -.04em; }
-    .user-management .overview-label { color: var(--text-muted); font-size: .7rem; font-weight: 700; letter-spacing: .055em; text-transform: uppercase; }
-    .user-management .user-toolbar { background: #fbfdfb; border-bottom: 1px solid var(--glass-border); padding: .8rem 1.25rem; }
-    .user-management .user-toolbar .search-box { width: min(100%, 300px); }
-    .user-management .user-toolbar .form-select { min-width: 140px; }
-    .user-management .users-table th { white-space: nowrap; }
+    .user-management .access-overview { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:1rem; margin-bottom:1.5rem; }
+    .user-management .overview-stat { position:relative; display:flex; align-items:center; gap:.9rem; min-width:0; padding:1rem 1.05rem; border-radius:14px; overflow:hidden; }
+    .user-management .access-overview .overview-stat.page-hero { margin:0; padding:1rem 1.05rem; min-height:92px; background:linear-gradient(135deg,var(--hero-from) 0%,var(--hero-mid) 50%,var(--hero-to) 100%); border:1px solid rgba(255,255,255,.1); box-shadow:0 8px 22px rgba(23,75,18,.16); }
+    .user-management .overview-stat::before { content:''; position:absolute; inset:0; opacity:.07; background-image:radial-gradient(circle at 1px 1px,#fff 1px,transparent 0); background-size:18px 18px; pointer-events:none; }
+    .user-management .overview-stat::after { content:''; position:absolute; width:72px; height:72px; right:-30px; bottom:-36px; border:1px solid rgba(255,255,255,.12); border-radius:50%; background:rgba(255,255,255,.025); box-shadow:0 0 0 18px rgba(255,255,255,.025); }
+    .user-management .overview-icon { position:relative; z-index:1; width:42px; height:42px; flex:0 0 42px; display:grid; place-items:center; border-radius:12px; color:#f4cb53; background:rgba(255,255,255,.1); }
+    .user-management .overview-copy { min-width:0; }
+    .user-management .overview-value, .user-management .overview-value.text-success, .user-management .overview-value.text-danger, .user-management .overview-value.text-warning { position:relative; z-index:1; color:#fff !important; font-size:1.55rem; font-weight:800; line-height:1.1; letter-spacing:-.04em; }
+    .user-management .overview-label { position:relative; z-index:1; color:rgba(255,255,255,.67); font-size:.7rem; font-weight:700; letter-spacing:.055em; text-transform:uppercase; }
+    .user-management .users-card { border-radius:16px; overflow:hidden; }
+    .user-management .users-card > .card-header { display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1.05rem 1.25rem; }
+    .user-management .account-count-badge { display:inline-flex; align-items:center; gap:.35rem; padding:.38rem .68rem; color:#365d38; background:#edf5eb; border-radius:999px; font-size:.75rem; font-weight:700; }
+    .user-management .user-toolbar { display:grid !important; grid-template-columns:minmax(220px,1fr) 170px 170px; background:#fbfdfb; border-bottom:1px solid var(--glass-border); border-top:1px solid var(--glass-border); padding:.9rem 1.25rem; }
+    .user-management .user-toolbar .search-box { width:100%; }
+    .user-management .user-toolbar .form-select { width:100%; min-width:0; }
+    .user-management .users-table { margin:0; }
+    .user-management .users-table th { white-space:nowrap; padding:.8rem .7rem; color:#536455; background:#f1f6ef; border-bottom:1px solid #dfe9dc; font-size:.7rem; letter-spacing:.045em; text-transform:uppercase; }
     .user-management .users-table td { vertical-align: middle; }
-    .user-management .users-table tbody tr { transition: background-color .18s ease; }
+    .user-management .users-table tbody tr { transition:background-color .18s ease; border-color:#edf1eb; }
+    .user-management .users-table tbody td { padding:.75rem .7rem; }
+    .user-management .users-table td:last-child { white-space:nowrap; }
     .user-management .user-count { color: var(--text-muted); font-size: .82rem; }
+    .account-create-modal .modal-dialog { max-width:680px; margin-top:1.5rem; margin-bottom:1.5rem; height:auto; min-height:calc(100% - 3rem); }
+    .account-create-modal .modal-content { max-height:calc(100vh - 3rem); max-height:calc(100dvh - 3rem); border:0; border-radius:16px; overflow:hidden; box-shadow:0 22px 60px rgba(12,42,15,.22); }
+    .account-create-modal .modal-header { padding:1rem 1.2rem; color:#fff; background:linear-gradient(125deg,#174b12,#2f6d1b); border:0; }
+    .account-create-modal .modal-title { display:flex; align-items:center; gap:.65rem; font-size:1rem; font-weight:750; }
+    .account-create-modal .modal-title-icon { width:34px; height:34px; display:grid; place-items:center; border-radius:10px; color:#f4cb53; background:rgba(255,255,255,.1); }
+    .account-create-modal .btn-close { filter:brightness(0) invert(1); opacity:.8; }
+    .account-create-modal .modal-body { min-height:0; overflow-y:auto; padding:1rem 1.2rem .75rem; }
+    .account-create-modal .compact-form-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.75rem 1rem; }
+    .account-create-modal .form-span-2 { grid-column:1 / -1; }
+    .account-create-modal .form-field { min-width:0; }
+    .account-create-modal .form-label { margin-bottom:.35rem; color:#2c3d2e; font-size:.78rem; font-weight:700; }
+    .account-create-modal .form-control, .account-create-modal .form-select { min-height:40px; border-color:#d8e2d6; border-radius:9px; font-size:.86rem; }
+    .account-create-modal input[type="file"].form-control { padding:.47rem .65rem; }
+    .account-create-modal .employee-photo-source { min-height:40px; display:flex; align-items:center; gap:.7rem; padding:.35rem .55rem; background:#f7faf6; border:1px solid #d8e2d6; border-radius:9px; }
+    .account-create-modal .employee-photo-source img { width:32px; height:32px; flex:0 0 32px; object-fit:cover; border-radius:50%; border:1px solid #d6e0d4; background:#fff; }
+    .account-create-modal .form-text { margin-top:.3rem; font-size:.7rem; line-height:1.35; }
+    .account-create-modal .account-note { display:flex; align-items:flex-start; gap:.65rem; margin:0 0 .9rem; padding:.7rem .8rem; color:#365b39; background:#f1f7ef; border:1px solid #dcebd8; border-radius:10px; font-size:.76rem; }
+    .account-create-modal .modal-footer { flex:0 0 auto; padding:.85rem 1.2rem 1.15rem; background:#fafcfa; border-top:1px solid #e8eee6; }
+    .account-create-modal .modal-footer .btn { min-width:112px; border-radius:9px; }
     @media (max-width: 767.98px) {
         .user-management .hero-actions { width: 100%; }
         .user-management .hero-actions .btn { flex: 1; }
-        .user-management .access-overview { display: grid !important; grid-template-columns: repeat(3, 1fr); }
-        .user-management .overview-stat { padding: .15rem .6rem; text-align: center; }
-        .user-management .overview-stat + .overview-stat { border-left: 1px solid #dde8df; }
+        .user-management .access-overview { grid-template-columns:repeat(2,minmax(0,1fr)); gap:.75rem; }
+        .user-management .overview-stat { padding:.85rem; }
+        .user-management .overview-icon { width:36px; height:36px; flex-basis:36px; }
         .user-management .overview-value { font-size: 1.35rem; }
-        .user-management .user-toolbar { padding: .75rem 1rem; }
+        .user-management .user-toolbar { grid-template-columns:1fr; padding:.75rem 1rem; }
         .user-management .user-toolbar .search-box, .user-management .user-toolbar .form-select { width: 100%; }
+        .account-create-modal .modal-dialog { margin:1rem .75rem; min-height:calc(100% - 2rem); }
+        .account-create-modal .modal-content { max-height:calc(100vh - 2rem); max-height:calc(100dvh - 2rem); }
+        .account-create-modal .compact-form-grid { grid-template-columns:1fr; }
+        .account-create-modal .form-span-2 { grid-column:auto; }
+        .account-create-modal .modal-footer .btn { flex:1; min-width:0; }
+    }
+    @media (min-width:768px) and (max-width:991.98px) {
+        .user-management .access-overview { grid-template-columns:repeat(2,minmax(0,1fr)); }
+        .user-management .user-toolbar { grid-template-columns:1fr 150px 150px; }
     }
 </style>
 
@@ -215,29 +284,29 @@ document.addEventListener('DOMContentLoaded', () => new bootstrap.Modal(document
     </div>
 </div>
 
-<div class="access-overview d-flex align-items-center justify-content-between mb-4 py-3" data-flash-toast-anchor>
-    <div class="overview-stat flex-fill">
-        <div class="overview-value"><?php echo $total_users; ?></div>
-        <div class="overview-label">HRIS accounts</div>
+<div class="access-overview" data-flash-toast-anchor>
+    <div class="overview-stat page-hero fadeup">
+        <div class="overview-icon"><i class="fas fa-users"></i></div><div class="overview-copy"><div class="overview-value"><?php echo $total_users; ?></div><div class="overview-label">HRIS accounts</div></div>
     </div>
-    <div class="overview-stat flex-fill">
-        <div class="overview-value text-success"><?php echo $active_users_count; ?></div>
-        <div class="overview-label">Active</div>
+    <div class="overview-stat page-hero fadeup">
+        <div class="overview-icon"><i class="fas fa-user-check"></i></div><div class="overview-copy"><div class="overview-value text-success"><?php echo $active_users_count; ?></div><div class="overview-label">Active</div></div>
     </div>
-    <div class="overview-stat flex-fill">
-        <div class="overview-value text-danger"><?php echo $inactive_users_count; ?></div>
-        <div class="overview-label">Inactive</div>
+    <div class="overview-stat page-hero fadeup">
+        <div class="overview-icon"><i class="fas fa-user-slash"></i></div><div class="overview-copy"><div class="overview-value text-danger"><?php echo $inactive_users_count; ?></div><div class="overview-label">Inactive</div></div>
     </div>
-    <div class="d-none d-md-block notification_placeholder text-muted small pe-3">System access overview</div>
+    <div class="overview-stat page-hero fadeup">
+        <div class="overview-icon"><i class="fas fa-user-lock"></i></div><div class="overview-copy"><div class="overview-value text-warning"><?php echo $held_users_count; ?></div><div class="overview-label">On hold</div></div>
+    </div>
 </div>
 
 <!-- Users Table -->
-<div class="content-card fadeup-1">
+<div class="content-card users-card fadeup-1">
     <div class="card-header">
         <div>
             <h5><i class="fas fa-users me-2"></i>All Users</h5>
-            <div class="user-count mt-1"><?php echo $total_users; ?> account<?php echo $total_users === 1 ? '' : 's'; ?> in the HRIS</div>
+            <div class="user-count mt-1">Search, filter, and manage system access.</div>
         </div>
+        <span class="account-count-badge"><i class="fas fa-database"></i><?php echo $total_users; ?> account<?php echo $total_users === 1 ? '' : 's'; ?></span>
     </div>
     <div class="user-toolbar d-flex flex-wrap align-items-center gap-2">
         <div class="search-box flex-grow-1">
@@ -255,6 +324,7 @@ document.addEventListener('DOMContentLoaded', () => new bootstrap.Modal(document
             <option value="">All statuses</option>
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
+            <option value="hold">On hold</option>
         </select>
     </div>
     <div class="card-body p-0">
@@ -277,7 +347,7 @@ document.addEventListener('DOMContentLoaded', () => new bootstrap.Modal(document
                 <tbody>
                     <?php $row_number = $offset + 1; ?>
                     <?php while ($user = $users->fetch_assoc()): ?>
-                        <tr data-role="<?php echo e($user['role']); ?>" data-status="<?php echo $user['is_active'] ? 'active' : 'inactive'; ?>">
+                        <tr data-role="<?php echo e($user['role']); ?>" data-status="<?php echo !empty($user['account_hold']) ? 'hold' : ($user['is_active'] ? 'active' : 'inactive'); ?>">
                             <td><strong><?php echo $row_number++; ?></strong></td>
                             <td>
                                 <img src="<?php echo getUserAvatar($user['user_profile_picture'], $user['employee_profile_picture']); ?>"
@@ -314,10 +384,10 @@ document.addEventListener('DOMContentLoaded', () => new bootstrap.Modal(document
                                         <i class="fas fa-edit"></i>
                                     </a>
                                     <!-- Toggle Status -->
-                                    <a href="?toggle=<?php echo $user['user_id']; ?>" class="btn btn-sm btn-outline-warning"
-                                        title="Toggle Active/Inactive">
-                                        <i class="fas fa-power-off"></i>
-                                    </a>
+                                    <form method="post" class="d-inline">
+                                        <?php echo csrfField(); ?><input type="hidden" name="action" value="toggle_status"><input type="hidden" name="user_id" value="<?php echo (int) $user['user_id']; ?>">
+                                        <button type="submit" class="btn btn-sm btn-outline-warning" title="Toggle Active/Inactive"><i class="fas fa-power-off"></i></button>
+                                    </form>
                                     <!-- Delete -->
                                     <button type="button" class="btn btn-sm btn-outline-danger" title="Delete User"
                                         onclick="setDeleteTarget(<?php echo $user['user_id']; ?>, '<?php echo e(addslashes($user['username'])); ?>')"
@@ -356,7 +426,7 @@ document.addEventListener('DOMContentLoaded', () => new bootstrap.Modal(document
                         }
                         if (empty($initials)) $initials = 'US';
                     ?>
-                        <div class="student-item" data-role="<?php echo e($user['role']); ?>" data-status="<?php echo $user['is_active'] ? 'active' : 'inactive'; ?>">
+                        <div class="student-item" data-role="<?php echo e($user['role']); ?>" data-status="<?php echo !empty($user['account_hold']) ? 'hold' : ($user['is_active'] ? 'active' : 'inactive'); ?>">
                             <div class="student-avatar">
                                 <img src="<?php echo getUserAvatar($user['user_profile_picture'], $user['employee_profile_picture']); ?>" alt="Profile" class="avatar-img">
                             </div>
@@ -384,8 +454,8 @@ document.addEventListener('DOMContentLoaded', () => new bootstrap.Modal(document
                                 </div>
                                 <div class="student-meta" style="margin-top: 4px;">
                                     Status: 
-                                    <span class="badge <?php echo $user['is_active'] ? 'bg-success' : 'bg-danger'; ?>">
-                                        <?php echo $user['is_active'] ? 'Active' : 'Inactive'; ?>
+                                    <span class="badge <?php echo !empty($user['account_hold']) ? 'bg-warning text-dark' : ($user['is_active'] ? 'bg-success' : 'bg-danger'); ?>">
+                                        <?php echo !empty($user['account_hold']) ? 'On Hold' : ($user['is_active'] ? 'Active' : 'Inactive'); ?>
                                     </span>
                                 </div>
                             </div>
@@ -398,10 +468,10 @@ document.addEventListener('DOMContentLoaded', () => new bootstrap.Modal(document
                                             <i class="fas fa-edit"></i>
                                         </a>
                                         <!-- Toggle Status -->
-                                        <a href="?toggle=<?php echo $user['user_id']; ?>" class="btn btn-sm btn-outline-warning"
-                                            title="Toggle Active/Inactive" style="padding: 5px 8px; border-radius: 6px;">
-                                            <i class="fas fa-power-off"></i>
-                                        </a>
+                                        <form method="post" class="d-inline">
+                                            <?php echo csrfField(); ?><input type="hidden" name="action" value="toggle_status"><input type="hidden" name="user_id" value="<?php echo (int) $user['user_id']; ?>">
+                                            <button type="submit" class="btn btn-sm btn-outline-warning" title="Toggle Active/Inactive" style="padding: 5px 8px; border-radius: 6px;"><i class="fas fa-power-off"></i></button>
+                                        </form>
                                         <!-- Delete -->
                                         <button type="button" class="btn btn-sm btn-outline-danger" title="Delete User"
                                             onclick="setDeleteTarget(<?php echo $user['user_id']; ?>, '<?php echo e(addslashes($user['username'])); ?>')"
@@ -478,17 +548,17 @@ document.addEventListener('DOMContentLoaded', () => new bootstrap.Modal(document
 </div>
 
 <!-- Add User Modal -->
-<div class="modal fade" id="addUserModal" tabindex="-1">
-    <div class="modal-dialog">
+<div class="modal fade account-create-modal" id="addUserModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title"><i class="fas fa-user-plus me-2"></i>Add New User</h5>
+                <h5 class="modal-title"><span class="modal-title-icon"><i class="fas fa-user-plus"></i></span>Add New User</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form method="POST" action="<?php echo BASE_URL; ?>/admin/add-user.php" enctype="multipart/form-data">
+            <form method="POST" action="<?php echo BASE_URL; ?>/admin/add-user.php">
                 <?php echo csrfField(); ?>
-                <div class="modal-body">
-                    <div class="mb-3">
+                <div class="modal-body"><div class="compact-form-grid">
+                    <div class="form-field form-span-2">
                         <label class="form-label">Select Employee <span class="text-danger">*</span></label>
                         <select class="form-select" name="employee_id" required onchange="prefillUserInfo(this)">
                             <option value="">Select Employee</option>
@@ -496,7 +566,11 @@ document.addEventListener('DOMContentLoaded', () => new bootstrap.Modal(document
                                 <option value="<?php echo $emp['employee_id']; ?>"
                                     data-name="<?php echo e($emp['first_name'] . ' ' . $emp['last_name']); ?>"
                                     data-email="<?php echo e($emp['personal_email']); ?>"
-                                    data-rank="<?php echo e($emp['rank_name'] ?? ''); ?>">
+                                    data-rank="<?php echo e($emp['rank_name'] ?? ''); ?>"
+                                    data-job-title="<?php echo e($emp['job_title'] ?? ''); ?>"
+                                    data-branch-id="<?php echo (int) ($emp['branch_id'] ?? 0); ?>"
+                                    data-branch-name="<?php echo e($emp['branch_name'] ?? 'Not assigned'); ?>"
+                                    data-avatar="<?php echo e(getUserAvatar(null, $emp['profile_picture'] ?? null)); ?>">
                                     <?php echo e($emp['last_name'] . ', ' . $emp['first_name']); ?>
                                     <?php if (!empty($emp['job_title'])): ?> - <?php echo e($emp['job_title']); ?><?php endif; ?>
                                     <?php if (!empty($emp['employee_code'])): ?> (<?php echo e($emp['employee_code']); ?>)<?php endif; ?>
@@ -505,7 +579,7 @@ document.addEventListener('DOMContentLoaded', () => new bootstrap.Modal(document
                         </select>
                         <div class="form-text">Only active, regular Human Resources employees without an HRIS account are eligible.</div>
                     </div>
-                    <div class="mb-3">
+                    <div class="form-field">
                         <label class="form-label">Username <span class="text-danger">*</span></label>
                         <input type="text" class="form-control" name="username" id="new_username" required>
                         <div class="form-text">Use a custom HR username. Do not use the Employee ID.</div>
@@ -513,35 +587,31 @@ document.addEventListener('DOMContentLoaded', () => new bootstrap.Modal(document
                     <input type="hidden" name="full_name" id="new_full_name">
                     <input type="hidden" name="email" id="new_email">
                     <input type="hidden" name="redirect" value="users.php">
-                    <div class="mb-3">
+                    <div class="form-field">
                         <label class="form-label">Role <span class="text-danger">*</span></label>
-                        <select class="form-select" name="role" required>
-                            <option value="">Select Role</option>
-                            <option value="HR Staff">HR Staff</option>
-                            <option value="HR Supervisor">HR Supervisor</option>
-                            <option value="HR Manager">HR Manager / Manager Level</option>
-                        </select>
-                        <div class="form-text">Use this access role for any HR manager-level employee, including HR Manager I-V and OIC HR Manager.</div>
+                        <input type="text" class="form-control bg-light" id="new_role_display" value="Select an employee" readonly aria-describedby="roleAutoHelp">
+                        <input type="hidden" name="role" id="new_role" value="">
+                        <div class="form-text" id="roleAutoHelp"><i class="fas fa-lock me-1"></i>Automatically assigned from the employee's position.</div>
                     </div>
-                    <div class="mb-3">
+                    <div class="form-field">
                         <label class="form-label">Branch</label>
-                        <select class="form-select" name="branch_id">
-                            <option value="">None (Admin)</option>
-                            <?php $branches->data_seek(0); while ($branch = $branches->fetch_assoc()): ?>
-                                <option value="<?php echo $branch['branch_id']; ?>"><?php echo e($branch['branch_name']); ?></option>
-                            <?php endwhile; ?>
-                        </select>
+                        <input type="text" class="form-control bg-light" id="new_branch_display" value="Select an employee" readonly>
+                        <input type="hidden" name="branch_id" id="new_branch_id" value="">
+                        <div class="form-text"><i class="fas fa-lock me-1"></i>Uses the employee's assigned branch.</div>
                     </div>
-                    <div class="mb-3">
+                    <div class="form-field">
                         <label class="form-label">Account Profile Picture</label>
-                        <input type="file" class="form-control" name="profile_picture" accept="image/*">
-                        <div class="form-text">Optional. Max 2MB (JPG, PNG, WebP).</div>
+                        <div class="employee-photo-source">
+                            <img id="new_employee_avatar" src="<?php echo e(getUserAvatar(null, null)); ?>" alt="Employee profile preview">
+                            <span class="small text-muted" id="new_employee_avatar_text">Select an employee</span>
+                        </div>
+                        <div class="form-text"><i class="fas fa-lock me-1"></i>Automatically uses the employee profile picture.</div>
                     </div>
-                    <div class="mb-3">
+                    <div class="form-field form-span-2">
                         <label class="form-label">Password <span class="text-danger">*</span></label>
                         <input type="password" class="form-control" name="password" required minlength="6">
                     </div>
-                </div>
+                </div></div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button type="submit" class="btn btn-primary"><i class="fas fa-save me-2"></i>Create User</button>
@@ -552,38 +622,39 @@ document.addEventListener('DOMContentLoaded', () => new bootstrap.Modal(document
 </div>
 
 <!-- Add Admin Modal -->
-<div class="modal fade" id="addAdminModal" tabindex="-1">
-    <div class="modal-dialog">
+<div class="modal fade account-create-modal" id="addAdminModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title"><i class="fas fa-user-shield me-2"></i>Add New Admin</h5>
+                <h5 class="modal-title"><span class="modal-title-icon"><i class="fas fa-user-shield"></i></span>Add New Admin</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form method="POST" action="<?php echo BASE_URL; ?>/admin/add-user.php">
                 <?php echo csrfField(); ?>
                 <div class="modal-body">
-                    <div class="alert alert-info py-2 small">
-                        <i class="fas fa-info-circle me-1"></i>Admin accounts are standalone and are not linked to employee records.
+                    <div class="account-note form-span-2">
+                        <i class="fas fa-info-circle mt-1"></i><span>Admin accounts are standalone and are not linked to employee records.</span>
                     </div>
                     <input type="hidden" name="role" value="Admin">
                     <input type="hidden" name="redirect" value="users.php">
-                    <div class="mb-3">
+                    <div class="compact-form-grid">
+                    <div class="form-field">
                         <label class="form-label">Full Name <span class="text-danger">*</span></label>
                         <input type="text" class="form-control" name="full_name" required>
                     </div>
-                    <div class="mb-3">
+                    <div class="form-field">
                         <label class="form-label">Email <span class="text-danger">*</span></label>
                         <input type="email" class="form-control" name="email" required>
                     </div>
-                    <div class="mb-3">
+                    <div class="form-field">
                         <label class="form-label">Username <span class="text-danger">*</span></label>
                         <input type="text" class="form-control" name="username" required>
                         <div class="form-text">Use a custom admin username.</div>
                     </div>
-                    <div class="mb-3">
+                    <div class="form-field">
                         <label class="form-label">Password <span class="text-danger">*</span></label>
                         <input type="password" class="form-control" name="password" required minlength="6">
-                    </div>
+                    </div></div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -606,12 +677,13 @@ document.addEventListener('DOMContentLoaded', () => new bootstrap.Modal(document
                 <p>Are you sure you want to delete user <strong id="deleteUserName"></strong>?</p>
                 <p class="text-danger small">This action cannot be undone.</p>
             </div>
-            <div class="modal-footer justify-content-center">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <a href="#" id="deleteConfirmBtn" class="btn btn-danger">
-                    <i class="fas fa-trash me-1"></i>Delete
-                </a>
-            </div>
+            <form method="post">
+                <?php echo csrfField(); ?><input type="hidden" name="action" value="delete_user"><input type="hidden" name="user_id" id="deleteUserId" value="">
+                <div class="modal-footer justify-content-center">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger"><i class="fas fa-trash me-1"></i>Delete</button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
@@ -619,34 +691,47 @@ document.addEventListener('DOMContentLoaded', () => new bootstrap.Modal(document
 <script>
     function setDeleteTarget(userId, username) {
         document.getElementById('deleteUserName').textContent = username;
-        document.getElementById('deleteConfirmBtn').href = '?delete=' + userId;
+        document.getElementById('deleteUserId').value = userId;
     }
 
     function prefillUserInfo(select) {
         const option = select.options[select.selectedIndex];
-        if (!option.value) return;
+        const roleField = document.getElementById('new_role');
+        const roleDisplay = document.getElementById('new_role_display');
+        const branchField = document.getElementById('new_branch_id');
+        const branchDisplay = document.getElementById('new_branch_display');
+        const avatar = document.getElementById('new_employee_avatar');
+        const avatarText = document.getElementById('new_employee_avatar_text');
+        if (!option.value) {
+            document.getElementById('new_full_name').value = '';
+            document.getElementById('new_email').value = '';
+            roleField.value = '';
+            roleDisplay.value = 'Select an employee';
+            branchField.value = '';
+            branchDisplay.value = 'Select an employee';
+            avatar.src = '<?php echo e(getUserAvatar(null, null)); ?>';
+            avatarText.textContent = 'Select an employee';
+            return;
+        }
 
         document.getElementById('new_full_name').value = option.getAttribute('data-name');
         document.getElementById('new_email').value = option.getAttribute('data-email') || '';
 
-        const roleSelect = document.querySelector('#addUserModal [name="role"]');
         const usernameField = document.getElementById('new_username');
-        const rank = (option.getAttribute('data-rank') || '').toLowerCase();
+        const position = ((option.getAttribute('data-rank') || '') + ' ' + (option.getAttribute('data-job-title') || '')).toLowerCase();
 
         if (!usernameField.value || usernameField.value === option.value) {
             const name = option.getAttribute('data-name').toLowerCase().replace(/\s+/g, '.');
             usernameField.value = name;
         }
 
-        if (roleSelect && !roleSelect.value) {
-            if (rank.includes('manager')) {
-                roleSelect.value = 'HR Manager';
-            } else if (rank.includes('supervisor')) {
-                roleSelect.value = 'HR Supervisor';
-            } else {
-                roleSelect.value = 'HR Staff';
-            }
-        }
+        const assignedRole = position.includes('manager') ? 'HR Manager' : (position.includes('supervisor') ? 'HR Supervisor' : 'HR Staff');
+        roleField.value = assignedRole;
+        roleDisplay.value = assignedRole;
+        branchField.value = option.getAttribute('data-branch-id') || '';
+        branchDisplay.value = option.getAttribute('data-branch-name') || 'Not assigned';
+        avatar.src = option.getAttribute('data-avatar') || '<?php echo e(getUserAvatar(null, null)); ?>';
+        avatarText.textContent = 'Inherited from employee profile';
     }
 
     document.addEventListener('DOMContentLoaded', function () {

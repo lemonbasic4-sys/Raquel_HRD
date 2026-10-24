@@ -25,14 +25,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $is_standalone_admin = ($role === 'Admin');
 
     if ($employee_id !== null) {
-        $employee_lookup = $conn->prepare("SELECT e.employee_code, e.employment_status, e.is_active, e.deleted_at, d.department_name
-            FROM employees e LEFT JOIN departments d ON d.department_id = e.department_id
+        $employee_lookup = $conn->prepare("SELECT e.employee_code, e.employment_status, e.is_active, e.deleted_at,
+                   e.branch_id, e.job_title, rc.rank_name, d.department_name
+            FROM employees e
+            LEFT JOIN departments d ON d.department_id = e.department_id
+            LEFT JOIN rank_categories rc ON rc.rank_category_id = e.rank_category_id
             WHERE e.employee_id = ? LIMIT 1");
         $employee_lookup->bind_param("i", $employee_id);
         $employee_lookup->execute();
         $employee_row = $employee_lookup->get_result()->fetch_assoc();
         $employee_lookup->close();
         $employee_username = trim((string)($employee_row['employee_code'] ?? ''));
+
+        // HRIS access is determined by the selected employee record, never by an editable form value.
+        if ($redirect === 'users.php') {
+            $position = strtolower(trim((string)($employee_row['rank_name'] ?? '') . ' ' . (string)($employee_row['job_title'] ?? '')));
+            $role = str_contains($position, 'manager')
+                ? 'HR Manager'
+                : (str_contains($position, 'supervisor') ? 'HR Supervisor' : 'HR Staff');
+            $branch_id = !empty($employee_row['branch_id']) ? (int) $employee_row['branch_id'] : null;
+        }
     }
 
     // For Employee-role portal accounts with no email, auto-generate a placeholder
@@ -109,7 +121,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Account avatars belong to the user record so standalone Admin accounts can use them too.
     $profile_picture = null;
     $profile_picture_path = null;
-    if (isset($_FILES['profile_picture']) && $_FILES['profile_picture']['error'] === UPLOAD_ERR_OK) {
+    // Employee-linked accounts inherit the employee profile photo; only standalone accounts may upload one.
+    if ($employee_id === null && isset($_FILES['profile_picture']) && $_FILES['profile_picture']['error'] === UPLOAD_ERR_OK) {
         $file_tmp = $_FILES['profile_picture']['tmp_name'];
         $file_name = $_FILES['profile_picture']['name'];
         $file_size = $_FILES['profile_picture']['size'];

@@ -13,6 +13,7 @@ $offset = ($current_page - 1) * $per_page;
 $selected_department = isset($_GET['department']) && $_GET['department'] !== '' ? max(0, (int)$_GET['department']) : 0;
 $selected_position   = isset($_GET['position'])   && $_GET['position']   !== '' ? trim($_GET['position'])   : '';
 $employee_search     = trim($_GET['search'] ?? '');
+$selected_employment = in_array($_GET['employment'] ?? '', ['Regular', 'Probationary'], true) ? $_GET['employment'] : '';
 
 $department_options = $conn->query("
     SELECT department_id, department_name
@@ -56,6 +57,11 @@ if ($selected_department > 0) {
 if ($selected_position !== '') {
     $safe_position = $conn->real_escape_string($selected_position);
     $base_where_conditions .= " AND e.job_title = '$safe_position'";
+}
+
+if ($selected_employment !== '') {
+    $safe_employment = $conn->real_escape_string($selected_employment);
+    $base_where_conditions .= " AND e.employment_status = '$safe_employment'";
 }
 
 // Search the entire employee directory, rather than only the current page.
@@ -220,6 +226,37 @@ document.addEventListener('DOMContentLoaded', () => new bootstrap.Modal(document
 </script>
 <?php endif; ?>
 
+<style>
+    .admin-employee-accounts-page .portal-accounts-card { overflow:hidden; border-radius:16px; }
+    .admin-employee-accounts-page .portal-accounts-card > .card-header { padding:1rem 1.2rem; background:#fff; border-bottom:0; }
+    .admin-employee-accounts-page .portal-filterbar { display:grid; grid-template-columns:minmax(0,1fr); gap:.75rem; padding:.9rem 1.2rem; background:#f8fbf7; border-top:1px solid #e5ece3; border-bottom:1px solid #dfe8dd; }
+    .admin-employee-accounts-page .portal-filter-form { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.65rem; align-items:center; min-width:0; }
+    .admin-employee-accounts-page .portal-filter-form > [name="search"] { grid-column:1 / 2; }
+    .admin-employee-accounts-page .portal-filter-form .btn { min-height:38px; white-space:nowrap; }
+    .admin-employee-accounts-page .portal-filterbar .form-control,
+    .admin-employee-accounts-page .portal-filterbar .form-select { width:100% !important; min-width:0; height:38px; border-color:#d4dfd2; border-radius:8px; }
+    .admin-employee-accounts-page .portal-page-search { width:100%; min-width:0 !important; max-width:none !important; }
+    .admin-employee-accounts-page .portal-accounts-table { margin:0; }
+    .admin-employee-accounts-page .portal-accounts-table thead th { padding:.82rem .72rem; color:#526553; background:#eef5ec; border-bottom:1px solid #d9e5d6; font-size:.7rem; font-weight:800; letter-spacing:.045em; text-transform:uppercase; white-space:nowrap; }
+    .admin-employee-accounts-page .portal-accounts-table tbody td { padding:.78rem .72rem; vertical-align:middle; border-color:#edf1eb; }
+    .admin-employee-accounts-page .portal-accounts-table tbody tr { transition:background-color .18s ease; }
+    .admin-employee-accounts-page .portal-accounts-table tbody tr:hover { background:#f8fbf7; }
+    .admin-employee-accounts-page .portal-accounts-table td:last-child { white-space:nowrap; }
+    .admin-employee-accounts-page .employee-identity { display:flex; align-items:center; gap:.7rem; min-width:220px; }
+    .admin-employee-accounts-page .employee-identity img { width:38px; height:38px; flex:0 0 38px; object-fit:cover; border-radius:50%; border:2px solid #e0e9dd; background:#fff; }
+    .admin-employee-accounts-page .employment-badge { display:inline-flex; margin-top:.3rem; padding:.2rem .45rem; border-radius:999px; font-size:.64rem; font-weight:750; }
+    .admin-employee-accounts-page .employment-badge.regular { color:#237242; background:#e5f5e9; }
+    .admin-employee-accounts-page .employment-badge.probationary { color:#5141a4; background:#ece9ff; }
+    @media (max-width:991.98px) {
+        .admin-employee-accounts-page .portal-filter-form { grid-template-columns:repeat(2,minmax(0,1fr)); }
+        .admin-employee-accounts-page .portal-filter-form > [name="search"] { grid-column:auto; }
+    }
+    @media (max-width:767.98px) {
+        .admin-employee-accounts-page .portal-filter-form { grid-template-columns:1fr; }
+        .admin-employee-accounts-page .portal-filter-form .btn { width:100%; }
+    }
+</style>
+
 <div class="admin-employee-accounts-page">
 <div class="page-hero fadeup">
     <div class="d-flex flex-wrap align-items-center justify-content-between mb-3 gap-3">
@@ -239,12 +276,14 @@ document.addEventListener('DOMContentLoaded', () => new bootstrap.Modal(document
     Employee Portal accounts are separate from HR system accounts. Company ID is suggested as the portal username, but you can use a custom one.
 </div>
 
-<div class="content-card fadeup-2">
+<div class="content-card portal-accounts-card fadeup-2">
     <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-3">
         <h5 class="mb-0"><i class="fas fa-user-lock me-2"></i>Portal Account Status</h5>
-        <div class="d-flex align-items-center justify-content-end gap-2 flex-wrap ms-auto" style="flex: 1 1 420px;">
-            <form method="GET" class="mb-0 d-flex align-items-center gap-2 flex-wrap">
-                <select class="form-select form-select-sm" id="department_filter" name="department" aria-label="Filter portal accounts by department" style="width: 200px;">
+        <span class="badge rounded-pill" style="background:#edf5eb;color:#37633a;"><?php echo $total_accounts; ?> employees</span>
+    </div>
+    <div class="portal-filterbar">
+            <form method="GET" class="portal-filter-form mb-0">
+                <select class="form-select form-select-sm" id="department_filter" name="department" aria-label="Filter portal accounts by department">
                     <option value="">All Departments</option>
                     <?php while ($department = $department_options->fetch_assoc()): ?>
                         <option value="<?php echo (int) $department['department_id']; ?>" <?php echo $selected_department === (int) $department['department_id'] ? 'selected' : ''; ?>>
@@ -252,7 +291,7 @@ document.addEventListener('DOMContentLoaded', () => new bootstrap.Modal(document
                         </option>
                     <?php endwhile; ?>
                 </select>
-                <select class="form-select form-select-sm" id="position_filter" name="position" aria-label="Filter portal accounts by position" style="width: 200px;">
+                <select class="form-select form-select-sm" id="position_filter" name="position" aria-label="Filter portal accounts by position">
                     <option value="">All Positions</option>
                     <?php while ($pos = $position_options->fetch_assoc()): ?>
                         <option value="<?php echo e($pos['job_title']); ?>" <?php echo $selected_position === $pos['job_title'] ? 'selected' : ''; ?>>
@@ -260,28 +299,31 @@ document.addEventListener('DOMContentLoaded', () => new bootstrap.Modal(document
                         </option>
                     <?php endwhile; ?>
                 </select>
-                <input type="search" class="form-control form-control-sm" name="search" value="<?php echo e($employee_search); ?>" placeholder="Name or employee ID" aria-label="Search all employees" style="width: 200px;">
+                <select class="form-select form-select-sm" name="employment" aria-label="Filter by employment status">
+                    <option value="">All Employment</option>
+                    <option value="Regular" <?php echo $selected_employment === 'Regular' ? 'selected' : ''; ?>>Regular</option>
+                    <option value="Probationary" <?php echo $selected_employment === 'Probationary' ? 'selected' : ''; ?>>Probationary</option>
+                </select>
+                <input type="search" class="form-control form-control-sm" name="search" value="<?php echo e($employee_search); ?>" placeholder="Name or employee ID" aria-label="Search all employees">
                 <button class="btn btn-sm btn-primary" type="submit"><i class="fas fa-search me-1"></i>Find</button>
-                <?php if ($selected_department > 0 || $selected_position !== '' || $employee_search !== ''): ?>
+                <?php if ($selected_department > 0 || $selected_position !== '' || $selected_employment !== '' || $employee_search !== ''): ?>
                     <a href="employee-accounts.php" class="btn btn-sm btn-outline-secondary" title="Clear filters">
                         <i class="fas fa-times me-1"></i>Clear
                     </a>
                 <?php endif; ?>
             </form>
-            <div class="search-box" style="min-width: 240px; flex: 1 1 240px; max-width: 320px;">
+            <div class="search-box portal-page-search">
                 <i class="fas fa-search search-icon"></i>
                 <input type="text" class="form-control form-control-sm" id="searchPortal" placeholder="Filter this page..." onkeyup="filterTable('searchPortal', 'portalTable')">
             </div>
-        </div>
     </div>
     <div class="card-body p-0">
         <div class="table-responsive d-none d-md-block">
-            <table class="table table-hover" id="portalTable">
+            <table class="table table-hover portal-accounts-table" id="portalTable">
                 <thead>
                     <tr>
                         <th>#</th>
-                        <th>Photo</th>
-                        <th>Employee Name</th>
+                        <th>Employee</th>
                         <th>Department</th>
                         <th>Branch</th>
                         <th>Account Status</th>
@@ -293,22 +335,19 @@ document.addEventListener('DOMContentLoaded', () => new bootstrap.Modal(document
                     <?php $row_number = $offset + 1; ?>
                     <?php if (!$employees || $employees->num_rows === 0): ?>
                         <tr>
-                            <td colspan="8" class="text-center py-4 text-muted">No employees found for the selected department.</td>
+                            <td colspan="7" class="text-center py-4 text-muted">No employees found for the selected filters.</td>
                         </tr>
                     <?php else: ?>
                         <?php while ($emp = $employees->fetch_assoc()): ?>
                             <tr>
                                 <td data-label="#"><strong><?php echo $row_number++; ?></strong></td>
-                                <td data-label="Photo">
-                                    <img src="<?php echo getEmployeeAvatar($emp['profile_picture']); ?>"
-                                         alt="Profile" class="rounded-circle" style="width: 32px; height: 32px; object-fit: cover;">
-                                </td>
-                                <td data-label="Employee Name">
-                                    <div><strong><?php echo e($emp['last_name'] . ', ' . $emp['first_name']); ?></strong></div>
-                                    <small class="text-muted"><?php echo e($emp['job_title']); ?> <span class="company-id-text">(Company ID: <span class="company-id-value"><?php echo e(getEmployeeDisplayId($emp)); ?></span>)</span></small>
-                                    <?php if (($emp['employment_status'] ?? '') === 'Probationary'): ?>
-                                        <div><span class="badge" style="background:#3730a3;">Probationary</span></div>
-                                    <?php endif; ?>
+                                <td data-label="Employee">
+                                    <div class="employee-identity">
+                                        <img src="<?php echo getEmployeeAvatar($emp['profile_picture']); ?>" alt="Profile">
+                                        <div><div><strong><?php echo e($emp['last_name'] . ', ' . $emp['first_name']); ?></strong></div>
+                                        <small class="text-muted"><?php echo e($emp['job_title']); ?> &middot; <span class="company-id-value"><?php echo e(getEmployeeDisplayId($emp)); ?></span></small>
+                                        <div><span class="employment-badge <?php echo ($emp['employment_status'] ?? '') === 'Probationary' ? 'probationary' : 'regular'; ?>"><?php echo e($emp['employment_status'] ?: 'Not set'); ?></span></div></div>
+                                    </div>
                                 </td>
                                 <td data-label="Department"><?php echo e($emp['department_name'] ?? 'N/A'); ?></td>
                                 <td data-label="Branch"><?php echo e($emp['branch_name'] ?? 'N/A'); ?></td>
@@ -514,7 +553,7 @@ document.addEventListener('DOMContentLoaded', () => new bootstrap.Modal(document
                     <input type="hidden" name="full_name" id="modal_full_name">
                     <input type="hidden" name="email" id="modal_email">
                     <input type="hidden" name="role" value="Employee">
-                    <input type="hidden" name="redirect" value="employee-accounts.php?page=<?php echo $current_page; ?><?php echo $selected_department > 0 ? '&department=' . (int) $selected_department : ''; ?><?php echo $selected_position !== '' ? '&position=' . urlencode($selected_position) : ''; ?><?php echo $employee_search !== '' ? '&search=' . urlencode($employee_search) : ''; ?>">
+                    <input type="hidden" name="redirect" value="employee-accounts.php?page=<?php echo $current_page; ?><?php echo $selected_department > 0 ? '&department=' . (int) $selected_department : ''; ?><?php echo $selected_position !== '' ? '&position=' . urlencode($selected_position) : ''; ?><?php echo $selected_employment !== '' ? '&employment=' . urlencode($selected_employment) : ''; ?><?php echo $employee_search !== '' ? '&search=' . urlencode($employee_search) : ''; ?>">
                     
                     <!-- Employee Badge Info -->
                     <div class="portal-emp-badge">

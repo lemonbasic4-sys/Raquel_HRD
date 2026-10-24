@@ -94,29 +94,26 @@ $employees = $conn->query("
     .job-badge-rf          { background: #f0fdf4; color: #166534; border: 1px solid #86efac; }
     .job-badge-default     { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
 
-    .admin-member-toolbar {
-        align-items: center;
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-        justify-content: flex-end;
-    }
-
-    .admin-member-toolbar .form-select {
-        min-width: 190px;
-    }
+    .admin-members-page .members-card { overflow:hidden; border-radius:16px; }
+    .admin-members-page .members-card > .card-header { display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1rem 1.2rem; background:#fff; border-bottom:0; }
+    .admin-members-page .member-count { display:inline-flex; align-items:center; gap:.35rem; padding:.38rem .68rem; color:#365d38; background:#edf5eb; border-radius:999px; font-size:.75rem; font-weight:700; }
+    .admin-member-toolbar { padding:.85rem 1.2rem; background:#f8fbf7; border-top:1px solid #e5ece3; border-bottom:1px solid #dfe8dd; }
+    .admin-member-toolbar form { display:grid !important; grid-template-columns:220px minmax(260px,1fr) auto; gap:.6rem; width:100%; }
+    .admin-member-toolbar .form-select, .admin-member-toolbar .form-control { width:100%; min-width:0; height:38px; border-color:#d4dfd2; border-radius:8px; }
+    .admin-member-toolbar .search-box { width:100%; }
+    .admin-members-page .members-table { margin:0; }
+    .admin-members-page .members-table thead th { padding:.82rem .72rem; color:#526553; background:#eef5ec; border-bottom:1px solid #d9e5d6; font-size:.7rem; font-weight:800; letter-spacing:.045em; text-transform:uppercase; white-space:nowrap; }
+    .admin-members-page .members-table tbody td { padding:.78rem .72rem; vertical-align:middle; border-color:#edf1eb; }
+    .admin-members-page .members-table tbody tr { transition:background-color .18s ease; }
+    .admin-members-page .members-table tbody tr:hover { background:#f8fbf7; }
+    .admin-members-page .member-identity { display:flex; align-items:center; gap:.75rem; min-width:240px; }
+    .admin-members-page .member-identity img { width:40px; height:40px; flex:0 0 40px; object-fit:cover; border-radius:50%; border:2px solid #e0e9dd; background:#fff; }
+    .admin-members-page .member-name { color:#243b28; font-weight:750; line-height:1.25; }
+    .admin-members-page .member-id { margin-top:.2rem; color:#738075; font-size:.7rem; }
 
     @media (max-width: 768px) {
-        .admin-member-toolbar,
-        .admin-member-toolbar form,
-        .admin-member-toolbar .search-box {
-            width: 100%;
-        }
-
-        .admin-member-toolbar .form-select,
-        .admin-member-toolbar .search-box input {
-            width: 100%;
-        }
+        .admin-members-page .members-card > .card-header { align-items:flex-start; }
+        .admin-member-toolbar form { grid-template-columns:1fr; }
     }
 </style>
 
@@ -134,11 +131,13 @@ $employees = $conn->query("
     <p class="text-white-50 small mb-0"><i class="fas fa-address-book me-1"></i>Full list of registered employees in the HRIS system.</p>
 </div>
 
-<div class="content-card fadeup-1">
+<div class="content-card members-card fadeup-1">
     <div class="card-header">
-        <h5><i class="fas fa-id-card me-2"></i>Employee Members</h5>
+        <div><h5 class="mb-0"><i class="fas fa-id-card me-2"></i>Employee Members</h5><div class="text-muted small mt-1">Browse registered employees across the organization.</div></div>
+        <span class="member-count"><i class="fas fa-users"></i><?php echo $total_members; ?> members</span>
+    </div>
         <div class="admin-member-toolbar">
-            <form method="GET" class="d-flex align-items-center gap-2 flex-wrap">
+            <form method="GET">
                 <select name="department" class="form-select form-select-sm" onchange="this.form.submit()" aria-label="Filter members by department">
                     <option value="">All Departments</option>
                     <?php while ($department = $department_options->fetch_assoc()): ?>
@@ -151,18 +150,16 @@ $employees = $conn->query("
                     <i class="fas fa-search search-icon"></i>
                     <input type="search" name="search" class="form-control form-control-sm" id="searchMembers" value="<?php echo e($search); ?>" placeholder="Search by name, ID, position..." onkeyup="filterTable('searchMembers', 'membersTable')">
                 </div>
+                <button class="btn btn-sm btn-primary" type="submit"><i class="fas fa-search me-1"></i>Find</button>
             </form>
         </div>
-    </div>
     <div class="card-body p-0">
         <div class="table-responsive d-none d-md-block">
-            <table class="table table-hover" id="membersTable">
+            <table class="table table-hover members-table" id="membersTable">
                 <thead>
                     <tr>
                         <th>#</th>
-                        <th>Employee ID</th>
-                        <th>Photo</th>
-                        <th>Full Name</th>
+                        <th>Employee</th>
                         <th>Department</th>
                         <th>Branch</th>
                         <th>Position</th>
@@ -173,18 +170,13 @@ $employees = $conn->query("
                     <?php $row_number = $offset + 1; ?>
                     <?php if ($employees->num_rows === 0): ?>
                         <tr>
-                            <td colspan="8" class="text-center py-4 text-muted">No members found for the selected department.</td>
+                            <td colspan="6" class="text-center py-4 text-muted">No members found for the selected filters.</td>
                         </tr>
                     <?php else: ?>
                         <?php while ($emp = $employees->fetch_assoc()): ?>
                             <tr>
                                 <td data-label="#"><strong><?php echo $row_number++; ?></strong></td>
-                                <td data-label="Employee ID"><strong class="company-id-value"><?php echo e(getEmployeeDisplayId($emp)); ?></strong></td>
-                                <td data-label="Photo">
-                                    <img src="<?php echo getEmployeeAvatar($emp['profile_picture']); ?>"
-                                         alt="Profile" class="rounded-circle" style="width: 32px; height: 32px; object-fit: cover;">
-                                </td>
-                                <td data-label="Full Name"><strong><?php echo e($emp['last_name'] . ', ' . $emp['first_name'] . ' ' . $emp['middle_name']); ?></strong></td>
+                                <td data-label="Employee"><div class="member-identity"><img src="<?php echo getEmployeeAvatar($emp['profile_picture']); ?>" alt="Profile"><div><div class="member-name"><?php echo e($emp['last_name'] . ', ' . $emp['first_name'] . ' ' . $emp['middle_name']); ?></div><div class="member-id"><i class="fas fa-id-badge me-1"></i><?php echo e(getEmployeeDisplayId($emp)); ?></div></div></div></td>
                                 <td data-label="Department"><?php echo e($emp['department_name'] ?? 'N/A'); ?></td>
                                 <td data-label="Branch"><?php echo e($emp['branch_name'] ?? 'N/A'); ?></td>
                                 <td data-label="Position">

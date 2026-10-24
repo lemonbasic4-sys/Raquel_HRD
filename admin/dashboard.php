@@ -147,6 +147,48 @@ $first_signin_users = $conn->query("
     LIMIT 3
 ");
 
+$held_account_count = (int) ($conn->query("
+    SELECT COUNT(*) AS c
+    FROM users u
+    LEFT JOIN employees e ON u.employee_id = e.employee_id
+    LEFT JOIN departments d ON e.department_id = d.department_id
+    WHERE u.account_hold = 1
+      AND ((u.role = 'Admin' AND u.employee_id IS NULL)
+        OR (u.role IN ('HR Manager', 'HR Supervisor', 'HR Staff')
+          AND e.employee_id IS NOT NULL AND d.department_name = 'Human Resources'))
+")->fetch_assoc()['c'] ?? 0);
+$held_accounts = $conn->query("
+    SELECT u.user_id, u.full_name, u.role, u.account_hold_reason
+    FROM users u
+    LEFT JOIN employees e ON u.employee_id = e.employee_id
+    LEFT JOIN departments d ON e.department_id = d.department_id
+    WHERE u.account_hold = 1
+      AND ((u.role = 'Admin' AND u.employee_id IS NULL)
+        OR (u.role IN ('HR Manager', 'HR Supervisor', 'HR Staff')
+          AND e.employee_id IS NOT NULL AND d.department_name = 'Human Resources'))
+    ORDER BY u.full_name LIMIT 3
+");
+
+$auto_backup_enabled = (int) getSetting($conn, 'auto_backup_enabled', '0');
+$auto_backup_last_run = getSetting($conn, 'auto_backup_last_run', '');
+$auto_backup_next_run = getSetting($conn, 'auto_backup_next_run', '');
+$backup_attention = !$auto_backup_enabled
+    || empty($auto_backup_last_run)
+    || (!empty($auto_backup_next_run) && strtotime($auto_backup_next_run) < time());
+if (!$auto_backup_enabled) {
+    $backup_status_title = 'Automatic backup disabled';
+    $backup_status_detail = 'Enable a schedule to protect system records.';
+} elseif (empty($auto_backup_last_run)) {
+    $backup_status_title = 'No automatic backup yet';
+    $backup_status_detail = 'Review the schedule or create a backup now.';
+} elseif (!empty($auto_backup_next_run) && strtotime($auto_backup_next_run) < time()) {
+    $backup_status_title = 'Scheduled backup overdue';
+    $backup_status_detail = 'The scheduled run time has passed.';
+} else {
+    $backup_status_title = 'Backup schedule healthy';
+    $backup_status_detail = 'Last run ' . date('M j, Y g:i A', strtotime($auto_backup_last_run)) . '.';
+}
+
 $audit_logs = $conn->query("SELECT al.*, u.full_name FROM audit_logs al LEFT JOIN users u ON al.user_id = u.user_id ORDER BY al.timestamp DESC LIMIT 10");
 ?>
 
@@ -203,37 +245,25 @@ $audit_logs = $conn->query("SELECT al.*, u.full_name FROM audit_logs al LEFT JOI
     <div class="col-lg-3 col-md-6">
         <div class="stat-card">
             <div class="stat-icon blue"><i class="fas fa-users-cog"></i></div>
-            <div class="stat-info">
-                <h3><?php echo $total_users; ?></h3>
-                <p>Total User Accounts</p>
-            </div>
+            <div class="stat-info"><h3><?php echo $total_users; ?></h3><p>Total User Accounts</p></div>
         </div>
     </div>
     <div class="col-lg-3 col-md-6">
         <div class="stat-card">
             <div class="stat-icon green"><i class="fas fa-user-check"></i></div>
-            <div class="stat-info">
-                <h3><?php echo $active_users; ?></h3>
-                <p>Active Accounts</p>
-            </div>
+            <div class="stat-info"><h3><?php echo $active_users; ?></h3><p>Active Accounts</p></div>
         </div>
     </div>
     <div class="col-lg-3 col-md-6">
         <div class="stat-card">
             <div class="stat-icon purple"><i class="fas fa-building"></i></div>
-            <div class="stat-info">
-                <h3><?php echo $total_branches; ?></h3>
-                <p>Registered Branches</p>
-            </div>
+            <div class="stat-info"><h3><?php echo $total_branches; ?></h3><p>Registered Branches</p></div>
         </div>
     </div>
     <div class="col-lg-3 col-md-6">
         <div class="stat-card">
             <div class="stat-icon gold"><i class="fas fa-file-invoice"></i></div>
-            <div class="stat-info">
-                <h3><?php echo $recent_logs; ?></h3>
-                <p>Security Events (24h)</p>
-            </div>
+            <div class="stat-info"><h3><?php echo $recent_logs; ?></h3><p>Security Events (24h)</p></div>
         </div>
     </div>
 </div>
@@ -251,7 +281,7 @@ $audit_logs = $conn->query("SELECT al.*, u.full_name FROM audit_logs al LEFT JOI
             </div>
             <div class="card-body">
                 <div class="row g-3 mb-4">
-                    <div class="col-md-6">
+                    <div class="col-xl-3 col-md-6">
                         <div class="border rounded-3 p-3 h-100" style="background:linear-gradient(135deg, #eef5ff 0%, #f8fbff 100%); border-color:#cfe0ff !important;">
                             <div class="d-flex align-items-start justify-content-between gap-3">
                                 <div>
@@ -268,7 +298,7 @@ $audit_logs = $conn->query("SELECT al.*, u.full_name FROM audit_logs al LEFT JOI
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-6">
+                    <div class="col-xl-3 col-md-6">
                         <div class="border rounded-3 p-3 h-100" style="background:linear-gradient(135deg, #fff8e8 0%, #fffdf8 100%); border-color:#f6dfac !important;">
                             <div class="d-flex align-items-start justify-content-between gap-3">
                                 <div>
@@ -285,9 +315,25 @@ $audit_logs = $conn->query("SELECT al.*, u.full_name FROM audit_logs al LEFT JOI
                             </div>
                         </div>
                     </div>
+                    <div class="col-xl-3 col-md-6">
+                        <div class="border rounded-3 p-3 h-100" style="background:linear-gradient(135deg, #fff1f2 0%, #fffafa 100%); border-color:#fecdd3 !important;">
+                            <div class="d-flex align-items-start justify-content-between gap-3">
+                                <div><div class="text-danger small fw-semibold text-uppercase" style="letter-spacing:.05em;">Accounts on hold</div><div class="d-flex align-items-baseline mt-1"><span class="display-6 fw-bold text-danger lh-1"><?php echo $held_account_count; ?></span><span class="text-muted small ms-2">accounts</span></div><p class="small text-muted mb-0 mt-2">Access restrictions that need review.</p></div>
+                                <span class="rounded-circle d-inline-flex align-items-center justify-content-center text-danger" style="width:42px;height:42px;background:#ffe4e6;flex:0 0 42px;"><i class="fas fa-user-lock"></i></span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-xl-3 col-md-6">
+                        <div class="border rounded-3 p-3 h-100" style="background:linear-gradient(135deg, #f3f4f6 0%, #ffffff 100%); border-color:#d1d5db !important;">
+                            <div class="d-flex align-items-start justify-content-between gap-3">
+                                <div><div class="small fw-semibold text-uppercase <?php echo $backup_attention ? 'text-danger' : 'text-success'; ?>" style="letter-spacing:.05em;">Backup status</div><div class="fw-bold mt-2"><?php echo e($backup_status_title); ?></div><p class="small text-muted mb-0 mt-2"><?php echo e($backup_status_detail); ?></p></div>
+                                <span class="rounded-circle d-inline-flex align-items-center justify-content-center <?php echo $backup_attention ? 'text-danger' : 'text-success'; ?>" style="width:42px;height:42px;background:#e5e7eb;flex:0 0 42px;"><i class="fas fa-database"></i></span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
-                <?php if ($pending_account_setup_count === 0 && $first_signin_count === 0): ?>
+                <?php if ($pending_account_setup_count === 0 && $first_signin_count === 0 && $held_account_count === 0 && !$backup_attention): ?>
                     <div class="d-flex align-items-center justify-content-center gap-2 rounded-3 py-3 px-4" style="background:#edf9f1; color:#277a47;">
                         <i class="fas fa-check-circle"></i>
                         <span class="small fw-semibold">All HR employee accounts are set up and activated.</span>
@@ -312,7 +358,7 @@ $audit_logs = $conn->query("SELECT al.*, u.full_name FROM audit_logs al LEFT JOI
                     <?php endif; ?>
 
                     <?php if ($first_signin_count > 0): ?>
-                        <div>
+                        <div class="mb-3">
                             <strong class="small text-warning d-block mb-2"><i class="fas fa-key me-1"></i>Accounts awaiting first sign-in</strong>
                             <?php while ($user = $first_signin_users->fetch_assoc()): ?>
                                 <div class="d-flex justify-content-between align-items-center rounded-3 px-3 py-2 mb-2 small" style="background:#fffcf5;">
@@ -323,6 +369,23 @@ $audit_logs = $conn->query("SELECT al.*, u.full_name FROM audit_logs al LEFT JOI
                                     <a href="<?php echo BASE_URL; ?>/admin/edit-user.php?id=<?php echo $user['user_id']; ?>" class="btn btn-sm btn-outline-warning">Review</a>
                                 </div>
                             <?php endwhile; ?>
+                        </div>
+                    <?php endif; ?>
+                    <?php if ($held_account_count > 0): ?>
+                        <div class="mb-3">
+                            <strong class="small text-danger d-block mb-2"><i class="fas fa-user-lock me-1"></i>Accounts currently on hold</strong>
+                            <?php while ($user = $held_accounts->fetch_assoc()): ?>
+                                <div class="d-flex justify-content-between align-items-center rounded-3 px-3 py-2 mb-2 small" style="background:#fff7f7;">
+                                    <div class="pe-3"><strong><?php echo e($user['full_name']); ?></strong><div class="text-muted mt-1"><?php echo e($user['role']); ?><?php echo $user['account_hold_reason'] ? ' &middot; ' . e($user['account_hold_reason']) : ''; ?></div></div>
+                                    <a href="<?php echo BASE_URL; ?>/admin/edit-user.php?id=<?php echo (int) $user['user_id']; ?>" class="btn btn-sm btn-outline-danger">Review</a>
+                                </div>
+                            <?php endwhile; ?>
+                        </div>
+                    <?php endif; ?>
+                    <?php if ($backup_attention): ?>
+                        <div class="d-flex justify-content-between align-items-center rounded-3 px-3 py-3 small" style="background:#f8fafc;">
+                            <div class="pe-3"><strong><i class="fas fa-database me-1"></i><?php echo e($backup_status_title); ?></strong><div class="text-muted mt-1"><?php echo e($backup_status_detail); ?></div></div>
+                            <a href="<?php echo BASE_URL; ?>/admin/backup.php" class="btn btn-sm btn-outline-primary">Manage backups</a>
                         </div>
                     <?php endif; ?>
                 <?php endif; ?>

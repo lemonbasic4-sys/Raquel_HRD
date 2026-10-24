@@ -212,27 +212,43 @@ document.addEventListener('DOMContentLoaded', () => new bootstrap.Modal(document
 <!-- ═══════════════════════════════════════════
      Page Header
 ═══════════════════════════════════════════ -->
-<div class="epu-page-header">
-    <div class="epu-page-header-left">
-        <a href="<?php echo BASE_URL; ?>/admin/employee-accounts.php?page=<?php echo $page; ?><?php echo $dept > 0 ? '&department=' . $dept : ''; ?>" class="epu-back-btn">
-            <i class="fas fa-arrow-left"></i>
-        </a>
-        <div>
-            <h4 class="epu-page-title">Employee Portal Account</h4>
-            <p class="epu-page-subtitle">Manage login credentials for non-HR portal access</p>
-        </div>
-    </div>
-    <div class="epu-status-pill <?php echo !empty($user['is_active']) ? 'active' : 'inactive'; ?>">
-        <i class="fas fa-<?php echo !empty($user['is_active']) ? 'check-circle' : 'ban'; ?>"></i>
-        <?php echo !empty($user['is_active']) ? 'Account Active' : 'Account Inactive'; ?>
-    </div>
-</div>
-
+<style>
+    .admin-portal-user-page { max-width:1050px; margin:0 auto; }
+    .admin-portal-user-page .page-hero { position:relative; overflow:hidden; padding:1.2rem 1.35rem; margin-bottom:1rem; }
+    .admin-portal-user-page .portal-hero-top { display:flex; justify-content:space-between; align-items:center; gap:1rem; margin-bottom:1rem; }
+    .admin-portal-user-page .portal-back { display:inline-flex; align-items:center; gap:.45rem; color:rgba(255,255,255,.82); font-size:.76rem; font-weight:700; text-decoration:none; }
+    .admin-portal-user-page .portal-status { display:inline-flex; align-items:center; gap:.4rem; padding:.35rem .65rem; color:#fff; background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.14); border-radius:999px; font-size:.72rem; font-weight:700; }
+    .admin-portal-user-page .epu-avatar { width:68px; height:68px; border:3px solid rgba(255,255,255,.35); }
+    .admin-portal-user-page .epu-meta-chip { padding:.3rem .55rem; font-size:.7rem; }
+    .admin-portal-user-page .epu-form-card { margin-bottom:1rem; border:1px solid #e2eae0; border-radius:15px; box-shadow:0 7px 22px rgba(29,63,31,.06); overflow:hidden; }
+    .admin-portal-user-page .epu-form-card-header { padding:.85rem 1.1rem; background:#fff; border-bottom:1px solid #e8eee6; }
+    .admin-portal-user-page .epu-form-card-icon { width:36px; height:36px; }
+    .admin-portal-user-page .epu-form-card-body { padding:1.05rem 1.1rem; }
+    .admin-portal-user-page .epu-field-label { margin-bottom:.35rem; font-size:.75rem; }
+    .admin-portal-user-page .epu-form-control { min-height:40px; font-size:.86rem; }
+    .admin-portal-user-page .epu-field-hint { margin-top:.3rem; font-size:.7rem; }
+    .admin-portal-user-page .epu-switch-row { margin-top:1rem; padding:.75rem .85rem; border-radius:10px; }
+    .admin-portal-user-page .epu-form-actions { margin-top:1rem; padding-top:.85rem; }
+    .admin-portal-user-page .epu-danger-card { margin-top:0; border-radius:14px; }
+    .admin-portal-user-page .epu-danger-card-inner { padding:.85rem 1rem; }
+    .admin-portal-user-page .epu-danger-desc { margin-bottom:0; font-size:.75rem; }
+    @media (max-width:767.98px) {
+        .admin-portal-user-page .page-hero { padding:1rem; }
+        .admin-portal-user-page .portal-hero-top { align-items:flex-start; }
+        .admin-portal-user-page .epu-form-card-body { padding:.9rem; }
+        .admin-portal-user-page .epu-danger-card-inner { align-items:stretch; }
+        .admin-portal-user-page .epu-btn-delete { width:100%; }
+    }
+</style>
 <!-- ═══════════════════════════════════════════
      Profile Hero Card
 ═══════════════════════════════════════════ -->
 <div class="admin-portal-user-page">
 <div class="page-hero fadeup">
+    <div class="portal-hero-top">
+        <a href="<?php echo BASE_URL; ?>/admin/employee-accounts.php?page=<?php echo $page; ?><?php echo $dept > 0 ? '&department=' . $dept : ''; ?>" class="portal-back"><i class="fas fa-arrow-left"></i>Portal accounts</a>
+        <span class="portal-status"><i class="fas fa-<?php echo !empty($user['is_active']) ? 'check-circle' : 'ban'; ?>"></i><?php echo !empty($user['is_active']) ? 'Account active' : 'Account inactive'; ?></span>
+    </div>
     <div class="d-flex align-items-center gap-4 flex-wrap">
         <div class="epu-avatar-wrap">
             <img src="<?php echo getEmployeeAvatar($user['profile_picture']); ?>"
@@ -240,6 +256,7 @@ document.addEventListener('DOMContentLoaded', () => new bootstrap.Modal(document
             <span class="epu-avatar-dot <?php echo !empty($user['is_active']) ? 'online' : 'offline'; ?>"></span>
         </div>
         <div class="epu-hero-info">
+            <div style="color:#f3cf62;font-size:.68rem;font-weight:750;letter-spacing:.09em;text-transform:uppercase;margin-bottom:.2rem;">Employee Portal Account</div>
             <h3 class="epu-hero-name" style="color: #ffffff; font-weight: 800; font-size: 1.35rem; margin: 0 0 4px;"><?php echo e($user['last_name'] . ', ' . $user['first_name']); ?></h3>
             <p class="epu-hero-role" style="color: rgba(255,255,255,0.75); font-size: 0.85rem; margin: 0 0 12px;"><?php echo e($user['job_title'] ?? 'Employee'); ?></p>
             <div class="epu-hero-meta">
@@ -273,13 +290,13 @@ document.addEventListener('DOMContentLoaded', () => new bootstrap.Modal(document
                     <div class="epu-input-group">
                         <span class="epu-input-prefix"><i class="fas fa-at"></i></span>
                         <input type="text" class="epu-form-control" name="username" id="portal_username"
-                               value="<?php echo e(getEmployeeDisplayId($user)); ?>" required>
+                               value="<?php echo e($user['username']); ?>" required>
                         <button type="button" class="epu-input-action" onclick="setUsernameToEmployeeId()"
                                 title="Use Employee ID as username">
                             <i class="fas fa-id-card"></i>
                         </button>
                     </div>
-                    <div class="epu-field-hint">Employee ID is autofilled. You can change it to any unique username.</div>
+                    <div class="epu-field-hint">Current portal username. Use the ID-card button to restore the Employee ID.</div>
                 </div>
 
                 <div class="col-md-6">
