@@ -22,7 +22,15 @@ $error = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verifyCsrfToken();
     try {
-        if (($_POST['action'] ?? '') === 'rate' && ($_POST['confirmed'] ?? '') === '1') {
+        if (($_POST['action'] ?? '') === 'start_hrd_cycle') {
+            if (!$annual_in_performance_page || $actor['role']!=='HR Manager' || !annualIsHrDepartment($actor)) {
+                throw new DomainException('Only the active Human Resources manager can start this cycle.');
+            }
+            $newCycleId=annualStartCycle($conn,$actor,(int)$actor['department_id'],
+                (string)($_POST['period_start'] ?? ''),(string)($_POST['period_end'] ?? ''),
+                (string)($_POST['self_rating_deadline'] ?? ''));
+            redirectWith(annualUrl($actor,'?view=peers&cycle_id='.$newCycleId),'success','Human Resources Annual cycle started. Employee self-rating notifications were sent.');
+        } elseif (($_POST['action'] ?? '') === 'rate' && ($_POST['confirmed'] ?? '') === '1') {
             $ratingTarget=annualMember($conn,$evaluationId);
             $withKra=$ratingTarget && annualCanFinalize($conn,$actor,$ratingTarget);
             if ($withKra) {
@@ -173,6 +181,9 @@ require_once __DIR__ . '/header.php';
     </section>
     <?php endif; ?>
     <?php if ($error): ?><div role="alert" class="alert alert-danger"><?php echo e($error); ?></div><?php endif; ?>
+    <?php if ($annual_in_performance_page && $actor['role']==='HR Manager' && annualIsHrDepartment($actor) && $view==='peers' && !$historyView && !$evaluationId): ?>
+        <?php require __DIR__.'/annual-cycle-start-panel.php'; ?>
+    <?php endif; ?>
     <?php if ($cycles): ?>
     <nav class="annual-workflow-nav d-flex flex-wrap gap-2 mb-4" aria-label="Annual workflow">
         <a class="btn btn-outline-success <?php echo !$historyView ? 'active' : ''; ?>" <?php echo !$historyView ? 'aria-current="page"' : ''; ?> href="<?php echo annualUrl($actor,'?view=peers'); ?>"><i class="fas fa-users me-2" aria-hidden="true"></i>360 · Department peers</a>

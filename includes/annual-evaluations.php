@@ -82,6 +82,12 @@ function ensureAnnualEvaluationSchema($conn): void
     foreach (['ready_for_approval_at'=>'DATETIME NULL','cycle_approved_by'=>'INT NULL'] as $column=>$definition) {
         if (!$conn->query("SHOW COLUMNS FROM annual_evaluation_cycles LIKE '{$column}'")->num_rows) $conn->query("ALTER TABLE annual_evaluation_cycles ADD COLUMN {$column} {$definition}");
     }
+    foreach (['started_at'=>'DATETIME NULL','started_by'=>'INT NULL','self_rating_deadline'=>'DATE NULL'] as $column=>$definition) {
+        if (!$conn->query("SHOW COLUMNS FROM annual_evaluation_cycles LIKE '{$column}'")->num_rows) $conn->query("ALTER TABLE annual_evaluation_cycles ADD COLUMN {$column} {$definition}");
+    }
+    // Cycles created before the explicit-start workflow are already in progress.
+    $conn->query('UPDATE annual_evaluation_cycles c SET c.started_at=c.created_at
+        WHERE c.started_at IS NULL AND EXISTS (SELECT 1 FROM annual_evaluation_members m WHERE m.cycle_id=c.cycle_id)');
 }
 
 function annualUsesPeerWorkflow($conn, int $evaluationId): bool
@@ -156,6 +162,118 @@ function annualExpectedPeers($conn, int $cycleId, int $employeeId): int
         JOIN employees e ON e.employee_id=m.employee_id WHERE m.cycle_id=? AND m.employee_id<>? AND '
         .annualRosterEligibilitySql(),[$cycleId,$employeeId])[0]['n'];
     return $count;
+}
+
+/** Preview the regular HRD employees and the forms authored by their heads. */
+function annualCycleRosterPreview($conn, int $departmentId): array
+{
+    $employees = annualQuery($conn, "SELECT e.employee_id,e.first_name,e.last_name,e.job_title_id,
+            j.job_title,j.reports_to,h.job_title AS reviewer_position_name
+        FROM employees e LEFT JOIN job_titles j ON j.job_title_id=e.job_title_id
+        LEFT JOIN job_titles h ON h.job_title_id=j.reports_to
+        WHERE e.department_id=? AND e.is_active=1 AND e.deleted_at IS NULL
+          AND e.employment_status='Regular'
+        ORDER BY e.last_name,e.first_name", [$departmentId]);
+    foreach ($employees as &$employee) {
+        $issues = [];
+        $positionId = (int)$employee['job_title_id'];
+        if (!$positionId || !$employee['job_title']) $issues[] = 'Active position missing';
+        if (!$employee['reports_to'] || !annualQuery($conn, "SELECT 1 FROM employees h
+                JOIN users u ON u.employee_id=h.employee_id
+                WHERE h.job_title_id=? AND h.employee_id<>? AND h.is_active=1 AND h.deleted_at IS NULL
+                  AND u.is_active=1 AND u.deleted_at IS NULL AND COALESCE(u.account_hold,0)=0 LIMIT 1",
+                [(int)$employee['reports_to'],(int)$employee['employee_id']])) $issues[] = 'Immediate head account missing';
+        if (!annualQuery($conn, "SELECT 1 FROM users WHERE employee_id=? AND role='Employee'
+                AND is_active=1 AND deleted_at IS NULL AND COALESCE(account_hold,0)=0 LIMIT 1",
+                [(int)$employee['employee_id']])) $issues[] = 'Employee Portal account missing';
+        $templates = annualQuery($conn, "SELECT t.template_id,t.kra_weight,t.behavior_weight FROM evaluation_templates t
+            JOIN evaluation_template_positions p ON p.template_id=t.template_id
+            JOIN users creator_account ON creator_account.user_id=t.created_by
+            JOIN employees creator ON creator.employee_id=creator_account.employee_id
+            WHERE t.target_department_id=? AND p.job_title_id=? AND t.evaluation_type='Annual'
+              AND t.status='Active' AND t.deleted_at IS NULL
+              AND creator.job_title_id=? AND creator.is_active=1 AND creator.deleted_at IS NULL
+              AND creator_account.is_active=1 AND creator_account.deleted_at IS NULL
+              AND COALESCE(creator_account.account_hold,0)=0",
+            [$departmentId,$positionId,(int)$employee['reports_to']]);
+        $validTemplate = false;
+        foreach ($templates as $template) {
+            $criteria = annualQuery($conn, "SELECT section,criterion_name,weight FROM evaluation_criteria
+                WHERE template_id=? ORDER BY section,sort_order,criterion_id", [(int)$template['template_id']]);
+            $kra = array_values(array_filter($criteria,static fn($row)=>$row['section']==='KRA'));
+            $behavior = array_values(array_filter($criteria,static fn($row)=>$row['section']==='Behavior'));
+            if ($kra && (int)round(array_sum(array_column($kra,'weight'))*100)===10000
+                && array_column($behavior,'criterion_name')===array_column(annualCoreValues(),'name')
+                && (float)$template['kra_weight']===80.0 && (float)$template['behavior_weight']===20.0) {
+                $validTemplate = true; break;
+            }
+        }
+        if (!$validTemplate) $issues[] = 'Annual form from immediate head missing or invalid (80/20, eight Core Values, KRA 100%)';
+        $employee['issues'] = $issues;
+    }
+    unset($employee);
+    return $employees;
+}
+
+function annualStartCycle($conn, array $actor, int $departmentId, string $from, string $to, string $deadline): int
+{
+    if ($actor['role'] !== 'HR Manager' || !annualIsHrDepartment($actor)
+        || (int)$actor['department_id']!==$departmentId) {
+        throw new DomainException('The HR Manager can start only the Human Resources Annual cycle.');
+    }
+    foreach ([$from,$to,$deadline] as $date) {
+        $parsed = DateTimeImmutable::createFromFormat('!Y-m-d',$date);
+        if (!$parsed || $parsed->format('Y-m-d')!==$date) throw new DomainException('Enter valid period and deadline dates.');
+    }
+    if ($from>$to) throw new DomainException('Period From must be on or before Period To.');
+    if ($deadline < date('Y-m-d')) throw new DomainException('The self-rating deadline cannot be in the past.');
+    $department = annualQuery($conn,'SELECT department_name FROM departments WHERE department_id=? AND is_active=1 AND deleted_at IS NULL',[$departmentId])[0] ?? null;
+    if (!$department) throw new DomainException('Select an active department.');
+    $roster = annualCycleRosterPreview($conn,$departmentId);
+    if (!$roster) throw new DomainException('This department has no active regular employees.');
+    foreach ($roster as $employee) {
+        if ($employee['issues']) throw new DomainException($employee['first_name'].' '.$employee['last_name'].': '.implode('; ',$employee['issues']));
+    }
+    $conn->begin_transaction();
+    try {
+        $existing = annualQuery($conn,'SELECT cycle_id FROM annual_evaluation_cycles
+            WHERE department_id=? AND period_start<=? AND period_end>=? LIMIT 1 FOR UPDATE',[$departmentId,$to,$from]);
+        if ($existing) throw new DomainException('An Annual cycle already covers some or all of this period for the department.');
+        if (annualQuery($conn,'SELECT cycle_id FROM annual_evaluation_cycles
+                WHERE department_id=? AND started_at IS NOT NULL AND completed_at IS NULL LIMIT 1 FOR UPDATE',[$departmentId])) {
+            throw new DomainException('Complete the department’s current Annual cycle before starting a new period.');
+        }
+        annualQuery($conn,'INSERT INTO annual_evaluation_cycles
+            (department_id,period_start,period_end,started_at,started_by,self_rating_deadline)
+            VALUES (?,?,?,NOW(),?,?)',[$departmentId,$from,$to,(int)$actor['user_id'],$deadline]);
+        $cycleId=(int)$conn->insert_id;
+        foreach ($roster as $employee) {
+            annualQuery($conn,'INSERT INTO annual_evaluation_members
+                (cycle_id,employee_id,position_id,reviewer_position_id,position_name) VALUES (?,?,?,?,?)',
+                [$cycleId,(int)$employee['employee_id'],(int)$employee['job_title_id'],(int)$employee['reports_to'],$employee['job_title']]);
+            foreach (annualQuery($conn,"SELECT user_id FROM users WHERE employee_id=? AND role='Employee'
+                    AND is_active=1 AND deleted_at IS NULL AND COALESCE(account_hold,0)=0",[(int)$employee['employee_id']]) as $user) {
+                createNotification($conn,(int)$user['user_id'],'Annual self-rating is open',
+                    $department['department_name'].' Annual evaluation covers '.$from.' to '.$to.'. Submit your self-rating by '.$deadline.'.',
+                    BASE_URL.'/employee/self-rating.php','evaluations',true);
+            }
+        }
+        logAudit($conn,(int)$actor['user_id'],'CREATE','Annual Cycle',$cycleId,
+            $department['department_name'].' '.$from.' to '.$to.'; self-rating deadline '.$deadline.'; '.count($roster).' members.');
+        $conn->commit();
+        return $cycleId;
+    } catch (Throwable $error) { $conn->rollback(); throw $error; }
+}
+
+function annualCycleForSelfRating($conn, int $departmentId, int $employeeId): ?array
+{
+    if (!$conn->query("SHOW TABLES LIKE 'annual_evaluation_cycles'")->num_rows) return null;
+    return annualQuery($conn,'SELECT c.cycle_id,c.period_start,c.period_end,c.self_rating_deadline,c.completed_at
+        FROM annual_evaluation_cycles c
+        LEFT JOIN annual_evaluation_members m ON m.cycle_id=c.cycle_id AND m.employee_id=?
+        WHERE c.department_id=? AND c.started_at IS NOT NULL
+          AND (m.member_id IS NULL OR m.evaluation_id IS NULL OR m.revision_pending=1)
+        ORDER BY c.period_end DESC,c.cycle_id DESC LIMIT 1',[$employeeId,$departmentId])[0] ?? null;
 }
 
 function annualAssertSnapshotActive(array $member): void
@@ -300,18 +418,42 @@ function annualRegisterSubmission($conn, int $evaluationId): void
         throw new DomainException('This Annual template must use the eight standard Core Behaviors & Values. Ask its creator to publish an updated template.');
     }
     $values = json_encode(annualValidateScores(array_column($criteria, 'score_value')));
-    annualQuery($conn, "INSERT INTO annual_evaluation_cycles (department_id,period_start,period_end) VALUES (?,?,?)
-        ON DUPLICATE KEY UPDATE cycle_id=cycle_id", [(int)$ev['department_id'], $start, $end]);
+    $departmentName = annualQuery($conn,'SELECT department_name FROM departments WHERE department_id=?',[(int)$ev['department_id']])[0]['department_name'] ?? '';
+    $isHrdCycle = annualIsHrDepartment(['department_name'=>$departmentName]);
+    if (!$isHrdCycle) {
+        // Other departments retain their existing submission-led workflow until
+        // their own managers receive an explicit Start Annual Cycle action.
+        annualQuery($conn,"INSERT INTO annual_evaluation_cycles (department_id,period_start,period_end) VALUES (?,?,?)
+            ON DUPLICATE KEY UPDATE cycle_id=cycle_id",[(int)$ev['department_id'],$start,$end]);
+    }
     $cycle = annualQuery($conn, 'SELECT * FROM annual_evaluation_cycles WHERE department_id=? AND period_start=? AND period_end=? FOR UPDATE',
-        [(int)$ev['department_id'], $start, $end])[0];
+        [(int)$ev['department_id'], $start, $end])[0] ?? null;
+    if (!$cycle || ($isHrdCycle && empty($cycle['started_at']))) throw new DomainException('HR Manager must start the Human Resources Annual cycle before self-ratings can be submitted.');
     $cycleId = (int)$cycle['cycle_id'];
-    $roster = annualQuery($conn, "SELECT DISTINCT e.employee_id,e.job_title_id,e.job_title,j.reports_to
-        FROM employees e JOIN job_titles j ON j.job_title_id=e.job_title_id
-        WHERE e.department_id=? AND e.is_active=1 AND e.deleted_at IS NULL AND e.employment_status='Regular'
-          AND EXISTS (SELECT 1 FROM evaluation_templates t JOIN evaluation_template_positions tp ON tp.template_id=t.template_id
-             WHERE tp.job_title_id=e.job_title_id AND t.target_department_id=e.department_id
-               AND t.evaluation_type='Annual' AND t.status='Active' AND t.deleted_at IS NULL)", [(int)$ev['department_id']]);
-    foreach ($roster as $r) {
+    if (!$isHrdCycle) {
+        $roster = annualQuery($conn, "SELECT DISTINCT e.employee_id,e.job_title_id,e.job_title,j.reports_to
+            FROM employees e JOIN job_titles j ON j.job_title_id=e.job_title_id
+            WHERE e.department_id=? AND e.is_active=1 AND e.deleted_at IS NULL AND e.employment_status='Regular'
+              AND EXISTS (SELECT 1 FROM evaluation_templates t JOIN evaluation_template_positions tp ON tp.template_id=t.template_id
+                 WHERE tp.job_title_id=e.job_title_id AND t.target_department_id=e.department_id
+                   AND t.evaluation_type='Annual' AND t.status='Active' AND t.deleted_at IS NULL)",[(int)$ev['department_id']]);
+        foreach ($roster as $r) {
+            annualQuery($conn,"INSERT INTO annual_evaluation_members (cycle_id,employee_id,position_id,reviewer_position_id,position_name)
+                VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE member_id=member_id",
+                [$cycleId,(int)$r['employee_id'],(int)$r['job_title_id'],$r['reports_to'],$r['job_title']]);
+        }
+    }
+    // A newly regularized employee may join an existing cycle without changing
+    // the original roster or its submitted evaluations.
+    $member = annualQuery($conn, 'SELECT * FROM annual_evaluation_members WHERE cycle_id=? AND employee_id=?',
+        [$cycleId,(int)$ev['employee_id']])[0] ?? null;
+    if (!$member) {
+        $roster = annualQuery($conn, "SELECT e.employee_id,e.job_title_id,e.job_title,j.reports_to
+            FROM employees e JOIN job_titles j ON j.job_title_id=e.job_title_id
+            WHERE e.employee_id=? AND e.department_id=? AND e.is_active=1 AND e.deleted_at IS NULL
+              AND e.employment_status='Regular'", [(int)$ev['employee_id'],(int)$ev['department_id']]);
+        if (!$roster) throw new DomainException('This employee is not eligible to join the department Annual cycle.');
+        $r=$roster[0];
         annualQuery($conn, "INSERT INTO annual_evaluation_members (cycle_id,employee_id,position_id,reviewer_position_id,position_name)
             VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE member_id=member_id", [$cycleId,(int)$r['employee_id'],(int)$r['job_title_id'], $r['reports_to'], $r['job_title']]);
     }

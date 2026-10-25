@@ -203,66 +203,41 @@ require_once '../includes/header.php';
 ?>
 
 <style>
-    /* ===== Continuous Non-Stop Full Circle Marquee ===== */
-    .stat-card-id {
-        overflow: hidden !important;
-        position: relative !important;
-        contain: paint !important;
-        clip-path: inset(0px) !important;
+    .template-create-page .wizard-summary-card {
+        display: block;
+        height: 100%;
+        min-height: 110px;
+        margin: 0;
+        padding: 16px 17px;
+        overflow: hidden;
+        background: linear-gradient(145deg, rgba(255,255,255,.17), rgba(255,255,255,.075));
+        border: 1px solid rgba(255,255,255,.28);
+        border-radius: 15px;
+        box-shadow: 0 8px 20px rgba(0,0,0,.12), inset 0 1px 0 rgba(255,255,255,.16);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
     }
-    
-    .stat-id-marquee-wrap {
-        overflow: hidden !important;
-        position: relative !important;
-        width: 100% !important;
-        max-width: 100% !important;
-        white-space: nowrap !important;
-        clip-path: inset(0px) !important;
-        contain: paint !important;
-        display: block !important;
+    .template-create-page .wizard-summary-card::after { display: none; }
+    .template-create-page .wizard-summary-card:hover {
+        transform: translateY(-2px);
+        background: linear-gradient(145deg, rgba(255,255,255,.21), rgba(255,255,255,.10));
+        box-shadow: 0 11px 24px rgba(0,0,0,.15), inset 0 1px 0 rgba(255,255,255,.2);
     }
-
-    .stat-id-marquee-track {
-        display: inline-flex !important;
-        white-space: nowrap !important;
-        will-change: transform;
-    }
-
-    .stat-id-marquee-track.scrolling {
-        animation: statMarqueeContinuous 10s linear infinite !important;
-    }
-
-    .stat-id-marquee-track.scrolling:hover {
-        animation-play-state: paused !important;
-        cursor: default;
-    }
-
-    .stat-id-marquee-content {
-        font-size: 1.25rem;
-        font-weight: 700;
-        color: #fff;
-        line-height: 1.2;
-        padding-right: 50px;
-        display: inline-block;
-        white-space: nowrap;
-    }
-
-    .stat-id-marquee-content-static {
-        font-size: 1.25rem;
-        font-weight: 700;
-        color: #fff;
-        line-height: 1.2;
-        display: inline-block;
-        white-space: nowrap;
-    }
-
-    @keyframes statMarqueeContinuous {
-        0% {
-            transform: translate3d(0, 0, 0);
-        }
-        100% {
-            transform: translate3d(-50%, 0, 0);
-        }
+    .wizard-summary-card > .d-flex { gap: 12px; min-width: 0; }
+    .wizard-summary-copy { flex: 1; min-width: 0; }
+    .template-create-page .wizard-summary-card .stat-value,
+    .wizard-identifier-window { display: block; color: #fff; font-size: 1.55rem; font-weight: 800; line-height: 1.15; letter-spacing: -.02em; }
+    .wizard-identifier-window { width: 100%; overflow: hidden; white-space: nowrap; }
+    .wizard-identifier-static { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; vertical-align: top; }
+    .wizard-identifier-track { display: flex; width: max-content; animation: wizardIdentifierScroll var(--marquee-duration, 10s) linear infinite; will-change: transform; }
+    .wizard-identifier-track span { flex: 0 0 auto; padding-right: 2rem; }
+    @keyframes wizardIdentifierScroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+    .template-create-page .wizard-summary-card .stat-label { color: rgba(255,255,255,.8); font-size: .71rem; line-height: 1.35; letter-spacing: .035em; margin-top: 8px; }
+    .wizard-summary-icon { display: grid; place-items: center; flex: 0 0 39px; width: 39px; height: 39px; border: 1px solid rgba(255,255,255,.19); border-radius: 11px; background: rgba(255,255,255,.12); color: #f3d982; font-size: 1.05rem; }
+    @media (max-width: 767.98px) {
+        .template-create-page .wizard-summary-card { min-height: 100px; padding: 13px; text-align: left; }
+        .template-create-page .wizard-summary-card .stat-value, .wizard-identifier-window { font-size: 1.35rem; }
+        .wizard-summary-icon { flex-basis: 33px; width: 33px; height: 33px; }
     }
 
     /* Wizard Stepper Styling */
@@ -415,7 +390,7 @@ require_once '../includes/header.php';
 <div class="page-hero fadeup">
     <div class="d-flex flex-wrap align-items-center justify-content-between mb-4 gap-3">
         <div>
-            <div style="font-size:.72rem;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,.55);">HR Manager · Evaluations</div>
+            <div style="font-size:.72rem;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,.55);"><?php echo !empty($creator_context['is_ceo']) ? 'President and CEO' : e($creator_context['role']); ?> · Evaluations</div>
             <h4 class="text-white fw-bold mb-0 mt-1"><i class="fas fa-magic me-2" style="color:#BD9414;"></i>Create Evaluation Template Wizard</h4>
         </div>
         <a href="<?php echo $template_list_url; ?>" class="btn btn-outline-light btn-sm rounded-pill px-3">
@@ -424,50 +399,48 @@ require_once '../includes/header.php';
     </div>
 
     <!-- Stats Header Cards -->
-    <div class="row g-3">
+    <div class="row g-3 wizard-summary-grid">
         <div class="col-6 col-md-3">
-            <div class="stat-card stat-card-id" style="overflow: hidden !important; position: relative !important; clip-path: inset(0px) !important; contain: paint !important;">
-                <div class="d-flex justify-content-between align-items-start" style="overflow: hidden !important; min-width: 0 !important; width: 100% !important;">
-                    <div style="overflow: hidden !important; min-width: 0 !important; flex: 1;" class="me-2">
-                        <div class="stat-id-marquee-wrap" id="statTemplateIdentifierContainer">
-                            <span class="stat-id-marquee-inner" id="statTemplateIdentifier">New Template</span>
-                        </div>
+            <div class="stat-card wizard-summary-card">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div class="wizard-summary-copy">
+                        <span class="wizard-identifier-window" id="statTemplateIdentifier" title="New Template"><span class="wizard-identifier-track"><span>New Template</span><span aria-hidden="true">New Template</span></span></span>
                         <div class="stat-label">Template Identifier</div>
                     </div>
-                    <i class="fas fa-barcode stat-icon text-white-50" style="flex-shrink:0;"></i>
+                    <span class="wizard-summary-icon"><i class="fas fa-barcode" aria-hidden="true"></i></span>
                 </div>
             </div>
         </div>
         <div class="col-6 col-md-3">
-            <div class="stat-card">
+            <div class="stat-card wizard-summary-card">
                 <div class="d-flex justify-content-between align-items-start">
-                    <div>
+                    <div class="wizard-summary-copy">
                         <div class="stat-value">80%</div>
                         <div class="stat-label">Default KRA Weight</div>
                     </div>
-                    <i class="fas fa-bullseye stat-icon" style="color:#BD9414;"></i>
+                    <span class="wizard-summary-icon"><i class="fas fa-bullseye" aria-hidden="true"></i></span>
                 </div>
             </div>
         </div>
         <div class="col-6 col-md-3">
-            <div class="stat-card">
+            <div class="stat-card wizard-summary-card">
                 <div class="d-flex justify-content-between align-items-start">
-                    <div>
+                    <div class="wizard-summary-copy">
                         <div class="stat-value">20%</div>
                         <div class="stat-label">Default Behavior Weight</div>
                     </div>
-                    <i class="fas fa-heart stat-icon" style="color:#dc3545;"></i>
+                    <span class="wizard-summary-icon"><i class="fas fa-heart" aria-hidden="true"></i></span>
                 </div>
             </div>
         </div>
         <div class="col-6 col-md-3">
-            <div class="stat-card">
+            <div class="stat-card wizard-summary-card">
                 <div class="d-flex justify-content-between align-items-start">
-                    <div>
+                    <div class="wizard-summary-copy">
                         <div class="stat-value">100%</div>
                         <div class="stat-label">Required Total Weight</div>
                     </div>
-                    <i class="fas fa-balance-scale stat-icon" style="color:#28a745;"></i>
+                    <span class="wizard-summary-icon"><i class="fas fa-balance-scale" aria-hidden="true"></i></span>
                 </div>
             </div>
         </div>
@@ -1754,23 +1727,22 @@ function clearDraftOnSubmit() {
 }
 
 function updateTemplateIdentifierMarquee() {
-    const wrap = document.getElementById('statTemplateIdentifierContainer');
-    if (!wrap) return;
+    const windowEl = document.getElementById('statTemplateIdentifier');
+    if (!windowEl) return;
 
     const tplNameInput = document.querySelector('[name="template_name"]');
     const formCodeInput = document.querySelector('[name="form_code"]');
-    let text = tplNameInput?.value?.trim() || formCodeInput?.value?.trim() || 'New Template';
-
-    const needsScroll = text.length > 10;
-    if (needsScroll) {
-        wrap.innerHTML = `
-            <div class="stat-id-marquee-track scrolling">
-                <span class="stat-id-marquee-content">${escAttr(text)}</span>
-                <span class="stat-id-marquee-content">${escAttr(text)}</span>
-            </div>`;
-    } else {
-        wrap.innerHTML = `<span class="stat-id-marquee-content-static" id="statTemplateIdentifier">${escAttr(text)}</span>`;
-    }
+    const text = tplNameInput?.value?.trim() || formCodeInput?.value?.trim() || 'New Template';
+    windowEl.title = text;
+    const track = document.createElement('span');
+    track.className = 'wizard-identifier-track';
+    const copy = document.createElement('span');
+    copy.textContent = text;
+    const duplicate = copy.cloneNode(true);
+    duplicate.setAttribute('aria-hidden', 'true');
+    track.append(copy, duplicate);
+    track.style.setProperty('--marquee-duration', `${Math.max(7, Math.min(18, text.length * .4))}s`);
+    windowEl.replaceChildren(track);
 }
 
 function attachAutosaveListeners() {

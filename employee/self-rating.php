@@ -78,6 +78,12 @@ $employee_stmt->bind_param("i", $employee_id);
 $employee_stmt->execute();
 $employee = $employee_stmt->get_result()->fetch_assoc();
 $employee_stmt->close();
+$available_annual_cycle = null;
+$is_hrd_annual_employee = annualIsHrDepartment(['department_name'=>$employee['department_name'] ?? '']);
+if (($employee['employment_status'] ?? '') === 'Regular' && $is_hrd_annual_employee) {
+    ensureAnnualEvaluationSchema($conn);
+    $available_annual_cycle = annualCycleForSelfRating($conn,(int)$employee['department_id'],$employee_id);
+}
 
 if (!$employee) {
     redirectWith(BASE_URL . '/employee/dashboard.php', 'danger', 'No employee record found for self-rating.');
@@ -189,6 +195,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $kra_scores = $_POST['kra_scores'] ?? [];
     $beh_scores = $_POST['beh_scores'] ?? [];
     $editing_id = (int) ($_POST['edit_id'] ?? 0);
+    if ($template_id > 0 && $available_annual_cycle) {
+        $posted_template_type = annualQuery($conn,'SELECT evaluation_type FROM evaluation_templates WHERE template_id=?',[$template_id])[0]['evaluation_type'] ?? '';
+        $existing_annual_status = $editing_id > 0
+            ? (annualQuery($conn,'SELECT status FROM evaluations WHERE evaluation_id=? AND employee_id=?',[$editing_id,$employee_id])[0]['status'] ?? '')
+            : '';
+        if ($posted_template_type === 'Annual' && ($editing_id === 0 || in_array($existing_annual_status,['Draft','Pending Self-Rating'],true))) {
+            $period_start = $available_annual_cycle['period_start'];
+            $period_end = $available_annual_cycle['period_end'];
+        }
+    }
     $is_valid_existing_edit = false;
     if ($editing_id > 0) {
         $existing_edit_stmt = $conn->prepare("SELECT template_id FROM evaluations
@@ -2319,14 +2335,19 @@ require_once '../includes/header.php';
                         // Compute on the fly for display and hidden inputs
                         $display_start = $edit_eval['evaluation_period_start'] ?? '';
                         $display_end = $edit_eval['evaluation_period_end'] ?? '';
+                        $eval_type = $edit_eval['evaluation_type'] ?? ($selected_template['evaluation_type'] ?? 'Annual');
+                        if ($eval_type === 'Annual' && $available_annual_cycle
+                            && (!$edit_eval || in_array($edit_eval['status'] ?? '', ['Draft','Pending Self-Rating'], true))) {
+                            $display_start = $available_annual_cycle['period_start'];
+                            $display_end = $available_annual_cycle['period_end'];
+                        }
                         
                         if (empty($display_start) || empty($display_end)) {
                             $hire_date = $employee['hire_date'] ?? date('Y-m-d');
-                            $eval_type = $edit_eval['evaluation_type'] ?? ($selected_template['evaluation_type'] ?? 'Annual');
                             
                             if ($eval_type === 'Annual') {
-                                $display_start = date('Y') . '-01-01';
-                                $display_end = date('Y') . '-12-31';
+                                $display_start = $available_annual_cycle['period_start'] ?? date('Y') . '-01-01';
+                                $display_end = $available_annual_cycle['period_end'] ?? date('Y') . '-12-31';
                             } elseif ($eval_type === 'Quarterly') {
                                 $current_month = (int)date('n');
                                 $current_year = date('Y');
@@ -2357,6 +2378,16 @@ require_once '../includes/header.php';
                         ?>
                         <input type="hidden" name="period_start" value="<?php echo e($display_start); ?>">
                         <input type="hidden" name="period_end" value="<?php echo e($display_end); ?>">
+                        <?php if (($eval_type ?? '') === 'Annual' && $is_hrd_annual_employee): ?>
+                        <div class="alert <?php echo $available_annual_cycle ? 'alert-info' : 'alert-warning'; ?> mt-3 mb-3" role="status">
+                            <?php if ($available_annual_cycle): ?>
+                                <strong>Annual cycle:</strong> <?php echo e(formatDate($display_start)); ?> to <?php echo e(formatDate($display_end)); ?>.
+                                Self-rating deadline: <?php echo e(formatDate($available_annual_cycle['self_rating_deadline'])); ?>.
+                            <?php else: ?>
+                                HR Manager has not started an available Annual cycle for your department. You can prepare a draft, but submission is unavailable until the cycle starts.
+                            <?php endif; ?>
+                        </div>
+                        <?php endif; ?>
 
                             <?php
                             // Rating scale definitions (1–4 matching the system's 0.00–4.00 range)

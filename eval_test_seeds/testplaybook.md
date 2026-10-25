@@ -162,9 +162,11 @@ Re-import leaves existing seeded templates and their criterion IDs unchanged.
    database, the template is Active, the employee is active and Regular, and the
    employee's position is included in the template targets. Confirm the creator's
    position is the target position's configured **Reports To**.
-5. A template is an available form, not a submitted evaluation. Annual cycles and
-   reviewer progress appear only after employees submit their self-ratings. Do not
-   import the seed expecting it to generate scores or completed evaluations.
+5. A template is an available form, not a submitted evaluation. The HR Manager
+   opens **Performance Evaluation → Regular Employee** for **Human Resources only**, selects evaluation
+   period From/To and the self-rating deadline, reviews the roster, then starts the cycle. This creates
+   the roster and sends Employee Portal self-rating notifications. Reviewer
+   progress appears as employees submit; importing the seed creates no scores.
 
 #### Manual Annual workflow checks
 
@@ -194,7 +196,7 @@ Developmental Plan tab and the head's View submitted review must show the saved
 goals as view-only. Later peer ratings must not change those goals.
 
 1. Use the seeded templates above **or** create Annual templates manually for the configured direct-report positions. Do not create duplicate templates for the same test. Confirm eight standard Core Values, KRA item weights totaling 100%, and the fixed 80/20 split. No framework code/version entry is required.
-2. Submit self-ratings from each Regular employee's Employee Portal using **identical start/end dates** for the department cycle. Employee count is dynamic, not fixed at three. Creating/importing templates alone does not create a cycle.
+2. As HR Manager, open **Performance Evaluation → Regular Employee** and start the Human Resources period after all regular HRD employees show Ready in the roster preview. Each target's Annual form must have been created by its immediate head. Then submit self-ratings from each Regular HRD employee's Employee Portal. The HRD form uses the manager-selected From/To dates. Other departments retain their existing flow for now. The deadline is a target date; late-participant status begins only after cycle approval.
 3. As HR Manager or HR Supervisor, open **Performance Evaluation → Regular Employee**. The department peer list shows eligible participants. Use **Rate & review** for a submitted direct-report Annual evaluation; your own self-rating is not a prerequisite. President/CEO approves the HR Manager. Audit Details in Evaluation History retains the traditional evaluation layout.
 4. Open **360 — Department peers**. HR Manager/Supervisor access it inside Performance Evaluation; HR Staff uses the dedicated **Annual & 360 Ratings** HRIS entry. Non-HRD departments use the Employee Portal. All eligible department participants appear, including your row marked **You / Cannot rate yourself**. Coworkers cannot be rated until both employees submit self-rating for that cycle.
 5. Rate the eight Core Values with numeric inputs from **1.00 to 4.00**. Immediate heads proceed through the **KRA → Core Behaviors → Review & Submit** tabs, compare each behavior with the employee's self-rating, draw a rater signature, and review the confirmation popup. Confirm submitted peer ratings are locked and self-rating/cross-department requests are rejected. On the printed evaluation form, verify the immediate head's signature appears in the **Rater** field.
@@ -209,6 +211,7 @@ goals as view-only. Later peer ratings must not change those goals.
 Run the isolated automated checks without importing any test data into your working database:
 
 ```powershell
+& "C:\xampp\php\php.exe" tests/annual-cycle-start.php
 & "C:\xampp\php\php.exe" tests/annual-evaluations.php
 ```
 
