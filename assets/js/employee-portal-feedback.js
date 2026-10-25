@@ -454,7 +454,7 @@
      AUTO-DISMISS SUCCESS ALERTS & AUDIO FEEDBACK (Req 15.3)
      Auto-plays audio chime on page load and auto-dismisses success banners
   ================================================================ */
-  var successAlerts = document.querySelectorAll('.alert-success, .alert-ep-success');
+  var successAlerts = document.querySelectorAll('.alert-success:not([data-persistent-alert]), .alert-ep-success:not([data-persistent-alert])');
   if (successAlerts.length > 0) {
     setTimeout(function () { playUiSound('success'); }, 150);
     successAlerts.forEach(function (alert) {

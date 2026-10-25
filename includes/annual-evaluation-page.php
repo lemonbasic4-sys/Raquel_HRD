@@ -179,6 +179,12 @@ require_once __DIR__ . '/header.php';
         <a class="btn btn-outline-success <?php echo $historyView ? 'active' : ''; ?>" <?php echo $historyView ? 'aria-current="page"' : ''; ?> href="<?php echo annualUrl($actor,'?view=history'); ?>"><i class="fas fa-history me-2" aria-hidden="true"></i>Annual Evaluation History</a>
     </nav>
     <?php endif; ?>
+    <?php if ($evaluationId && $cycle && $actor['role']==='HR Manager' && empty($cycle['completed_at']) && !empty($cycle['ready_for_approval_at'])): ?>
+        <div class="alert alert-success d-flex flex-wrap align-items-center justify-content-between gap-3" role="status" data-persistent-alert>
+            <div><strong>Ready for HR Manager approval</strong><div>All annual requirements are complete. The cycle will move to history after approval.</div></div>
+            <form method="post"><?php echo csrfField(); ?><input type="hidden" name="action" value="approve_cycle"><input type="hidden" name="cycle_id" value="<?php echo (int)$cycleId; ?>"><button class="btn btn-success" type="submit"><i class="fas fa-check-circle me-2" aria-hidden="true"></i>Approve cycle</button></form>
+        </div>
+    <?php endif; ?>
     <?php if (!$cycles || (!$evaluationId && !$cycleOptions)): ?>
         <div class="annual-note-card" role="status">
             <i class="fas fa-layer-group annual-note-icon" aria-hidden="true"></i>
@@ -186,12 +192,6 @@ require_once __DIR__ . '/header.php';
             <p class="mb-0"><?php echo $historyView ? 'Completed department cycles appear here after all required approvals and 360 ratings are submitted.' : 'Submitted Annual cycles appear here while reviews and ratings are in progress. Completed cycles are available in Annual Evaluation History.'; ?></p>
         </div>
     <?php elseif (!$evaluationId): ?>
-        <?php if ($cycle && empty($cycle['completed_at']) && !empty($cycle['ready_for_approval_at'])): ?>
-            <div class="alert alert-success d-flex flex-wrap align-items-center justify-content-between gap-3">
-                <div><strong>Ready for HR Manager approval</strong><div>All annual requirements are complete. The cycle will move to history after approval.</div></div>
-                <?php if ($actor['role']==='HR Manager'): ?><form method="post"><?php echo csrfField(); ?><input type="hidden" name="action" value="approve_cycle"><input type="hidden" name="cycle_id" value="<?php echo (int)$cycleId; ?>"><button class="btn btn-success" type="submit"><i class="fas fa-check-circle me-2" aria-hidden="true"></i>Approve cycle</button></form><?php endif; ?>
-            </div>
-        <?php endif; ?>
         <form class="content-card annual-cycle-filter p-3 mb-4 d-flex gap-2 flex-wrap" method="get">
             <?php if ($annual_in_performance_page): ?><input type="hidden" name="category" value="regular"><?php endif; ?>
             <input type="hidden" name="view" value="<?php echo $historyView ? 'history' : e($view); ?>">
@@ -205,12 +205,11 @@ require_once __DIR__ . '/header.php';
         <?php if ($historyView): ?>
             <div class="alert alert-success" role="status"><i class="fas fa-check-circle me-2" aria-hidden="true"></i>All required Annual approvals and 360 ratings are complete. This cycle is archived for viewing. Completed <?php echo e($cycle['completed_at']); ?>.</div>
         <?php elseif ($view==='peers'): ?>
-            <div class="alert alert-info">Rate coworkers on Core Behaviors &amp; Values. For your direct reports, review KRA and submit your Core Values rating on the same screen. Your self-rating is included once. Confirmed peer ratings are locked.</div>
             <?php if (!annualCanRate($actor)): ?><div class="alert alert-warning">HR department peer ratings are completed through your HRIS account. Your Employee Portal remains available for self-rating and your results.</div><?php endif; ?>
             <?php if ($own && !$own[0]['evaluation_id']): ?><div class="alert alert-warning"><?php echo $actor['role']==='HR Manager' ? 'Your own Annual self-rating is pending. You may rate submitted department evaluations now and complete your self-rating separately.' : 'Your own Annual self-rating is pending. Direct-report Rate & Review remains available; submit your self-rating before rating other coworkers.'; ?></div><?php endif; ?>
         <?php endif; ?>
         <div class="content-card p-3">
-            <header class="annual-section-heading <?php echo $view==='peers' ? 'annual-peer-heading' : ''; ?>"><div><h2 class="h5 mb-1"><?php echo $historyView ? 'Annual Evaluation History' : ($view==='peers' ? '360 Rating — Department Peers' : 'Annual Evaluation Progress'); ?></h2><p class="text-muted small mb-0"><?php echo $historyView ? 'Completed department evaluations and their approved results. View only.' : ($view==='peers' ? 'Rate your coworkers on the eight Core Behaviors & Values items.' : 'Review submitted self-ratings, department 360 participation, and annual results.'); ?></p></div>
+            <header class="annual-section-heading <?php echo $view==='peers' ? 'annual-peer-heading' : ''; ?>"><div><h2 class="h5 mb-1"><?php echo $historyView ? 'Annual Evaluation History' : ($view==='peers' ? '360 Rating — Department Peers' : 'Annual Evaluation Progress'); ?><?php if ($view==='peers' && !$historyView): ?> <button type="button" class="annual-peer-help" data-bs-toggle="tooltip" data-bs-placement="bottom" data-bs-container="body" title="Rate coworkers on Core Behaviors &amp; Values. For your direct reports, review KRA and submit your Core Values rating on the same screen. Your self-rating is included once. Confirmed peer ratings are locked." aria-label="Department peer rating instructions"><i class="fas fa-info-circle" aria-hidden="true"></i></button><?php endif; ?></h2><p class="text-muted small mb-0"><?php echo $historyView ? 'Completed department evaluations and their approved results. View only.' : ($view==='peers' ? 'Rate your coworkers on the eight Core Behaviors & Values items.' : 'Review submitted self-ratings, department 360 participation, and annual results.'); ?></p></div>
                 <?php if ($view==='peers'): ?>
                 <div class="annual-peer-size">
                     <div class="package-stat" aria-label="Department size: <?php echo count($members); ?> employees in this Annual cycle">
@@ -220,6 +219,12 @@ require_once __DIR__ . '/header.php';
                 </div>
                 <?php endif; ?>
             </header>
+            <?php if ($view==='peers' && !$historyView && $cycle && $actor['role']==='HR Manager' && empty($cycle['completed_at']) && !empty($cycle['ready_for_approval_at'])): ?>
+                <div class="alert alert-success d-flex flex-wrap align-items-center justify-content-between gap-3 mt-3" role="status" data-persistent-alert>
+                    <div><strong>Ready for HR Manager approval</strong><div>All annual requirements are complete. The cycle will move to history after approval.</div></div>
+                    <form method="post"><?php echo csrfField(); ?><input type="hidden" name="action" value="approve_cycle"><input type="hidden" name="cycle_id" value="<?php echo (int)$cycleId; ?>"><button class="btn btn-success" type="submit"><i class="fas fa-check-circle me-2" aria-hidden="true"></i>Approve cycle</button></form>
+                </div>
+            <?php endif; ?>
             <div class="row g-2 mb-3"><div class="col-md-7"><label for="annualSearch" class="form-label">Find employee</label><input id="annualSearch" class="form-control" type="search" placeholder="Employee name or position"></div>
                 <div class="col-md-5"><label for="annualStatus" class="form-label">Status</label><select id="annualStatus" class="form-select"><option value="">All</option><option value="submitted">Self-rating submitted</option><option value="pending">For consolidation</option><option value="finalized">Finalized</option><option value="revision">Revision pending</option></select></div></div>
             <div class="table-responsive"><table class="table align-middle" id="annualRoster">
@@ -648,6 +653,11 @@ require_once __DIR__ . '/header.php';
     </div></div>
 </div>
 <script>
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.annual-peer-help[data-bs-toggle="tooltip"]').forEach(button => {
+        bootstrap.Tooltip.getOrCreateInstance(button, { trigger:'hover focus', container:'body' });
+    });
+});
 <?php if ($executiveKraOnly && $view==='rate'): ?>
 // Executives approve KRAs; department coworkers provide behavior ratings.
 ['annualRateCoreTab','annualRatePlanTab','annualRateCorePanel','annualRatePlanPanel'].forEach(id=>document.getElementById(id)?.remove());
