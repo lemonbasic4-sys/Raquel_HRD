@@ -673,13 +673,34 @@ let histActiveType = 'probationary';
 
 function histSetType(type, btn) {
     histActiveType = type;
-    document.querySelectorAll('.history-review-tab').forEach(tab => tab.classList.toggle('active', tab === btn));
+    document.querySelectorAll('.history-review-tab').forEach(tab => {
+        const active = tab === btn;
+        tab.classList.toggle('active', active);
+        tab.setAttribute('aria-selected', active ? 'true' : 'false');
+    });
     document.getElementById('historyTypeHeading').textContent = type === 'probationary' ? 'Probationary Evaluation' : 'Regular Employee';
     document.getElementById('historyTypePeriod').textContent = type === 'probationary' ? 'Initial and Final employee evaluations' : 'Annual team evaluations';
     histActiveStatus = 'All';
     document.querySelectorAll('.hist-status-pill').forEach(p => p.className = 'hist-status-pill');
     document.querySelector('.hist-status-pill')?.classList.add('active-all');
+    syncHistFilterOptions();
     applyHistFilters();
+}
+
+function syncHistFilterOptions() {
+    const rows = [...document.querySelectorAll('#histTableBody .history-row')]
+        .filter(row => row.dataset.type === histActiveType);
+    for (const [id, field, label] of [
+        ['histDeptFilter', 'department', 'All Departments'],
+        ['histTemplateFilter', 'template', 'All Templates'],
+        ['histEvalTypeFilter', 'evaluationType', 'All Types']
+    ]) {
+        const select = document.getElementById(id);
+        if (!select) continue;
+        const values = [...new Set(rows.map(row => row.dataset[field]).filter(Boolean))]
+            .sort((a, b) => a.localeCompare(b));
+        select.replaceChildren(new Option(label, 'All'), ...values.map(value => new Option(value, value)));
+    }
 }
 
 function histFilter(status, btn) {
@@ -735,6 +756,7 @@ function applyHistFilters() {
 }
 
 document.addEventListener('DOMContentLoaded', function () {
+    syncHistFilterOptions();
     document.getElementById('histSearchInput')?.addEventListener('input', applyHistFilters);
     document.getElementById('histDeptFilter')?.addEventListener('change', applyHistFilters);
     document.getElementById('histTemplateFilter')?.addEventListener('change', applyHistFilters);

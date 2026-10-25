@@ -863,7 +863,24 @@ function setSupervisorHistoryType(type, btn) {
     supervisorActiveStatus = 'All';
     document.querySelectorAll('.hist-status-pill').forEach(pill => pill.className = 'hist-status-pill');
     document.querySelector('.hist-status-pill')?.classList.add('active-all');
+    syncSupervisorHistoryFilterOptions();
     applySupervisorFilters();
+}
+
+function syncSupervisorHistoryFilterOptions() {
+    const rows = [...document.querySelectorAll('#evalTable tbody tr.eval-row')]
+        .filter(row => row.dataset.type === supervisorActiveType);
+    for (const [id, field, label] of [
+        ['supervisorDeptFilter', 'department', 'All Departments'],
+        ['supervisorTemplateFilter', 'template', 'All Templates'],
+        ['supervisorEvalTypeFilter', 'evaluationType', 'All Types']
+    ]) {
+        const select = document.getElementById(id);
+        if (!select) continue;
+        const values = [...new Set(rows.map(row => row.dataset[field]).filter(Boolean))]
+            .sort((a, b) => a.localeCompare(b));
+        select.replaceChildren(new Option(label, 'All'), ...values.map(value => new Option(value, value)));
+    }
 }
 
 function filterByStatus(status, btn) {
@@ -919,6 +936,7 @@ function applySupervisorFilters() {
 }
 
 document.addEventListener('DOMContentLoaded', function () {
+    syncSupervisorHistoryFilterOptions();
     document.getElementById('customSearchEval')?.addEventListener('input', applySupervisorFilters);
     document.getElementById('supervisorDeptFilter')?.addEventListener('change', applySupervisorFilters);
     document.getElementById('supervisorTemplateFilter')?.addEventListener('change', applySupervisorFilters);

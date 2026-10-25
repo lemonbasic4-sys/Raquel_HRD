@@ -887,6 +887,9 @@ $active_package_tab = in_array($_SESSION['role'] ?? '', ['HR Manager','HR Superv
             <?php endif; ?>
         </nav>
         <?php endif; ?>
+        <nav class="d-flex flex-wrap gap-2 mb-3" aria-label="Probationary evaluation history">
+            <a class="btn btn-success" style="background:#294306;border-color:#294306;color:#fff" href="<?php echo BASE_URL; ?>/employee/probationary-evaluation-history.php"><i class="fas fa-history me-2" aria-hidden="true"></i>Probationary Evaluation History</a>
+        </nav>
         <?php if ($packages || $waiting_packages): ?>
         <div id="packageFilterEmpty" class="package-empty d-none" role="status">
             <i class="fas fa-filter fa-2x text-muted mb-2" style="opacity:0.4;"></i>
