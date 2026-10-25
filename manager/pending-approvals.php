@@ -547,17 +547,6 @@ $regularization_pending_count = count($regularization_pending);
             <h4 class="text-white fw-bold mb-0 mt-1"><i class="fas fa-check-double me-2" style="color:#BD9414;"></i>Pending Approvals</h4>
             <p class="text-white-50 small mb-0 mt-2">Review pending employee changes and performance evaluations, then approve, return, or reject them with confidence.</p>
         </div>
-        <div class="d-flex flex-column align-items-end gap-2">
-            <div style="color:rgba(255,255,255,.6);font-size:.8rem;">
-                <i class="fas fa-sync-alt me-1"></i>Data as of <?php echo date('F d, Y'); ?>
-            </div>
-            <!-- Quick Actions -->
-            <div class="d-flex gap-2 flex-wrap justify-content-end">
-                <a href="evaluation-history.php" class="btn btn-sm px-3 fw-semibold" style="background:rgba(255,255,255,.1);color:rgba(255,255,255,.8);border:1px solid rgba(255,255,255,.15);border-radius:20px;font-size:.78rem;">
-                    <i class="fas fa-history me-1"></i>View History
-                </a>
-            </div>
-        </div>
     </div>
 
     <div class="row g-3" id="managerApprovalSummary">
