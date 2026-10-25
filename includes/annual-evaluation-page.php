@@ -78,7 +78,8 @@ if ($evaluationId) {
     $cycleId=(int)$member['cycle_id'];
     // The HRD workflow now displays rater names in 360 results. Keep
     // authorization for viewing the evaluation itself separate from rating/finalization.
-    $named=(int)$actor['employee_id']!==(int)$member['employee_id'];
+    $named=(int)$actor['employee_id']!==(int)$member['employee_id']
+        || ($actor['role']==='HR Manager' && annualIsHrDepartment($actor));
     $canFinalize=annualCanFinalize($conn,$actor,$member);
 }
 // Existing inbox links may still target the retired consolidation review.
@@ -279,7 +280,11 @@ require_once __DIR__ . '/header.php';
                     <?php elseif ($historyView && $target): ?>
                         <a class="btn btn-sm btn-outline-success" href="<?php echo annualUrl($actor,'?view='.(annualCanFinalize($conn,$actor,$target) && $m['rated'] ? 'head-review' : 'review').'&evaluation_id='.(int)$m['evaluation_id']); ?>">View completed evaluation</a>
                     <?php elseif ($view==='peers' && $isOwnRow): ?>
-                        <span class="annual-roster-action-muted"><?php echo $m['evaluation_id'] ? 'Cannot rate yourself' : 'Your self-rating is not yet submitted'; ?></span>
+                        <?php if ($m['evaluation_id']): ?>
+                            <a class="btn btn-sm btn-outline-success" href="<?php echo annualUrl($actor,'?view=review&evaluation_id='.(int)$m['evaluation_id']); ?>">View my score</a>
+                        <?php else: ?>
+                            <span class="annual-roster-action-muted">Your self-rating is not yet submitted</span>
+                        <?php endif; ?>
                     <?php elseif (!$m['evaluation_id']): ?>
                         <span class="annual-roster-action-muted">Awaiting employee self-rating</span>
                     <?php elseif ($view==='peers' && ($isDepartmentPeer || ($target && annualCanFinalize($conn,$actor,$target))) && annualCanRate($actor) && $m['evaluation_id']): ?>
