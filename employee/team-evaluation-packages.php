@@ -801,14 +801,6 @@ $probationary_package_count = count(array_filter($packages, static fn($package) 
 $regular_package_count = count($packages) + count($waiting_packages) - $probationary_package_count;
 $active_package_tab = in_array($_SESSION['role'] ?? '', ['HR Manager','HR Supervisor'],true)
     ? 'probationary' : ($probationary_package_count > 0 ? 'probationary' : 'regular');
-$package_department_options = [];
-foreach (array_merge($packages, $waiting_packages) as $package_option) {
-    $department_option_id = (int)($package_option['department_id'] ?? 0);
-    if ($department_option_id > 0) {
-        $package_department_options[$department_option_id] = (string)($package_option['department_name'] ?? 'Department');
-    }
-}
-asort($package_department_options, SORT_NATURAL | SORT_FLAG_CASE);
 ?>
 <div class="evaluation-packages">
     <?php $shared_performance_heading=in_array($_SESSION['role'] ?? '', ['HR Manager','HR Supervisor'],true); ?>
@@ -864,12 +856,9 @@ asort($package_department_options, SORT_NATURAL | SORT_FLAG_CASE);
             .package-category-tab__copy small{color:#6b7280;font-size:.72rem}
             .package-category-tab__count{display:grid;place-items:center;min-width:26px;height:26px;padding:0 .4rem;border-radius:999px;background:#fff;color:#374151;font-size:.76rem;font-weight:700}
             .package-category-tab.active .package-category-tab__count{background:#082e06;color:#fff}
-            .package-department-filter{display:flex;align-items:flex-end;gap:.6rem;justify-content:flex-end;margin:-.35rem 0 1rem}
-            .package-department-filter .form-label{white-space:nowrap;color:#475569}
-            .package-department-filter .form-select{max-width:280px}
             .package-card.package-card--probationary{border-color:#3730a3!important}
             .package-card.package-card--probationary .package-card__header{border-left:4px solid #3730a3}
-            @media(max-width:575.98px){.package-category-tabs{gap:.4rem}.package-category-tab{flex:1;min-width:0;padding:.65rem .5rem;gap:.45rem}.package-category-tab__icon{width:30px;height:30px}.package-category-tab__copy strong{font-size:.76rem}.package-category-tab__copy small{font-size:.65rem}.package-department-filter{justify-content:stretch;flex-wrap:wrap}.package-department-filter .form-select{max-width:none;width:100%}}
+            @media(max-width:575.98px){.package-category-tabs{gap:.4rem}.package-category-tab{flex:1;min-width:0;padding:.65rem .5rem;gap:.45rem}.package-category-tab__icon{width:30px;height:30px}.package-category-tab__copy strong{font-size:.76rem}.package-category-tab__copy small{font-size:.65rem}}
         </style>
         <?php if (!$shared_performance_heading): ?>
         <nav class="package-category-tabs" aria-label="Evaluation review type">
@@ -898,20 +887,11 @@ asort($package_department_options, SORT_NATURAL | SORT_FLAG_CASE);
             <?php endif; ?>
         </nav>
         <?php endif; ?>
-        <div class="package-department-filter">
-            <label for="packageDepartmentFilter" class="form-label mb-1 small fw-semibold">Filter department</label>
-            <select id="packageDepartmentFilter" class="form-select form-select-sm" aria-label="Filter evaluation reviews by department">
-                <option value="">All Departments</option>
-                <?php foreach ($package_department_options as $department_option_id => $department_option_name): ?>
-                    <option value="<?php echo (int)$department_option_id; ?>"><?php echo e($department_option_name); ?></option>
-                <?php endforeach; ?>
-            </select>
-        </div>
         <?php if ($packages || $waiting_packages): ?>
         <div id="packageFilterEmpty" class="package-empty d-none" role="status">
             <i class="fas fa-filter fa-2x text-muted mb-2" style="opacity:0.4;"></i>
             <h2 class="h6 fw-bold mb-1">No evaluation reviews match these filters</h2>
-            <p class="mb-0 text-muted small">Choose another department or evaluation tab.</p>
+            <p class="mb-0 text-muted small">Choose another evaluation tab.</p>
         </div>
         <?php endif; ?>
     <?php endif; ?>
@@ -1539,7 +1519,6 @@ function rejectProbationaryRegularization(packageId) {
 
 const packageCategoryTabs = Array.from(document.querySelectorAll('[data-package-category-tab]'));
 const packageCards = Array.from(document.querySelectorAll('[data-package-category]'));
-const packageDepartmentFilter = document.getElementById('packageDepartmentFilter');
 const packageFilterEmpty = document.getElementById('packageFilterEmpty');
 
 document.querySelectorAll('[data-return-toggle]').forEach((button) => {
@@ -1556,22 +1535,17 @@ document.querySelectorAll('[data-return-toggle]').forEach((button) => {
 function applyPackageFilters() {
     const activeTab = packageCategoryTabs.find((tab) => tab.classList.contains('active'));
     const activeCategory = activeTab ? activeTab.dataset.packageCategoryTab : <?php echo json_encode($active_package_tab); ?>;
-    const selectedDepartment = packageDepartmentFilter ? packageDepartmentFilter.value : '';
     let visibleCardCount = 0;
 
     packageCards.forEach((card) => {
         const matchesCategory = card.dataset.packageCategory === activeCategory;
-        const matchesDepartment = !selectedDepartment || card.dataset.packageDepartment === selectedDepartment;
-        const isVisible = matchesCategory && matchesDepartment;
+        const isVisible = matchesCategory;
         card.classList.toggle('d-none', !isVisible);
         if (isVisible) visibleCardCount++;
     });
 
     packageCategoryTabs.forEach((tab) => {
-        const departmentCards = packageCards.filter((card) =>
-            (!selectedDepartment || card.dataset.packageDepartment === selectedDepartment)
-            && card.dataset.packageCategory === tab.dataset.packageCategoryTab
-        );
+        const departmentCards = packageCards.filter((card) => card.dataset.packageCategory === tab.dataset.packageCategoryTab);
         const count = tab.querySelector('.package-category-tab__count');
         if (count) count.textContent = departmentCards.length;
     });
@@ -1590,7 +1564,6 @@ packageCategoryTabs.forEach((tab) => {
         applyPackageFilters();
     });
 });
-if (packageDepartmentFilter) packageDepartmentFilter.addEventListener('change', applyPackageFilters);
 applyPackageFilters();
 
 function submitPackageForm(packageId) {
