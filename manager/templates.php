@@ -347,48 +347,48 @@ $used_template_count = (int) $conn->query("SELECT COUNT(DISTINCT ev.template_id)
         </div>
     </div>
 
-    <div class="row g-3">
+    <div class="row g-3 template-summary-grid">
         <div class="col-6 col-md-3">
-            <div class="stat-card">
+            <div class="stat-card template-summary-card">
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
                         <div class="stat-value"><?php echo $active_template_count; ?></div>
                         <div class="stat-label">Active Templates</div>
                     </div>
-                    <i class="fas fa-file-alt stat-icon text-white-50"></i>
+                    <span class="template-summary-icon"><i class="fas fa-file-alt" aria-hidden="true"></i></span>
                 </div>
             </div>
         </div>
         <div class="col-6 col-md-3">
-            <div class="stat-card">
+            <div class="stat-card template-summary-card">
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
                         <div class="stat-value"><?php echo $archived_template_count; ?></div>
                         <div class="stat-label">Archived</div>
                     </div>
-                    <i class="fas fa-archive stat-icon" style="color:#BD9414;"></i>
+                    <span class="template-summary-icon"><i class="fas fa-archive" aria-hidden="true"></i></span>
                 </div>
             </div>
         </div>
         <div class="col-6 col-md-3">
-            <div class="stat-card">
+            <div class="stat-card template-summary-card">
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
                         <div class="stat-value"><?php echo $used_template_count; ?></div>
                         <div class="stat-label">Used in Evaluations</div>
                     </div>
-                    <i class="fas fa-chart-bar stat-icon" style="color:#17a2b8;"></i>
+                    <span class="template-summary-icon"><i class="fas fa-chart-bar" aria-hidden="true"></i></span>
                 </div>
             </div>
         </div>
         <div class="col-6 col-md-3">
-            <div class="stat-card">
+            <div class="stat-card template-summary-card">
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
                         <div class="stat-value"><?php echo $filtered_template_count; ?></div>
                         <div class="stat-label">Shown</div>
                     </div>
-                    <i class="fas fa-filter stat-icon" style="color:#28a745;"></i>
+                    <span class="template-summary-icon"><i class="fas fa-filter" aria-hidden="true"></i></span>
                 </div>
             </div>
         </div>
@@ -716,6 +716,54 @@ function confirmBatchDelete() {
 </script>
 
 <style>
+.template-library-page .template-summary-card {
+    display: block;
+    height: 100%;
+    min-height: 104px;
+    padding: 17px 18px;
+    overflow: hidden;
+    background: linear-gradient(145deg, rgba(255,255,255,.17), rgba(255,255,255,.075));
+    border: 1px solid rgba(255,255,255,.28);
+    border-radius: 16px;
+    box-shadow: 0 8px 22px rgba(0,0,0,.12), inset 0 1px 0 rgba(255,255,255,.16);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+}
+.template-library-page .template-summary-card::after { display: none; }
+.template-library-page .template-summary-card:hover {
+    background: linear-gradient(145deg, rgba(255,255,255,.22), rgba(255,255,255,.10));
+    box-shadow: 0 11px 25px rgba(0,0,0,.15), inset 0 1px 0 rgba(255,255,255,.2);
+    transform: translateY(-2px);
+}
+.template-library-page .template-summary-card > div { gap: 12px; }
+.template-library-page .template-summary-card .stat-value {
+    font-size: 1.75rem;
+    line-height: 1.1;
+    letter-spacing: -.025em;
+}
+.template-library-page .template-summary-card .stat-label {
+    color: rgba(255,255,255,.82);
+    font-size: .72rem;
+    line-height: 1.35;
+    letter-spacing: .035em;
+}
+.template-summary-icon {
+    display: grid;
+    place-items: center;
+    flex: 0 0 40px;
+    width: 40px;
+    height: 40px;
+    border: 1px solid rgba(255,255,255,.18);
+    border-radius: 12px;
+    background: rgba(255,255,255,.12);
+    color: #f2d67e;
+    font-size: 1.05rem;
+}
+@media (max-width: 767.98px) {
+    .template-library-page .template-summary-card { min-height: 100px; padding: 14px; text-align: left; }
+    .template-library-page .template-summary-card .stat-value { font-size: 1.5rem; }
+    .template-summary-icon { flex-basis: 34px; width: 34px; height: 34px; }
+}
 .bg-primary-subtle { background-color: #e3f2fd; }
 .bg-success-subtle { background-color: #e8f5e9; }
 .bg-info-subtle { background-color: #e0f7fa; }
