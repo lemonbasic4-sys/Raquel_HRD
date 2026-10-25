@@ -48,6 +48,15 @@ if ($adminCheck->get_result()->num_rows > 0) {
 }
 $adminCheck->close();
 
+$missingHrisAccount = false;
+if (strcasecmp((string)($emp['department_name'] ?? ''), 'Human Resources') === 0) {
+    $hrisCheck = $conn->prepare("SELECT 1 FROM users WHERE employee_id = ? AND role IN ('HR Manager', 'HR Supervisor', 'HR Staff') AND deleted_at IS NULL LIMIT 1");
+    $hrisCheck->bind_param('i', $eid);
+    $hrisCheck->execute();
+    $missingHrisAccount = $hrisCheck->get_result()->num_rows === 0;
+    $hrisCheck->close();
+}
+
 // Map contacts/email to legacy fields for UI compatibility
 $emp['email'] = $emp['personal_email'];
 $emp['contact_number'] = $emp['mobile_number'];
@@ -200,6 +209,20 @@ $discList = [
         font-size: 1.65rem;
         font-weight: 700;
         color: var(--text-dark);
+    }
+
+    .ep-hris-missing {
+        display: inline-flex;
+        align-items: center;
+        gap: .4rem;
+        padding: .35rem .65rem;
+        border: 1px solid #f2c468;
+        border-radius: 999px;
+        background: #fff3d7;
+        color: #805100;
+        font-size: .76rem;
+        font-weight: 700;
+        line-height: 1.2;
     }
 
     .employee-reference-hero {
@@ -1510,6 +1533,9 @@ foreach ($completionSections as $k => $done) {
                 <span class="badge ep-badge-status <?php echo $emp['is_active'] ? 'ep-status-active' : 'ep-status-inactive'; ?>">
                     <i class="fas fa-circle me-1" style="font-size:0.4rem; vertical-align: middle;"></i><?php echo $emp['is_active'] ? 'Active' : 'Inactive'; ?>
                 </span>
+                <?php if ($missingHrisAccount): ?>
+                    <span class="ep-hris-missing" role="status" title="This Human Resources employee does not have an HRIS portal account."><i class="fas fa-user-lock" aria-hidden="true"></i> No HRIS account</span>
+                <?php endif; ?>
             </div>
             <div class="ep-hero-role mt-1">
                 <?php echo e($emp['job_title']); ?>
