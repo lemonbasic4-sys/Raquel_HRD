@@ -38,6 +38,15 @@ $oldest_days = (int)($conn->query("SELECT COALESCE(MAX(DATEDIFF(CURRENT_DATE(), 
     WHERE ev.status IN ('Pending Supervisor', 'Pending HR Consolidation')
       AND e.is_active = 1
       AND e.employee_id NOT IN (SELECT employee_id FROM users WHERE role = 'Admin' AND employee_id IS NOT NULL)")->fetch_assoc()['d'] ?? 0);
+$oldest_pending_employee = '';
+if ($overdue_count > 0) {
+    $oldest_pending_employee = (string)($conn->query("SELECT CONCAT(e.first_name, ' ', e.last_name) AS employee_name
+        FROM evaluations ev JOIN employees e ON e.employee_id=ev.employee_id
+        WHERE ev.status IN ('Pending Supervisor', 'Pending HR Consolidation')
+          AND e.is_active=1 AND ev.submitted_date IS NOT NULL
+          AND e.employee_id NOT IN (SELECT employee_id FROM users WHERE role='Admin' AND employee_id IS NOT NULL)
+        ORDER BY ev.submitted_date ASC LIMIT 1")->fetch_assoc()['employee_name'] ?? '');
+}
 
 $validated_total = $conn->query("SELECT COUNT(*) as c FROM evaluations WHERE endorsed_by = {$_SESSION['user_id']}")->fetch_assoc()['c'];
 
@@ -139,15 +148,65 @@ if ($annual_dashboard_actor && $conn->query("SHOW TABLES LIKE 'annual_evaluation
         ];
     }
 }
-$pending_pkg_count = count($pending_packages);
-$dashboard_evaluation_category = !$pending_packages || array_filter($pending_packages, static fn($package) => empty($package['annual_url'])) ? 'probationary' : 'regular';
-$dashboard_evaluation_url = BASE_URL . '/employee/team-evaluation-packages.php?category=' . $dashboard_evaluation_category;
+$annual_review_count = count(array_filter($pending_packages, static fn($package) => !empty($package['annual_url'])));
+$probationary_review_count = count(array_filter($pending_packages, static fn($package) => empty($package['annual_url']) && ($package['action_status'] ?? '') === 'Pending'));
+$waiting_package_count = count(array_filter($pending_packages, static fn($package) => empty($package['annual_url']) && ($package['action_status'] ?? '') === 'Waiting'));
+$pending_pkg_count = $annual_review_count + $probationary_review_count;
+usort($pending_packages, static function ($a, $b) {
+    $aWaiting = ($a['action_status'] ?? '') === 'Waiting';
+    $bWaiting = ($b['action_status'] ?? '') === 'Waiting';
+    return $aWaiting <=> $bWaiting;
+});
+$annual_review_url = BASE_URL . '/employee/team-evaluation-packages.php?category=regular&view=peers';
+$probationary_review_url = BASE_URL . '/employee/team-evaluation-packages.php?category=probationary';
+$validation_queue_url = BASE_URL . '/supervisor/pending-endorsements.php';
+$annual_cycle_progress = null;
+if ($annual_dashboard_actor && $conn->query("SHOW TABLES LIKE 'annual_evaluation_cycles'")->num_rows) {
+    $cycle = annualQuery($conn, 'SELECT cycle_id,period_start,period_end,ready_for_approval_at,completed_at
+        FROM annual_evaluation_cycles WHERE department_id=? AND completed_at IS NULL
+        ORDER BY period_end DESC,cycle_id DESC LIMIT 1', [(int)$annual_dashboard_actor['department_id']])[0] ?? null;
+    if ($cycle) {
+        $cycleMembers = annualQuery($conn, 'SELECT m.employee_id,m.evaluation_id,m.current_version,m.revision_pending
+            FROM annual_evaluation_members m JOIN employees e ON e.employee_id=m.employee_id
+            WHERE m.cycle_id=? AND '.annualRosterEligibilitySql(), [(int)$cycle['cycle_id']]);
+        $submitted = 0;
+        $reviewed = 0;
+        $peerReceived = 0;
+        $peerExpected = 0;
+        foreach ($cycleMembers as $member) {
+            $submitted += !empty($member['evaluation_id']) && empty($member['revision_pending']) ? 1 : 0;
+            $reviewed += (int)$member['current_version'] > 0 && empty($member['revision_pending']) ? 1 : 0;
+            if (!empty($member['evaluation_id'])) {
+                $peerExpected += annualExpectedPeers($conn, (int)$cycle['cycle_id'], (int)$member['employee_id']);
+                $peerReceived += (int)(annualQuery($conn, 'SELECT COUNT(*) AS n FROM annual_peer_submissions WHERE cycle_id=? AND target_employee_id=?',
+                    [(int)$cycle['cycle_id'], (int)$member['employee_id']])[0]['n'] ?? 0);
+            }
+        }
+        $annual_cycle_progress = [
+            'cycle_id' => (int)$cycle['cycle_id'],
+            'period_end' => $cycle['period_end'],
+            'total' => count($cycleMembers),
+            'submitted' => $submitted,
+            'reviewed' => $reviewed,
+            'peer_received' => $peerReceived,
+            'peer_expected' => $peerExpected,
+            'ready' => !empty($cycle['ready_for_approval_at']),
+        ];
+    }
+}
 ?>
 
 <style>
     .supervisor-dashboard .approval-list {
         padding: 15px;
     }
+    .supervisor-dashboard .dashboard-stat-detail { color: rgba(255,255,255,.76); font-size: .74rem; line-height: 1.35; }
+    .supervisor-dashboard .annual-progress-card { background: #fff; border: 1px solid #dce6d8; border-radius: 16px; padding: 20px 22px; box-shadow: 0 6px 20px rgba(16,46,14,.06); }
+    .supervisor-dashboard .annual-progress-grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 12px; }
+    .supervisor-dashboard .annual-progress-item { background: #f3f7ef; border-radius: 12px; padding: 13px 15px; }
+    .supervisor-dashboard .annual-progress-item strong { display: block; color: #173d12; font-size: 1.15rem; }
+    .supervisor-dashboard .annual-progress-item span { color: #52624e; font-size: .75rem; }
+    @media (max-width: 767.98px) { .supervisor-dashboard .annual-progress-grid { grid-template-columns: repeat(2, minmax(0,1fr)); } }
 
     .supervisor-dashboard .approval-item {
         display: flex;
@@ -682,42 +741,48 @@ document.addEventListener('DOMContentLoaded', function () {
         </div>
     </div>
 
-    <!-- Stat Cards Row -->
+    <!-- Each count links to the workflow it measures. -->
     <div class="row g-3 mb-3">
-        <!-- Performance Evaluation -->
-        <div class="col-6 col-md-3">
-            <a href="<?php echo e($dashboard_evaluation_url); ?>" class="stat-card text-decoration-none d-block">
+        <div class="col-6 col-xl-4">
+            <a href="<?php echo e($annual_review_url); ?>" class="stat-card text-decoration-none d-block">
                 <div class="d-flex justify-content-between align-items-start">
-                    <div>
-                        <div class="stat-value"><?php echo $pending_pkg_count > 0 ? $pending_pkg_count : $pending_validations; ?></div>
-                        <div class="stat-label">Performance Evaluations</div>
-                    </div>
-                    <i class="fas fa-layer-group stat-icon" style="color:#ffc107;"></i>
+                    <div><div class="stat-value"><?php echo $annual_review_count; ?></div><div class="stat-label">Annual reviews ready</div></div>
+                    <i class="fas fa-users stat-icon" aria-hidden="true"></i>
                 </div>
-                <?php if ($pending_pkg_count > 0): ?>
-                <div class="mt-2" style="font-size:.72rem;color:rgba(255,255,255,.55);">
-                    <i class="fas fa-layer-group me-1"></i><?php echo $pending_pkg_count; ?> evaluation review<?php echo $pending_pkg_count === 1 ? '' : 's'; ?> awaiting review
+                <div class="mt-2 dashboard-stat-detail">Immediate-head reviews assigned to you</div>
+            </a>
+        </div>
+        <div class="col-6 col-xl-4">
+            <a href="<?php echo e($probationary_review_url); ?>" class="stat-card text-decoration-none d-block">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div><div class="stat-value"><?php echo $probationary_review_count; ?></div><div class="stat-label">Probationary reviews ready</div></div>
+                    <i class="fas fa-clipboard-check stat-icon" aria-hidden="true"></i>
                 </div>
-                <?php elseif ($queue_employee_count > 0): ?>
-                <div class="mt-2" style="font-size:.72rem;color:rgba(255,255,255,.55);">
-                    <i class="fas fa-users me-1"></i><?php echo $queue_employee_count; ?> employee<?php echo $queue_employee_count === 1 ? '' : 's'; ?> in queue
+                <div class="mt-2 dashboard-stat-detail"><?php echo $waiting_package_count; ?> more waiting for submissions</div>
+            </a>
+        </div>
+        <div class="col-6 col-xl-4">
+            <a href="<?php echo e($validation_queue_url); ?>" class="stat-card text-decoration-none d-block">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div><div class="stat-value"><?php echo $pending_validations; ?></div><div class="stat-label">HR validations pending</div></div>
+                    <i class="fas fa-inbox stat-icon" aria-hidden="true"></i>
                 </div>
-                <?php endif; ?>
+                <div class="mt-2 dashboard-stat-detail">Shared HR Supervisor validation queue</div>
             </a>
         </div>
         <!-- Overdue (7+ days) -->
-        <div class="col-6 col-md-3">
+        <div class="col-6 col-xl-4">
             <a href="pending-endorsements.php?attention=overdue" class="stat-card text-decoration-none d-block">
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
                         <div class="stat-value" style="<?php echo $overdue_count > 0 ? 'color:#ff6b6b;' : ''; ?>"><?php echo $overdue_count; ?></div>
-                        <div class="stat-label">Overdue (7+ Days)</div>
+                        <div class="stat-label">HR validations overdue (7+ days)</div>
                     </div>
                     <i class="fas fa-hourglass-end stat-icon" style="color:#dc3545;"></i>
                 </div>
                 <div class="mt-2" style="font-size:.72rem;color:rgba(255,255,255,.55);">
-                    <?php if ($oldest_days > 0): ?>
-                        <i class="fas fa-clock me-1"></i>Oldest: <?php echo $oldest_days; ?> day<?php echo $oldest_days === 1 ? '' : 's'; ?> ago
+                    <?php if ($overdue_count > 0): ?>
+                        <i class="fas fa-clock me-1"></i>Oldest: <?php echo e($oldest_pending_employee); ?> · <?php echo $oldest_days; ?> days since submission
                     <?php else: ?>
                         <i class="fas fa-check me-1"></i>No overdue items
                     <?php endif; ?>
@@ -725,12 +790,12 @@ document.addEventListener('DOMContentLoaded', function () {
             </a>
         </div>
         <!-- Low Score -->
-        <div class="col-6 col-md-3">
+        <div class="col-6 col-xl-4">
             <a href="pending-endorsements.php?attention=low_score" class="stat-card text-decoration-none d-block">
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
                         <div class="stat-value" style="<?php echo $low_score_count > 0 ? 'color:#ff6b6b;' : ''; ?>"><?php echo $low_score_count; ?></div>
-                        <div class="stat-label">Low Score (&lt; 2.0)</div>
+                        <div class="stat-label">HR validations with low score</div>
                     </div>
                     <i class="fas fa-arrow-trend-down stat-icon" style="color:#fd7e14;"></i>
                 </div>
@@ -740,7 +805,7 @@ document.addEventListener('DOMContentLoaded', function () {
             </a>
         </div>
         <!-- Validated This Month -->
-        <div class="col-6 col-md-3">
+        <div class="col-6 col-xl-4">
             <a href="evaluation-history.php" class="stat-card text-decoration-none d-block">
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
@@ -758,18 +823,36 @@ document.addEventListener('DOMContentLoaded', function () {
 
 </div>
 
+<?php if ($annual_cycle_progress): ?>
+<section class="annual-progress-card mb-4 fadeup" aria-labelledby="annualProgressTitle">
+    <div class="d-flex align-items-start justify-content-between gap-3 flex-wrap mb-3">
+        <div>
+            <h5 id="annualProgressTitle" class="fw-bold mb-1">Annual cycle progress</h5>
+            <div class="small text-muted">Period ending <?php echo e(formatDate($annual_cycle_progress['period_end'])); ?></div>
+        </div>
+        <a href="<?php echo e($annual_review_url . '&cycle_id=' . $annual_cycle_progress['cycle_id']); ?>" class="btn btn-sm btn-outline-primary">View cycle</a>
+    </div>
+    <div class="annual-progress-grid">
+        <div class="annual-progress-item"><strong><?php echo $annual_cycle_progress['submitted']; ?> / <?php echo $annual_cycle_progress['total']; ?></strong><span>Self-ratings submitted</span></div>
+        <div class="annual-progress-item"><strong><?php echo $annual_cycle_progress['peer_received']; ?> / <?php echo $annual_cycle_progress['peer_expected']; ?></strong><span>Department 360 ratings received</span></div>
+        <div class="annual-progress-item"><strong><?php echo $annual_cycle_progress['reviewed']; ?> / <?php echo $annual_cycle_progress['total']; ?></strong><span>Immediate-head reviews complete</span></div>
+        <div class="annual-progress-item"><strong><?php echo $annual_cycle_progress['ready'] ? 'Ready' : 'In progress'; ?></strong><span>HR Manager cycle approval</span></div>
+    </div>
+</section>
+<?php endif; ?>
+
 <div class="row g-4 mb-4">
     <div class="col-12">
         <div class="chart-card h-100">
             <div class="cc-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-                <h5 class="mb-0"><i class="fas fa-layer-group me-2"></i>Performance Evaluation</h5>
+                <h5 class="mb-0"><i class="fas fa-layer-group me-2"></i>Reviews that need your action</h5>
                 <div class="d-flex align-items-center gap-2">
                     <?php if ($pending_pkg_count > 0): ?>
                         <span class="badge bg-light text-muted border"><?php echo number_format($pending_pkg_count); ?> evaluation review<?php echo $pending_pkg_count === 1 ? '' : 's'; ?></span>
                     <?php elseif ($queue_employee_count > 0): ?>
                         <span class="badge bg-light text-muted border"><?php echo number_format($queue_employee_count); ?> employee<?php echo $queue_employee_count === 1 ? '' : 's'; ?></span>
                     <?php endif; ?>
-                    <a href="<?php echo e($dashboard_evaluation_url); ?>" class="btn btn-sm btn-outline-primary rounded-pill px-3">View All</a>
+                    <a href="<?php echo e($annual_review_count > 0 && $probationary_review_count === 0 ? $annual_review_url : $probationary_review_url); ?>" class="btn btn-sm btn-outline-primary rounded-pill px-3">View evaluations</a>
                 </div>
             </div>
             <div class="cc-body p-0">
@@ -790,13 +873,13 @@ document.addEventListener('DOMContentLoaded', function () {
                                 </div>
                                 <div class="dashboard-package-status">
                                     <span class="dashboard-package-status-label">Current Status</span>
-                                    <span class="dashboard-package-status-badge"><i class="fas <?php echo $is_waiting ? 'fa-hourglass-half' : 'fa-hourglass-start'; ?>"></i><?php echo $is_waiting ? 'Waiting for submissions' : 'Pending ' . e($_SESSION['role'] ?? 'Reviewer'); ?></span>
+                                    <span class="dashboard-package-status-badge"><i class="fas <?php echo $is_waiting ? 'fa-hourglass-half' : 'fa-hourglass-start'; ?>"></i><?php echo $is_waiting ? 'Waiting for submissions' : 'Ready for your review'; ?></span>
                                     <span class="dashboard-package-step"><?php echo $is_waiting ? 'Team self-ratings are still in progress' : e($pkg['step_label']) . ' — you are the next reviewer'; ?></span>
                                 </div>
                                 <?php if ($is_waiting): ?>
-                                    <a href="<?php echo BASE_URL; ?>/employee/team-evaluation-packages.php?category=probationary" class="btn dashboard-package-action">View Progress <i class="fas fa-chevron-down ms-1"></i></a>
+                                    <a href="<?php echo e($probationary_review_url . '#package-' . (int)$pkg['package_id']); ?>" class="btn dashboard-package-action">View progress <i class="fas fa-arrow-right ms-1"></i></a>
                                 <?php else: ?>
-                                    <a href="<?php echo e($pkg['annual_url'] ?? BASE_URL . '/employee/team-evaluation-packages.php?category=probationary'); ?>" class="btn dashboard-package-action">Review <i class="fas fa-chevron-down ms-1"></i></a>
+                                    <a href="<?php echo e($pkg['annual_url'] ?? $probationary_review_url . '#package-' . (int)$pkg['package_id']); ?>" class="btn dashboard-package-action">Review now <i class="fas fa-arrow-right ms-1"></i></a>
                                 <?php endif; ?>
                             </div>
                         <?php endforeach; ?>
@@ -835,7 +918,7 @@ document.addEventListener('DOMContentLoaded', function () {
                                         <div class="fw-bold text-dark"><?php echo formatDate($row['submitted_date']); ?></div>
                                         <div class="x-small">Pending Validation</div>
                                     </div>
-                                    <a href="<?php echo BASE_URL; ?>/supervisor/pending-endorsements.php" class="btn btn-primary btn-review">Review</a>
+                                    <a href="<?php echo e($validation_queue_url . '?q=' . rawurlencode($group['employee_name']) . '#supervisorQueueList'); ?>" class="btn btn-primary btn-review">Review now</a>
                                 </div>
                             <?php else: ?>
                                 <div class="approval-group-wrap">
@@ -880,7 +963,7 @@ document.addEventListener('DOMContentLoaded', function () {
                                                         <div class="progress-bar <?php echo ($score >= 3) ? 'bg-success' : (($score >= 2) ? 'bg-primary' : 'bg-warning'); ?>" style="width: <?php echo min(100, max(0, ($score / 4) * 100)); ?>%;"></div>
                                                     </div>
                                                 </div>
-                                                <a href="<?php echo BASE_URL; ?>/supervisor/pending-endorsements.php" class="btn btn-primary btn-sm btn-review">Review</a>
+                                                <a href="<?php echo e($validation_queue_url . '?q=' . rawurlencode($group['employee_name']) . '#supervisorQueueList'); ?>" class="btn btn-primary btn-sm btn-review">Review now</a>
                                             </div>
                                         <?php endforeach; ?>
                                     </div>
