@@ -40,6 +40,12 @@ if ($effective_role === 'HR Staff' && $current_dir === 'staff') {
 if ($current_dir === 'employee' && in_array($effective_role, ['Employee', 'HR Manager', 'HR Supervisor', 'HR Staff'], true)) {
     sendEmployeeProbationReminder($conn, (int) $_SESSION['user_id']);
 }
+if ($current_dir === 'employee' && $effective_role === 'Employee') {
+    $ap_readiness_actor = annualActor($conn,(int)($_SESSION['user_id'] ?? 0));
+    if ($ap_readiness_actor && annualIsApDepartment($ap_readiness_actor)) {
+        annualSyncApCycleReadinessNotification($conn,$ap_readiness_actor);
+    }
+}
 $notif_count = getUnreadNotificationCount($conn, (int) $_SESSION['user_id'], $notif_context);
 $notifications = getRecentNotifications($conn, (int) $_SESSION['user_id'], 5, $notif_context);
 
@@ -229,7 +235,7 @@ switch ($effective_role) {
         if (isset($_SESSION['employee_id']) && $conn) {
             $_hdr_emp_id = (int) $_SESSION['employee_id'];
             $_hdr_dept_stmt = $conn->prepare("
-                SELECT d.department_name, e.branch_id, e.rank_category_id, e.job_title_id, e.employment_status
+                SELECT d.department_name, e.department_id, e.branch_id, e.rank_category_id, e.job_title_id, e.employment_status
                 FROM employees e 
                 LEFT JOIN departments d ON e.department_id = d.department_id 
                 WHERE e.employee_id = ? 
@@ -239,6 +245,7 @@ switch ($effective_role) {
             $_hdr_dept_stmt->execute();
             $_hdr_dept_row = $_hdr_dept_stmt->get_result()->fetch_assoc();
             $_hdr_emp_dept = $_hdr_dept_row['department_name'] ?? '';
+            $_hdr_emp_department_id = (int)($_hdr_dept_row['department_id'] ?? 0);
             $is_hr_personnel = strcasecmp($_hdr_emp_dept, 'Human Resources') === 0;
             $_hdr_emp_branch_id = $_hdr_dept_row ? (int)$_hdr_dept_row['branch_id'] : 0;
             $_hdr_emp_rank = $_hdr_dept_row ? (int)$_hdr_dept_row['rank_category_id'] : 0;
@@ -246,6 +253,11 @@ switch ($effective_role) {
             $_hdr_emp_status = $_hdr_dept_row['employment_status'] ?? 'Regular';
             $is_probationary_employee = strcasecmp(trim((string)$_hdr_emp_status), 'Probationary') === 0;
             $_hdr_dept_stmt->close();
+            $_hdr_ap_annual_waiting = false;
+            if ($_hdr_emp_status === 'Regular' && annualIsApDepartment(['department_name'=>$_hdr_emp_dept])) {
+                ensureAnnualEvaluationSchema($conn);
+                $_hdr_ap_annual_waiting = !annualCycleForSelfRating($conn,$_hdr_emp_department_id,$_hdr_emp_id);
+            }
 
             $_hdr_allowed_eval_types = getAllowedEvaluationTypesForEmploymentStatus($_hdr_emp_status);
             $_hdr_in_clause = "'" . implode("','", $_hdr_allowed_eval_types) . "'";
@@ -265,6 +277,7 @@ switch ($effective_role) {
                         AND (et.target_job_title_id IS NULL OR et.target_job_title_id = ?)
                         AND $_hdr_legacy_rank_sql))
                   AND et.evaluation_type IN ($_hdr_in_clause)
+                  AND (et.evaluation_type <> 'Annual' OR ? = 0)
                   AND (et.evaluation_type <> 'Final' OR $_hdr_final_gate = 1)
                   AND NOT EXISTS (
                       SELECT 1
@@ -276,7 +289,7 @@ switch ($effective_role) {
                         AND ev.status NOT IN ('Draft', 'Returned', 'Rejected', 'Pending Self-Rating')
                   )
             ");
-            $_hdr_pt_stmt->bind_param("siii", $_hdr_emp_dept, $_hdr_emp_position_id, $_hdr_emp_position_id, $_hdr_emp_id);
+            $_hdr_pt_stmt->bind_param("siiii", $_hdr_emp_dept, $_hdr_emp_position_id, $_hdr_emp_position_id, $_hdr_ap_annual_waiting, $_hdr_emp_id);
             $_hdr_pt_stmt->execute();
             $m_pending_template_count = (int) ($_hdr_pt_stmt->get_result()->fetch_assoc()['total'] ?? 0);
             $_hdr_pt_stmt->close();

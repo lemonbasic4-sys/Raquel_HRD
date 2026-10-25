@@ -3,6 +3,7 @@ $page_title = 'Edit Employee';
 require_once '../includes/session-check.php';
 checkRole(['HR Manager', 'HR Supervisor']);
 require_once '../includes/functions.php';
+ensureAnnualEvaluationSchema($conn);
 
 $eid = isset($_GET['id']) ? (int) $_GET['id'] : 0;
 $return_to = $_POST['return_to'] ?? ($_GET['return'] ?? (BASE_URL . '/manager/employees.php'));
@@ -320,6 +321,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->bind_param($types, ...$params);
         $stmt->execute();
         $stmt->close();
+
+        if (($emp['employment_status'] ?? '') !== 'Regular' && $employment_status === 'Regular') {
+            $regularized = $conn->prepare('UPDATE employees SET regularization_effective_date=CURRENT_DATE() WHERE employee_id=?');
+            $regularized->bind_param('i', $eid);
+            $regularized->execute();
+            $regularized->close();
+        }
 
         // Update 1:1 Tables (REPLACE INTO is safe for 1:1 extension tables)
 

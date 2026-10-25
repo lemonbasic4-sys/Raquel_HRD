@@ -3231,6 +3231,7 @@ function ensureProbationaryEvaluationSchema($conn)
             'probationary_regularization_eligible' => "ALTER TABLE employees ADD COLUMN probationary_regularization_eligible TINYINT(1) NOT NULL DEFAULT 0",
             'probationary_eligible_evaluation_id' => "ALTER TABLE employees ADD COLUMN probationary_eligible_evaluation_id INT NULL",
             'probationary_eligible_at' => "ALTER TABLE employees ADD COLUMN probationary_eligible_at DATETIME NULL",
+            'regularization_effective_date' => "ALTER TABLE employees ADD COLUMN regularization_effective_date DATE NULL",
             'probationary_next_evaluation_type' => "ALTER TABLE employees ADD COLUMN probationary_next_evaluation_type VARCHAR(20) NULL",
             'probationary_next_evaluation_due_date' => "ALTER TABLE employees ADD COLUMN probationary_next_evaluation_due_date DATE NULL",
         ];
@@ -3304,10 +3305,11 @@ function applyProbationaryEvaluationOutcome($conn, $evaluation_id)
             probationary_eligible_at = IF(? = 1, NOW(), NULL),
             probationary_next_evaluation_type = ?,
             probationary_next_evaluation_due_date = ?,
-            employment_status = IF(? = 1, 'Regular', employment_status)
+            employment_status = IF(? = 1, 'Regular', employment_status),
+            regularization_effective_date = IF(? = 1, CURDATE(), regularization_effective_date)
         WHERE employee_id = ?");
     $regularize_int = $regularize ? 1 : 0;
-    $update->bind_param('iiissii', $eligible, $eligible_eval_id, $eligible, $next_type, $next_due_date, $regularize_int, $employee_id);
+    $update->bind_param('iiissiii', $eligible, $eligible_eval_id, $eligible, $next_type, $next_due_date, $regularize_int, $regularize_int, $employee_id);
     $ok = $update->execute();
     $update->close();
     if ($ok && $regularize && $is_hr && (int)($row['rank_category_id'] ?? 0) === 3) {
@@ -3365,12 +3367,12 @@ function applyDueStaffRegularizations($conn): void
     while ($row = $due->fetch_assoc()) {
         $employee_id = (int)$row['employee_id'];
         $evaluation_id = (int)$row['evaluation_id'];
-        $update = $conn->prepare("UPDATE employees SET employment_status = 'Regular',
+        $update = $conn->prepare("UPDATE employees SET employment_status = 'Regular', regularization_effective_date = ?,
             probationary_regularization_eligible = 0,
             probationary_eligible_evaluation_id = ?, probationary_eligible_at = COALESCE(probationary_eligible_at, NOW()),
             probationary_next_evaluation_type = NULL, probationary_next_evaluation_due_date = NULL
             WHERE employee_id = ? AND employment_status = 'Probationary'");
-        $update->bind_param('ii', $evaluation_id, $employee_id);
+        $update->bind_param('sii', $row['effective_date'], $evaluation_id, $employee_id);
         $update->execute();
         $changed = $update->affected_rows === 1;
         $update->close();

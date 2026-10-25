@@ -79,11 +79,14 @@ $employee_stmt->execute();
 $employee = $employee_stmt->get_result()->fetch_assoc();
 $employee_stmt->close();
 $available_annual_cycle = null;
-$is_hrd_annual_employee = annualIsHrDepartment(['department_name'=>$employee['department_name'] ?? '']);
-if (($employee['employment_status'] ?? '') === 'Regular' && $is_hrd_annual_employee) {
+$is_managed_annual_employee = annualUsesManagedCycle(['department_name'=>$employee['department_name'] ?? '']);
+if (($employee['employment_status'] ?? '') === 'Regular' && $is_managed_annual_employee) {
     ensureAnnualEvaluationSchema($conn);
     $available_annual_cycle = annualCycleForSelfRating($conn,(int)$employee['department_id'],$employee_id);
 }
+$ap_annual_waiting = ($employee['employment_status'] ?? '') === 'Regular'
+    && annualIsApDepartment(['department_name'=>$employee['department_name'] ?? ''])
+    && !$available_annual_cycle;
 
 if (!$employee) {
     redirectWith(BASE_URL . '/employee/dashboard.php', 'danger', 'No employee record found for self-rating.');
@@ -387,6 +390,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     $evaluation_type = trim($template['evaluation_type'] ?? 'Annual');
+    if ($evaluation_type === 'Annual' && $ap_annual_waiting) {
+        $errors[] = 'The AP Manager has not started an available Annual cycle. Please wait before opening this self-rating form.';
+    }
     if (($employee['employment_status'] ?? '') === 'Probationary'
         && in_array($evaluation_type, ['Initial', 'Final'], true)
         && $evaluation_type !== $probationary_phase_type
@@ -684,6 +690,7 @@ $templates_stmt = $conn->prepare("
             AND (et.target_job_title_id IS NULL OR et.target_job_title_id = ?)
             AND $legacy_probationary_rank_et))
       AND et.evaluation_type IN ($in_clause)
+      AND (et.evaluation_type <> 'Annual' OR ? = 0)
       $probationary_phase_filter_et
       AND (et.evaluation_type <> 'Final' OR $initial_gate = 1)
       AND NOT EXISTS (
@@ -698,7 +705,7 @@ $templates_stmt = $conn->prepare("
       )
     ORDER BY template_name
 ");
-$templates_stmt->bind_param("siii", $employee_dept, $employee['job_title_id'], $employee['job_title_id'], $employee_id);
+$templates_stmt->bind_param("siiii", $employee_dept, $employee['job_title_id'], $employee['job_title_id'], $ap_annual_waiting, $employee_id);
 $templates_stmt->execute();
 $templates = $templates_stmt->get_result();
 $available_template_count = (int) $templates->num_rows;
@@ -727,11 +734,12 @@ if ($selected_template_id > 0) {
                       AND (target_job_title_id IS NULL OR target_job_title_id = ?)
                       AND $legacy_probationary_rank_full))
               AND evaluation_type IN ($in_clause)
+              AND (evaluation_type <> 'Annual' OR ? = 0)
               $probationary_phase_filter_full
               AND (evaluation_type <> 'Final' OR $initial_gate = 1)
             LIMIT 1
         ");
-        $sel_template_stmt->bind_param("isii", $selected_template_id, $employee_dept, $employee['job_title_id'], $employee['job_title_id']);
+        $sel_template_stmt->bind_param("isiii", $selected_template_id, $employee_dept, $employee['job_title_id'], $employee['job_title_id'], $ap_annual_waiting);
     }
     $sel_template_stmt->execute();
     $selected_template = $sel_template_stmt->get_result()->fetch_assoc();
@@ -2225,6 +2233,9 @@ require_once '../includes/header.php';
                         <?php endif; ?>
 
                         <!-- 1. Primary Action: Template Selection at TOP -->
+                        <?php if ($ap_annual_waiting && !$edit_eval): ?>
+                            <div class="alert alert-info mb-3" role="status"><i class="fas fa-clock me-2" aria-hidden="true"></i>The AP Annual self-rating form will appear here after the AP Manager starts the evaluation cycle.</div>
+                        <?php endif; ?>
                         <div class="row g-3 mb-4">
                             <div class="col-12">
                                 <label class="form-label fw-bold text-primary" style="font-size: 0.95rem;">
@@ -2378,13 +2389,13 @@ require_once '../includes/header.php';
                         ?>
                         <input type="hidden" name="period_start" value="<?php echo e($display_start); ?>">
                         <input type="hidden" name="period_end" value="<?php echo e($display_end); ?>">
-                        <?php if (($eval_type ?? '') === 'Annual' && $is_hrd_annual_employee): ?>
+                        <?php if (($eval_type ?? '') === 'Annual' && $is_managed_annual_employee): ?>
                         <div class="alert <?php echo $available_annual_cycle ? 'alert-info' : 'alert-warning'; ?> mt-3 mb-3" role="status">
                             <?php if ($available_annual_cycle): ?>
                                 <strong>Annual cycle:</strong> <?php echo e(formatDate($display_start)); ?> to <?php echo e(formatDate($display_end)); ?>.
                                 Self-rating deadline: <?php echo e(formatDate($available_annual_cycle['self_rating_deadline'])); ?>.
                             <?php else: ?>
-                                HR Manager has not started an available Annual cycle for your department. You can prepare a draft, but submission is unavailable until the cycle starts.
+                                Your department cycle owner has not started an available Annual cycle. You can prepare a draft, but submission is unavailable until the cycle starts.
                             <?php endif; ?>
                         </div>
                         <?php endif; ?>

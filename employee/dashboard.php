@@ -13,11 +13,7 @@ $user_id     = (int)($_SESSION['user_id']     ?? 0);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'dismiss_first_login_password_notice') {
     verifyCsrfToken();
-    $dismiss_stmt = $conn->prepare("UPDATE users SET first_login_completed = 1 WHERE user_id = ? AND role = 'Employee'");
-    $dismiss_stmt->bind_param('i', $user_id);
-    $dismiss_stmt->execute();
-    $dismiss_stmt->close();
-    $_SESSION['first_login_completed'] = true;
+    $_SESSION['first_login_password_notice_dismissed'] = true;
     header('Location: dashboard.php');
     exit();
 }
@@ -27,7 +23,7 @@ $security_stmt->bind_param('i', $user_id);
 $security_stmt->execute();
 $security_state = $security_stmt->get_result()->fetch_assoc() ?? [];
 $security_stmt->close();
-$show_first_login_password_modal = empty($security_state['first_login_completed']);
+$show_first_login_password_modal = empty($security_state['first_login_completed']) && empty($_SESSION['first_login_password_notice_dismissed']);
 $must_change_password = !empty($security_state['must_change_password']);
 
 // ── Employee core info ──────────────────────────────────────────────────────
@@ -95,6 +91,11 @@ if ($r2) $completed_evals = (int)$r2->fetch_assoc()['c'];
 
 $pending_template_count = 0;
 $employee_dept = $emp['department_name'] ?? '';
+$ap_annual_waiting = false;
+if (($emp['employment_status'] ?? '') === 'Regular' && annualIsApDepartment(['department_name'=>$employee_dept])) {
+    ensureAnnualEvaluationSchema($conn);
+    $ap_annual_waiting = !annualCycleForSelfRating($conn,(int)$emp['department_id'],$employee_id);
+}
 $allowed_eval_types = getAllowedEvaluationTypesForEmploymentStatus($emp['employment_status'] ?? 'Regular');
 $allowed_eval_type_sql = "'" . implode("','", $allowed_eval_types) . "'";
 $legacy_probationary_rank_et = probationaryTemplateLegacyRankSql('et', $emp['job_title_id'] ?? 0);
@@ -110,6 +111,7 @@ $pending_templates_stmt = $conn->prepare("
             AND (et.target_job_title_id IS NULL OR et.target_job_title_id = ?)
             AND $legacy_probationary_rank_et))
       AND et.evaluation_type IN ($allowed_eval_type_sql)
+      AND (et.evaluation_type <> 'Annual' OR ? = 0)
       AND NOT EXISTS (
           SELECT 1
           FROM evaluations ev
@@ -119,7 +121,7 @@ $pending_templates_stmt = $conn->prepare("
             AND ev.status NOT IN ('Draft', 'Returned', 'Rejected', 'Pending Self-Rating')
       )
 ");
-$pending_templates_stmt->bind_param("siii", $employee_dept, $emp['job_title_id'], $emp['job_title_id'], $employee_id);
+$pending_templates_stmt->bind_param("siiii", $employee_dept, $emp['job_title_id'], $emp['job_title_id'], $ap_annual_waiting, $employee_id);
 $pending_templates_stmt->execute();
 $pending_template_count = (int) ($pending_templates_stmt->get_result()->fetch_assoc()['total'] ?? 0);
 $pending_templates_stmt->close();

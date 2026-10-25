@@ -245,3 +245,37 @@
 .annual-page .annual-rate-pending::before{content:'';display:inline-block;width:7px;height:7px;flex-shrink:0;border-radius:50%;background:#43812c;animation:annual-rate-dot 2s ease-in-out infinite}
 @keyframes annual-rate-dot{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(67,129,44,.4)}50%{opacity:.65;box-shadow:0 0 0 4px rgba(67,129,44,.12)}}
 @keyframes annual-rate-breathe{0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(67,129,44,0);background-color:#edf7e6}50%{transform:scale(1.12);box-shadow:0 0 0 6px rgba(67,129,44,.3);background-color:#c8e6b7}}
+.annual-page #annual-cycle-start .annual-cycle-start-breathe{display:inline-flex;align-items:center;justify-content:center;transform-origin:center;animation:annual-cycle-start-breathe 3s ease-in-out infinite !important;will-change:transform}
+@keyframes annual-cycle-start-breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.025)}}
+.annual-page #annualCycleStartConfirmModal .modal-content{border:1px solid #cbd9c2;border-radius:16px;overflow:hidden;box-shadow:0 18px 48px rgba(8,46,6,.22)}
+.annual-page #annualCycleStartConfirmModal .modal-header{background:#eef3e8;border-bottom:1px solid #d4ddcd;padding:16px 20px}
+.annual-page #annualCycleStartConfirmModal .modal-header h2{color:#173b15}
+.annual-page #annualCycleStartConfirmModal .modal-body{padding:20px}
+.annual-page #annualCycleStartConfirmModal .modal-footer{border-top:1px solid #e4e9df;padding:14px 20px}
+#annualRatingSummary .modal-dialog{width:min(760px,calc(100vw - 24px));max-width:none;margin:12px auto}
+#annualRatingSummary .modal-content{max-height:calc(100dvh - 24px);border:1px solid #cbd9c2;border-radius:16px;overflow:hidden;box-shadow:0 20px 55px rgba(8,46,6,.28)}
+#annualRatingSummary .modal-header{position:relative;isolation:isolate;display:flex;align-items:center;justify-content:space-between;flex:0 0 auto;gap:14px;padding:14px 20px;background:linear-gradient(135deg,var(--hero-from,#294306) 0%,var(--hero-mid,#294306) 50%,var(--hero-to,#294306) 100%);border:0;color:#fff}
+#annualRatingSummary .modal-header::before{content:'';position:absolute;inset:0;z-index:-1;background:url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffffff' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/svg%3E");pointer-events:none}
+#annualRatingSummary .modal-header h2{color:#fff;font-size:1.1rem;font-weight:700;line-height:1.3}
+#annualRatingSummary .modal-header .btn-close{flex:0 0 auto;margin:0 0 0 auto;opacity:.85}
+#annualRatingSummary .annual-rating-modal-heading{min-width:0}
+#annualRatingSummary .annual-rating-modal-eyebrow{display:block;margin-bottom:5px;color:rgba(255,255,255,.78);font-size:.74rem;font-weight:700;line-height:1;text-transform:uppercase}
+#annualRatingSummary .modal-body{min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:20px;background:#fff}
+#annualRatingSummary .annual-rating-modal-subject{display:flex;flex-wrap:wrap;align-items:center;gap:7px 12px;margin:0 0 18px;padding:10px 14px;border:1px solid #d4ddcd;border-radius:10px;background:#f4f7ef;color:#526147;font-size:.85rem}
+#annualRatingSummary .annual-rating-modal-subject strong{color:#19351b;font-size:1rem}
+#annualRatingSummary .modal-body h3{margin-bottom:10px;color:#19351b}
+#annualRatingSummary .table-responsive{border:1px solid #dce5d6;border-radius:10px;overflow-x:auto}
+#annualRatingSummary .table{min-width:540px;font-size:.82rem}
+#annualRatingSummary .table th{padding:10px 12px;background:#eef3e8;color:#294306;font-size:.73rem}
+#annualRatingSummary .table td{padding:9px 12px}
+#annualRatingSummary .table tbody tr:nth-child(even){background:#f4f7f1}
+#annualRatingSummary .table tfoot th,#annualRatingSummary .table tfoot td{background:#f8f5e9;border-top:1px solid #d8d8c0;color:#19351b;font-weight:700}
+#annualRatingSummary .annual-rating-modal-warning{display:flex;align-items:flex-start;gap:11px;margin:20px 0 0;background:#fff7df;border:1px solid #e8cf86;color:#57430c;font-size:.83rem}
+#annualRatingSummary .annual-rating-modal-warning i{margin-top:3px;color:#9a7510}
+#annualRatingSummary .modal-footer{flex:0 0 auto;gap:10px;padding:14px 20px;border-top:1px solid #d4ddcd;background:#f7f9f4}
+#annualRatingSummary .modal-footer .btn{margin:0}
+@media(max-width:640px){#annualRatingSummary .modal-header,#annualRatingSummary .modal-body,#annualRatingSummary .modal-footer{padding:14px}#annualRatingSummary .modal-footer{flex-direction:column-reverse;align-items:stretch}#annualRatingSummary .modal-footer .btn{width:100%}}
+.annual-page #annual-cycle-start [data-bs-target="#annualCycleReadOnlyDetails"] .fa-chevron-down{transition:transform .2s ease}
+.annual-page #annual-cycle-start [data-bs-target="#annualCycleReadOnlyDetails"][aria-expanded="true"] .fa-chevron-down{transform:rotate(180deg)}
+.annual-page .annual-you-indicator{display:inline-flex;align-items:center;gap:5px;margin:4px 0 0;padding:4px 9px;border:1px solid #bb941f;border-radius:999px;background:#f9e9ad;color:#193c12;font-size:.76rem;font-weight:800;line-height:1.2;white-space:nowrap;box-shadow:0 2px 6px rgba(8,46,6,.16)}
+.annual-page .annual-you-indicator i{font-size:.72rem;color:#1c631e}

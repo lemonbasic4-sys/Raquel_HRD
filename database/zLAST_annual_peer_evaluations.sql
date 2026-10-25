@@ -1,4 +1,11 @@
 -- Annual workflow only. Safe to import repeatedly; existing evaluations are preserved.
+CREATE TABLE IF NOT EXISTS annual_cycle_department_owners (
+    department_id INT NOT NULL PRIMARY KEY,
+    owner_position_id INT NOT NULL,
+    CONSTRAINT fk_annual_cycle_owner_department FOREIGN KEY (department_id) REFERENCES departments(department_id),
+    CONSTRAINT fk_annual_cycle_owner_position FOREIGN KEY (owner_position_id) REFERENCES job_titles(job_title_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS annual_evaluation_cycles (
     cycle_id INT AUTO_INCREMENT PRIMARY KEY,
     department_id INT NOT NULL,

@@ -88,6 +88,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_SESSION['role'] = $user['role'];
                 $_SESSION['first_login_completed'] = (bool) ($user['first_login_completed'] ?? false);
                 $_SESSION['must_change_password'] = (bool) ($user['must_change_password'] ?? false);
+                unset($_SESSION['first_login_password_notice_dismissed']);
 
                 logLoginAudit($conn, $username, 'Employee Portal', 'Successful', '', (int)$user['user_id']);
 

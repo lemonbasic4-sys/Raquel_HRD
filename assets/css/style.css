@@ -277,6 +277,13 @@ a {
 /* ===== Mobile Gear Settings Dropdown Styling ===== */
 #mobileGearDropdown {
     max-width: calc(100vw - 24px) !important;
+    max-height: calc(100vh - 96px);
+    max-height: calc(100dvh - 96px - env(safe-area-inset-bottom, 0px));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+    scrollbar-width: thin;
     box-shadow: 0 10px 30px rgba(0,0,0,0.15) !important;
 }
 

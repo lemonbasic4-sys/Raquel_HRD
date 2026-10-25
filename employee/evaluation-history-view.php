@@ -40,6 +40,12 @@ $is_annual_peer_evaluation = ($evaluation['evaluation_type'] ?? '') === 'Annual'
     && annualUsesPeerWorkflow($conn, $evaluation_id);
 $annualResultMember=$is_annual_peer_evaluation ? annualMember($conn,$evaluation_id) : null;
 $annualResultComplete=$annualResultMember && count(annualPeers($conn,$annualResultMember))>=annualExpectedPeers($conn,(int)$annualResultMember['cycle_id'],(int)$annualResultMember['employee_id']);
+$annualOwnActor=$annualResultMember ? annualActor($conn,$user_id) : null;
+$annualNamedPeers=$annualOwnActor && annualCanSeeOwnPeerNames($conn,$annualOwnActor,$annualResultMember);
+$annualReceivedPeers=$annualResultMember ? annualPeers($conn,$annualResultMember,$annualNamedPeers) : [];
+$annualPeerSelf=$annualResultMember ? (json_decode($annualResultMember['self_values_json'] ?? '[]',true) ?: []) : [];
+$annualPeerBreakdown=$annualResultMember && count($annualPeerSelf)===count(annualCoreValues())
+    ? annualCandidate($conn,$annualResultMember) : null;
 $criteria_stmt = $conn->prepare("SELECT ec.section, ec.criterion_name, ec.description, ec.weight, es.score_value,
         es.dept_manager_override_score, es.supervisor_override_score, es.manager_override_score,
         COALESCE(es.supervisor_override_score, es.dept_manager_override_score, es.manager_override_score, es.score_value) AS reviewed_score
@@ -490,18 +496,21 @@ require_once '../includes/header.php';
                 <table class="package-table table align-middle mb-0">
                     <thead>
                         <tr>
-                            <th style="<?php echo $show_reviewed_scores ? 'width:40%;' : 'width:70%;'; ?>">Criterion</th>
-                            <th class="text-end" style="<?php echo $show_reviewed_scores ? 'width:20%;' : 'width:30%;'; ?>">
-                                <?php echo $show_reviewed_scores ? 'Original Self-Rating' : 'Submitted Rating'; ?>
+                            <th style="<?php echo $annualPeerBreakdown ? '' : ($show_reviewed_scores ? 'width:40%;' : 'width:70%;'); ?>">Criterion</th>
+                            <th class="text-end" style="<?php echo $annualPeerBreakdown ? '' : ($show_reviewed_scores ? 'width:20%;' : 'width:30%;'); ?>">
+                                <?php echo $annualPeerBreakdown ? 'Self-rating' : ($show_reviewed_scores ? 'Original Self-Rating' : 'Submitted Rating'); ?>
                             </th>
-                            <?php if ($show_reviewed_scores): ?>
-                                <th class="text-end" style="width:20%;"><?php echo $is_annual_peer_evaluation ? 'Combined 360 Average' : 'Reviewed / Adjusted'; ?></th>
+                            <?php if ($annualPeerBreakdown): ?>
+                                <?php foreach ($annualReceivedPeers as $peerIndex=>$peer): ?><th class="text-end"><?php echo e($annualNamedPeers ? $peer['rater_name'] : 'Employee '.($peerIndex+1)); ?></th><?php endforeach; ?>
+                                <th class="text-end">Combined 360 average</th>
+                            <?php elseif ($show_reviewed_scores): ?>
+                                <th class="text-end" style="width:20%;">Reviewed / Adjusted</th>
                                 <th class="text-center" style="width:20%;">Variance</th>
                             <?php endif; ?>
                         </tr>
                     </thead>
                     <tbody>
-                        <?php foreach ($behavior as $criterion): ?>
+                        <?php foreach ($behavior as $itemIndex=>$criterion): ?>
                         <?php
                             $orig = (float)$criterion['score_value'];
                             $rev  = (float)$criterion['reviewed_score'];
@@ -515,9 +524,12 @@ require_once '../includes/header.php';
                                     <div class="small text-muted mt-1"><?php echo e($criterion['description']); ?></div>
                                 <?php endif; ?>
                             </td>
-                            <td data-label="<?php echo $show_reviewed_scores ? 'Original Self-Rating' : 'Submitted Rating'; ?>" class="text-end tabular-nums fw-semibold" style="font-size:1.05rem;"><?php echo number_format($orig, 2); ?></td>
-                            <?php if ($show_reviewed_scores): ?>
-                                <td data-label="<?php echo $is_annual_peer_evaluation ? 'Combined 360 Average' : 'Reviewed / Adjusted'; ?>" class="text-end tabular-nums fw-bold text-dark" style="font-size:1.1rem;"><?php echo number_format($rev, 2); ?></td>
+                            <td data-label="<?php echo $annualPeerBreakdown ? 'Self-rating' : ($show_reviewed_scores ? 'Original Self-Rating' : 'Submitted Rating'); ?>" class="text-end tabular-nums fw-semibold" style="font-size:1.05rem;"><?php echo number_format($orig, 2); ?></td>
+                            <?php if ($annualPeerBreakdown): ?>
+                                <?php foreach ($annualReceivedPeers as $peerIndex=>$peer): $peerScores=json_decode($peer['scores_json'],true) ?: []; ?><td data-label="<?php echo e($annualNamedPeers ? $peer['rater_name'] : 'Employee '.($peerIndex+1)); ?>" class="text-end tabular-nums"><?php echo isset($peerScores[$itemIndex]) ? number_format((float)$peerScores[$itemIndex],2) : '—'; ?></td><?php endforeach; ?>
+                                <td data-label="Combined 360 average" class="text-end tabular-nums fw-bold text-dark" style="font-size:1.1rem;"><?php echo number_format((float)$annualPeerBreakdown['item_averages'][$itemIndex],2); ?></td>
+                            <?php elseif ($show_reviewed_scores): ?>
+                                <td data-label="Reviewed / Adjusted" class="text-end tabular-nums fw-bold text-dark" style="font-size:1.1rem;"><?php echo number_format($rev, 2); ?></td>
                                 <td data-label="Variance" class="text-center">
                                     <?php if ($is_adj): ?>
                                         <span class="badge <?php echo $diff > 0 ? 'bg-success' : 'bg-danger'; ?> px-2 py-1" style="font-size:.85rem;">
@@ -536,8 +548,8 @@ require_once '../includes/header.php';
             <div class="d-flex justify-content-end align-items-center gap-3 mt-3 pt-3 border-top">
                 <span class="text-muted small text-uppercase fw-bold">Core Behaviors &amp; Values Total:</span>
                 <span class="fw-bold tabular-nums" style="font-size:1.15rem;">
-                    <?php echo number_format($show_reviewed_scores ? (float)$evaluation['behavior_average'] : $orig_beh_average, 2); ?>
-                    <?php if ($show_reviewed_scores && abs((float)$evaluation['behavior_average'] - $orig_beh_average) > 0.001): ?>
+                    <?php echo number_format($annualPeerBreakdown ? (float)$annualPeerBreakdown['core'] : ($show_reviewed_scores ? (float)$evaluation['behavior_average'] : $orig_beh_average), 2); ?>
+                    <?php if (!$annualPeerBreakdown && $show_reviewed_scores && abs((float)$evaluation['behavior_average'] - $orig_beh_average) > 0.001): ?>
                         <span class="badge bg-warning text-dark ms-1" title="Original: <?php echo number_format($orig_beh_average, 2); ?>">Self: <?php echo number_format($orig_beh_average, 2); ?></span>
                     <?php endif; ?>
                 </span>

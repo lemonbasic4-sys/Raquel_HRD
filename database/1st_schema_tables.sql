@@ -117,6 +117,7 @@ CREATE TABLE employees (
     probationary_regularization_eligible TINYINT(1) NOT NULL DEFAULT 0,
     probationary_eligible_evaluation_id INT NULL,
     probationary_eligible_at DATETIME NULL,
+    regularization_effective_date DATE NULL,
     probationary_next_evaluation_type VARCHAR(20) NULL,
     probationary_next_evaluation_due_date DATE NULL,
     employment_type ENUM('Full-time', 'Part-time') DEFAULT 'Full-time',

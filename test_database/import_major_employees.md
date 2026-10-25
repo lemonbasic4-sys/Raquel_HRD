@@ -38,7 +38,7 @@ Changing this seed does not rename employees already imported under the old `TDB
 
 All accounts use the local test password: **`password`**. Never use this seed or password in production.
 
-Every employee's **Employee Portal username equals their employee code**, shown below. Accounts are active, not held, and first-login setup is already completed. HR personnel and the CEO each have an Employee account as well as their separate work-role account.
+Every employee's **Employee Portal username equals their employee code**, shown below. Accounts are active and not held. Their first login prompts them to change the test password. HR personnel and the CEO each have an Employee account as well as their separate work-role account.
 
 | Work role | Username |
 | --- | --- |

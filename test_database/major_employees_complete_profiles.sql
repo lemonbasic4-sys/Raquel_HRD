@@ -154,7 +154,7 @@ FROM test_major_roster r WHERE NOT EXISTS (SELECT 1 FROM employee_addresses p WH
 -- Employee Portal account for EVERY roster member (including HR and CEO).
 INSERT INTO users (employee_id,username,email,password_hash,full_name,profile_picture,role,branch_id,is_active,first_login_completed,must_change_password)
 SELECT r.employee_id,r.employee_code,CONCAT(LOWER(r.employee_code),'@portal.example.invalid'),
-'$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi',CONCAT(r.first_name,' ',r.last_name),IF(r.gender='Female','avatar_f.jpg','avatar_m.jpg'),'Employee',102,1,1,0
+'$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi',CONCAT(r.first_name,' ',r.last_name),IF(r.gender='Female','avatar_f.jpg','avatar_m.jpg'),'Employee',102,1,0,0
 FROM test_major_roster r WHERE NOT EXISTS (SELECT 1 FROM users u WHERE u.employee_id=r.employee_id AND u.role='Employee');
 
 -- Separate work-role accounts; Employee Portal accounts remain available.
