@@ -50,6 +50,8 @@ try {
         annualQuery($conn,'INSERT INTO users (user_id,employee_id,username,email,password_hash,full_name,role) VALUES (?,?,?,?,?,?,?)',
             [$id,$id,'hrtest'.$id,'hrtest'.$id.'@example.invalid','unused','HR '.$id,$role]);
     }
+    annualQuery($conn,'INSERT INTO users (user_id,employee_id,username,email,password_hash,full_name,role) VALUES (?,?,?,?,?,?,?)',
+        [11,1,'ceoportal','ceoportal@example.invalid','unused','CEO Employee Portal','Employee']);
     foreach ([[100,1],[101,2],[105,3],[108,4]] as [$position,$creator]) {
         annualQuery($conn,"INSERT INTO evaluation_templates (template_id,template_name,evaluation_type,status,target_department_id,kra_weight,behavior_weight,created_by) VALUES (?,?,'Annual','Active',1,80,20,?)",
             [$position,'AP Annual '.$position,$creator]);
@@ -104,6 +106,20 @@ try {
         && str_contains($ownerPanel,'Start the department Annual cycle and notify the employees shown above?')
         && !str_contains($ownerPanel,'onsubmit="return confirm('),
         'Ready AP Manager Start button opens the confirmation modal');
+    $president=annualActor($conn,1);
+    apCheck(annualPresidentApPreviewDepartmentId($conn,$president)===1
+        && annualPresidentApPreviewDepartmentId($conn,annualActor($conn,11))===1
+        && !annualCanOwnCycle($conn,$president,1),
+        'President work and Employee Portal accounts can preview AP readiness without owning the cycle');
+    $actor=annualActor($conn,11);
+    $cycleSetupDepartmentId=1;
+    ob_start(); require __DIR__.'/../includes/annual-cycle-start-panel.php'; $presidentPanel=ob_get_clean();
+    apCheck(str_contains($presidentPanel,'Acquired Properties Annual cycle')
+        && str_contains($presidentPanel,'Read only')
+        && str_contains($presidentPanel,'All Annual forms are ready')
+        && !str_contains($presidentPanel,'name="action" value="start_annual_cycle"'),
+        'President Employee Portal shows the AP readiness panel but no Start action');
+    unset($cycleSetupDepartmentId);
     $actor=$supervisor;
     $cycleId=annualStartCycle($conn,$owner,1,'2026-01-01','2026-12-31','2026-12-31');
     apCheck(!annualApCycleReadyToStart($conn,$owner)

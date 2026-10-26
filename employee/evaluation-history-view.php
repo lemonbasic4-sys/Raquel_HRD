@@ -132,10 +132,10 @@ require_once '../includes/header.php';
             <div>
                 <h2 class="h5 mb-0 fw-bold">
                     <i class="fas fa-balance-scale me-2"></i>
-                    <?php echo $is_package_completed ? 'Original Self-Rating vs. Final / Reviewed Rating' : ($show_reviewed_scores ? 'Original Self-Rating vs. Immediate Head Review' : 'Submitted Self-Rating Summary'); ?>
+                    <?php echo $is_package_completed ? 'Original Self-Rating vs. Final / Reviewed Rating' : ($show_reviewed_scores ? 'Original Self-Rating vs. Immediate Head Review' : ($is_annual_peer_evaluation ? 'Submitted Self-Rating & Current 360 Results' : 'Submitted Self-Rating Summary')); ?>
                 </h2>
                 <div class="small text-muted mt-1">
-                    <?php echo $is_package_completed ? 'Audit comparison between your submitted rating and officer adjustments.' : ($show_reviewed_scores ? 'Compare your original ratings with the immediate head’s reviewed ratings.' : 'Your submitted self-ratings are shown below while the evaluation review is in progress.'); ?>
+                    <?php echo $is_package_completed ? 'Audit comparison between your submitted rating and officer adjustments.' : ($show_reviewed_scores ? 'Compare your original ratings with the immediate head’s reviewed ratings.' : ($is_annual_peer_evaluation ? 'Your self-ratings and received department 360 ratings are shown below while head approval is pending.' : 'Your submitted self-ratings are shown below while the evaluation review is in progress.')); ?>
                 </div>
             </div>
             <div>
@@ -159,7 +159,7 @@ require_once '../includes/header.php';
                         <?php if ($is_probationary_evaluation): ?>
                             <strong>Probationary evaluation in progress:</strong> The evaluation is moving through its immediate-head and final approval steps. This is an individual review; it does not use a shared department behavior score.
                         <?php elseif ($is_annual_peer_evaluation): ?>
-                            <strong>Annual evaluation in progress:</strong> Your original submitted self-ratings are shown here. Department 360 ratings and immediate-head consolidation are handled separately in Annual &amp; 360 Ratings. Official final scores become available after your immediate head finalizes the evaluation.
+                            <strong>Annual evaluation in progress:</strong> Your self-ratings and submitted department 360 ratings are shown here. The combined score is provisional until your immediate head approves the KRA and all required 360 ratings are received.
                         <?php else: ?>
                             <strong>Consolidation &amp; Management Review in Progress:</strong> Your self-evaluation is currently undergoing departmental consolidation and governance routing. Official final scores, shared behavior metrics, and officer endorsements will be unlocked here once the Board of Directors approves the cycle.
                         <?php endif; ?>
@@ -168,12 +168,16 @@ require_once '../includes/header.php';
             <?php endif; ?>
 
             <?php if ($is_annual_peer_evaluation):
-                $annualDisplayKra=$show_reviewed_scores ? (float)$evaluation['kra_subtotal'] : $orig_kra_subtotal;
-                $annualDisplayCore=$show_reviewed_scores ? (float)$evaluation['behavior_average'] : $orig_beh_average;
-                $annualDisplayTotal=$show_reviewed_scores && $evaluation['total_score']!==null ? (float)$evaluation['total_score'] : $orig_total_score;
+                $annualScoresApproved=$show_reviewed_scores && (int)($annualResultMember['current_version'] ?? 0)>0;
+                $annualResultProvisional=!$annualScoresApproved || !$annualResultComplete;
+                $annualShowLive360=!empty($annualReceivedPeers);
+                $annualDisplayKra=$annualScoresApproved ? (float)$evaluation['kra_subtotal'] : $orig_kra_subtotal;
+                $annualDisplayCore=$annualScoresApproved ? (float)$evaluation['behavior_average'] : (float)($annualPeerBreakdown['core'] ?? $orig_beh_average);
+                $annualDisplayTotal=$annualScoresApproved && $evaluation['total_score']!==null
+                    ? (float)$evaluation['total_score'] : (float)($annualPeerBreakdown['total'] ?? $orig_total_score);
                 $annualTier=$annualDisplayTotal>=3.6 ? 'outstanding' : ($annualDisplayTotal>=2.6 ? 'exceeds' : ($annualDisplayTotal>=2 ? 'meets' : 'needs'));
             ?>
-            <?php $annualScoresApproved=$show_reviewed_scores; require __DIR__.'/../includes/annual-result-cards.php'; ?>
+            <?php require __DIR__.'/../includes/annual-result-cards.php'; ?>
             <?php else: ?>
             <div class="row g-3">
                 <?php if ($is_annual_peer_evaluation): ?>

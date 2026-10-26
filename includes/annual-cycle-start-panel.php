@@ -1,9 +1,9 @@
 <?php
 // Included for the configured cycle owner or AP VP/Supervisor in read-only mode.
-$hrdDepartmentId=(int)$actor['department_id'];
+$hrdDepartmentId=(int)($cycleSetupDepartmentId ?? $actor['department_id']);
 $cycleSetupReadOnly=!annualCanOwnCycle($conn,$actor,$hrdDepartmentId);
-$cycleDepartmentName=(string)$actor['department_name'];
-$cycleActionName=annualIsHrDepartment($actor) ? 'HRD' : $cycleDepartmentName;
+$cycleDepartmentName=(string)(annualQuery($conn,'SELECT department_name FROM departments WHERE department_id=?',[$hrdDepartmentId])[0]['department_name'] ?? $actor['department_name']);
+$cycleActionName=annualIsHrDepartment(['department_name'=>$cycleDepartmentName]) ? 'HRD' : $cycleDepartmentName;
 $annual_in_performance_page=$annual_in_performance_page ?? false;
 $periodFrom=(string)($_POST['period_start'] ?? $_GET['cycle_from'] ?? date('Y').'-01-01');
 $periodTo=(string)($_POST['period_end'] ?? $_GET['cycle_to'] ?? date('Y').'-12-31');

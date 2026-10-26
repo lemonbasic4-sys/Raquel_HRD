@@ -7,6 +7,8 @@ $actor = annualActor($conn, (int)($_SESSION['user_id'] ?? 0));
 if (!$actor || $actor['employment_status'] !== 'Regular') {
     http_response_code(403); exit('Annual evaluations are available to active regular employees.');
 }
+$externalApPreviewDepartmentId=annualPresidentApPreviewDepartmentId($conn,$actor);
+$cycleSetupDepartmentId=$externalApPreviewDepartmentId ?: (int)$actor['department_id'];
 if ($_SERVER['REQUEST_METHOD']==='GET' && !$annual_in_performance_page
     && (in_array($actor['role'], ['HR Manager','HR Supervisor'], true)
         || basename(dirname($_SERVER['SCRIPT_NAME']))!==annualPortal($actor))) {
@@ -193,7 +195,7 @@ require_once __DIR__ . '/header.php';
     </section>
     <?php endif; ?>
     <?php if ($error): ?><div role="alert" class="alert alert-danger"><?php echo e($error); ?></div><?php endif; ?>
-    <?php if (annualCanViewCycleSetup($conn,$actor,(int)$actor['department_id']) && $view==='peers' && !$historyView && !$evaluationId): ?>
+    <?php if (($externalApPreviewDepartmentId || annualCanViewCycleSetup($conn,$actor,$cycleSetupDepartmentId)) && $view==='peers' && !$historyView && !$evaluationId): ?>
         <?php require __DIR__.'/annual-cycle-start-panel.php'; ?>
     <?php endif; ?>
     <?php if ($cycles): ?>
@@ -565,8 +567,10 @@ require_once __DIR__ . '/header.php';
                     <p class="small text-muted mb-0">Behavior results include the names of employees who submitted each 360 rating.</p>
                 </div>
             </div>
-            <?php if (count($peers)>=$expected):
+            <?php if ($peers):
                 $annualScoresApproved=$member['evaluation_status']==='Approved';
+                $annualResultProvisional=!$annualScoresApproved || count($peers)<$expected;
+                $annualShowLive360=true;
                 $annualDisplayKra=$annualScoresApproved ? (float)$member['kra_subtotal'] : $candidate['kra'];
                 $annualDisplayCore=$annualScoresApproved ? (float)$member['behavior_average'] : $candidate['core'];
                 $annualDisplayTotal=$annualScoresApproved ? (float)$member['official_score'] : $candidate['total'];

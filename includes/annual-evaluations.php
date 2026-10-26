@@ -155,6 +155,25 @@ function annualCanViewCycleSetup($conn, array $actor, int $departmentId): bool
         [(int)$actor['job_title_id'],$departmentId]);
 }
 
+/** The CEO who created the AP VP form can monitor AP readiness without owning the cycle. */
+function annualPresidentApPreviewDepartmentId($conn, array $actor): int
+{
+    if (!in_array($actor['role'],['Employee','President and CEO'],true)
+        || $actor['employment_status'] !== 'Regular') return 0;
+    $row=annualQuery($conn,"SELECT d.department_id FROM departments d
+        JOIN job_titles vp ON vp.department_id=d.department_id AND vp.reports_to=?
+        JOIN evaluation_template_positions target ON target.job_title_id=vp.job_title_id
+        JOIN evaluation_templates form ON form.template_id=target.template_id
+        JOIN users creator_account ON creator_account.user_id=form.created_by
+        WHERE d.department_name='Acquired Properties'
+          AND vp.job_title='VP for Acquired Properties' AND vp.is_active=1
+          AND form.target_department_id=d.department_id
+          AND creator_account.employee_id=? AND creator_account.role='President and CEO'
+          AND form.evaluation_type='Annual' AND form.status='Active' AND form.deleted_at IS NULL
+        LIMIT 1",[(int)$actor['job_title_id'],(int)$actor['employee_id']])[0] ?? null;
+    return (int)($row['department_id'] ?? 0);
+}
+
 function annualPortal(array $actor): string
 {
     return ['HR Manager' => 'manager', 'HR Supervisor' => 'supervisor', 'HR Staff' => 'staff'][$actor['role']] ?? 'employee';
