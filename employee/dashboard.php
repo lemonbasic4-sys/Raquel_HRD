@@ -92,7 +92,7 @@ if ($r2) $completed_evals = (int)$r2->fetch_assoc()['c'];
 $pending_template_count = 0;
 $employee_dept = $emp['department_name'] ?? '';
 $ap_annual_waiting = false;
-if (($emp['employment_status'] ?? '') === 'Regular' && annualIsApDepartment(['department_name'=>$employee_dept])) {
+if (($emp['employment_status'] ?? '') === 'Regular' && annualUsesDepartmentCycle(['department_name'=>$employee_dept])) {
     ensureAnnualEvaluationSchema($conn);
     $ap_annual_waiting = !annualCycleForSelfRating($conn,(int)$emp['department_id'],$employee_id);
 }

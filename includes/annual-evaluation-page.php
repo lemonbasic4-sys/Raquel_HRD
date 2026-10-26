@@ -7,8 +7,16 @@ $actor = annualActor($conn, (int)($_SESSION['user_id'] ?? 0));
 if (!$actor || $actor['employment_status'] !== 'Regular') {
     http_response_code(403); exit('Annual evaluations are available to active regular employees.');
 }
-$externalApPreviewDepartmentId=annualPresidentApPreviewDepartmentId($conn,$actor);
-$cycleSetupDepartmentId=$externalApPreviewDepartmentId ?: (int)$actor['department_id'];
+$externalCyclePreviews=annualExternalPreviewDepartments($conn,$actor);
+$ownCycleSetupVisible=annualCanViewCycleSetup($conn,$actor,(int)$actor['department_id']);
+$cycleSetupChoices=[];
+if ($ownCycleSetupVisible) $cycleSetupChoices[(int)$actor['department_id']]=$actor['department_name'];
+foreach ($externalCyclePreviews as $externalPreview) {
+    $cycleSetupChoices[(int)$externalPreview['department_id']]=$externalPreview['department_name'];
+}
+$requestedPreviewId=(int)($_GET['preview_department'] ?? 0);
+$cycleSetupDepartmentId=isset($cycleSetupChoices[$requestedPreviewId]) ? $requestedPreviewId
+    : ($externalCyclePreviews ? (int)$externalCyclePreviews[0]['department_id'] : (int)$actor['department_id']);
 if ($_SERVER['REQUEST_METHOD']==='GET' && !$annual_in_performance_page
     && (in_array($actor['role'], ['HR Manager','HR Supervisor'], true)
         || basename(dirname($_SERVER['SCRIPT_NAME']))!==annualPortal($actor))) {
@@ -118,7 +126,7 @@ if ($view==='head-review') {
 $cycle=null;
 foreach ($cycles as $c) if ((int)$c['cycle_id']===$cycleId) $cycle=$c;
 if ($cycleId && !$cycle) { http_response_code(403); exit('This department cycle is unavailable.'); }
-if ($cycle && (empty($cycle['completed_at']) || annualIsApDepartment($cycle))) {
+if ($cycle && (empty($cycle['completed_at']) || annualUsesDepartmentCycle($cycle))) {
     $conn->begin_transaction();
     try {
         annualQuery($conn,'SELECT cycle_id FROM annual_evaluation_cycles WHERE cycle_id=? FOR UPDATE',[$cycleId]);
@@ -195,7 +203,14 @@ require_once __DIR__ . '/header.php';
     </section>
     <?php endif; ?>
     <?php if ($error): ?><div role="alert" class="alert alert-danger"><?php echo e($error); ?></div><?php endif; ?>
-    <?php if (($externalApPreviewDepartmentId || annualCanViewCycleSetup($conn,$actor,$cycleSetupDepartmentId)) && $view==='peers' && !$historyView && !$evaluationId): ?>
+    <?php if ($cycleSetupChoices && $view==='peers' && !$historyView && !$evaluationId): ?>
+        <?php if (count($cycleSetupChoices)>1): ?>
+            <nav class="d-flex gap-2 mb-3" aria-label="Department cycle previews">
+                <?php foreach ($cycleSetupChoices as $previewId=>$previewName): ?>
+                    <a class="btn btn-sm <?php echo $cycleSetupDepartmentId===$previewId ? 'btn-success' : 'btn-outline-success'; ?>" href="<?php echo e(annualUrl($actor,'?view=peers&preview_department='.$previewId)); ?>"><?php echo e($previewName); ?> readiness</a>
+                <?php endforeach; ?>
+            </nav>
+        <?php endif; ?>
         <?php require __DIR__.'/annual-cycle-start-panel.php'; ?>
     <?php endif; ?>
     <?php if ($cycles): ?>
@@ -206,7 +221,7 @@ require_once __DIR__ . '/header.php';
     <?php endif; ?>
     <?php if ($evaluationId && $cycle && annualCanOwnCycle($conn,$actor,(int)$cycle['department_id']) && empty($cycle['completed_at']) && !empty($cycle['ready_for_approval_at'])): ?>
         <div class="alert alert-success d-flex flex-wrap align-items-center justify-content-between gap-3" role="status" data-persistent-alert>
-            <div><strong>Ready for <?php echo annualIsHrDepartment($cycle) ? 'HR Manager' : 'AP Manager'; ?> approval</strong><div>All annual requirements are complete. The cycle will move to history after approval.</div></div>
+            <div><strong>Ready for <?php echo e(annualCycleOwnerName($conn,(int)$cycle['department_id'])); ?> approval</strong><div>All annual requirements are complete. The cycle will move to history after approval.</div></div>
             <form method="post"><?php echo csrfField(); ?><input type="hidden" name="action" value="approve_cycle"><input type="hidden" name="cycle_id" value="<?php echo (int)$cycleId; ?>"><button class="btn btn-success" type="submit"><i class="fas fa-check-circle me-2" aria-hidden="true"></i>Approve cycle</button></form>
         </div>
     <?php endif; ?>
@@ -246,7 +261,7 @@ require_once __DIR__ . '/header.php';
             </header>
             <?php if ($view==='peers' && !$historyView && $cycle && annualCanOwnCycle($conn,$actor,(int)$cycle['department_id']) && empty($cycle['completed_at']) && !empty($cycle['ready_for_approval_at'])): ?>
                 <div class="alert alert-success d-flex flex-wrap align-items-center justify-content-between gap-3 mt-3" role="status" data-persistent-alert>
-                    <div><strong>Ready for <?php echo annualIsHrDepartment($cycle) ? 'HR Manager' : 'AP Manager'; ?> approval</strong><div>All annual requirements are complete. The cycle will move to history after approval.</div></div>
+                    <div><strong>Ready for <?php echo e(annualCycleOwnerName($conn,(int)$cycle['department_id'])); ?> approval</strong><div>All annual requirements are complete. The cycle will move to history after approval.</div></div>
                     <form method="post"><?php echo csrfField(); ?><input type="hidden" name="action" value="approve_cycle"><input type="hidden" name="cycle_id" value="<?php echo (int)$cycleId; ?>"><button class="btn btn-success" type="submit"><i class="fas fa-check-circle me-2" aria-hidden="true"></i>Approve cycle</button></form>
                 </div>
             <?php endif; ?>

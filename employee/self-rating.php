@@ -85,7 +85,7 @@ if (($employee['employment_status'] ?? '') === 'Regular' && $is_managed_annual_e
     $available_annual_cycle = annualCycleForSelfRating($conn,(int)$employee['department_id'],$employee_id);
 }
 $ap_annual_waiting = ($employee['employment_status'] ?? '') === 'Regular'
-    && annualIsApDepartment(['department_name'=>$employee['department_name'] ?? ''])
+    && annualUsesDepartmentCycle(['department_name'=>$employee['department_name'] ?? ''])
     && !$available_annual_cycle;
 
 if (!$employee) {
@@ -391,7 +391,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $evaluation_type = trim($template['evaluation_type'] ?? 'Annual');
     if ($evaluation_type === 'Annual' && $ap_annual_waiting) {
-        $errors[] = 'The AP Manager has not started an available Annual cycle. Please wait before opening this self-rating form.';
+        $errors[] = 'The department cycle owner has not started an available Annual cycle. Please wait before opening this self-rating form.';
     }
     if (($employee['employment_status'] ?? '') === 'Probationary'
         && in_array($evaluation_type, ['Initial', 'Final'], true)
@@ -2234,7 +2234,7 @@ require_once '../includes/header.php';
 
                         <!-- 1. Primary Action: Template Selection at TOP -->
                         <?php if ($ap_annual_waiting && !$edit_eval): ?>
-                            <div class="alert alert-info mb-3" role="status"><i class="fas fa-clock me-2" aria-hidden="true"></i>The AP Annual self-rating form will appear here after the AP Manager starts the evaluation cycle.</div>
+                            <div class="alert alert-info mb-3" role="status"><i class="fas fa-clock me-2" aria-hidden="true"></i>The Annual self-rating form will appear here after the department cycle owner starts the evaluation cycle.</div>
                         <?php endif; ?>
                         <div class="row g-3 mb-4">
                             <div class="col-12">

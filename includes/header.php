@@ -42,7 +42,7 @@ if ($current_dir === 'employee' && in_array($effective_role, ['Employee', 'HR Ma
 }
 if ($current_dir === 'employee' && $effective_role === 'Employee') {
     $ap_readiness_actor = annualActor($conn,(int)($_SESSION['user_id'] ?? 0));
-    if ($ap_readiness_actor && annualIsApDepartment($ap_readiness_actor)) {
+    if ($ap_readiness_actor && annualUsesDepartmentCycle($ap_readiness_actor)) {
         annualSyncApCycleReadinessNotification($conn,$ap_readiness_actor);
     }
 }
@@ -254,7 +254,7 @@ switch ($effective_role) {
             $is_probationary_employee = strcasecmp(trim((string)$_hdr_emp_status), 'Probationary') === 0;
             $_hdr_dept_stmt->close();
             $_hdr_ap_annual_waiting = false;
-            if ($_hdr_emp_status === 'Regular' && annualIsApDepartment(['department_name'=>$_hdr_emp_dept])) {
+            if ($_hdr_emp_status === 'Regular' && annualUsesDepartmentCycle(['department_name'=>$_hdr_emp_dept])) {
                 ensureAnnualEvaluationSchema($conn);
                 $_hdr_ap_annual_waiting = !annualCycleForSelfRating($conn,$_hdr_emp_department_id,$_hdr_emp_id);
             }

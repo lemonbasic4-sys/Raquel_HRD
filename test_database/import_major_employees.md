@@ -1,10 +1,12 @@
 # Complete department employee test database
 
-A clean Regular-employee baseline for department evaluation testing: **41 employees across all 12 departments**, **41 Employee Portal accounts**, four additional HR/executive work accounts, and one Admin account. The fourth import below adds the Acquired Properties Annual head templates for the dry run.
+For the step-by-step portal walkthrough and current local database state, read [Annual evaluation dry-run handbook](annual_evaluation_dry_run_handbook.md).
+
+A clean Regular-employee baseline for department evaluation testing: **41 employees across all 12 departments**, **41 Employee Portal accounts**, four additional HR/executive work accounts, and one Admin account. The three Annual template imports below add **40 sample forms** across all departments. The President/CEO is excluded from the Office of the President roster pending an external KRA reviewer.
 
 This is an alternative to the employee imports in `eval_test_seeds/testplaybook.md`, not an additional layer on top of them. No application database was reimported when these files were created.
 
-## Reset local `raquel_hris` and import the AP dry run
+## Reset local `raquel_hris` and prepare every department dry run
 
 **Back up first. `database/1st_schema_tables.sql` DROPS and recreates `raquel_hris`, including all current employees, evaluations, accounts, and history.** Its database name is hard-coded; merely selecting a different database in phpMyAdmin will not protect `raquel_hris`.
 
@@ -27,13 +29,19 @@ if ($LASTEXITCODE -ne 0) { throw "Employee import failed" }
 
 & "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source test_database/ap_annual_head_templates.sql;"
 if ($LASTEXITCODE -ne 0) { throw "AP Annual template import failed" }
+
+& "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source test_database/audit_annual_head_templates.sql;"
+if ($LASTEXITCODE -ne 0) { throw "Audit Annual template import failed" }
+
+& "C:\xampp\mysql\bin\mysql.exe" -u root raquel_hris -e "source test_database/remaining_department_annual_templates.sql;"
+if ($LASTEXITCODE -ne 0) { throw "Remaining department Annual template import failed" }
 ```
 
-Alternatively, import those same four files, in order, through phpMyAdmin after accepting the reset warning. The fourth file only adds the AP Annual test forms; it does not create a cycle or submit any ratings.
+Alternatively, import the same six files in order through phpMyAdmin after accepting the reset warning. The three template files only add test forms; they do not create cycles or submit ratings.
 
 Do **not** mix in `3rd_seed_HR_accounts_.sql`, older department employee seeds, probationary-profile seeds, `brainrot_mockup_employees.sql`, or the old account-creation script for this baseline. They introduce different employee IDs/duplicate position holders and are unnecessary here.
 
-The employee and AP template SQL files have no hard-coded database selection. The employee SQL does not delete existing employees and can be rerun to add missing profile rows without resetting existing values, passwords, or evaluation history. The AP template SQL skips its own forms if they already exist; it never replaces a used or archived form. However, combining these files with a populated database is not a clean baseline: unrelated employees remain and affect department peer counts. Fixed ID/code collisions fail rather than replace existing people. If an import fails, disconnect/roll back the transaction before retrying; do not continue blindly.
+The employee and three template SQL files have no hard-coded database selection. The employee SQL does not delete existing employees and can be rerun to add missing profile rows without resetting existing values, passwords, or evaluation history. The template SQL files skip their own forms if they already exist; they never replace a used or archived form. However, combining these files with a populated database is not a clean baseline: unrelated employees remain and affect department peer counts. Fixed ID/code collisions fail rather than replace existing people. If an import fails, disconnect/roll back the transaction before retrying; do not continue blindly.
 
 Changing this seed does not rename employees already imported under the old `TDB-...` codes. Use the new codes on your next intentional fresh test import; do not rerun the updated seed over the old roster without a migration.
 
@@ -164,13 +172,50 @@ To verify the fresh import before logging in:
 
 Expect exactly the four AP people listed above and four form rows showing `11`, `100.00`, and `8`. Then sign in as `AP-002` and open **Annual & 360 Ratings**. Confirm all four positions are Ready, start the AP cycle, and complete self-ratings, head reviews, department 360 ratings, and AP Manager cycle approval. The President and CEO reviews the VP's KRA; department 360 ratings remain within AP. Use a self-rating deadline on or after the day you start the cycle.
 
-## Start evaluation testing in other departments
+## Audit Annual dry run
 
-1. Sign in using each required Employee Portal account.
-2. Confirm the department and immediate head match the roster.
-3. Create the appropriate evaluation templates for the positions you want to test. The optional AP dry run import contains only the four AP templates; other departments have no seeded templates. The baseline contains no evaluations, ratings, approvals, or notifications.
-4. Perform self-rating, immediate-head review, and department peer ratings through the application.
-5. Use the department's actual roster and configured external immediate head when checking expected 360 counts.
+The optional Audit template import creates four **Active Annual** forms for the seeded Audit employees:
+
+| Target position and portal username | Form creator | KRA items | Core Behaviors & Values |
+| --- | --- | ---: | ---: |
+| Audit Manager I (`AUD-001`) | President and CEO (`isabella.cruz`) | 11 | 8 |
+| Audit Manager II (`AUD-002`) | Audit Manager I (`AUD-001`) | 11 | 8 |
+| Audit Supervisor I (`AUD-003`) | Audit Manager II (`AUD-002`) | 11 | 8 |
+| Auditor I (`AUD-004`) | Audit Supervisor I (`AUD-003`) | 11 | 8 |
+
+These are synthetic test KRAs with 80% KRA / 20% Core Values. Audit Manager I starts and approves the Audit cycle. Audit Manager II and Audit Supervisor I can inspect form readiness in read-only mode. The President and CEO reviews Audit Manager I's KRA, and the four Audit employees rate Core Values within Audit. Before the cycle starts, their Annual self-rating forms and pending badges stay hidden. The Audit Manager I username is `AUD-001` on the Employee Portal.
+
+To run the isolated Audit seed and cycle check without resetting the application database:
+
+```powershell
+& "C:\xampp\php\php.exe" tests/annual-audit-cycle.php
+```
+
+## Dry run every department
+
+1. Import all six files above into a fresh test database. Every seeded position with an immediate head receives one sample Annual form. The baseline contains no evaluations, ratings, approvals, or notifications.
+2. Sign in as each department owner below and open **Annual & 360 Ratings**. Confirm readiness, then start that department's cycle. Each cycle has its own period and approval; none starts automatically.
+3. Submit self-ratings from department Employee Portal accounts, complete immediate-head KRA reviews and same-department 360 ratings, then approve each cycle from its owner account.
+4. Confirm that IT Manager I's KRA goes to VP for Operations and Procurement Supervisor I's KRA goes to GS Manager I. Their Core Values ratings stay inside IT and Purchasing, respectively.
+
+| Department | Cycle owner | Portal username |
+| --- | --- | --- |
+| Acquired Properties | AP Manager I | `AP-002` |
+| Audit | Audit Manager I | `AUD-001` |
+| Business Development | Business Development Officer I | `BD-001` |
+| Compliance | Compliance Supervisor I | `COM-001` |
+| Finance | VP for Finance | `FIN-001` |
+| General Services | VP for General Services | `GS-001` |
+| Human Resources | HR Manager I (HRIS account) | `elena.delgado` |
+| Information Technology | IT Manager I | `IT-001` |
+| Marketing | Marketing Manager I | `MKT-001` |
+| Office of the President | President and CEO | `OP-001` |
+| Operations | VP for Operations | `OPS-001` |
+| Purchasing | Procurement Supervisor I | `PUR-001` |
+
+Office of the President has one participant, Executive Assistant I. The CEO owns and reviews that cycle but does not receive an Annual score in it. With one participant, Core Values use the employee self-rating and the CEO's in-department head rating; there are no other department peers.
+
+All imported KRAs are **generic test prompts**, each form has 11 items totaling 100% KRA weight, plus eight Core Values. They are suitable for workflow and computation testing, not production performance decisions.
 
 Do not import the older HRD annual template seed without reviewing its hard-coded creator/employee IDs: this baseline uses different IDs. Existing notification logic may generate legitimate reminders after login, but this seed does not create overdue probationary employees or seed notification rows.
 
@@ -179,7 +224,10 @@ Do not import the older HRD annual template seed without reviewing its hard-code
 ```powershell
 & "C:\xampp\php\php.exe" tests/ap-template-seed.php
 & "C:\xampp\php\php.exe" tests/annual-ap-cycle.php
+& "C:\xampp\php\php.exe" tests/annual-audit-cycle.php
+& "C:\xampp\php\php.exe" tests/annual-all-departments.php
+& "C:\xampp\php\php.exe" scripts/check-annual-readiness.php
 ```
 
-Both checks create and remove their own disposable databases. The first imports the organization, major employees, and AP forms and checks four ready AP positions, 11 KRAs and eight behaviors per form, and a duplicate-free template rerun. The second checks the AP workflow. Neither replaces a hands-on portal dry run. There is currently no `test_database/verify_seed.php` script in this checkout.
+The first four checks create and remove their own disposable databases. The all-departments check imports all 40 sample forms, verifies each owner and roster, starts and approves each department cycle in isolation, and verifies a duplicate-free template rerun. The readiness script checks the configured application database and initializes missing owner mappings without starting cycles. These checks do not replace a hands-on portal dry run. There is currently no `test_database/verify_seed.php` script in this checkout.
 

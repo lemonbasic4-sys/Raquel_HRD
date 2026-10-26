@@ -93,10 +93,20 @@ function ensureAnnualEvaluationSchema($conn): void
         CONSTRAINT fk_annual_cycle_owner_department FOREIGN KEY (department_id) REFERENCES departments(department_id),
         CONSTRAINT fk_annual_cycle_owner_position FOREIGN KEY (owner_position_id) REFERENCES job_titles(job_title_id)
     )');
-    // AP is the pilot. The mapping is explicit and can be changed without changing authorization code.
+    // One configured owner per department; the hierarchy does not grant every head approval.
     $conn->query("INSERT IGNORE INTO annual_cycle_department_owners (department_id,owner_position_id)
         SELECT d.department_id,j.job_title_id FROM departments d JOIN job_titles j ON j.department_id=d.department_id
-        WHERE d.department_name='Acquired Properties' AND j.job_title='AP Manager I' AND j.is_active=1");
+        WHERE ((d.department_name='Acquired Properties' AND j.job_title='AP Manager I')
+            OR (d.department_name='Audit' AND j.job_title='Audit Manager I')
+            OR (d.department_name='Business Development' AND j.job_title='Business Development Officer I')
+            OR (d.department_name='Compliance' AND j.job_title='Compliance Supervisor I')
+            OR (d.department_name='Finance' AND j.job_title='VP for Finance')
+            OR (d.department_name='General Services' AND j.job_title='VP for General Services')
+            OR (d.department_name='Information Technology' AND j.job_title='IT Manager I')
+            OR (d.department_name='Marketing' AND j.job_title='Marketing Manager I')
+            OR (d.department_name='Office of the President' AND j.job_title='President and CEO')
+            OR (d.department_name='Operations' AND j.job_title='VP for Operations')
+            OR (d.department_name='Purchasing' AND j.job_title='Procurement Supervisor I')) AND j.is_active=1");
     $ready[$key] = true;
     // Cycles created before the explicit-start workflow are already in progress.
     $conn->query('UPDATE annual_evaluation_cycles c SET c.started_at=c.created_at
@@ -130,28 +140,52 @@ function annualIsApDepartment(array $actor): bool
     return strcasecmp(trim((string)($actor['department_name'] ?? '')), 'Acquired Properties') === 0;
 }
 
+function annualIsAuditDepartment(array $actor): bool
+{
+    return strcasecmp(trim((string)($actor['department_name'] ?? '')), 'Audit') === 0;
+}
+
+function annualUsesDepartmentCycle(array $actor): bool
+{
+    return in_array(trim((string)($actor['department_name'] ?? '')),[
+        'Acquired Properties','Audit','Business Development','Compliance','Finance',
+        'General Services','Information Technology','Marketing','Office of the President',
+        'Operations','Purchasing'],true);
+}
+
 function annualUsesManagedCycle(array $actor): bool
 {
-    return annualIsHrDepartment($actor) || annualIsApDepartment($actor);
+    return annualIsHrDepartment($actor) || annualUsesDepartmentCycle($actor);
 }
 
 function annualCanOwnCycle($conn, array $actor, int $departmentId): bool
 {
     if ($actor['employment_status'] !== 'Regular' || (int)$actor['department_id'] !== $departmentId) return false;
     if (annualIsHrDepartment($actor)) return $actor['role'] === 'HR Manager';
-    if (!annualIsApDepartment($actor) || $actor['role'] !== 'Employee') return false;
+    if (!annualUsesDepartmentCycle($actor) || !in_array($actor['role'],['Employee','President and CEO'],true)) return false;
     return (bool)annualQuery($conn, 'SELECT 1 FROM annual_cycle_department_owners
         WHERE department_id=? AND owner_position_id=?', [$departmentId,(int)$actor['job_title_id']]);
+}
+
+function annualCycleOwnerName($conn, int $departmentId): string
+{
+    $department=annualQuery($conn,'SELECT department_name FROM departments WHERE department_id=?',[$departmentId])[0] ?? [];
+    if (annualIsHrDepartment($department)) return 'HR Manager';
+    if (annualIsApDepartment($department)) return 'AP Manager';
+    $owner=annualQuery($conn,'SELECT j.job_title FROM annual_cycle_department_owners o
+        JOIN job_titles j ON j.job_title_id=o.owner_position_id WHERE o.department_id=?',[$departmentId])[0] ?? null;
+    return (string)($owner['job_title'] ?? 'department cycle owner');
 }
 
 function annualCanViewCycleSetup($conn, array $actor, int $departmentId): bool
 {
     if (annualCanOwnCycle($conn,$actor,$departmentId)) return true;
     if ($actor['employment_status'] !== 'Regular' || $actor['role'] !== 'Employee'
-        || (int)$actor['department_id'] !== $departmentId || !annualIsApDepartment($actor)) return false;
-    return (bool)annualQuery($conn,"SELECT 1 FROM job_titles
-        WHERE job_title_id=? AND department_id=?
-          AND (job_title LIKE 'AP Supervisor%' OR job_title='VP for Acquired Properties')",
+        || (int)$actor['department_id'] !== $departmentId || !annualUsesDepartmentCycle($actor)) return false;
+    return (bool)annualQuery($conn,"SELECT 1 FROM job_titles j
+        WHERE j.job_title_id=? AND j.department_id=?
+          AND (j.rank_category_id=1 OR EXISTS (SELECT 1 FROM job_titles child
+              WHERE child.reports_to=j.job_title_id AND child.department_id=j.department_id))",
         [(int)$actor['job_title_id'],$departmentId]);
 }
 
@@ -172,6 +206,40 @@ function annualPresidentApPreviewDepartmentId($conn, array $actor): int
           AND form.evaluation_type='Annual' AND form.status='Active' AND form.deleted_at IS NULL
         LIMIT 1",[(int)$actor['job_title_id'],(int)$actor['employee_id']])[0] ?? null;
     return (int)($row['department_id'] ?? 0);
+}
+
+/** The CEO who created the Audit Manager I form can inspect Audit readiness. */
+function annualPresidentAuditPreviewDepartmentId($conn, array $actor): int
+{
+    if (!in_array($actor['role'],['Employee','President and CEO'],true)
+        || $actor['employment_status'] !== 'Regular') return 0;
+    $row=annualQuery($conn,"SELECT d.department_id FROM departments d
+        JOIN job_titles manager ON manager.department_id=d.department_id AND manager.reports_to=?
+        JOIN evaluation_template_positions target ON target.job_title_id=manager.job_title_id
+        JOIN evaluation_templates form ON form.template_id=target.template_id
+        JOIN users creator_account ON creator_account.user_id=form.created_by
+        WHERE d.department_name='Audit' AND manager.job_title='Audit Manager I' AND manager.is_active=1
+          AND form.target_department_id=d.department_id
+          AND creator_account.employee_id=? AND creator_account.role='President and CEO'
+          AND form.evaluation_type='Annual' AND form.status='Active' AND form.deleted_at IS NULL
+        LIMIT 1",[(int)$actor['job_title_id'],(int)$actor['employee_id']])[0] ?? null;
+    return (int)($row['department_id'] ?? 0);
+}
+
+/** Departments whose top Annual form this actor created as an external immediate head. */
+function annualExternalPreviewDepartments($conn, array $actor): array
+{
+    if ($actor['employment_status']!=='Regular') return [];
+    return annualQuery($conn,"SELECT DISTINCT d.department_id,d.department_name FROM departments d
+        JOIN annual_cycle_department_owners owner ON owner.department_id=d.department_id
+        JOIN job_titles target_position ON target_position.department_id=d.department_id AND target_position.reports_to=?
+        JOIN evaluation_template_positions target ON target.job_title_id=target_position.job_title_id
+        JOIN evaluation_templates form ON form.template_id=target.template_id AND form.target_department_id=d.department_id
+        JOIN users creator ON creator.user_id=form.created_by AND creator.employee_id=?
+        WHERE d.department_id<>? AND d.is_active=1 AND d.deleted_at IS NULL
+          AND form.evaluation_type='Annual' AND form.status='Active' AND form.deleted_at IS NULL
+          AND creator.role IN ('Employee','President and CEO')
+        ORDER BY d.department_name",[(int)$actor['job_title_id'],(int)$actor['employee_id'],(int)$actor['department_id']]);
 }
 
 function annualPortal(array $actor): string
@@ -232,9 +300,11 @@ function annualCycleRosterPreview($conn, int $departmentId): array
     $employees = annualQuery($conn, "SELECT e.employee_id,e.first_name,e.last_name,e.job_title_id,
             j.job_title,j.reports_to,h.job_title AS reviewer_position_name
         FROM employees e LEFT JOIN job_titles j ON j.job_title_id=e.job_title_id
+        JOIN departments d ON d.department_id=e.department_id
         LEFT JOIN job_titles h ON h.job_title_id=j.reports_to
         WHERE e.department_id=? AND e.is_active=1 AND e.deleted_at IS NULL
           AND e.employment_status='Regular'
+          AND (d.department_name<>'Office of the President' OR j.reports_to IS NOT NULL)
         ORDER BY j.rank_category_id,j.job_title_id,e.last_name,e.first_name", [$departmentId]);
     foreach ($employees as &$employee) {
         $issues = [];
@@ -306,7 +376,7 @@ function annualCyclePositionReadinessRows(array $employees): array
 
 function annualApCycleReadyToStart($conn, array $actor): bool
 {
-    if (!annualIsApDepartment($actor) || !annualCanOwnCycle($conn,$actor,(int)$actor['department_id'])) return false;
+    if (!annualUsesDepartmentCycle($actor) || !annualCanOwnCycle($conn,$actor,(int)$actor['department_id'])) return false;
     ensureAnnualEvaluationSchema($conn);
     $year=date('Y');
     $from=$year.'-01-01';
@@ -321,14 +391,14 @@ function annualApCycleReadyToStart($conn, array $actor): bool
 /** Keep one actionable notification while the AP Manager can start this year's cycle. */
 function annualSyncApCycleReadinessNotification($conn, array $actor): bool
 {
-    if (!annualIsApDepartment($actor) || !annualCanOwnCycle($conn,$actor,(int)$actor['department_id'])) return false;
+    if (!annualUsesDepartmentCycle($actor) || !annualCanOwnCycle($conn,$actor,(int)$actor['department_id'])) return false;
     $ready=annualApCycleReadyToStart($conn,$actor);
-    $title='AP Annual cycle ready to start ('.date('Y').')';
+    $title=(annualIsApDepartment($actor) ? 'AP' : $actor['department_name']).' Annual cycle ready to start ('.date('Y').')';
     $existing=annualQuery($conn,'SELECT notification_id FROM notifications WHERE user_id=? AND title=? LIMIT 1',
         [(int)$actor['user_id'],$title]);
     if ($ready && !$existing) {
         createNotification($conn,(int)$actor['user_id'],$title,
-            'All Acquired Properties Annual forms and accounts are ready. Start the department evaluation cycle.',
+            'All '.$actor['department_name'].' Annual forms and accounts are ready. Start the department evaluation cycle.',
             annualUrl($actor,'?view=peers'),'evaluations',true);
     } elseif (!$ready && $existing) {
         annualQuery($conn,'UPDATE notifications SET needs_action=0 WHERE user_id=? AND title=? AND needs_action=1',
@@ -381,9 +451,9 @@ function annualStartCycle($conn, array $actor, int $departmentId, string $from, 
         }
         logAudit($conn,(int)$actor['user_id'],'CREATE','Annual Cycle',$cycleId,
             $department['department_name'].' '.$from.' to '.$to.'; self-rating deadline '.$deadline.'; '.count($roster).' members.');
-        if (annualIsApDepartment($department)) {
+        if (annualUsesDepartmentCycle($department)) {
             annualQuery($conn,'UPDATE notifications SET needs_action=0 WHERE user_id=? AND title=? AND needs_action=1',
-                [(int)$actor['user_id'],'AP Annual cycle ready to start ('.date('Y').')']);
+                [(int)$actor['user_id'],(annualIsApDepartment($department) ? 'AP' : $department['department_name']).' Annual cycle ready to start ('.date('Y').')']);
         }
         $conn->commit();
         return $cycleId;
@@ -403,7 +473,7 @@ function annualCycleForSelfRating($conn, int $departmentId, int $employeeId): ?a
         ORDER BY c.period_end DESC,c.cycle_id DESC',[$employeeId,$employeeId,$departmentId]);
     $department=annualQuery($conn,'SELECT department_name FROM departments WHERE department_id=?',[$departmentId])[0] ?? [];
     foreach ($cycles as $cycle) {
-        if (annualIsApDepartment($department) && empty($cycle['member_id'])) {
+        if (annualUsesDepartmentCycle($department) && empty($cycle['member_id'])) {
             $eligibleDate=$cycle['regularization_effective_date'] ?: (!empty($cycle['probationary_eligible_at']) ? substr($cycle['probationary_eligible_at'],0,10) : $cycle['hire_date']);
             if (!$eligibleDate || $eligibleDate < $cycle['period_start'] || $eligibleDate > $cycle['period_end']) continue;
         }
@@ -412,15 +482,17 @@ function annualCycleForSelfRating($conn, int $departmentId, int $employeeId): ?a
     return null;
 }
 
-/** Caller holds the cycle lock. Enroll AP employees regularized within the cycle period. */
+/** Caller holds the cycle lock. Enroll new pilot-department employees within the cycle period. */
 function annualSyncApCycleRoster($conn, array $cycle): int
 {
-    if (!annualIsApDepartment($cycle) || empty($cycle['started_at'])) return 0;
+    if (!annualUsesDepartmentCycle($cycle) || empty($cycle['started_at'])) return 0;
     $newMembers=annualQuery($conn,"SELECT e.employee_id,e.job_title_id,j.job_title,j.reports_to
         FROM employees e JOIN job_titles j ON j.job_title_id=e.job_title_id
+        JOIN departments d ON d.department_id=e.department_id
         LEFT JOIN annual_evaluation_members m ON m.cycle_id=? AND m.employee_id=e.employee_id
         WHERE e.department_id=? AND e.is_active=1 AND e.deleted_at IS NULL
           AND e.employment_status='Regular' AND m.member_id IS NULL
+          AND (d.department_name<>'Office of the President' OR j.reports_to IS NOT NULL)
           AND COALESCE(e.regularization_effective_date,DATE(e.probationary_eligible_at),e.hire_date) BETWEEN ? AND ?",
         [(int)$cycle['cycle_id'],(int)$cycle['department_id'],$cycle['period_start'],$cycle['period_end']]);
     foreach ($newMembers as $person) {
@@ -433,7 +505,7 @@ function annualSyncApCycleRoster($conn, array $cycle): int
                 AND is_active=1 AND deleted_at IS NULL AND COALESCE(account_hold,0)=0",
                 [(int)$person['employee_id']]) as $user) {
             createNotification($conn,(int)$user['user_id'],'Annual self-rating available',
-                'You joined the Acquired Properties Annual cycle for '.$cycle['period_start'].' to '.$cycle['period_end'].'. Submit your self-rating to begin department 360 ratings.',
+                'You joined the '.$cycle['department_name'].' Annual cycle for '.$cycle['period_start'].' to '.$cycle['period_end'].'. Submit your self-rating to begin department 360 ratings.',
                 BASE_URL.'/employee/self-rating.php','evaluations',true);
         }
     }
@@ -593,6 +665,9 @@ function annualRegisterSubmission($conn, int $evaluationId): void
     }
     $values = json_encode(annualValidateScores(array_column($criteria, 'score_value')));
     $departmentName = annualQuery($conn,'SELECT department_name FROM departments WHERE department_id=?',[(int)$ev['department_id']])[0]['department_name'] ?? '';
+    if ($departmentName==='Office of the President' && !$ev['reports_to']) {
+        throw new DomainException('The President/CEO is excluded from this department Annual cycle.');
+    }
     $isManagedCycle = annualUsesManagedCycle(['department_name'=>$departmentName]);
     if (!$isManagedCycle) {
         // Other departments retain their existing submission-led workflow until
@@ -622,7 +697,7 @@ function annualRegisterSubmission($conn, int $evaluationId): void
     $member = annualQuery($conn, 'SELECT * FROM annual_evaluation_members WHERE cycle_id=? AND employee_id=?',
         [$cycleId,(int)$ev['employee_id']])[0] ?? null;
     if (!$member) {
-        if (annualIsApDepartment(['department_name'=>$departmentName])) {
+        if (annualUsesDepartmentCycle(['department_name'=>$departmentName])) {
             $personDate=annualQuery($conn,'SELECT COALESCE(regularization_effective_date,DATE(probationary_eligible_at),hire_date) AS effective_date FROM employees WHERE employee_id=?',[(int)$ev['employee_id']])[0]['effective_date'] ?? null;
             if (!$personDate || $personDate<$cycle['period_start'] || $personDate>$cycle['period_end']) {
                 throw new DomainException('Your effective regularization or hire date is outside this Annual cycle period.');

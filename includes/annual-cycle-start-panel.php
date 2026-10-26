@@ -1,9 +1,10 @@
 <?php
-// Included for the configured cycle owner or AP VP/Supervisor in read-only mode.
+// Included for the configured cycle owner or department heads in read-only mode.
 $hrdDepartmentId=(int)($cycleSetupDepartmentId ?? $actor['department_id']);
 $cycleSetupReadOnly=!annualCanOwnCycle($conn,$actor,$hrdDepartmentId);
 $cycleDepartmentName=(string)(annualQuery($conn,'SELECT department_name FROM departments WHERE department_id=?',[$hrdDepartmentId])[0]['department_name'] ?? $actor['department_name']);
 $cycleActionName=annualIsHrDepartment(['department_name'=>$cycleDepartmentName]) ? 'HRD' : $cycleDepartmentName;
+$cycleOwnerName=annualCycleOwnerName($conn,$hrdDepartmentId);
 $annual_in_performance_page=$annual_in_performance_page ?? false;
 $periodFrom=(string)($_POST['period_start'] ?? $_GET['cycle_from'] ?? date('Y').'-01-01');
 $periodTo=(string)($_POST['period_end'] ?? $_GET['cycle_to'] ?? date('Y').'-12-31');
@@ -24,7 +25,7 @@ $positionRoster=annualCyclePositionReadinessRows($hrdRoster);
     <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap <?php echo $cycleSetupReadOnly ? 'mb-0' : 'mb-3'; ?>">
         <div>
             <h2 class="h5 fw-bold mb-1" id="hrdCycleStartTitle"><i class="fas fa-calendar-check me-2" aria-hidden="true"></i><?php echo e($cycleDepartmentName); ?> Annual cycle</h2>
-            <p class="small text-muted mb-0"><?php echo $cycleSetupReadOnly ? ($hrdOpenCycle ? formatDate($hrdOpenCycle['period_start']).' to '.formatDate($hrdOpenCycle['period_end']).' · View cycle details below.' : 'Read-only form readiness. The AP Manager starts the cycle.') : 'Start this department cycle after each immediate head has created the Annual form for their direct reports.'; ?></p>
+            <p class="small text-muted mb-0"><?php echo $cycleSetupReadOnly ? ($hrdOpenCycle ? formatDate($hrdOpenCycle['period_start']).' to '.formatDate($hrdOpenCycle['period_end']).' · View cycle details below.' : 'Read-only form readiness. The '.e($cycleOwnerName).' starts the cycle.') : 'Start this department cycle after each immediate head has created the Annual form for their direct reports.'; ?></p>
         </div>
         <div class="d-flex gap-2 align-items-center">
             <?php if ($cycleSetupReadOnly): ?><span class="badge bg-secondary">Read only</span><?php endif; ?>
@@ -36,7 +37,7 @@ $positionRoster=annualCyclePositionReadinessRows($hrdRoster);
     </div>
     <div<?php if ($cycleSetupReadOnly): ?> class="collapse pt-3" id="annualCycleReadOnlyDetails"<?php endif; ?>>
     <?php if ($hrdOpenCycle): ?>
-        <p class="mb-0">The <?php echo e(formatDate($hrdOpenCycle['period_start'])); ?> to <?php echo e(formatDate($hrdOpenCycle['period_end'])); ?> cycle is open. <?php echo $cycleSetupReadOnly ? 'The AP Manager will approve it after all required ratings are complete.' : 'Complete and approve it before starting another period.'; ?></p>
+        <p class="mb-0">The <?php echo e(formatDate($hrdOpenCycle['period_start'])); ?> to <?php echo e(formatDate($hrdOpenCycle['period_end'])); ?> cycle is open. <?php echo $cycleSetupReadOnly ? 'The '.e($cycleOwnerName).' will approve it after all required ratings are complete.' : 'Complete and approve it before starting another period.'; ?></p>
     <?php elseif (!$cycleSetupReadOnly): ?>
         <form method="get" class="row g-2 align-items-end mb-3">
             <?php if ($annual_in_performance_page): ?><input type="hidden" name="category" value="regular"><?php endif; ?><input type="hidden" name="view" value="peers">
@@ -60,11 +61,11 @@ $positionRoster=annualCyclePositionReadinessRows($hrdRoster);
         </table></div>
         <?php if ($hrdReady && !$hrdOverlap): ?>
             <div class="mt-3 d-flex justify-content-center">
-                <button class="btn btn-success<?php echo annualIsApDepartment($actor) ? ' annual-cycle-start-breathe' : ''; ?>" type="button" data-bs-toggle="modal" data-bs-target="#annualCycleStartConfirmModal"><i class="fas fa-play me-2" aria-hidden="true"></i>Start <?php echo e($cycleActionName); ?> cycle and notify employees</button>
+                <button class="btn btn-success<?php echo annualUsesDepartmentCycle($actor) ? ' annual-cycle-start-breathe' : ''; ?>" type="button" data-bs-toggle="modal" data-bs-target="#annualCycleStartConfirmModal"><i class="fas fa-play me-2" aria-hidden="true"></i>Start <?php echo e($cycleActionName); ?> cycle and notify employees</button>
             </div>
         <?php endif; ?>
     <?php else: ?>
-        <p class="small text-muted mb-3">The AP Manager has not started a cycle. The current Annual form readiness is shown below.</p>
+        <p class="small text-muted mb-3">The <?php echo e($cycleOwnerName); ?> has not started a cycle. The current Annual form readiness is shown below.</p>
     <?php endif; ?>
     <?php if ($cycleSetupReadOnly): ?>
         <div class="table-responsive"><table class="table table-sm align-middle mb-0">
@@ -76,11 +77,11 @@ $positionRoster=annualCyclePositionReadinessRows($hrdRoster);
                     <td><?php echo e($position['reviewer_position_name'] ?: 'Immediate head missing'); ?></td>
                     <td><?php if ($position['issues']): ?><span class="text-danger"><?php echo (int)$position['blocked_count']; ?> of <?php echo (int)$position['employee_count']; ?> need attention: <?php echo e(implode('; ',$position['issues'])); ?></span><?php else: ?><span class="text-success fw-semibold"><i class="fas fa-check-circle me-1" aria-hidden="true"></i>Ready</span><?php endif; ?></td></tr>
                 <?php endforeach; ?>
-                <?php if (!$positionRoster): ?><tr><td colspan="4" class="text-muted text-center py-3">No active regular AP employees found.</td></tr><?php endif; ?>
+                <?php if (!$positionRoster): ?><tr><td colspan="4" class="text-muted text-center py-3">No active regular employees found.</td></tr><?php endif; ?>
             </tbody>
         </table></div>
         <?php if (!$hrdOpenCycle): ?>
-            <p class="alert alert-info mt-3 mb-0" role="status"><i class="fas fa-clock me-2" aria-hidden="true"></i><?php echo $hrdReady ? 'All Annual forms are ready. Please wait for the AP Manager to start the evaluation cycle.' : 'Please wait for the AP Manager to start the evaluation cycle after the required Annual forms and accounts are ready.'; ?></p>
+            <p class="alert alert-info mt-3 mb-0" role="status"><i class="fas fa-clock me-2" aria-hidden="true"></i><?php echo $hrdReady ? 'All Annual forms are ready. Please wait for the '.e($cycleOwnerName).' to start the evaluation cycle.' : 'Please wait for the '.e($cycleOwnerName).' to start the evaluation cycle after the required Annual forms and accounts are ready.'; ?></p>
         <?php endif; ?>
     <?php endif; ?>
     </div>
