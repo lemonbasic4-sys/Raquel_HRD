@@ -34,6 +34,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !isset($_GET['category'])
     }
 }
 
+// Managed regular-employee cycles use their own review engines.
+if (($_GET['category'] ?? '') === 'quarterly') {
+    $quarterly_in_performance_page = in_array($_SESSION['role'] ?? '', ['HR Manager', 'HR Supervisor'], true);
+    require_once __DIR__ . '/../includes/quarterly-evaluations.php';
+    require __DIR__ . '/../includes/quarterly-evaluation-page.php';
+    exit;
+}
+
 // The Regular tab uses the Annual engine, not the legacy package pipeline.
 if (in_array($_SESSION['role'] ?? '', ['HR Manager', 'HR Supervisor'], true)
     && ($_GET['category'] ?? '') === 'regular') {
@@ -885,6 +893,10 @@ $active_package_tab = in_array($_SESSION['role'] ?? '', ['HR Manager','HR Superv
                 <span class="package-category-tab__count"><?php echo $regular_package_count; ?></span>
             </button>
             <?php endif; ?>
+            <a class="package-category-tab" href="<?php echo BASE_URL; ?>/employee/team-evaluation-packages.php?category=quarterly">
+                <span class="package-category-tab__icon"><i class="fas fa-calendar-alt" aria-hidden="true"></i></span>
+                <span class="package-category-tab__copy"><strong>Quarterly Evaluation</strong><small>Quarterly cycles &amp; 360 ratings</small></span>
+            </a>
         </nav>
         <?php endif; ?>
         <nav class="d-flex flex-wrap gap-2 mb-3" aria-label="Probationary evaluation history">

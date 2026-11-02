@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/annual-evaluations.php';
+require_once __DIR__ . '/quarterly-evaluations.php';
 
 // ============================================
 
@@ -7770,6 +7771,7 @@ function recalculateEvaluationScores($conn, $evaluation_id)
     
     $eval = $eval_q->fetch_assoc();
     if (($eval['evaluation_type'] ?? '') === 'Annual' && annualUsesPeerWorkflow($conn,$evaluation_id)) return false;
+    if (($eval['evaluation_type'] ?? '') === 'Quarterly' && quarterlyUsesPeerWorkflow($conn,$evaluation_id)) return false;
     $kra_weight_pct = (float)($eval['kra_weight'] ?? 80);
     $beh_weight_pct = (float)($eval['behavior_weight'] ?? 20);
     if (in_array($eval['evaluation_type'] ?? '', ['Initial', 'Final'], true)) {

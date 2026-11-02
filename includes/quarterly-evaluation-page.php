@@ -1,0 +1,1062 @@
+<?php
+$quarterly_in_performance_page = $quarterly_in_performance_page ?? false;
+$page_title = $quarterly_in_performance_page ? 'Performance Evaluation' : 'Quarterly Evaluations & 360 Ratings';
+require_once __DIR__ . '/session-check.php';
+ensureQuarterlyEvaluationSchema($conn);
+$actor = quarterlyActor($conn, (int)($_SESSION['user_id'] ?? 0));
+if (!$actor || $actor['employment_status'] !== 'Regular') {
+    http_response_code(403); exit('Quarterly evaluations are available to active regular employees.');
+}
+if (quarterlyCanOwnCycle($conn,$actor,(int)$actor['department_id'])) {
+    quarterlySyncApCycleReadinessNotification($conn,$actor);
+}
+$externalCyclePreviews=quarterlyExternalPreviewDepartments($conn,$actor);
+$ownCycleSetupVisible=quarterlyCanViewCycleSetup($conn,$actor,(int)$actor['department_id']);
+$cycleSetupChoices=[];
+if ($ownCycleSetupVisible) $cycleSetupChoices[(int)$actor['department_id']]=$actor['department_name'];
+foreach ($externalCyclePreviews as $externalPreview) {
+    $cycleSetupChoices[(int)$externalPreview['department_id']]=$externalPreview['department_name'];
+}
+$requestedPreviewId=(int)($_GET['preview_department'] ?? 0);
+$cycleSetupDepartmentId=isset($cycleSetupChoices[$requestedPreviewId]) ? $requestedPreviewId
+    : ($externalCyclePreviews ? (int)$externalCyclePreviews[0]['department_id'] : (int)$actor['department_id']);
+if ($_SERVER['REQUEST_METHOD']==='GET' && !$quarterly_in_performance_page
+    && (in_array($actor['role'], ['HR Manager','HR Supervisor'], true)
+        || basename(dirname($_SERVER['SCRIPT_NAME']))!==quarterlyPortal($actor))) {
+    header('Location: '.quarterlyUrl($actor, $_GET ? '?'.http_build_query($_GET) : '')); exit;
+}
+$view = (string)($_GET['view'] ?? 'list');
+$historyView=$view==='history';
+if ($historyView) $view='peers';
+$evaluationId = (int)($_GET['evaluation_id'] ?? 0);
+if (!$evaluationId && $view==='list') $view='peers';
+$cycleId = (int)($_GET['cycle_id'] ?? 0);
+$error = '';
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    verifyCsrfToken();
+    try {
+        if (($_POST['action'] ?? '') === 'start_quarterly_cycle') {
+            if (!quarterlyCanOwnCycle($conn,$actor,(int)$actor['department_id'])) {
+                throw new DomainException('Only the assigned department cycle owner can start this cycle.');
+            }
+            $newCycleId=quarterlyStartCycle($conn,$actor,(int)$actor['department_id'],
+                (string)($_POST['period_start'] ?? ''),(string)($_POST['period_end'] ?? ''),
+                (string)($_POST['self_rating_deadline'] ?? ''));
+            redirectWith(quarterlyUrl($actor,'?view=peers&cycle_id='.$newCycleId),'success','Department Quarterly cycle started. Employee self-rating notifications were sent.');
+        } elseif (($_POST['action'] ?? '') === 'rate' && ($_POST['confirmed'] ?? '') === '1') {
+            $ratingTarget=quarterlyMember($conn,$evaluationId);
+            $withKra=$ratingTarget && quarterlyCanFinalize($conn,$actor,$ratingTarget);
+            if ($withKra) {
+                quarterlyReviewAndRate($conn,$actor,$evaluationId,(array)($_POST['kra'] ?? []),
+                    (string)($_POST['review_token'] ?? ''),(array)($_POST['scores'] ?? []),trim($_POST['rater_signature_data'] ?? ''),(array)($_POST['plans'] ?? []),(string)($_POST['head_comments'] ?? ''));
+            } else {
+                if (!empty($_POST['kra'])) throw new DomainException('Only the immediate head may adjust KRA ratings.');
+                quarterlySubmitPeers($conn,$actor,$evaluationId,(array)($_POST['scores'] ?? []));
+            }
+            redirectWith(quarterlyUrl($actor,'?view=peers&cycle_id='.(int)$_POST['cycle_id']),'success',$withKra ? 'KRA review approved and your 360 ratings submitted. Peer ratings are locked.' : 'Your 360 ratings were submitted and locked.');
+        } elseif (($_POST['action'] ?? '') === 'approve_cycle') {
+            $approveCycleId=(int)($_POST['cycle_id'] ?? 0);
+            $conn->begin_transaction();
+            try {
+                quarterlyQuery($conn,'SELECT cycle_id FROM quarterly_evaluation_cycles WHERE cycle_id=? FOR UPDATE',[$approveCycleId]);
+                quarterlyUpdateCycleCompletion($conn,$approveCycleId,(int)$actor['user_id']);
+                $conn->commit();
+            } catch (Throwable $approvalError) { $conn->rollback(); throw $approvalError; }
+            redirectWith(quarterlyUrl($actor,'?view=history&cycle_id='.$approveCycleId),'success','Quarterly cycle approved and moved to history.');
+        } elseif (($_POST['action'] ?? '') === 'return') {
+            quarterlyReturnEvaluation($conn,$actor,(int)($_POST['return_evaluation_id'] ?? 0),(string)($_POST['return_reason'] ?? ''));
+            redirectWith(quarterlyUrl($actor,'?view=peers'),'success','Evaluation returned. Earlier 360 ratings will be cleared when the employee resubmits.');
+        } elseif (($_POST['action'] ?? '') === 'finalize') {
+            quarterlyFinalize($conn,$actor,$evaluationId,(array)($_POST['kra'] ?? []),trim($_POST['remarks'] ?? ''),(string)($_POST['review_token'] ?? ''),(array)($_POST['core_adjustments'] ?? []));
+            redirectWith(quarterlyUrl($actor,'?view=results&evaluation_id='.$evaluationId),'success','Quarterly evaluation finalized. The approved version was recorded.');
+        } else {
+            throw new DomainException('Review the rating summary and confirm before submitting.');
+        }
+    } catch (DomainException $e) { $error=$e->getMessage(); }
+      catch (Throwable $e) { error_log('Quarterly workflow: '.$e->getMessage()); $error='The request could not be completed. Your previous finalized result has been preserved. Please try again.'; }
+}
+$cycles = quarterlyQuery($conn,"SELECT DISTINCT c.*,d.department_name FROM quarterly_evaluation_cycles c
+    JOIN departments d ON d.department_id=c.department_id JOIN quarterly_evaluation_members m ON m.cycle_id=c.cycle_id
+    WHERE m.employee_id=? OR m.reviewer_position_id=?
+    ORDER BY c.period_end DESC,c.cycle_id DESC",[(int)$actor['employee_id'],(int)$actor['job_title_id']]);
+$cycleOptions=array_values(array_filter($cycles,static fn($c)=>!empty($c['completed_at'])===$historyView));
+if (!$cycleId && $cycleOptions) $cycleId=(int)$cycleOptions[0]['cycle_id'];
+$member=null; $named=false; $canFinalize=false;
+if ($evaluationId) {
+    $member=quarterlyMember($conn,$evaluationId);
+    if ($member && $view==='review' && $actor['role']==='Employee'
+        && (int)$member['employee_id']===(int)$actor['employee_id']) {
+        header('Location: '.BASE_URL.'/employee/evaluation-history-view.php?evaluation_id='.$evaluationId);
+        exit;
+    }
+    $sameDepartmentPeerView=$member && (int)$member['employee_id']!==(int)$actor['employee_id']
+        && (int)$member['department_id']===(int)$actor['department_id'] && quarterlyCanRate($actor);
+    if (!$member || ((int)$member['employee_id']!==(int)$actor['employee_id'] && !quarterlyCanSeeNames($conn,$actor,$member)
+        && $view!=='rate' && !(in_array($view,['review','results'],true) && $sameDepartmentPeerView))) { http_response_code(403); exit('This Quarterly evaluation is unavailable to your account.'); }
+    $cycleId=(int)$member['cycle_id'];
+    // Heads can identify department raters on their own result. Staff see numbered peers.
+    $named=(int)$actor['employee_id']!==(int)$member['employee_id']
+        || quarterlyCanSeeOwnPeerNames($conn,$actor,$member);
+    $canFinalize=quarterlyCanFinalize($conn,$actor,$member);
+}
+// Existing inbox links may still target the retired consolidation review.
+if ($_SERVER['REQUEST_METHOD']==='GET' && $member && $canFinalize && $view==='review'
+    && in_array($actor['role'],['HR Manager','HR Supervisor'],true)) {
+    $hasHeadReview=(bool)quarterlyQuery($conn,'SELECT 1 FROM quarterly_peer_submissions WHERE cycle_id=? AND target_employee_id=? AND rater_employee_id=? LIMIT 1',
+        [(int)$member['cycle_id'],(int)$member['employee_id'],(int)$actor['employee_id']]);
+    if ($hasHeadReview || !(int)$member['current_version']) {
+        header('Location: '.quarterlyUrl($actor,'?view='.($hasHeadReview ? 'head-review' : 'rate').'&evaluation_id='.$evaluationId)); exit;
+    }
+}
+$executiveKraOnly=$member && $canFinalize && (int)$actor['department_id']!==(int)$member['department_id'];
+$headReviewSubmission=null;
+$headReviewKra=[];
+if ($view==='head-review') {
+    if (!$member || !$canFinalize) { http_response_code(403); exit('Only this employee\'s immediate head can view the submitted head review.'); }
+    $headReviewSubmission=quarterlyQuery($conn,'SELECT scores_json,rater_signature_data,rater_signed_at,submitted_at FROM quarterly_peer_submissions WHERE cycle_id=? AND rater_employee_id=? AND target_employee_id=?',
+        [$cycleId,(int)$actor['employee_id'],(int)$member['employee_id']])[0] ?? null;
+    if (!$headReviewSubmission && $executiveKraOnly) {
+        $approval=quarterlyQuery($conn,'SELECT approved_at,rater_signature_data,rater_signed_at FROM quarterly_kra_approvals WHERE member_id=? AND approved_by=? ORDER BY approval_id DESC LIMIT 1',[(int)$member['member_id'],(int)$actor['user_id']])[0] ?? null;
+        if ($approval) {
+            $headReviewSubmission=['scores_json'=>$member['self_values_json'],'submitted_at'=>$approval['approved_at'],'rater_signature_data'=>$approval['rater_signature_data'],'rater_signed_at'=>$approval['rater_signed_at']];
+        }
+    }
+    if (!$headReviewSubmission) { http_response_code(404); exit('The head review has not been submitted.'); }
+    $kraApproval=quarterlyQuery($conn,'SELECT ratings_json FROM quarterly_kra_approvals WHERE member_id=? AND approved_by=? AND approved_at<=? ORDER BY approved_at DESC,approval_id DESC LIMIT 1',
+        [(int)$member['member_id'],(int)$actor['user_id'],$headReviewSubmission['submitted_at']])[0] ?? null;
+    $headReviewKra=$kraApproval ? (json_decode($kraApproval['ratings_json'],true) ?: []) : quarterlyKraRows($conn,$evaluationId);
+}
+$cycle=null;
+foreach ($cycles as $c) if ((int)$c['cycle_id']===$cycleId) $cycle=$c;
+if ($cycleId && !$cycle) { http_response_code(403); exit('This department cycle is unavailable.'); }
+if ($cycle && (empty($cycle['completed_at']) || quarterlyUsesDepartmentCycle($cycle))) {
+    $conn->begin_transaction();
+    try {
+        quarterlyQuery($conn,'SELECT cycle_id FROM quarterly_evaluation_cycles WHERE cycle_id=? FOR UPDATE',[$cycleId]);
+        quarterlyUpdateCycleCompletion($conn,$cycleId);
+        $cycle=array_merge($cycle,quarterlyQuery($conn,'SELECT ready_for_approval_at,completed_at FROM quarterly_evaluation_cycles WHERE cycle_id=?',[$cycleId])[0]);
+        foreach ($cycles as &$cycleOption) {
+            if ((int)$cycleOption['cycle_id']===$cycleId) $cycleOption=array_merge($cycleOption,$cycle);
+        }
+        unset($cycleOption);
+        $cycleOptions=array_values(array_filter($cycles,static fn($c)=>!empty($c['completed_at'])===$historyView));
+        $conn->commit();
+    } catch (Throwable $cycleError) { $conn->rollback(); throw $cycleError; }
+}
+if ($cycle && !empty($cycle['completed_at'])) {
+    $historyView=true;
+    $cycleOptions=array_values(array_filter($cycles,static fn($c)=>!empty($c['completed_at'])));
+}
+if ($historyView && $cycle && empty($cycle['completed_at']) && !$evaluationId) {
+    header('Location: '.quarterlyUrl($actor,'?view=peers&cycle_id='.$cycleId)); exit;
+}
+if ($cycle && !empty($cycle['completed_at']) && $view==='rate') {
+    header('Location: '.quarterlyUrl($actor,'?view='.($canFinalize ? 'head-review' : 'review').'&evaluation_id='.$evaluationId)); exit;
+}
+$members=$cycle ? quarterlyQuery($conn,"SELECT m.*,e.first_name,e.last_name,ev.total_score,
+        (SELECT COUNT(*) FROM quarterly_peer_submissions s JOIN employees rater ON rater.employee_id=s.rater_employee_id WHERE s.cycle_id=m.cycle_id AND s.target_employee_id=m.employee_id AND rater.department_id=e.department_id) AS received,
+        (SELECT COUNT(*) FROM quarterly_peer_submissions s WHERE s.cycle_id=m.cycle_id AND s.target_employee_id=m.employee_id AND s.rater_employee_id=?) AS rated
+    FROM quarterly_evaluation_members m JOIN employees e ON e.employee_id=m.employee_id
+    LEFT JOIN job_titles jt ON jt.job_title_id=m.position_id
+    LEFT JOIN evaluations ev ON ev.evaluation_id=m.evaluation_id WHERE m.cycle_id=? AND ".quarterlyRosterEligibilitySql()."
+    ORDER BY COALESCE(jt.rank_category_id,999),m.position_id,e.last_name,e.first_name",
+    [(int)$actor['employee_id'],$cycleId]) : [];
+$own=array_values(array_filter($members,static fn($m)=>(int)$m['employee_id']===(int)$actor['employee_id']));
+if ($cycle && (int)$actor['department_id']!==(int)$cycle['department_id']) {
+    foreach ($members as &$executiveMember) {
+        $executiveMember['rated']=(bool)quarterlyQuery($conn,'SELECT 1 FROM quarterly_kra_approvals WHERE member_id=? AND approved_by=? LIMIT 1',[(int)$executiveMember['member_id'],(int)$actor['user_id']]);
+    }
+    unset($executiveMember);
+}
+$quarterlyOutgoing=[];
+if ($cycle) {
+    foreach (quarterlyQuery($conn,'SELECT rater_employee_id,target_employee_id FROM quarterly_peer_submissions WHERE cycle_id=?',[$cycleId]) as $submission) {
+        $quarterlyOutgoing[(int)$submission['rater_employee_id']][(int)$submission['target_employee_id']]=true;
+    }
+}
+$directReportCycle=(bool)array_filter($members,static fn($m)=>(int)$m['employee_id']!==(int)$actor['employee_id'] && (int)$m['reviewer_position_id']>0 && (int)$m['reviewer_position_id']===(int)$actor['job_title_id']);
+$isDepartmentPeer=$own && (int)$cycle['department_id']===(int)$actor['department_id'];
+if (($view==='rate' && !$isDepartmentPeer && !$canFinalize) || ($view==='peers' && !$isDepartmentPeer && !$directReportCycle && $cycle)) {
+    http_response_code(403); exit('360 ratings are available only within your own department cycle.');
+}
+if ($view==='rate') {
+    if (!$member || !quarterlyCanRate($actor) || (empty($own[0]['evaluation_id']) && !quarterlyCanRateBeforeSelf($conn,$actor,$member)) || (int)$member['employee_id']===(int)$actor['employee_id']) {
+        http_response_code(403); exit('This peer-rating task is unavailable.');
+    }
+    $raterMember=!empty($own[0]['evaluation_id']) ? quarterlyMember($conn,(int)$own[0]['evaluation_id']) : null;
+    if (!$raterMember && !quarterlyCanRateBeforeSelf($conn,$actor,$member)) {
+        http_response_code(409);
+        exit('Your own Quarterly evaluation record is unavailable, so you cannot submit department peer ratings yet. Contact HR to restore or review your Quarterly record.');
+    }
+    try { quarterlyAssertSnapshotActive($member); if ($raterMember) quarterlyAssertSnapshotActive($raterMember); }
+    catch (DomainException $e) { http_response_code(403); exit(e($e->getMessage())); }
+    $submitted=quarterlyQuery($conn,'SELECT scores_json FROM quarterly_peer_submissions WHERE cycle_id=? AND rater_employee_id=? AND target_employee_id=?',
+        [$cycleId,(int)$actor['employee_id'],(int)$member['employee_id']])[0] ?? null;
+}
+require_once __DIR__ . '/header.php';
+?>
+<link rel="stylesheet" href="<?php echo BASE_URL; ?>/assets/css/quarterly-evaluations.css?v=<?php echo filemtime(__DIR__.'/../assets/css/quarterly-evaluations.css'); ?>">
+<link rel="stylesheet" href="<?php echo BASE_URL; ?>/assets/css/quarterly-result-cards.css?v=<?php echo filemtime(__DIR__.'/../assets/css/quarterly-result-cards.css'); ?>">
+<div class="quarterly-page evaluation-packages <?php echo $quarterly_in_performance_page ? 'quarterly-page--integrated' : 'container-fluid py-4'; ?>">
+    <?php if ($quarterly_in_performance_page): require __DIR__.'/performance-evaluation-heading.php'; else: ?>
+    <section class="quarterly-hero mb-4">
+        <p class="small text-uppercase mb-1"><?php echo $quarterly_in_performance_page ? 'Performance Evaluation Process' : 'Performance evaluation · Regular employees'; ?></p>
+        <h1 class="h3 fw-bold"><i class="fas fa-users me-2 quarterly-hero-icon" aria-hidden="true"></i><?php echo $quarterly_in_performance_page ? 'Performance Evaluation' : 'Quarterly Evaluations &amp; 360 Ratings'; ?></h1>
+        <p class="mb-0">Position-specific KRAs and individual Core Behaviors &amp; Values results.</p>
+    </section>
+    <?php endif; ?>
+    <?php if ($error): ?><div role="alert" class="alert alert-danger"><?php echo e($error); ?></div><?php endif; ?>
+    <?php if ($cycleSetupChoices && $view==='peers' && !$historyView && !$evaluationId): ?>
+        <?php if (count($cycleSetupChoices)>1): ?>
+            <nav class="d-flex gap-2 mb-3" aria-label="Department cycle previews">
+                <?php foreach ($cycleSetupChoices as $previewId=>$previewName): ?>
+                    <a class="btn btn-sm <?php echo $cycleSetupDepartmentId===$previewId ? 'btn-success' : 'btn-outline-success'; ?>" href="<?php echo e(quarterlyUrl($actor,'?view=peers&preview_department='.$previewId)); ?>"><?php echo e($previewName); ?> readiness</a>
+                <?php endforeach; ?>
+            </nav>
+        <?php endif; ?>
+        <?php require __DIR__.'/quarterly-cycle-start-panel.php'; ?>
+    <?php endif; ?>
+    <?php if ($cycles): ?>
+    <nav class="quarterly-workflow-nav d-flex flex-wrap gap-2 mb-4" aria-label="Quarterly workflow">
+        <a class="btn btn-outline-success <?php echo !$historyView ? 'active' : ''; ?>" <?php echo !$historyView ? 'aria-current="page"' : ''; ?> href="<?php echo quarterlyUrl($actor,'?view=peers'); ?>"><i class="fas fa-users me-2" aria-hidden="true"></i>360 · Department peers</a>
+        <a class="btn btn-outline-success <?php echo $historyView ? 'active' : ''; ?>" <?php echo $historyView ? 'aria-current="page"' : ''; ?> href="<?php echo quarterlyUrl($actor,'?view=history'); ?>"><i class="fas fa-history me-2" aria-hidden="true"></i>Quarterly Evaluation History</a>
+    </nav>
+    <?php endif; ?>
+    <?php if ($evaluationId && $cycle && quarterlyCanOwnCycle($conn,$actor,(int)$cycle['department_id']) && empty($cycle['completed_at']) && !empty($cycle['ready_for_approval_at'])): ?>
+        <div class="alert alert-success d-flex flex-wrap align-items-center justify-content-between gap-3" role="status" data-persistent-alert>
+            <div><strong>Ready for <?php echo e(quarterlyCycleOwnerName($conn,(int)$cycle['department_id'])); ?> approval</strong><div>All quarterly requirements are complete. The cycle will move to history after approval.</div></div>
+            <form method="post"><?php echo csrfField(); ?><input type="hidden" name="action" value="approve_cycle"><input type="hidden" name="cycle_id" value="<?php echo (int)$cycleId; ?>"><button class="btn btn-success" type="submit"><i class="fas fa-check-circle me-2" aria-hidden="true"></i>Approve cycle</button></form>
+        </div>
+    <?php endif; ?>
+    <?php if (!$cycles || (!$evaluationId && !$cycleOptions)): ?>
+        <div class="quarterly-note-card" role="status">
+            <i class="fas fa-layer-group quarterly-note-icon" aria-hidden="true"></i>
+            <h2 class="h5 fw-bold"><?php echo $historyView ? 'No completed Quarterly cycles yet' : 'No active Quarterly evaluations'; ?></h2>
+            <p class="mb-0"><?php echo $historyView ? 'Completed department cycles appear here after all required approvals and 360 ratings are submitted.' : 'Submitted Quarterly cycles appear here while reviews and ratings are in progress. Completed cycles are available in Quarterly Evaluation History.'; ?></p>
+        </div>
+    <?php elseif (!$evaluationId): ?>
+        <form class="content-card quarterly-cycle-filter p-3 mb-4 d-flex gap-2 flex-wrap" method="get">
+            <?php if ($quarterly_in_performance_page): ?><input type="hidden" name="category" value="quarterly"><?php endif; ?>
+            <input type="hidden" name="view" value="<?php echo $historyView ? 'history' : e($view); ?>">
+            <label for="quarterlyCycle" class="align-self-center">Department / period</label>
+            <select id="quarterlyCycle" name="cycle_id" class="form-select quarterly-cycle">
+            <?php foreach ($cycleOptions as $c): ?>
+                <option value="<?php echo (int)$c['cycle_id']; ?>" <?php echo (int)$c['cycle_id']===$cycleId ? 'selected' : ''; ?>><?php echo e($c['department_name'].' · '.$c['period_start'].' to '.$c['period_end']); ?></option>
+            <?php endforeach; ?>
+            </select><button class="btn btn-success">Show cycle</button>
+        </form>
+        <?php if ($historyView): ?>
+            <div class="alert alert-success" role="status"><i class="fas fa-check-circle me-2" aria-hidden="true"></i>All required Quarterly approvals and 360 ratings are complete. This cycle is archived for viewing. Completed <?php echo e($cycle['completed_at']); ?>.</div>
+        <?php elseif ($view==='peers'): ?>
+            <?php if (!quarterlyCanRate($actor)): ?><div class="alert alert-warning">HR department peer ratings are completed through your HRIS account. Your Employee Portal remains available for self-rating and your results.</div><?php endif; ?>
+            <?php if ($own && !$own[0]['evaluation_id']): ?><div class="alert alert-warning"><?php echo $actor['role']==='HR Manager' ? 'Your own Quarterly self-rating is pending. You may rate submitted department evaluations now and complete your self-rating separately.' : 'Your own Quarterly self-rating is pending. Direct-report Rate & Review remains available; submit your self-rating before rating other coworkers.'; ?></div><?php endif; ?>
+        <?php endif; ?>
+        <div class="content-card p-3">
+            <header class="quarterly-section-heading <?php echo $view==='peers' ? 'quarterly-peer-heading' : ''; ?>"><div><h2 class="h5 mb-1"><?php echo $historyView ? 'Quarterly Evaluation History' : ($view==='peers' ? '360 Rating — Department Peers' : 'Quarterly Evaluation Progress'); ?><?php if ($view==='peers' && !$historyView): ?> <button type="button" class="quarterly-peer-help" data-bs-toggle="tooltip" data-bs-placement="bottom" data-bs-container="body" title="Rate coworkers on Core Behaviors &amp; Values. For your direct reports, review KRA and submit your Core Values rating on the same screen. Your self-rating is included once. Confirmed peer ratings are locked." aria-label="Department peer rating instructions"><i class="fas fa-info-circle" aria-hidden="true"></i></button><?php endif; ?></h2><p class="text-muted small mb-0"><?php echo $historyView ? 'Completed department evaluations and their approved results. View only.' : ($view==='peers' ? 'Rate your coworkers on the eight Core Behaviors & Values items.' : 'Review submitted self-ratings, department 360 participation, and quarterly results.'); ?></p></div>
+                <?php if ($view==='peers'): ?>
+                <div class="quarterly-peer-size">
+                    <div class="package-stat" aria-label="Department size: <?php echo count($members); ?> employees in this Quarterly cycle">
+                        <div class="package-stat-icon" style="background:rgba(8,46,6,.08);color:var(--rp-forest-green,#082e06);"><i class="fas fa-users" aria-hidden="true"></i></div>
+                        <div class="package-stat-content"><strong><?php echo count($members); ?> <?php echo count($members)===1 ? 'Employee' : 'Employees'; ?></strong><span>Department size</span></div>
+                    </div>
+                </div>
+                <?php endif; ?>
+            </header>
+            <?php if ($view==='peers' && !$historyView && $cycle && quarterlyCanOwnCycle($conn,$actor,(int)$cycle['department_id']) && empty($cycle['completed_at']) && !empty($cycle['ready_for_approval_at'])): ?>
+                <div class="alert alert-success d-flex flex-wrap align-items-center justify-content-between gap-3 mt-3" role="status" data-persistent-alert>
+                    <div><strong>Ready for <?php echo e(quarterlyCycleOwnerName($conn,(int)$cycle['department_id'])); ?> approval</strong><div>All quarterly requirements are complete. The cycle will move to history after approval.</div></div>
+                    <form method="post"><?php echo csrfField(); ?><input type="hidden" name="action" value="approve_cycle"><input type="hidden" name="cycle_id" value="<?php echo (int)$cycleId; ?>"><button class="btn btn-success" type="submit"><i class="fas fa-check-circle me-2" aria-hidden="true"></i>Approve cycle</button></form>
+                </div>
+            <?php endif; ?>
+            <div class="row g-2 mb-3"><div class="col-md-7"><label for="quarterlySearch" class="form-label">Find employee</label><input id="quarterlySearch" class="form-control" type="search" placeholder="Employee name or position"></div>
+                <div class="col-md-5"><label for="quarterlyStatus" class="form-label">Status</label><select id="quarterlyStatus" class="form-select"><option value="">All</option><option value="submitted">Self-rating submitted</option><option value="pending">For consolidation</option><option value="finalized">Finalized</option><option value="revision">Revision pending</option></select></div></div>
+            <div class="table-responsive"><table class="table align-middle" id="quarterlyRoster">
+            <thead><tr><th>Task status</th><th>Employee</th><th>Position</th><th>Self-rating</th><th><?php echo $view==='peers' ? 'Your 360 rating' : '360 received'; ?></th><?php if ($view==='peers'): ?><th class="text-center">360 received</th><?php endif; ?><th>Quarterly result</th><th class="text-center">Final score</th><th>Action</th></tr></thead>
+            <tbody><?php foreach ($members as $m):
+                $isOwnRow=(int)$m['employee_id']===(int)$actor['employee_id'];
+                $target=$m['evaluation_id'] ? quarterlyMember($conn,(int)$m['evaluation_id']) : null;
+                $canRead=$target && ((int)$m['employee_id']===(int)$actor['employee_id'] || quarterlyCanSeeNames($conn,$actor,$target)
+                    || ((int)$cycle['department_id']===(int)$actor['department_id'] && quarterlyCanRate($actor)));
+                if ($view==='peers' && !$isDepartmentPeer && (!$target || !quarterlyCanFinalize($conn,$actor,$target))) continue;
+                if ($view!=='peers' && (!$target || !quarterlyCanFinalize($conn,$actor,$target))) continue;
+                $state=$m['current_version'] ? ((int)$m['received']>=quarterlyExpectedPeers($conn,$cycleId,(int)$m['employee_id']) ? 'Approved · Score complete' : 'Approved · Score provisional') : 'Awaiting immediate-head approval';
+                $taskTotal=0; $taskDone=0; $headTaskTotal=0; $headTaskDone=0;
+                foreach ($members as $taskMember) {
+                    if ((int)$taskMember['employee_id']===(int)$m['employee_id']) continue;
+                    $taskTotal++;
+                    if (!empty($quarterlyOutgoing[(int)$m['employee_id']][(int)$taskMember['employee_id']]) && !empty($taskMember['self_values_json'])) $taskDone++;
+                    if ((int)$taskMember['reviewer_position_id']>0 && (int)$taskMember['reviewer_position_id']===(int)$m['position_id']) {
+                        $headTaskTotal++;
+                        if ($taskMember['current_version'] && !$taskMember['revision_pending'] && !empty($taskMember['self_values_json'])) $headTaskDone++;
+                    }
+                }
+                $dutiesComplete=$taskDone===$taskTotal && $headTaskDone===$headTaskTotal;
+                ?>
+                <tr data-quarterly-state="<?php echo $m['revision_pending'] ? 'revision' : ($m['current_version'] ? 'finalized' : 'pending'); ?>" data-quarterly-submitted="<?php echo $m['evaluation_id'] ? '1' : '0'; ?>"><td class="text-nowrap">
+                        <?php if ($headTaskTotal): ?><span class="d-block small" title="<?php echo $headTaskDone.' of '.$headTaskTotal; ?> assigned KRA reviews completed"><i class="fas fa-<?php echo $headTaskDone===$headTaskTotal ? 'check-circle text-success' : 'times-circle text-danger'; ?> me-1" aria-hidden="true"></i>KRA <span class="visually-hidden"><?php echo $headTaskDone===$headTaskTotal ? 'completed' : 'pending'; ?></span></span><?php endif; ?>
+                        <span class="d-block small" title="<?php echo $taskDone.' of '.$taskTotal; ?> department behavior ratings submitted"><i class="fas fa-<?php echo $taskDone===$taskTotal ? 'check-circle text-success' : 'times-circle text-danger'; ?> me-1" aria-hidden="true"></i>Behavior <span class="visually-hidden"><?php echo $taskDone===$taskTotal ? 'completed' : 'pending'; ?></span></span>
+                    </td><td><?php echo e($m['first_name'].' '.$m['last_name']); ?><?php if ($view==='peers' && $isOwnRow): ?> <span class="quarterly-you-indicator" aria-label="Your evaluation"><i class="fas fa-user-check" aria-hidden="true"></i>You</span><?php endif; ?></td><td><?php echo e($m['position_name']); ?></td>
+                    <td><span class="quarterly-status-pill <?php echo $m['evaluation_id'] ? 'is-complete' : 'is-waiting'; ?>"><?php echo $m['evaluation_id'] ? 'Submitted' : 'Awaiting self-rating'; ?></span></td>
+                    <td><?php if ($view==='peers'): ?><span class="quarterly-status-pill <?php echo $isOwnRow ? ($m['evaluation_id'] ? 'is-self' : 'is-waiting') : ($m['rated'] ? 'is-complete' : 'is-waiting'); ?>"><?php echo $isOwnRow ? ($m['evaluation_id'] ? 'Self-rating included' : 'Awaiting self-rating') : ($m['rated'] ? 'Submitted · Locked' : 'Not submitted'); ?></span><?php else: echo (int)$m['received'].' / '.max(0,count($members)-1); endif; ?></td>
+                    <?php if ($view==='peers'): $receivedCount=(int)$m['received']; $expectedCount=quarterlyExpectedPeers($conn,$cycleId,(int)$m['employee_id']); ?>
+                    <td class="text-center"><span class="quarterly-status-pill <?php echo $receivedCount>=$expectedCount && $m['evaluation_id'] ? 'is-complete' : 'is-pending'; ?>" title="<?php echo $receivedCount; ?> of <?php echo $expectedCount; ?> expected coworker ratings submitted; excludes self-rating"><i class="fas fa-users me-1" aria-hidden="true"></i><?php echo $receivedCount.' / '.$expectedCount; ?></span></td>
+                    <?php endif; ?>
+                    <td><span class="quarterly-status-pill <?php echo $m['revision_pending'] ? 'is-revision' : ($m['current_version'] ? 'is-complete' : 'is-pending'); ?>"><?php echo e($state); ?></span>
+                    </td>
+                    <td class="text-center text-nowrap">
+                        <?php if ($m['current_version']): ?><strong style="font-size:1.15rem;color:#24452b"><?php echo number_format((float)$m['total_score'],2); ?></strong><small class="d-block text-muted">/ 4.00</small><?php else: ?><span class="text-muted">—</span><?php endif; ?>
+                    </td>
+                    <td><div class="d-flex align-items-start gap-2" style="position:relative"><?php if ($target && !$target['self_values_json']): ?>
+                        <span class="quarterly-status-pill is-revision">Returned · Awaiting resubmission</span>
+                    <?php elseif ($historyView && $target): ?>
+                        <a class="btn btn-sm btn-outline-success" href="<?php echo $isOwnRow && $actor['role']==='Employee' ? BASE_URL.'/employee/evaluation-history-view.php?evaluation_id='.(int)$m['evaluation_id'] : quarterlyUrl($actor,'?view='.(quarterlyCanFinalize($conn,$actor,$target) && $m['rated'] ? 'head-review' : 'review').'&evaluation_id='.(int)$m['evaluation_id']); ?>">View completed evaluation</a>
+                    <?php elseif ($view==='peers' && $isOwnRow): ?>
+                        <?php if ($m['evaluation_id']): ?>
+                            <a class="btn btn-sm btn-outline-success" href="<?php echo $actor['role']==='Employee' ? BASE_URL.'/employee/evaluation-history-view.php?evaluation_id='.(int)$m['evaluation_id'] : quarterlyUrl($actor,'?view=review&evaluation_id='.(int)$m['evaluation_id']); ?>">View my score</a>
+                        <?php else: ?>
+                            <span class="quarterly-roster-action-muted">Your self-rating is not yet submitted</span>
+                        <?php endif; ?>
+                    <?php elseif (!$m['evaluation_id']): ?>
+                        <span class="quarterly-roster-action-muted">Awaiting employee self-rating</span>
+                    <?php elseif ($view==='peers' && ($isDepartmentPeer || ($target && quarterlyCanFinalize($conn,$actor,$target))) && quarterlyCanRate($actor) && $m['evaluation_id']): ?>
+                        <?php if (empty($own[0]['evaluation_id']) && !quarterlyCanRateBeforeSelf($conn,$actor,$target)): ?>
+                            <button class="btn btn-sm btn-outline-secondary" type="button" disabled aria-disabled="true" title="Submit your Quarterly self-rating first to unlock peer ratings.">Self-rating required</button>
+                        <?php elseif (quarterlyCanFinalize($conn,$actor,$target) && $m['rated']): ?>
+                            <?php if (!empty($m['revision_pending'])): ?>
+                                <a class="btn btn-sm btn-outline-success" href="<?php echo quarterlyUrl($actor,'?view=review&evaluation_id='.(int)$m['evaluation_id']); ?>">Review revised result</a>
+                            <?php else: ?>
+                                <a class="btn btn-sm btn-outline-success" href="<?php echo quarterlyUrl($actor,'?view=head-review&evaluation_id='.(int)$m['evaluation_id']); ?>">View submitted review</a>
+                            <?php endif; ?>
+                        <?php elseif (quarterlyCanFinalize($conn,$actor,$target)): ?>
+                            <a class="btn btn-sm btn-outline-success quarterly-rate-pending" href="<?php echo quarterlyUrl($actor,'?view=rate&evaluation_id='.(int)$m['evaluation_id']); ?>">Rate &amp; review</a>
+                        <?php elseif ($m['rated']): ?>
+                            <a class="btn btn-sm btn-outline-success" href="<?php echo quarterlyUrl($actor,'?view=review&evaluation_id='.(int)$m['evaluation_id']); ?>">View behavior</a>
+                        <?php else: ?>
+                            <a class="btn btn-sm btn-outline-success quarterly-rate-pending" href="<?php echo quarterlyUrl($actor,'?view=rate&evaluation_id='.(int)$m['evaluation_id']); ?>">Rate</a>
+                        <?php endif; ?>
+                    <?php elseif ($canRead): ?>
+                        <a class="btn btn-sm btn-outline-success" href="<?php echo quarterlyUrl($actor,'?view=review&evaluation_id='.(int)$m['evaluation_id']); ?>">View evaluation</a>
+                    <?php else: ?>—<?php endif; ?>
+                    <?php if (!$historyView && empty($cycle['completed_at']) && $target && !empty($target['self_values_json']) && quarterlyCanFinalize($conn,$actor,$target)): ?>
+                        <button type="button" class="btn btn-sm btn-outline-danger flex-shrink-0" title="Return evaluation" aria-label="Return evaluation" data-bs-toggle="modal" data-bs-target="#quarterlyReturnModal" data-return-id="<?php echo (int)$target['evaluation_id']; ?>" data-return-name="<?php echo e($target['first_name'].' '.$target['last_name']); ?>"><i class="fas fa-undo-alt" aria-hidden="true"></i></button>
+                    <?php endif; ?></div></td>
+                </tr>
+            <?php endforeach; ?></tbody>
+        </table></div></div>
+    <?php elseif ($view==='head-review'): $headReviewScores=json_decode($headReviewSubmission['scores_json'],true) ?: []; $headReviewSelf=json_decode($member['self_values_json'] ?? '[]',true) ?: []; $headReviewScore=quarterlyCalculate($headReviewKra,$headReviewScores,[]); ?>
+        <section class="content-card p-4 quarterly-head-review-view">
+            <div class="quarterly-submission-heading">
+                <div><p class="small text-uppercase mb-1">Immediate-head submission · View only</p><h2 class="h4 mb-1"><?php echo e($member['first_name'].' '.$member['last_name']); ?></h2>
+                    <p class="mb-0"><?php echo e($member['position_name'].' · '.$member['period_start'].' to '.$member['period_end']); ?></p></div>
+                <span class="quarterly-status-pill is-complete">Submitted · Locked</span>
+            </div>
+            <?php
+                $quarterlyScoresApproved=$member['evaluation_status']==='Approved';
+                $liveSummary=quarterlyCandidate($conn,$member);
+                $quarterlyDisplayKra=$quarterlyScoresApproved ? (float)$member['kra_subtotal'] : $liveSummary['kra'];
+                $quarterlyDisplayCore=$quarterlyScoresApproved ? (float)$member['behavior_average'] : $liveSummary['core'];
+                $quarterlyDisplayTotal=$quarterlyScoresApproved ? (float)$member['official_score'] : $liveSummary['total'];
+                $quarterlyTier=$quarterlyDisplayTotal>=3.6 ? 'outstanding' : ($quarterlyDisplayTotal>=2.6 ? 'exceeds' : ($quarterlyDisplayTotal>=2 ? 'meets' : 'needs'));
+            ?>
+            <div class="mb-4"><?php require __DIR__.'/quarterly-result-cards.php'; ?></div>
+
+            <?php $headPlans=quarterlyQuery($conn,'SELECT improvement_area,support_needed,time_frame FROM evaluation_dev_plans WHERE evaluation_id=? ORDER BY sort_order,plan_id',[$evaluationId]); ?>
+            <section class="quarterly-submitted-details">
+                <nav class="quarterly-review-tabs quarterly-head-review-tabs" role="tablist" aria-label="Submitted evaluation sections">
+                    <button class="active" id="headKraTab" type="button" role="tab" data-bs-toggle="tab" data-bs-target="#headKraPanel" aria-controls="headKraPanel" aria-selected="true"><i class="fas fa-chart-pie me-2" aria-hidden="true"></i>Key Result Areas <span><?php echo count($headReviewKra); ?></span></button>
+                    <button id="headCoreTab" type="button" role="tab" data-bs-toggle="tab" data-bs-target="#headCorePanel" aria-controls="headCorePanel" aria-selected="false"><i class="fas fa-users me-2" aria-hidden="true"></i>Core Behaviors &amp; Values <span>8</span></button>
+                    <button id="headPlanTab" type="button" role="tab" data-bs-toggle="tab" data-bs-target="#headPlanPanel" aria-controls="headPlanPanel" aria-selected="false"><i class="fas fa-seedling me-2" aria-hidden="true"></i>Developmental Plan <span><?php echo count($headPlans); ?></span></button>
+                    <button id="headRemarksTab" type="button" role="tab" data-bs-toggle="tab" data-bs-target="#headRemarksPanel" aria-controls="headRemarksPanel" aria-selected="false"><i class="fas fa-file-signature me-2" aria-hidden="true"></i>Remarks &amp; Signature</button>
+                </nav>
+                <div class="tab-content quarterly-submitted-tab-content">
+                    <div class="tab-pane show active" id="headKraPanel" role="tabpanel" aria-labelledby="headKraTab" tabindex="0">
+            <h3 class="h5 quarterly-review-section"><span>Key Result Areas · Immediate-head review</span><small>80% KRA</small></h3>
+            <div class="table-responsive quarterly-score-table-wrap mb-4"><table class="table quarterly-score-table"><thead><tr><th>Criterion</th><th class="text-end">Weight</th><th class="text-end">Employee self-rating</th><th class="text-end">Reviewed / Adjusted</th><th class="text-center">Variance</th></tr></thead><tbody>
+                <?php foreach ($headReviewKra as $row): ?><tr><td><strong><?php echo e($row['criterion_name']); ?></strong><?php if (!empty($row['kpi_description'])): ?><small><?php echo e($row['kpi_description']); ?></small><?php endif; ?></td><td class="text-end"><?php echo number_format((float)$row['weight'],2); ?>%</td><td class="text-end"><?php echo number_format((float)$row['self_rating'],2); ?></td><td class="text-end"><strong><?php echo number_format((float)$row['rating'],2); ?></strong></td><td class="text-center"><?php $difference=round((float)$row['rating']-(float)$row['self_rating'],2); ?><span class="quarterly-review-variance <?php echo $difference>0 ? 'is-positive' : ($difference<0 ? 'is-negative' : 'is-neutral'); ?>"><?php echo $difference==0 ? '—' : ($difference>0 ? '+' : '').number_format($difference,2); ?></span></td></tr><?php endforeach; ?>
+            </tbody></table></div>
+
+                    </div>
+                    <div class="tab-pane" id="headCorePanel" role="tabpanel" aria-labelledby="headCoreTab" tabindex="0">
+            <h3 class="h5 quarterly-review-section"><span>Core Behaviors &amp; Values · Department 360 ratings</span><small>20% Core Values</small></h3>
+            <?php if (quarterlyCanSeeNames($conn,$actor,$member)):
+                $headDepartmentPeers=quarterlyPeers($conn,$member,true);
+                foreach ($headDepartmentPeers as &$headDepartmentPeer) {
+                    $headDepartmentPeer['ratings']=quarterlyValidateScores(json_decode($headDepartmentPeer['scores_json'],true) ?: []);
+                }
+                unset($headDepartmentPeer);
+                $headCombined=quarterlyCalculate($headReviewKra,$headReviewSelf,array_column($headDepartmentPeers,'ratings'));
+            ?>
+            <p class="small text-muted">Combined averages include the employee's self-rating and submitted coworker ratings. Pending submissions are excluded.</p>
+            <div class="table-responsive quarterly-score-table-wrap mb-4">
+                <table class="table quarterly-score-table quarterly-core-score-table">
+                    <thead><tr>
+                        <th scope="col">Criterion</th><th scope="col" class="text-end">Self-rating</th>
+                        <?php foreach ($headDepartmentPeers as $peer): ?><th scope="col" class="text-end"><?php echo e($peer['rater_name']); ?></th><?php endforeach; ?>
+                        <th scope="col" class="text-end">Combined average</th>
+                    </tr></thead>
+                    <tbody><?php foreach (quarterlyCoreValues() as $i=>$value): ?><tr>
+                        <td><strong><?php echo e($value['name']); ?></strong><small><?php echo e($value['kpi']); ?></small></td>
+                        <td class="text-end"><?php echo number_format((float)$headReviewSelf[$i],2); ?></td>
+                        <?php foreach ($headDepartmentPeers as $peer): ?><td class="text-end"><?php echo number_format($peer['ratings'][$i],2); ?></td><?php endforeach; ?>
+                        <td class="text-end"><?php echo number_format($headCombined['item_averages'][$i],2); ?></td>
+                    </tr><?php endforeach; ?></tbody>
+                    <tfoot><tr>
+                        <th scope="row">Average</th>
+                        <td class="text-end"><strong><?php echo number_format(array_sum($headReviewSelf)/count(quarterlyCoreValues()),2); ?></strong></td>
+                        <?php foreach ($headDepartmentPeers as $peer): ?><td class="text-end"><strong><?php echo number_format(array_sum($peer['ratings'])/count(quarterlyCoreValues()),2); ?></strong></td><?php endforeach; ?>
+                        <td class="text-end"><strong><?php echo number_format($headCombined['core'],2); ?></strong></td>
+                    </tr></tfoot>
+                </table>
+            </div>
+            <?php endif; ?>
+
+                    </div>
+                    <div class="tab-pane" id="headPlanPanel" role="tabpanel" aria-labelledby="headPlanTab" tabindex="0">
+            <section class="mb-4"><h3 class="h5 quarterly-review-section"><span><i class="fas fa-seedling me-2" aria-hidden="true"></i>Developmental Plan</span></h3>
+                <?php if (!$headPlans): ?><p class="small text-muted">No developmental plan items added.</p><?php endif; ?>
+                <?php if ($headPlans): ?>
+                <div class="table-responsive quarterly-submitted-plan-wrap">
+                    <table class="table table-bordered align-middle mb-0 quarterly-submitted-plan-table">
+                        <thead class="table-light"><tr><th>Area for Improvement / Development</th><th>Support Needed / Action Plan</th><th>Target Time Frame</th></tr></thead>
+                        <tbody><?php foreach ($headPlans as $plan): ?><tr>
+                            <td data-label="Area for Improvement / Development" class="fw-semibold text-dark"><?php echo e($plan['improvement_area'] ?: '—'); ?></td>
+                            <td data-label="Support Needed / Action Plan"><?php echo e($plan['support_needed'] ?: '—'); ?></td>
+                            <td data-label="Target Time Frame"><span class="badge bg-light text-dark border"><?php echo e($plan['time_frame'] ?: '—'); ?></span></td>
+                        </tr><?php endforeach; ?></tbody>
+                    </table>
+                </div>
+                <?php endif; ?>
+            </section>
+
+                    </div>
+                    <div class="tab-pane" id="headRemarksPanel" role="tabpanel" aria-labelledby="headRemarksTab" tabindex="0">
+            <section class="quarterly-rater-signature"><h3 class="h6 fw-bold">Rater signature</h3><?php if (!empty($headReviewSubmission['rater_signature_data'])): ?><img src="<?php echo e($headReviewSubmission['rater_signature_data']); ?>" alt="Submitted immediate-head rater signature" style="display:block;max-width:560px;width:100%;max-height:150px;object-fit:contain;background:#fff;border:1px solid #d5ddd2;border-radius:8px;padding:8px;"><p class="small text-muted mt-2 mb-0">Signed <?php echo e($headReviewSubmission['rater_signed_at'] ?? ''); ?></p><?php else: ?><p class="text-muted mb-0">No signature was saved on this submission.</p><?php endif; ?></section>
+            <section class="mt-4"><h3 class="h6 fw-bold"><i class="fas fa-comment-alt me-2" aria-hidden="true"></i>Immediate Head Comments</h3><p class="quarterly-plan-summary" style="white-space:pre-wrap;"><?php echo e($member['head_comments'] ?: 'No comments added.'); ?></p></section>
+
+                    </div>
+                </div>
+            </section>
+            <a class="btn btn-outline-success mt-4" href="<?php echo quarterlyUrl($actor,'?view=peers&amp;cycle_id='.$cycleId); ?>">Back to Department Peers</a>
+        </section>
+    <?php elseif ($view==='rate'): ?>
+        <section class="content-card p-4 quarterly-rate-view <?php echo !$canFinalize ? 'quarterly-peer-rate-view' : ''; ?>">
+            <header class="quarterly-rating-employee-header">
+                <div><h2 class="h4"><?php echo e($member['first_name'].' '.$member['last_name']); ?></h2>
+            <p><?php echo e($member['position_name']); ?> · <?php echo e($member['period_start'].' to '.$member['period_end']); ?></p></div>
+                <span class="quarterly-status-pill <?php echo $submitted ? 'is-complete' : 'is-self'; ?>"><i class="fas fa-users me-1" aria-hidden="true"></i><?php echo $submitted ? 'Submitted · Locked' : ($canFinalize ? 'Immediate-head review' : 'Department peer rating'); ?></span>
+            </header>
+            <?php if ($canFinalize && !$submitted):
+                // Reference only: exclude head overrides and department peer ratings.
+                $selfSummaryKras=quarterlyKraRows($conn,$evaluationId);
+                foreach ($selfSummaryKras as &$selfSummaryRow) {
+                    $selfSummaryRow['rating']=$selfSummaryRow['self_rating'];
+                }
+                unset($selfSummaryRow);
+                $selfSummary=quarterlyCalculate($selfSummaryKras,json_decode($member['self_values_json'] ?? '[]',true) ?: [],[]);
+                $quarterlyScoresApproved=false;
+                $quarterlyDisplayKra=$selfSummary['kra'];
+                $quarterlyDisplayCore=$selfSummary['core'];
+                $quarterlyDisplayTotal=$selfSummary['total'];
+                $quarterlyTier='meets';
+            ?>
+                <section class="mb-4" aria-label="Employee submitted self-rating summary">
+                    <h3 class="h6 fw-bold mb-2">Employee self-rating</h3>
+                    <p class="small text-muted mb-3">Submitted scores for reference. Your review changes and department peer ratings are not included here.</p>
+                    <?php require __DIR__.'/quarterly-result-cards.php'; ?>
+                </section>
+            <?php endif; ?>
+            <p id="quarterlyRatingProgress" class="small fw-bold" aria-live="polite"></p>
+            <?php if ($submitted): ?><div class="alert alert-success">Submitted and locked. These ratings cannot be edited.</div><?php endif; ?>
+            <form method="post" id="quarterlyRatingForm" data-draft-key="quarterly-rating-overrides-v3-<?php echo (int)$actor['user_id']; ?>-<?php echo $evaluationId; ?>-<?php echo substr(hash('sha256',json_encode([$member['employee_id'],$member['evaluation_created_at'],$member['evaluation_submitted_at'],$member['period_start'],$member['period_end']])),0,24); ?>" data-resume-tab="<?php echo $_SERVER['REQUEST_METHOD']==='POST' ? '1' : '0'; ?>" data-submitted="<?php echo $submitted ? '1' : '0'; ?>" data-override-only="<?php echo !$submitted ? '1' : '0'; ?>">
+                <p class="small text-muted">Use ratings from 1.00 to 4.00. Decimals are allowed, up to two decimal places (for example, 3.25).</p>
+                <p id="quarterlyRatingScaleNotice" class="alert alert-warning" role="status" hidden></p>
+                <?php if ($canFinalize && !$submitted): ?><p id="quarterlyHeadOverallPreview" class="alert alert-success" aria-live="polite"></p><?php endif; ?>
+                <?php echo csrfField(); ?><input type="hidden" name="action" value="rate"><input type="hidden" name="cycle_id" value="<?php echo $cycleId; ?>"><input type="hidden" name="confirmed" id="quarterlyConfirmed" value="0">
+                <?php if ($canFinalize && !$submitted): $rateKras=quarterlyKraRows($conn,$evaluationId); ?>
+                    <input type="hidden" name="review_token" value="<?php echo quarterlyReviewToken($conn,$member); ?>">
+                    <div class="alert alert-info">You are this employee's immediate head. Leave KRA and behavior fields blank to retain the employee's submitted ratings. Enter a value only for an item you want to change. Both will save together after confirmation.</div>
+                    <nav class="quarterly-review-tabs" role="tablist" aria-label="Rating sections">
+                        <button class="active" id="quarterlyRateKraTab" type="button" role="tab" data-bs-toggle="tab" data-bs-target="#quarterlyRateKraPanel" aria-controls="quarterlyRateKraPanel" aria-selected="true"><i class="fas fa-chart-pie me-2" aria-hidden="true"></i>Key Result Areas · Immediate-head review <span><?php echo count($rateKras); ?></span></button>
+                        <button id="quarterlyRateCoreTab" type="button" role="tab" data-bs-toggle="tab" data-bs-target="#quarterlyRateCorePanel" aria-controls="quarterlyRateCorePanel" aria-selected="false"><i class="fas fa-users me-2" aria-hidden="true"></i>Core Behaviors &amp; Values · Your 360 rating <span>8</span></button>
+                        <button id="quarterlyRatePlanTab" type="button" role="tab" data-bs-toggle="tab" data-bs-target="#quarterlyRatePlanPanel" aria-controls="quarterlyRatePlanPanel" aria-selected="false"><i class="fas fa-seedling me-2" aria-hidden="true"></i>Developmental Plan</button>
+                        <button id="quarterlyRateReviewTab" type="button" role="tab" data-bs-toggle="tab" data-bs-target="#quarterlyRateReviewPanel" aria-controls="quarterlyRateReviewPanel" aria-selected="false"><i class="fas fa-clipboard-check me-2" aria-hidden="true"></i>Review &amp; Submit</button>
+                    </nav>
+                    <div class="tab-content p-3">
+                    <div class="tab-pane show active quarterly-probation-section" id="quarterlyRateKraPanel" role="tabpanel" aria-labelledby="quarterlyRateKraTab" tabindex="0">
+                    <h3 class="h5 quarterly-review-section"><span><i class="fas fa-chart-pie me-2" aria-hidden="true"></i>Key Result Areas · Immediate-head review</span><small>KRA Weight: 80%</small></h3>
+                    <div class="table-responsive quarterly-score-table-wrap mb-3"><table class="table quarterly-score-table"><thead><tr><th>Criterion</th><th class="text-end">Weight</th><th class="text-end">Employee Self-Rating</th><th>Evaluator Adjusted Rating</th></tr></thead><tbody>
+                    <?php foreach ($rateKras as $r): ?><tr><td><strong><?php echo e($r['criterion_name']); ?></strong><?php if (!empty($r['kpi_description'])): ?><small><?php echo e($r['kpi_description']); ?></small><?php endif; ?></td><td class="text-end"><?php echo number_format((float)$r['weight'],2); ?>%</td><td class="text-end"><?php echo number_format((float)$r['self_rating'],2); ?></td><td><input class="form-control quarterly-number quarterly-rate-kra" type="number" inputmode="decimal" min="1" max="4" step="0.01" data-weight="<?php echo e($r['weight']); ?>" data-submitted-rating="<?php echo e($r['self_rating']); ?>" name="kra[<?php echo (int)$r['score_id']; ?>]" aria-label="Reviewed KRA: <?php echo e($r['criterion_name']); ?>" data-label="KRA · <?php echo e($r['criterion_name']); ?>" placeholder="Unchanged" value="<?php echo e($_POST['kra'][$r['score_id']] ?? ''); ?>"><span class="quarterly-rating-unit">/ 4.00</span></td></tr><?php endforeach; ?>
+                    </tbody><tfoot><tr><th colspan="2">Key Result Areas (KRA) total</th><td class="text-end"><?php echo number_format(round(array_sum(array_map(static fn($r)=>(float)$r['weight']*(float)$r['self_rating']/100,$rateKras)),2),2); ?></td><td class="text-end"><strong id="quarterlyRateKraTotal">—</strong><small>Weight: 80%</small></td></tr></tfoot></table></div>
+                    <div class="quarterly-rating-step-actions"><span></span><button class="btn btn-success" type="button" id="quarterlyRateKraNext" data-quarterly-tab="#quarterlyRateCorePanel" aria-controls="quarterlyRateCorePanel">Next: Core Behaviors <i class="fas fa-arrow-right ms-2" aria-hidden="true"></i></button></div>
+                    </div><div class="tab-pane quarterly-probation-section" id="quarterlyRateCorePanel" role="tabpanel" aria-labelledby="quarterlyRateCoreTab" tabindex="0">
+                    <h3 class="h5 quarterly-review-section"><span><i class="fas fa-users me-2" aria-hidden="true"></i>Core Behaviors &amp; Values · Your 360 rating</span><small>Behavior Weight: 20%</small></h3>
+                <?php elseif ($canFinalize): ?>
+                    <a class="btn btn-outline-success mb-3" href="<?php echo quarterlyUrl($actor,'?view=review&evaluation_id='.$evaluationId); ?>">Review KRA &amp; consolidate Quarterly result</a>
+                <?php endif; ?>
+                <?php if (!$canFinalize || $submitted): ?><section class="quarterly-probation-section quarterly-peer-rating-section" id="quarterlyRateCorePanel"><h3 class="h5 quarterly-review-section"><span><i class="fas fa-users me-2" aria-hidden="true"></i>Core Behaviors &amp; Values · Your 360 rating</span><small>Behavior Weight: 20%</small></h3><?php endif; ?>
+                <?php if ($canFinalize && !$submitted): ?><p class="small text-muted">Leave blank to retain the employee's self-rating. Enter a value only to override that item.</p><?php endif; ?>
+                <?php if (!$canFinalize && !$submitted): ?><p class="small text-muted">Leave fields blank to retain the employee’s self-ratings. Enter a value only for a behavior you want to change. Submitting confirms all eight effective ratings.</p><?php endif; ?>
+                <div class="table-responsive quarterly-score-table-wrap"><table class="table align-middle quarterly-rating-table quarterly-score-table"><thead><tr><th>Criterion</th><th class="text-end">Employee self-rating</th><th class="text-end">Your 360 rating (1–4)</th></tr></thead><tbody>
+                <?php $selfValues=json_decode($member['self_values_json'] ?? '[]',true) ?: [];
+                $scores=$submitted ? json_decode($submitted['scores_json'],true) : ($_POST['scores'] ?? []);
+                foreach (quarterlyCoreValues() as $i=>$value): ?>
+                    <tr><td><strong><?php echo e($value['name']); ?></strong><small><?php echo e($value['kpi']); ?></small></td><td class="text-end"><strong><?php echo isset($selfValues[$i]) ? number_format((float)$selfValues[$i],2) : '—'; ?></strong></td><td>
+                        <input class="form-control quarterly-number" type="number" inputmode="decimal" min="1" max="4" step="0.01" placeholder="Unchanged"
+                            name="scores[<?php echo $i; ?>]" aria-label="Rating for <?php echo e($value['name']); ?>" data-label="<?php echo e($value['name']); ?>" data-self-rating="<?php echo e($selfValues[$i] ?? ''); ?>"
+                            value="<?php echo isset($scores[$i]) && is_numeric($scores[$i]) ? e(number_format((float)$scores[$i],2,'.','')) : e($scores[$i] ?? ''); ?>" <?php echo $submitted ? 'disabled' : ''; ?>><span class="quarterly-rating-unit">/ 4.00</span>
+                    </td></tr>
+                <?php endforeach; ?></tbody><tfoot><tr><th>Average</th><td class="text-end"><strong><?php echo count($selfValues) ? number_format(array_sum(array_map('floatval',$selfValues))/count($selfValues),2) : '—'; ?></strong><small>Self-rating</small></td><td class="text-end"><strong id="quarterlyPeerRatingAverage">—</strong><small>Your 360</small></td></tr></tfoot></table></div>
+                <?php if (!$canFinalize || $submitted): ?></section><?php endif; ?>
+                <?php if ($canFinalize && !$submitted): ?><div class="quarterly-rating-step-actions"><button class="btn btn-outline-success" type="button" id="quarterlyRateCoreBack" data-quarterly-tab="#quarterlyRateKraPanel" aria-controls="quarterlyRateKraPanel"><i class="fas fa-arrow-left me-2" aria-hidden="true"></i>Back to KRA</button><button class="btn btn-success" type="button" id="quarterlyRateCoreNext" data-quarterly-tab="#quarterlyRatePlanPanel" aria-controls="quarterlyRatePlanPanel">Next: Developmental Plan <i class="fas fa-arrow-right ms-2" aria-hidden="true"></i></button></div><?php endif; ?>
+                <?php if ($canFinalize && !$submitted): ?></div>
+                    <div class="tab-pane quarterly-probation-section" id="quarterlyRatePlanPanel" role="tabpanel" aria-labelledby="quarterlyRatePlanTab" tabindex="0">
+                        <h3 class="h5 quarterly-review-section"><span><i class="fas fa-seedling me-2" aria-hidden="true"></i>Developmental Plan</span><small>Immediate-head recommendations</small></h3>
+                        <p class="text-muted small mb-3">Specify growth areas, required support, and target completion timelines for this employee. Complete each added item or leave the section blank.</p>
+                        <div class="table-responsive">
+                            <table class="table table-bordered align-middle quarterly-development-table">
+                                <thead class="table-light"><tr><th style="width:35%">Area for Improvement / Development</th><th style="width:35%">Support Needed / Action Plan</th><th style="width:20%">Target Time Frame</th><th style="width:10%" class="text-center">Action</th></tr></thead>
+                                <tbody id="quarterlyPlanRows" data-initial="<?php echo e(json_encode($_POST['plans'] ?? quarterlyQuery($conn,'SELECT improvement_area,support_needed,time_frame FROM evaluation_dev_plans WHERE evaluation_id=? ORDER BY sort_order,plan_id',[$evaluationId]))); ?>"></tbody>
+                            </table>
+                        </div>
+                        <p class="quarterly-plan-empty" id="quarterlyPlanEmpty" hidden>No developmental items added.</p>
+                        <button type="button" class="btn btn-sm btn-outline-success mt-2" id="quarterlyAddPlan"><i class="fas fa-plus me-1" aria-hidden="true"></i>Add Development Item</button>
+                        <div class="quarterly-rating-step-actions"><button type="button" class="btn btn-outline-success" data-quarterly-tab="#quarterlyRateCorePanel">Back to Core Behaviors</button><button type="button" class="btn btn-success" data-quarterly-tab="#quarterlyRateReviewPanel">Next: Review &amp; Submit <i class="fas fa-arrow-right ms-2" aria-hidden="true"></i></button></div>
+                    </div>
+                    <div class="tab-pane" id="quarterlyRateReviewPanel" role="tabpanel" aria-labelledby="quarterlyRateReviewTab" tabindex="0">
+                        <h3 class="h5 quarterly-review-section"><span><i class="fas fa-clipboard-check me-2" aria-hidden="true"></i>Review &amp; Submit Ratings</span></h3>
+                        <p>Check the effective KRA and behavior ratings before approving. Blank overrides retain the employee's submitted ratings. Confirmation approves the employee's evaluation and locks your ratings. The overall score updates automatically as remaining department members submit their 360 ratings.</p>
+                        <section class="quarterly-review-summary-group" aria-labelledby="quarterlyReviewKraHeading">
+                            <h4 class="h6" id="quarterlyReviewKraHeading">Key Result Areas · Immediate-head review <span>80% of final score</span></h4>
+                            <div class="table-responsive quarterly-score-table-wrap"><table class="table table-sm quarterly-score-table"><thead><tr><th>KRA item</th><th class="text-end">Weight</th><th class="text-end">Submitted</th><th class="text-end">Reviewed</th></tr></thead><tbody id="quarterlyRatingPreviewKraRows"><tr><td colspan="4" class="text-muted">No KRA ratings available.</td></tr></tbody><tfoot><tr><th colspan="3">Weighted KRA subtotal</th><td class="text-end"><strong id="quarterlyRatingPreviewKraTotal">—</strong></td></tr></tfoot></table></div>
+                        </section>
+                        <section class="quarterly-review-summary-group mt-4" aria-labelledby="quarterlyReviewBehaviorHeading">
+                            <h4 class="h6" id="quarterlyReviewBehaviorHeading">Core Behaviors &amp; Values · 360 rating <span>20% of final score</span></h4>
+                            <div class="table-responsive quarterly-score-table-wrap"><table class="table table-sm quarterly-score-table"><thead><tr><th>Behavior</th><th class="text-end">Employee self-rating</th><th class="text-end">Your 360 rating</th></tr></thead><tbody id="quarterlyRatingPreviewBehaviorRows"><tr><td colspan="3" class="text-muted">Complete the behavior ratings in the previous tab to review them here.</td></tr></tbody><tfoot><tr><th colspan="2">Your 360 average</th><td class="text-end"><strong id="quarterlyRatingPreviewBehaviorAverage">—</strong></td></tr></tfoot></table></div>
+                        </section>
+                        <section class="quarterly-review-summary-group mt-4"><h4 class="h6"><i class="fas fa-seedling me-2" aria-hidden="true"></i>Developmental Plan</h4><div id="quarterlyPlanPreview"></div></section>
+                        <div class="quarterly-rater-signature mt-4">
+                            <label class="form-label fw-bold" for="quarterlyRaterSignatureCanvas">Rater signature <span class="text-danger">*</span></label>
+                            <p class="small text-muted mb-2">Sign below. Your signature will appear in the Rater field on the printed evaluation form.</p>
+                            <canvas id="quarterlyRaterSignatureCanvas" width="560" height="140" aria-label="Draw your rater signature" style="display:block;width:100%;max-width:560px;height:140px;touch-action:none;background:#fff;border:1px dashed #94a3b8;border-radius:8px;"></canvas>
+                            <input type="hidden" name="rater_signature_data" id="quarterlyRaterSignatureData" value="<?php echo e($_POST['rater_signature_data'] ?? ''); ?>">
+                            <div id="quarterlyRaterSignatureError" class="small text-danger mt-1" role="alert" hidden>Please sign before submitting.</div>
+                            <button class="btn btn-sm btn-outline-secondary mt-2" type="button" id="quarterlyClearRaterSignature">Clear signature</button>
+                            <div class="mt-4">
+                                <label class="form-label fw-bold" for="quarterlyHeadComments"><i class="fas fa-comment-alt me-2" aria-hidden="true"></i>Immediate Head Comments</label>
+                                <p class="small text-muted mb-2">Add feedback or recommendations for the employee. These comments will appear on the printed evaluation form.</p>
+                                <textarea class="form-control" id="quarterlyHeadComments" name="head_comments" rows="4" maxlength="4000" placeholder="Enter your feedback or recommendations…"><?php echo e($_POST['head_comments'] ?? $member['head_comments'] ?? ''); ?></textarea>
+                            </div>
+                        </div>
+                        <div class="quarterly-rating-step-actions"><button class="btn btn-outline-success" type="button" id="quarterlyRateReviewBack" data-quarterly-tab="#quarterlyRatePlanPanel" aria-controls="quarterlyRatePlanPanel"><i class="fas fa-arrow-left me-2" aria-hidden="true"></i>Back to Developmental Plan</button><button class="btn btn-success" type="button" id="quarterlyReviewRatings">Review &amp; submit ratings</button></div>
+                    </div></div><?php endif; ?>
+                <?php if (!$canFinalize): ?><div class="quarterly-rating-step-actions"><a class="btn btn-outline-success" href="<?php echo e(quarterlyUrl($actor,'?view=peers&cycle_id='.$cycleId)); ?>"><i class="fas fa-arrow-left me-2" aria-hidden="true"></i>Back to Department Peers</a><?php if (!$submitted): ?><button class="btn btn-success" type="button" id="quarterlyReviewRatings"><i class="fas fa-clipboard-check me-2" aria-hidden="true"></i>Review &amp; submit ratings</button><?php endif; ?></div><?php endif; ?>
+            </form>
+        </section>
+        <div class="modal fade" id="quarterlyRatingSummary" tabindex="-1" aria-labelledby="quarterlySummaryTitle" aria-hidden="true"><div class="modal-dialog modal-dialog-centered modal-dialog-scrollable"><div class="modal-content">
+            <div class="modal-header"><div class="quarterly-rating-modal-heading"><span class="quarterly-rating-modal-eyebrow">Final check</span><h2 id="quarterlySummaryTitle" class="modal-title h5 mb-0"><i class="fas fa-clipboard-check me-2" aria-hidden="true"></i>Review &amp; submit ratings</h2></div><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button></div>
+            <div class="modal-body"><p class="quarterly-rating-modal-subject"><span>Evaluation for</span><strong><?php echo e($member['first_name'].' '.$member['last_name']); ?></strong></p>
+                <div id="quarterlySummaryKraSection"><h3 class="h6">Key Result Areas · 80%</h3><div class="table-responsive"><table class="table table-sm"><thead><tr><th>KRA item</th><th class="text-end">Weight</th><th class="text-end">Submitted</th><th class="text-end">Reviewed</th></tr></thead><tbody id="quarterlySummaryKraRows"></tbody><tfoot><tr><th colspan="3">Weighted KRA subtotal</th><td class="text-end"><strong id="quarterlySummaryKraTotal">—</strong></td></tr></tfoot></table></div></div>
+                <h3 class="h6 mt-3">Core Behaviors &amp; Values · 360 rating · 20%</h3><div class="table-responsive"><table class="table table-sm"><thead><tr><th>Behavior</th><th class="text-end">Employee self-rating</th><th class="text-end">Your 360 rating</th></tr></thead><tbody id="quarterlySummaryBehaviorRows"></tbody><tfoot><tr><th colspan="2">Your 360 average</th><td class="text-end"><strong id="quarterlySummaryBehaviorAverage">—</strong></td></tr></tfoot></table></div>
+                <?php if ($canFinalize): ?><section class="mt-3"><h3 class="h6">Developmental Plan</h3><div id="quarterlyPlanConfirmation"></div><h3 class="h6 mt-3">Immediate Head Comments</h3><p id="quarterlyHeadCommentsConfirmation" style="white-space:pre-wrap;overflow-wrap:anywhere;"></p></section><?php endif; ?>
+                <div class="alert alert-warning quarterly-rating-modal-warning"><i class="fas fa-lock" aria-hidden="true"></i><span><strong>This can’t be undone.</strong> After confirmation, your ratings and rater signature are locked and cannot be edited. Please verify the summary before continuing.</span></div></div>
+            <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Back to edit</button><button type="button" class="btn btn-success" id="quarterlyConfirmSubmit"><i class="fas fa-check-circle me-2" aria-hidden="true"></i>Submit and lock ratings</button></div>
+        </div></div></div>
+    <?php elseif ($member):
+        $peers=quarterlyPeers($conn,$member,$named);
+        $self=json_decode($member['self_values_json'],true);
+        $candidate=quarterlyCandidate($conn,$member);
+        if ((int)$member['current_version']>0 && !$member['revision_pending']) {
+            $currentSnapshot=quarterlyQuery($conn,'SELECT snapshot_json FROM quarterly_evaluation_versions WHERE member_id=? AND version_number=?',[(int)$member['member_id'],(int)$member['current_version']])[0] ?? null;
+            $currentSnapshot=$currentSnapshot ? json_decode($currentSnapshot['snapshot_json'],true) : [];
+            if (!empty($currentSnapshot['core_adjustments'])) $candidate=quarterlyApplyCoreAdjustments($candidate,$currentSnapshot['core_adjustments']);
+        }
+        $kra=quarterlyKraRows($conn,$evaluationId);
+        $submittedKraTotal=round(array_sum(array_map(static fn($row)=>(float)$row['weight']*(float)$row['self_rating']/100,$kra)),2);
+        $versions=quarterlyQuery($conn,'SELECT version_number,finalized_at,remarks,snapshot_json FROM quarterly_evaluation_versions WHERE member_id=? ORDER BY version_number DESC',[(int)$member['member_id']]);
+        $editable=$view==='review' && $canFinalize && (!$member['current_version'] || $member['revision_pending']);
+        $expected=quarterlyExpectedPeers($conn,$cycleId,(int)$member['employee_id']);
+        ?>
+        <?php if (!$canFinalize && $sameDepartmentPeerView): ?>
+        <section class="content-card p-4 mb-4" id="quarterly360">
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+                <div>
+                    <h2 class="h4"><?php echo e($member['first_name'].' '.$member['last_name']); ?> · Core Behaviors &amp; Values</h2>
+                    <p><?php echo e($member['position_name'].' · '.$member['period_start'].' to '.$member['period_end']); ?></p>
+                    <p class="small text-muted mb-0">Behavior results include the names of employees who submitted each 360 rating.</p>
+                </div>
+            </div>
+            <?php if ($peers):
+                $quarterlyScoresApproved=$member['evaluation_status']==='Approved';
+                $quarterlyResultProvisional=!$quarterlyScoresApproved || count($peers)<$expected;
+                $quarterlyShowLive360=true;
+                $quarterlyDisplayKra=$quarterlyScoresApproved ? (float)$member['kra_subtotal'] : $candidate['kra'];
+                $quarterlyDisplayCore=$quarterlyScoresApproved ? (float)$member['behavior_average'] : $candidate['core'];
+                $quarterlyDisplayTotal=$quarterlyScoresApproved ? (float)$member['official_score'] : $candidate['total'];
+                $quarterlyTier=$quarterlyDisplayTotal>=3.6 ? 'outstanding' : ($quarterlyDisplayTotal>=2.6 ? 'exceeds' : ($quarterlyDisplayTotal>=2 ? 'meets' : 'needs'));
+            ?>
+            <div class="mb-4"><?php require __DIR__.'/quarterly-result-cards.php'; ?></div>
+            <?php endif; ?>
+            <div class="table-responsive quarterly-score-table-wrap"><table class="table align-middle quarterly-score-table quarterly-core-score-table"><thead><tr><th>Criterion</th><th class="text-end">Self-rating</th><?php foreach ($peers as $i=>$p): ?><th class="text-end"><?php echo e($named ? $p['rater_name'] : 'Employee '.($i+1)); ?></th><?php endforeach; ?><th class="text-end">Combined average</th></tr></thead><tbody>
+            <?php foreach (quarterlyCoreValues() as $i=>$value): ?><tr><td><strong><?php echo e($value['name']); ?></strong><small><?php echo e($value['kpi']); ?></small></td><td class="text-end"><?php echo number_format((float)$self[$i],2); ?></td><?php foreach ($peers as $p): $peerScores=json_decode($p['scores_json'],true); ?><td class="text-end"><?php echo number_format((float)$peerScores[$i],2); ?></td><?php endforeach; ?><td class="text-end"><?php echo number_format($candidate['item_averages'][$i],2); ?></td></tr><?php endforeach; ?>
+            </tbody><tfoot><tr><th colspan="<?php echo 2+count($peers); ?>">Core Behaviors &amp; Values total</th><td class="text-end"><strong><?php echo number_format($candidate['core'],2); ?></strong><small>Weight: 20%</small></td></tr></tfoot></table></div>
+        </section>
+        <?php else: ?>
+        <section class="content-card p-4 mb-4" id="quarterlyOverview">
+            <?php if ((int)$member['current_version']>0): $scoreComplete=count($peers)>=quarterlyExpectedPeers($conn,$cycleId,(int)$member['employee_id']); ?>
+            <div class="alert <?php echo $scoreComplete ? 'alert-success' : 'alert-info'; ?>" role="status"><strong>Approved · <?php echo $scoreComplete ? 'Score complete' : 'Score provisional'; ?></strong><p class="mb-0"><?php echo $scoreComplete ? 'All required department ratings have been received. Your score is complete.' : 'Your immediate head has approved your evaluation. Your overall score may change as remaining department members submit their 360 ratings. You will be notified when your score changes.'; ?></p></div>
+            <?php endif; ?>
+            <h2 class="h4"><?php echo e($member['first_name'].' '.$member['last_name']); ?></h2>
+            <p><?php echo e($member['position_name'].' · '.$member['template_name'].' · '.$member['period_start'].' to '.$member['period_end']); ?></p>
+            <p class="small">Finalized by the immediate-head position: <strong><?php echo e($member['reviewer_position_name'] ?? 'Not configured'); ?></strong></p>
+            <?php if (!$member['reviewer_position_id']): ?><div class="alert alert-warning">Configure this position's Reports To relationship in Position Management before finalizing this evaluation.</div><?php endif; ?>
+            <?php if ($member['revision_pending']): ?><div class="alert alert-warning">Late 360 · Revision pending. The official score remains <?php echo number_format((float)$member['official_score'],2); ?> until the immediate head re-finalizes.</div><?php endif; ?>
+            <div class="row g-3 quarterly-summary">
+                <div class="col-sm-4"><div class="p-3 bg-light rounded"><span>Reviewed KRA · 80%</span><strong><?php echo number_format($candidate['kra'],2); ?></strong></div></div>
+                <div class="col-sm-4"><div class="p-3 bg-light rounded"><span>Self + peer Core Values · 20%</span><strong><?php echo number_format($candidate['core'],2); ?></strong><small><?php echo count($peers); ?> of <?php echo $expected; ?> peer ratings received</small></div></div>
+                <div class="col-sm-4"><div class="p-3 bg-light rounded"><span><?php echo $member['current_version'] ? 'Official final score' : 'Provisional combined score'; ?></span><strong><?php echo number_format((float)($member['current_version'] ? $member['official_score'] : $candidate['total']),2); ?></strong>
+                    <?php if ($member['revision_pending']): ?><small>Pending candidate: <?php echo number_format($candidate['total'],2); ?></small><?php endif; ?></div></div>
+            </div>
+        </section>
+        <?php if ($editable): ?>
+        <form method="post" class="content-card quarterly-review-card mb-4" id="quarterlyConsolidationForm" data-core="<?php echo $candidate['core']; ?>">
+            <?php echo csrfField(); ?><input type="hidden" name="action" value="finalize"><input type="hidden" name="review_token" value="<?php echo quarterlyReviewToken($conn,$member); ?>">
+        <?php else: ?>
+        <section class="content-card quarterly-review-card mb-4" aria-label="Quarterly evaluation details">
+        <?php endif; ?>
+            <div class="quarterly-review-tabs" role="tablist" aria-label="Evaluation sections">
+                <button class="active" id="quarterlyKraTab" type="button" role="tab" data-bs-toggle="tab" data-bs-target="#quarterlyKraPanel" aria-controls="quarterlyKraPanel" aria-selected="true"><i class="fas fa-chart-pie me-2"></i>Key Result Areas (KRA) <span><?php echo count($kra); ?></span></button>
+                <button id="quarterlyCoreTab" type="button" role="tab" data-bs-toggle="tab" data-bs-target="#quarterlyCorePanel" aria-controls="quarterlyCorePanel" aria-selected="false"><i class="fas fa-users me-2"></i>Core Behaviors &amp; Values <span>8</span></button>
+                <button id="quarterlyDecisionTab" type="button" role="tab" data-bs-toggle="tab" data-bs-target="#quarterlyDecisionPanel" aria-controls="quarterlyDecisionPanel" aria-selected="false"><i class="fas fa-file-signature me-2"></i>Consolidation &amp; Final Score</button>
+            </div>
+            <div class="tab-content p-4">
+            <div class="tab-pane show active" id="quarterlyKraPanel" role="tabpanel" aria-labelledby="quarterlyKraTab" tabindex="0">
+            <?php if ($editable): ?><div class="alert alert-info"><strong>How to Adjust Ratings:</strong> Enter the evaluator adjusted rating between 1.00 and 4.00. The proposed final score recalculates automatically.</div><?php endif; ?>
+            <h3 class="h5 quarterly-review-section" id="quarterlyKra"><span><i class="fas fa-chart-pie me-2"></i>Key Result Areas (KRA)</span><small>KRA Weight: 80%</small></h3>
+            <div class="table-responsive quarterly-score-table-wrap"><table class="table align-middle quarterly-score-table"><thead><tr><th>Criterion</th><th class="text-end">Weight</th><th class="text-end">Submitted rating</th><th class="text-end"><?php echo $editable ? 'Reviewed rating' : 'Final rating'; ?></th></tr></thead><tbody>
+            <?php foreach ($kra as $row): ?><tr><td><strong><?php echo e($row['criterion_name']); ?></strong><?php if (!empty($row['kpi_description'])): ?><small><?php echo e($row['kpi_description']); ?></small><?php endif; ?></td><td class="text-end"><?php echo number_format((float)$row['weight'],2); ?>%</td><td class="text-end"><?php echo number_format((float)$row['self_rating'],2); ?></td><td class="text-end">
+                <?php if ($editable): ?><input class="form-control quarterly-number" type="number" inputmode="decimal" min="1" max="4" step="0.01" required data-weight="<?php echo e($row['weight']); ?>" name="kra[<?php echo (int)$row['score_id']; ?>]" aria-label="Reviewed rating for <?php echo e($row['criterion_name']); ?>" value="<?php echo e($_POST['kra'][$row['score_id']] ?? $row['rating']); ?>">
+                <?php else: echo number_format((float)$row['rating'],2); endif; ?></td></tr><?php endforeach; ?></tbody>
+                <tfoot><tr><th colspan="2">Key Result Areas (KRA) total</th><td class="text-end"><?php echo number_format($submittedKraTotal,2); ?></td><td class="text-end"><strong id="quarterlyReviewedKraTotal"><?php echo number_format($candidate['kra'],2); ?></strong><small>Weight: 80%</small></td></tr></tfoot></table></div>
+            </div>
+            <div class="tab-pane" id="quarterlyCorePanel" role="tabpanel" aria-labelledby="quarterlyCoreTab" tabindex="0">
+            <h3 class="h5 quarterly-review-section" id="quarterly360"><span><i class="fas fa-users me-2"></i>Core Behaviors &amp; Values · 360 Results</span><small>Behavior Weight: 20%</small></h3>
+            <p class="small text-muted"><?php echo $named ? 'Rater names are visible to authorized consolidators only.' : 'Coworker identities are hidden. Employee labels identify anonymous responses only.'; ?></p>
+            <div class="table-responsive quarterly-score-table-wrap"><table class="table quarterly-score-table quarterly-core-score-table"><thead><tr><th>Criterion</th><th class="text-end">Self-rating</th>
+                <?php foreach ($peers as $i=>$p): ?><th class="text-end"><?php echo e($named ? $p['rater_name'] : 'Employee '.($i+1)); ?></th><?php endforeach; ?><th class="text-end"><?php echo $editable ? 'Final reviewed rating' : 'Combined average'; ?></th></tr></thead><tbody>
+            <?php foreach (quarterlyCoreValues() as $i=>$value): ?><tr><td><strong><?php echo e($value['name']); ?></strong><small><?php echo e($value['kpi']); ?></small></td><td class="text-end"><?php echo number_format((float)$self[$i],2); ?></td>
+                <?php foreach ($peers as $p): $pScores=json_decode($p['scores_json'],true); ?><td><?php echo number_format((float)$pScores[$i],2); ?></td><?php endforeach; ?><td>
+                <?php if ($editable): ?><input form="quarterlyConsolidationForm" class="form-control quarterly-number quarterly-core-adjustment" type="number" inputmode="decimal" min="1" max="4" step="0.01" required name="core_adjustments[<?php echo $i; ?>]" aria-label="Final reviewed rating for <?php echo e($value['name']); ?>" value="<?php echo e($_POST['core_adjustments'][$i] ?? number_format($candidate['item_averages'][$i],2,'.','')); ?>">
+                <?php else: echo number_format($candidate['item_averages'][$i],2); endif; ?></td></tr><?php endforeach; ?>
+            </tbody><tfoot><tr><th colspan="<?php echo 2+count($peers); ?>">Core Behaviors &amp; Values total</th><td class="text-end"><strong id="quarterlyReviewedCoreTotal"><?php echo number_format($candidate['core'],2); ?></strong><small>Weight: 20%</small></td></tr></tfoot></table></div>
+            </div>
+            <div class="tab-pane" id="quarterlyDecisionPanel" role="tabpanel" aria-labelledby="quarterlyDecisionTab" tabindex="0">
+            <h3 class="h5 quarterly-review-section"><?php echo (int)$member['current_version'] ? 'Approved Quarterly Result · View Only' : 'Quarterly Review Status'; ?></h3>
+            <p><?php echo $view==='results' && !(int)$member['current_version']
+                ? 'The immediate-head KRA review and submitted 360 ratings are locked. Quarterly finalization will be completed after department peer participation is complete.'
+                : 'Approved KRA (80%) + combined Core Values result (20%). Later peer submissions update the overall score automatically. Previous score versions are preserved below.'; ?></p>
+            <?php if ($editable): ?>
+                <section class="quarterly-head-review-score mb-4 p-3 rounded" id="quarterlyProposedResult" aria-label="Proposed weighted quarterly score" aria-live="polite">
+                    <div class="quarterly-head-review-score-icon" aria-hidden="true"><i class="fas fa-chart-line"></i></div>
+                    <div class="quarterly-head-review-score-details">
+                        <div class="quarterly-head-review-score-kicker">Weighted result · 80/20</div>
+                        <h4 class="h6 mb-2">Proposed overall score</h4>
+                        <div class="quarterly-head-review-score-breakdown">
+                            <div class="quarterly-head-review-score-part"><span>KRA <b>80%</b></span><strong id="quarterlyProposedKra"><?php echo number_format($candidate['kra'],2); ?></strong></div>
+                            <i class="fas fa-plus quarterly-head-review-score-operator" aria-hidden="true"></i>
+                            <div class="quarterly-head-review-score-part quarterly-head-review-score-part--behavior"><span>Behavior <b>20%</b></span><strong id="quarterlyProposedCore"><?php echo number_format($candidate['core'],2); ?></strong></div>
+                        </div>
+                    </div>
+                    <div class="quarterly-head-review-score-total"><span>Overall score</span><strong id="quarterlyProposedTotal"><?php echo number_format($candidate['total'],2); ?></strong><small>KRA × 80% + Behavior × 20%</small></div>
+                </section>
+                <p class="small text-muted">Adjust each behavior’s combined score from 1.00 to 4.00 if needed. These reviewed Core Values scores and the reviewed KRA scores will be saved together in the finalized version.</p>
+                <label for="quarterlyRemarks" class="form-label fw-bold">Review remarks</label>
+                <textarea id="quarterlyRemarks" class="form-control mb-3" name="remarks" rows="3" placeholder="Explain adjustments, missing participation, or late revisions."><?php echo e($_POST['remarks'] ?? ''); ?></textarea>
+                <?php if (count($peers)<$expected): ?><p class="text-warning-emphasis" id="quarterlyParticipationNotice">Some raters have not submitted. Finalization is unavailable until all <?php echo $expected; ?> expected raters have submitted their 360 ratings (<?php echo count($peers); ?> received). Refresh this review after they submit.</p><?php endif; ?>
+                <button class="btn btn-success" type="submit" <?php echo count($peers)<$expected ? 'disabled aria-disabled="true" aria-describedby="quarterlyParticipationNotice"' : ''; ?>><?php echo $member['current_version'] ? 'Approve &amp; finalize revised Quarterly result' : 'Approve &amp; finalize Quarterly evaluation'; ?></button>
+            <?php endif; ?>
+            </div></div>
+        <?php if ($editable): ?></form><?php else: ?></section><?php endif; ?>
+        <?php if ($versions): ?><section class="content-card p-4" id="quarterlyHistory"><h3 class="h5">Approval &amp; Score History</h3>
+            <?php foreach ($versions as $v): $snapshot=json_decode($v['snapshot_json'],true); ?>
+                <div class="border rounded p-3 mb-2"><strong>Version <?php echo (int)$v['version_number']; ?> · <?php echo number_format($snapshot['total'],2); ?></strong>
+                    <p class="small mb-1"><?php echo e($v['finalized_at']); ?> · KRA <?php echo number_format($snapshot['kra'],2); ?> · Core Values <?php echo number_format($snapshot['core'],2); ?> · <?php echo (int)$snapshot['peer_count']; ?> peer ratings</p>
+                    <p class="mb-0"><?php echo e($v['remarks']); ?></p></div>
+            <?php endforeach; ?>
+        </section><?php endif; ?>
+        <?php endif; ?>
+    <?php endif; ?>
+</div>
+<div class="modal fade" id="quarterlyReturnModal" tabindex="-1" aria-labelledby="quarterlyReturnTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
+        <form method="post">
+            <div class="modal-header"><h2 class="modal-title fs-5" id="quarterlyReturnTitle"><i class="fas fa-undo-alt text-danger me-2" aria-hidden="true"></i>Return evaluation</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+            <div class="modal-body">
+                <?php echo csrfField(); ?><input type="hidden" name="action" value="return"><input type="hidden" name="return_evaluation_id" id="quarterlyReturnEvaluationId">
+                <p id="quarterlyReturnEmployee" class="fw-semibold"></p>
+                <label for="quarterlyReturnReason" class="form-label">Return reason <span class="text-danger">*</span></label>
+                <textarea class="form-control" id="quarterlyReturnReason" name="return_reason" rows="4" required></textarea>
+                <p class="small text-muted mt-3 mb-0">The employee will be notified to revise and resubmit. Resubmission clears earlier 360 ratings, and department raters must rate again.</p>
+            </div>
+            <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-outline-danger">Return to employee</button></div>
+        </form>
+    </div></div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.quarterly-peer-help[data-bs-toggle="tooltip"]').forEach(button => {
+        bootstrap.Tooltip.getOrCreateInstance(button, { trigger:'hover focus', container:'body' });
+    });
+});
+<?php if ($executiveKraOnly && $view==='rate'): ?>
+// Executives approve KRAs; department coworkers provide behavior ratings.
+['quarterlyRateCoreTab','quarterlyRatePlanTab','quarterlyRateCorePanel','quarterlyRatePlanPanel'].forEach(id=>document.getElementById(id)?.remove());
+['quarterlyRatingProgress','quarterlyHeadOverallPreview'].forEach(id=>document.getElementById(id)?.remove());
+const executiveNext=document.getElementById('quarterlyRateKraNext');
+if (executiveNext) { executiveNext.dataset.quarterlyTab='#quarterlyRateReviewPanel'; executiveNext.setAttribute('aria-controls','quarterlyRateReviewPanel'); executiveNext.textContent='Next: Review & Submit'; }
+const executiveBack=document.getElementById('quarterlyRateReviewBack');
+if (executiveBack) { executiveBack.dataset.quarterlyTab='#quarterlyRateKraPanel'; executiveBack.setAttribute('aria-controls','quarterlyRateKraPanel'); executiveBack.textContent='Back to KRA'; }
+document.getElementById('quarterlyReviewBehaviorHeading')?.closest('section')?.remove();
+document.getElementById('quarterlySummaryBehaviorRows')?.closest('.table-responsive')?.previousElementSibling?.remove();
+document.getElementById('quarterlySummaryBehaviorRows')?.closest('.table-responsive')?.remove();
+document.getElementById('quarterlyPlanConfirmation')?.previousElementSibling?.remove();
+document.getElementById('quarterlyPlanConfirmation')?.remove();
+const executiveNotice=document.querySelector('#quarterlyRatingForm > .alert-info');
+if (executiveNotice) executiveNotice.textContent='Review the employee’s KRA ratings, add comments, and sign to approve. Core Behaviors ratings are submitted within the employee’s department.';
+const executiveReviewNotice=document.querySelector('#quarterlyRateReviewPanel > p');
+if (executiveReviewNotice) executiveReviewNotice.textContent='Check the effective KRA ratings before approving. Blank fields retain the employee’s submitted ratings. The quarterly result includes the department’s combined behavior ratings.';
+<?php endif; ?>
+document.getElementById('quarterlyReturnModal')?.addEventListener('show.bs.modal',event=>{
+    const trigger=event.relatedTarget;
+    document.getElementById('quarterlyReturnEvaluationId').value=trigger?.dataset.returnId || '';
+    document.getElementById('quarterlyReturnEmployee').textContent=trigger?.dataset.returnName || '';
+    document.getElementById('quarterlyReturnReason').value='';
+});
+document.getElementById('quarterlyReturnModal')?.addEventListener('shown.bs.modal',()=>document.getElementById('quarterlyReturnReason').focus());
+function quarterlyEffectiveRating(input) {
+    if (!input.checkValidity()) return null;
+    const raw=input.value!=='' ? input.value : (input.closest('form')?.dataset.overrideOnly==='1' ? (input.dataset.submittedRating ?? input.dataset.selfRating ?? '') : '');
+    return raw!=='' && Number.isFinite(Number(raw)) && Number(raw)>=1 && Number(raw)<=4 ? Number(raw) : null;
+}
+function updateQuarterlyProgress() {
+    const inputs=[...document.querySelectorAll('#quarterlyRatingForm input[name^="scores["]')];
+    const progress=document.getElementById('quarterlyRatingProgress');
+    const rated=inputs.filter(input=>quarterlyEffectiveRating(input)!==null);
+    if (progress) {
+        progress.textContent=rated.length+' of 8 values rated';
+        if (rated.length===8) progress.textContent+=' · Your 360 average: '+(rated.reduce((sum,input)=>sum+quarterlyEffectiveRating(input),0)/8).toFixed(2);
+    }
+    const coreAverage=document.getElementById('quarterlyPeerRatingAverage');
+    if (coreAverage) coreAverage.textContent=rated.length===8 ? (rated.reduce((sum,input)=>sum+quarterlyEffectiveRating(input),0)/8).toFixed(2) : '—';
+    const kraInputs=[...document.querySelectorAll('#quarterlyRatingForm input.quarterly-rate-kra')];
+    const kraTotal=document.getElementById('quarterlyRateKraTotal');
+    if (kraTotal) kraTotal.textContent=kraInputs.length && kraInputs.every(input=>quarterlyEffectiveRating(input)!==null)
+        ? kraInputs.reduce((sum,input)=>sum+Number(input.dataset.weight)/100*quarterlyEffectiveRating(input),0).toFixed(2) : '—';
+    const overallPreview=document.getElementById('quarterlyHeadOverallPreview');
+    if (overallPreview) {
+        const valid=kraInputs.length>0 && inputs.length===8 && [...kraInputs,...inputs].every(input=>quarterlyEffectiveRating(input)!==null);
+        if (valid) {
+            const kra=Math.round((kraInputs.reduce((sum,input)=>sum+Math.round(Number(input.dataset.weight)/100*quarterlyEffectiveRating(input)*100)/100,0)+Number.EPSILON)*100)/100;
+            const core=Math.round((inputs.reduce((sum,input)=>sum+quarterlyEffectiveRating(input),0)/8+Number.EPSILON)*100)/100;
+            const total=Math.round((kra*.8+core*.2+Number.EPSILON)*100)/100;
+            const label=total>=3.6 ? 'Outstanding' : total>=2.6 ? 'Exceeds Expectations' : total>=2 ? 'Meets Expectations' : 'Needs Improvement';
+            overallPreview.textContent='Proposed overall score: '+total.toFixed(2)+' / 4.00 · '+label+' — (KRA '+kra.toFixed(2)+' × 80%) + (Behavior '+core.toFixed(2)+' × 20%).';
+        } else overallPreview.textContent='Complete all ratings from 1.00 to 4.00 to preview the overall score.';
+    }
+    renderQuarterlyRatingPreview();
+    quarterlyRenderPlanSummary();
+}
+const quarterlyRatingForm=document.getElementById('quarterlyRatingForm');
+const quarterlyDraftKey=quarterlyRatingForm?.dataset.draftKey;
+document.getElementById('quarterlyHeadComments')?.addEventListener('input',()=>saveQuarterlyRatingDraft());
+// Match the probationary form's separate section-total bars, retaining score IDs.
+[['quarterlyRateKraPanel','Key Result Areas (KRA) Total','quarterlyRateKraTotal'],['quarterlyRateCorePanel','Core Behaviors & Values Total','quarterlyPeerRatingAverage']].forEach(([panelId,title,scoreId])=>{
+    const panel=document.getElementById(panelId), score=document.getElementById(scoreId);
+    const footer=score?.closest('tfoot'); if(!panel || !footer) return;
+    const self=Number.parseFloat(footer.rows[0].cells[1].textContent);
+    const bar=document.createElement('div'); bar.className='quarterly-section-total';
+    const label=document.createElement('strong'); label.textContent=title+':';
+    const values=document.createElement('div'); values.className='quarterly-section-total-values';
+    const selfLabel=document.createElement('span'); selfLabel.textContent='Self-Rating: '+self.toFixed(2);
+    const box=document.createElement('span'); box.className='quarterly-section-total-box';
+    box.append(document.createTextNode('Total Score: '),score,document.createTextNode(' / 4.00'));
+    values.append(selfLabel,box); bar.append(label,values);
+    const wrap=footer.closest('.table-responsive'); footer.remove(); wrap.after(bar);
+});
+let quarterlyPlanIndex=0;
+function quarterlyReadPlans() {
+    return [...document.querySelectorAll('#quarterlyPlanRows .quarterly-plan-row')].map(row=>Object.fromEntries(
+        [...row.querySelectorAll('[data-quarterly-plan-field]')].map(input=>[input.dataset.quarterlyPlanField,input.value])
+    ));
+}
+function quarterlyValidatePlanFields() {
+    document.querySelectorAll('#quarterlyPlanRows .quarterly-plan-row').forEach(row=>{
+        const fields=[...row.querySelectorAll('[data-quarterly-plan-field]')];
+        const hasContent=fields.some(field=>field.value.trim()!=='');
+        fields.forEach(field=>{ field.required=hasContent; field.setCustomValidity(hasContent && field.value.trim()==='' ? 'Complete this field or remove this development goal.' : ''); });
+    });
+}
+function quarterlyUpdatePlanLayout() {
+    const rows=[...document.querySelectorAll('#quarterlyPlanRows .quarterly-plan-row')];
+    rows.forEach((row,index)=>{ row.setAttribute('aria-label','Development item '+(index+1)); });
+    const add=document.getElementById('quarterlyAddPlan');
+    if(add) add.disabled=rows.length>=20;
+    const empty=document.getElementById('quarterlyPlanEmpty');
+    if(empty) empty.hidden=rows.length>0;
+}
+function quarterlyAddPlanRow(plan={}) {
+    const container=document.getElementById('quarterlyPlanRows');
+    if (!container || container.children.length>=20) return;
+    const index=quarterlyPlanIndex++;
+    const row=document.createElement('tr'); row.className='quarterly-plan-row';
+    [['improvement_area','Area for Improvement / Development',2000,'e.g. Advanced Excel / Financial Analysis'],['support_needed','Support Needed / Action Plan',4000,'e.g. External Training / Peer Mentoring'],['time_frame','Target Time Frame',100,'e.g. Q3 2026 / 3 Months']].forEach(([name,label,limit,placeholder])=>{
+        const cell=document.createElement('td'); cell.dataset.label=label;
+        const input=document.createElement('input'); input.type='text'; input.className='form-control';
+        input.id='quarterlyPlan-'+index+'-'+name; input.name='plans['+index+']['+name+']'; input.dataset.quarterlyPlanField=name;
+        input.setAttribute('aria-label',label); input.maxLength=limit; input.value=plan[name] || ''; input.placeholder=placeholder;
+        input.addEventListener('input',()=>{quarterlyValidatePlanFields(); quarterlyRenderPlanSummary(); saveQuarterlyRatingDraft();});
+        cell.appendChild(input); row.appendChild(cell);
+    });
+    const actions=document.createElement('td'); actions.className='text-center'; actions.dataset.label='Action';
+    const remove=document.createElement('button'); remove.type='button'; remove.className='btn btn-sm btn-outline-danger';
+    remove.title='Remove Row'; remove.setAttribute('aria-label','Remove developmental item');
+    const trash=document.createElement('i'); trash.className='fas fa-trash-alt'; trash.setAttribute('aria-hidden','true'); remove.appendChild(trash);
+    remove.addEventListener('click',()=>{row.remove(); quarterlyUpdatePlanLayout(); quarterlyRenderPlanSummary(); saveQuarterlyRatingDraft();});
+    actions.appendChild(remove); row.appendChild(actions); container.appendChild(row); quarterlyUpdatePlanLayout();
+}
+function quarterlyRenderPlanSummary() {
+    const plans=quarterlyReadPlans().filter(plan=>Object.values(plan).some(value=>value.trim()!==''));
+    ['quarterlyPlanPreview','quarterlyPlanConfirmation'].forEach(id=>{
+        const target=document.getElementById(id); if(!target) return;
+        target.replaceChildren();
+        if(!plans.length) { const note=document.createElement('p'); note.className='small text-muted mb-0'; note.textContent='No developmental plan items added.'; target.appendChild(note); return; }
+        plans.forEach((plan,index)=>{
+            const block=document.createElement('div'); block.className='quarterly-plan-summary';
+            [['Goal '+(index+1),plan.improvement_area],['Action / support',plan.support_needed],['Target time frame',plan.time_frame]].forEach(([label,value])=>{
+                const line=document.createElement('p'); const title=document.createElement('strong'); title.textContent=label+': ';
+                line.append(title,document.createTextNode(value || 'Not entered')); block.appendChild(line);
+            }); target.appendChild(block);
+        });
+    });
+}
+const quarterlyPlanRows=document.getElementById('quarterlyPlanRows');
+if (quarterlyPlanRows) {
+    try { const initial=Object.values(JSON.parse(quarterlyPlanRows.dataset.initial || '[]')); (initial.length ? initial : [{}]).forEach(plan=>quarterlyAddPlanRow(plan)); } catch (_) { quarterlyAddPlanRow(); }
+    document.getElementById('quarterlyAddPlan')?.addEventListener('click',()=>{ quarterlyAddPlanRow(); saveQuarterlyRatingDraft(); });
+}
+function saveQuarterlyRatingDraft(panelOverride=null) {
+    if (!quarterlyRatingForm || !quarterlyDraftKey || quarterlyRatingForm.dataset.submitted==='1') return;
+    const values={};
+    quarterlyRatingForm.querySelectorAll('input[type="number"]').forEach(input=>{ values[input.name]=input.value; });
+    const activePanel=panelOverride || document.querySelector('.quarterly-review-tabs button.active')?.dataset.bsTarget || '#quarterlyRateKraPanel';
+    try { sessionStorage.setItem(quarterlyDraftKey,JSON.stringify({values,activePanel,behaviorDefaultsVersion:1,plans:quarterlyReadPlans(),headComments:document.getElementById('quarterlyHeadComments')?.value || '',signature:document.getElementById('quarterlyRaterSignatureData')?.value || ''})); } catch (_) {}
+}
+function restoreQuarterlyRatingDraft() {
+    if (!quarterlyRatingForm || !quarterlyDraftKey) return;
+    try {
+        if (quarterlyRatingForm.dataset.submitted==='1') sessionStorage.removeItem(quarterlyDraftKey);
+        else {
+            const draft=JSON.parse(sessionStorage.getItem(quarterlyDraftKey) || 'null');
+            if (draft && draft.values) quarterlyRatingForm.querySelectorAll('input[type="number"]').forEach(input=>{
+                if (Object.prototype.hasOwnProperty.call(draft.values,input.name)) {
+                    input.value=draft.values[input.name];
+                }
+            });
+            if (Array.isArray(draft?.plans) && document.getElementById('quarterlyPlanRows')) {
+                document.getElementById('quarterlyPlanRows').replaceChildren();
+                draft.plans.forEach(plan=>quarterlyAddPlanRow(plan));
+                quarterlyUpdatePlanLayout();
+            }
+            const comments=document.getElementById('quarterlyHeadComments');
+            if(comments && typeof draft?.headComments==='string') comments.value=draft.headComments;
+            const signature=document.getElementById('quarterlyRaterSignatureData');
+            if (signature && draft?.signature) signature.value=draft.signature;
+            const navigationType=performance.getEntriesByType('navigation')[0]?.type;
+            const resumeTab=quarterlyRatingForm.dataset.resumeTab==='1' || navigationType==='reload' || navigationType==='back_forward';
+            const activeTrigger=resumeTab && draft?.activePanel && document.querySelector('.quarterly-review-tabs [data-bs-target="'+draft.activePanel+'"]');
+            if (activeTrigger && window.bootstrap?.Tab) bootstrap.Tab.getOrCreateInstance(activeTrigger).show();
+            document.dispatchEvent(new Event('quarterlyRatingDraftRestored'));
+        }
+    } catch (_) {}
+    quarterlyRatingForm.querySelectorAll('input[type="number"]').forEach(formatQuarterlyRatingDecimal);
+    updateQuarterlyProgress();
+}
+function formatQuarterlyRatingDecimal(input) {
+    if (input.value!=='' && input.checkValidity() && Number.isFinite(Number(input.value))) input.value=Number(input.value).toFixed(2);
+}
+if (quarterlyRatingForm && quarterlyDraftKey) {
+    if (document.readyState==='loading') document.addEventListener('DOMContentLoaded',restoreQuarterlyRatingDraft,{once:true});
+    else restoreQuarterlyRatingDraft();
+}
+document.querySelectorAll('#quarterlyRatingForm input[type="number"]').forEach(input=>{
+    const enforceRatingScale=()=>{
+        const notice=document.getElementById('quarterlyRatingScaleNotice');
+        let message='';
+        if(input.value!=='' && Number.isFinite(Number(input.value)) && Number(input.value)>4) {
+            input.value='4.00';
+            message='The maximum rating is 4.00. Your entry has been limited to 4.00.';
+        } else if(input.value!=='' && !input.checkValidity()) {
+            message='Enter a rating from 1.00 to 4.00 with no more than two decimal places.';
+        }
+        input.classList.toggle('is-invalid',input.value!=='' && !input.checkValidity());
+        input.setAttribute('aria-invalid',String(input.value!=='' && !input.checkValidity()));
+        if (notice) { notice.textContent=message; notice.hidden=!message; }
+        updateQuarterlyProgress(); saveQuarterlyRatingDraft();
+    };
+    input.addEventListener('input',enforceRatingScale);
+    input.addEventListener('change',enforceRatingScale);
+    input.addEventListener('blur',()=>{ formatQuarterlyRatingDecimal(input); updateQuarterlyProgress(); saveQuarterlyRatingDraft(); });
+});
+updateQuarterlyProgress();
+document.querySelectorAll('.quarterly-review-tabs [data-bs-toggle="tab"]').forEach(trigger=>{
+    trigger.addEventListener('click',()=>saveQuarterlyRatingDraft(trigger.dataset.bsTarget));
+    trigger.addEventListener('shown.bs.tab',()=>saveQuarterlyRatingDraft(trigger.dataset.bsTarget));
+});
+document.querySelectorAll('#quarterlyRatingForm [data-quarterly-tab]').forEach(button=>button.addEventListener('click',()=>{
+    const trigger=document.querySelector('.quarterly-review-tabs [data-bs-target="'+button.dataset.quarterlyTab+'"]');
+    if (trigger) { bootstrap.Tab.getOrCreateInstance(trigger).show(); trigger.focus(); saveQuarterlyRatingDraft(button.dataset.quarterlyTab); }
+}));
+function renderQuarterlyRatingPreview() {
+    const form=document.getElementById('quarterlyRatingForm');
+    if (!form || !document.getElementById('quarterlyRatingPreviewKraRows')) return;
+    renderQuarterlyRatingTables(form,'quarterlyRatingPreviewKraRows','quarterlyRatingPreviewKraTotal',
+        'quarterlyRatingPreviewBehaviorRows','quarterlyRatingPreviewBehaviorAverage');
+}
+function renderQuarterlyRatingTables(form,kraBodyId,kraTotalId,behaviorBodyId,behaviorAverageId) {
+    const kraBody=document.getElementById(kraBodyId), behaviorBody=document.getElementById(behaviorBodyId);
+    const kraInputs=[...form.querySelectorAll('input.quarterly-rate-kra')];
+    const behaviorInputs=[...form.querySelectorAll('input[name^="scores["]')];
+    if (kraBody) {
+        kraBody.replaceChildren();
+        kraInputs.forEach(input=>{
+            const row=document.createElement('tr');
+            [input.dataset.label || 'KRA',Number(input.dataset.weight).toFixed(2)+'%',input.dataset.submittedRating || '—',quarterlyEffectiveRating(input)!==null ? quarterlyEffectiveRating(input).toFixed(2)+(form.dataset.overrideOnly==='1' ? (input.value==='' || Number(input.value)===Number(input.dataset.submittedRating ?? input.dataset.selfRating) ? ' · Retained' : ' · Modified') : '') : 'Invalid or missing'].forEach((text,index)=>{
+                const cell=document.createElement('td'); cell.textContent=text; if(index) cell.className='text-end'; row.append(cell);
+            });
+            kraBody.append(row);
+        });
+        const subtotal=kraInputs.length && kraInputs.every(input=>quarterlyEffectiveRating(input)!==null)
+            ? kraInputs.reduce((sum,input)=>sum+Number(input.dataset.weight)/100*quarterlyEffectiveRating(input),0) : null;
+        const total=document.getElementById(kraTotalId); if(total) total.textContent=subtotal===null ? '—' : subtotal.toFixed(2);
+    }
+    if (behaviorBody) {
+        behaviorBody.replaceChildren();
+        behaviorInputs.forEach(input=>{
+            const row=document.createElement('tr');
+            [input.dataset.label || 'Behavior',input.dataset.selfRating || '—',quarterlyEffectiveRating(input)!==null ? quarterlyEffectiveRating(input).toFixed(2)+(form.dataset.overrideOnly==='1' ? (input.value==='' || Number(input.value)===Number(input.dataset.submittedRating ?? input.dataset.selfRating) ? ' · Retained' : ' · Modified') : '') : 'Invalid or missing'].forEach((text,index)=>{
+                const cell=document.createElement('td'); cell.textContent=text; if(index) cell.className='text-end'; row.append(cell);
+            });
+            behaviorBody.append(row);
+        });
+        const average=behaviorInputs.length && behaviorInputs.every(input=>quarterlyEffectiveRating(input)!==null)
+            ? behaviorInputs.reduce((sum,input)=>sum+quarterlyEffectiveRating(input),0)/behaviorInputs.length : null;
+        const total=document.getElementById(behaviorAverageId); if(total) total.textContent=average===null ? '—' : average.toFixed(2);
+    }
+}
+(() => {
+    const canvas=document.getElementById('quarterlyRaterSignatureCanvas');
+    const input=document.getElementById('quarterlyRaterSignatureData');
+    if (!canvas || !input) return;
+    const context=canvas.getContext('2d');
+    context.strokeStyle='#14241a'; context.fillStyle='#14241a'; context.lineWidth=2.4; context.lineCap='round'; context.lineJoin='round';
+    let drawing=false, hasInk=false;
+    const point=event=>{ const rect=canvas.getBoundingClientRect(); return {x:(event.clientX-rect.left)*canvas.width/rect.width,y:(event.clientY-rect.top)*canvas.height/rect.height}; };
+    const restoreSignature=()=>{ if(input.value) { const image=new Image(); image.onload=()=>{context.drawImage(image,0,0,canvas.width,canvas.height);hasInk=true;}; image.src=input.value; } };
+    restoreSignature(); document.addEventListener('quarterlyRatingDraftRestored',restoreSignature);
+    canvas.addEventListener('pointerdown',event=>{ drawing=true; hasInk=true; canvas.setPointerCapture(event.pointerId); const p=point(event); context.beginPath(); context.arc(p.x,p.y,1.2,0,Math.PI*2); context.fill(); context.beginPath(); context.moveTo(p.x,p.y); event.preventDefault(); });
+    canvas.addEventListener('pointermove',event=>{ if(!drawing) return; const p=point(event); context.lineTo(p.x,p.y); context.stroke(); event.preventDefault(); });
+    const finish=()=>{ if(!drawing) return; drawing=false; input.value=hasInk ? canvas.toDataURL('image/png') : ''; document.getElementById('quarterlyRaterSignatureError')?.setAttribute('hidden',''); saveQuarterlyRatingDraft(); };
+    canvas.addEventListener('pointerup',finish); canvas.addEventListener('pointercancel',finish);
+    document.getElementById('quarterlyClearRaterSignature')?.addEventListener('click',()=>{ context.clearRect(0,0,canvas.width,canvas.height); hasInk=false; input.value=''; saveQuarterlyRatingDraft(); });
+})();
+function updateQuarterlyProposedResult() {
+    const form=document.getElementById('quarterlyConsolidationForm'), result=document.getElementById('quarterlyProposedResult');
+    if (!form || !result) return;
+    const round2=value=>Math.round((value+Number.EPSILON)*100)/100;
+    const inputs=[...form.querySelectorAll('input[data-weight]')];
+    if (inputs.some(input=>input.value==='' || !input.checkValidity())) { result.textContent='Complete valid KRA ratings to preview the proposed score.'; return; }
+    const kra=round2(inputs.reduce((sum,input)=>sum+round2(Number(input.dataset.weight)/100*quarterlyEffectiveRating(input)),0));
+    const kraTotal=document.getElementById('quarterlyReviewedKraTotal');
+    if (kraTotal) kraTotal.textContent=kra.toFixed(2);
+    const coreInputs=[...form.querySelectorAll('.quarterly-core-adjustment')];
+    if (coreInputs.some(input=>input.value==='' || !input.checkValidity())) { result.textContent='Complete valid Core Values ratings to preview the proposed score.'; return; }
+    const core=round2(coreInputs.length ? coreInputs.reduce((sum,input)=>sum+Number(input.value),0)/8 : Number(form.dataset.core));
+    const coreTotal=document.getElementById('quarterlyReviewedCoreTotal');
+    if (coreTotal) coreTotal.textContent=core.toFixed(2);
+    const total=round2(kra*.8+core*.2);
+    document.getElementById('quarterlyProposedKra').textContent=kra.toFixed(2);
+    document.getElementById('quarterlyProposedCore').textContent=core.toFixed(2);
+    document.getElementById('quarterlyProposedTotal').textContent=total.toFixed(2);
+    result.setAttribute('aria-label','Proposed overall score '+total.toFixed(2)+'. KRA '+kra.toFixed(2)+' times 80 percent plus Behavior '+core.toFixed(2)+' times 20 percent.');
+}
+document.querySelectorAll('#quarterlyConsolidationForm input[data-weight]').forEach(input=>input.addEventListener('input',updateQuarterlyProposedResult));
+document.querySelectorAll('#quarterlyConsolidationForm .quarterly-core-adjustment').forEach(input=>input.addEventListener('input',updateQuarterlyProposedResult));
+document.getElementById('quarterlyConsolidationForm')?.addEventListener('invalid',event=>{
+    const panel=event.target.closest('.tab-pane');
+    const trigger=panel && document.querySelector('[data-bs-target="#'+panel.id+'"]');
+    if (trigger) bootstrap.Tab.getOrCreateInstance(trigger).show();
+},true);
+updateQuarterlyProposedResult();
+function filterQuarterlyRoster() {
+    const text=(document.getElementById('quarterlySearch')?.value || '').toLowerCase();
+    const state=document.getElementById('quarterlyStatus')?.value || '';
+    document.querySelectorAll('#quarterlyRoster tbody tr').forEach(row=>{
+        const matches=state==='submitted' ? row.dataset.quarterlySubmitted==='1' : !state || row.dataset.quarterlyState===state;
+        row.hidden=!matches || !row.textContent.toLowerCase().includes(text);
+    });
+}
+document.getElementById('quarterlySearch')?.addEventListener('input',filterQuarterlyRoster);
+document.getElementById('quarterlyStatus')?.addEventListener('change',filterQuarterlyRoster);
+document.getElementById('quarterlyReviewRatings')?.addEventListener('click', () => {
+    const form=document.getElementById('quarterlyRatingForm');
+    const commentsPreview=document.getElementById('quarterlyHeadCommentsConfirmation');
+    if(commentsPreview) commentsPreview.textContent=document.getElementById('quarterlyHeadComments')?.value.trim() || 'No comments added.';
+    quarterlyValidatePlanFields();
+    const invalid=[...form.querySelectorAll('input,textarea')].find(input=>!input.checkValidity());
+    if (invalid) {
+        const panel=invalid.closest('.tab-pane');
+        const trigger=panel && document.querySelector('[data-bs-target="#'+panel.id+'"]');
+        if (trigger) bootstrap.Tab.getOrCreateInstance(trigger).show();
+        invalid.reportValidity();
+        return;
+    }
+    const signature=document.getElementById('quarterlyRaterSignatureData');
+    if (signature && !signature.value) {
+        document.getElementById('quarterlyRaterSignatureError')?.removeAttribute('hidden');
+        document.querySelector('.quarterly-review-tabs [data-bs-target="#quarterlyRateReviewPanel"]')?.click();
+        document.getElementById('quarterlyRaterSignatureCanvas')?.scrollIntoView({behavior:'smooth',block:'center'});
+        return;
+    }
+    renderQuarterlyRatingTables(form,'quarterlySummaryKraRows','quarterlySummaryKraTotal',
+        'quarterlySummaryBehaviorRows','quarterlySummaryBehaviorAverage');
+    const kraSection=document.getElementById('quarterlySummaryKraSection');
+    if (kraSection) kraSection.hidden=!form.querySelector('input.quarterly-rate-kra');
+    // The signature is validated above and included in the POST. Keep it out of
+    // the behavior ratings table: that table's body only contains rating rows.
+    new bootstrap.Modal(document.getElementById('quarterlyRatingSummary')).show();
+});
+document.getElementById('quarterlyConfirmSubmit')?.addEventListener('click', function() {
+    const form=document.getElementById('quarterlyRatingForm');
+    if (!form) return;
+    document.getElementById('quarterlyConfirmed').value='1';
+    this.disabled=true;
+    form.requestSubmit();
+});
+// Remember the submitted-review tab per user and evaluation in this browser tab.
+const headReviewTabs=document.querySelector('.quarterly-head-review-tabs');
+if (headReviewTabs) {
+    const headTabKey='quarterly-head-review-tab-<?php echo (int)$actor['user_id']; ?>-<?php echo (int)$evaluationId; ?>';
+    const headTriggers=[...headReviewTabs.querySelectorAll('[data-bs-toggle="tab"]')];
+    headTriggers.forEach(trigger=>trigger.addEventListener('shown.bs.tab',()=>{
+        try { sessionStorage.setItem(headTabKey,trigger.id); } catch (_) {}
+    }));
+    const restoreHeadTab=()=>{
+        let saved;
+        try { saved=sessionStorage.getItem(headTabKey); } catch (_) { return; }
+        const trigger=headTriggers.find(button=>button.id===saved);
+        if (trigger && window.bootstrap?.Tab) bootstrap.Tab.getOrCreateInstance(trigger).show();
+    };
+    if (document.readyState==='loading') document.addEventListener('DOMContentLoaded',restoreHeadTab,{once:true});
+    else restoreHeadTab();
+}
+</script>
+<?php require_once __DIR__ . '/footer.php'; ?>

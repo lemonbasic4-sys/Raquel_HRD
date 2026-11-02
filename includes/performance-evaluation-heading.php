@@ -1,6 +1,7 @@
 <?php
 // Shared HRIS heading for both evaluation categories.
 $regular_category = !empty($annual_in_performance_page);
+$quarterly_category = !empty($quarterly_in_performance_page);
 ?>
 <section class="package-hero">
     <?php if ($regular_category && !empty($member) && in_array($view ?? '', ['review','results'],true)): ?>
@@ -26,16 +27,20 @@ $regular_category = !empty($annual_in_performance_page);
 .performance-category-tab{display:flex;align-items:center;gap:.75rem;min-width:240px;padding:.8rem 1rem;background:#f3f4f6;border:0;border-bottom:3px solid transparent;border-radius:.5rem .5rem 0 0;color:#374151;text-align:left;text-decoration:none}
 .performance-category-tab:hover{background:#e9f2e9;color:#082e06}
 .performance-category-tab.active{background:#eef7ed;border-bottom-color:#d4a900;color:#082e06}
+.performance-category-tab:disabled{opacity:.65;cursor:not-allowed}
 .performance-category-icon{display:grid;place-items:center;width:38px;height:38px;border-radius:50%;background:rgba(8,46,6,.08);font-size:1.1rem;flex-shrink:0}
 .performance-category-copy{display:flex;flex-direction:column;gap:.15rem}
 .performance-category-copy strong{font-size:.9rem}.performance-category-copy small{color:#6b7280;font-size:.72rem}
 @media(max-width:575.98px){.performance-category-tabs{gap:.4rem}.performance-category-tab{flex:1;min-width:0;padding:.65rem .5rem;gap:.45rem}.performance-category-icon{width:30px;height:30px}.performance-category-copy strong{font-size:.76rem}.performance-category-copy small{font-size:.65rem}}
 </style>
 <nav class="performance-category-tabs" aria-label="Evaluation review type">
-    <a class="performance-category-tab <?php echo !$regular_category ? 'active' : ''; ?>" <?php echo !$regular_category ? 'aria-current="page"' : ''; ?> href="<?php echo BASE_URL; ?>/employee/team-evaluation-packages.php?category=probationary">
+    <a class="performance-category-tab <?php echo !$regular_category && !$quarterly_category ? 'active' : ''; ?>" <?php echo !$regular_category && !$quarterly_category ? 'aria-current="page"' : ''; ?> href="<?php echo BASE_URL; ?>/employee/team-evaluation-packages.php?category=probationary">
         <span class="performance-category-icon"><i class="fas fa-users" aria-hidden="true"></i></span><span class="performance-category-copy"><strong>Probationary Employee</strong><small>Initial and Final evaluations</small></span>
     </a>
     <a class="performance-category-tab <?php echo $regular_category ? 'active' : ''; ?>" <?php echo $regular_category ? 'aria-current="page"' : ''; ?> href="<?php echo BASE_URL; ?>/employee/team-evaluation-packages.php?category=regular">
         <span class="performance-category-icon"><i class="fas fa-user" aria-hidden="true"></i></span><span class="performance-category-copy"><strong>Regular Employee</strong><small>Annual evaluations &amp; 360 ratings</small></span>
+    </a>
+    <a class="performance-category-tab <?php echo $quarterly_category ? 'active' : ''; ?>" <?php echo $quarterly_category ? 'aria-current="page"' : ''; ?> href="<?php echo BASE_URL; ?>/employee/team-evaluation-packages.php?category=quarterly">
+        <span class="performance-category-icon"><i class="fas fa-calendar-alt" aria-hidden="true"></i></span><span class="performance-category-copy"><strong>Quarterly Evaluation</strong><small>Quarterly cycles &amp; 360 ratings</small></span>
     </a>
 </nav>

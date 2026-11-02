@@ -115,6 +115,7 @@ $summary = [
 
 $MAX_PREVIEW = 200; // cap for safety
 $row_count   = 0;
+$seen_company_ids = [];
 
 while (($row = fgetcsv($file)) !== false) {
     if (empty(array_filter($row))) continue;
@@ -133,13 +134,6 @@ while (($row = fgetcsv($file)) !== false) {
         return $val;
     };
 
-    $row_count++;
-    if ($row_count > $MAX_PREVIEW) {
-        $summary['warnings'][] = "Only the first {$MAX_PREVIEW} rows are shown in the preview. All rows will be processed on confirm.";
-        // Still count skipped/new/update for rows beyond limit via a quick check
-        break;
-    }
-
     $first_name    = $getV('First Name', 0);
     $last_name     = $getV('Last Name', 1);
     $middle_name   = $getV('Middle Name', 2);
@@ -148,6 +142,12 @@ while (($row = fgetcsv($file)) !== false) {
     // Skip instruction / legend row if present in uploaded CSV
     if (str_starts_with($first_name, '[') || str_starts_with($last_name, '[') || stripos($first_name, '[Required]') !== false) {
         continue;
+    }
+
+    $row_count++;
+    if ($row_count > $MAX_PREVIEW) {
+        $summary['warnings'][] = "Only the first {$MAX_PREVIEW} rows are shown in the preview. All rows will be processed on confirm.";
+        break;
     }
 
     $hireDateRaw   = $getV('Hire Date', 33);
@@ -174,6 +174,16 @@ while (($row = fgetcsv($file)) !== false) {
     }
     if (empty($job_title_name)) {
         $row_issues[] = 'Missing job title';
+    }
+    $has_id_conflict = false;
+    if ($employee_code !== '') {
+        $code_key = strtolower($employee_code);
+        if (isset($seen_company_ids[$code_key])) {
+            $row_issues[] = 'Company ID is repeated in this CSV. Review both rows.';
+            $has_id_conflict = true;
+        } else {
+            $seen_company_ids[$code_key] = true;
+        }
     }
 
     $is_fatal = !empty($row_issues);
@@ -230,19 +240,36 @@ while (($row = fgetcsv($file)) !== false) {
     // ── Existing employee check ───────────────────────────────────────────────
     $is_update = false;
     if (!empty($employee_code)) {
-        $ec = $conn->prepare("SELECT employee_id FROM employees WHERE employee_code = ? LIMIT 1");
+        $ec = $conn->prepare("SELECT employee_id, first_name, last_name, date_of_birth FROM employees WHERE employee_code = ? LIMIT 1");
         $ec->bind_param("s", $employee_code);
         $ec->execute();
-        if ($ec->get_result()->num_rows > 0) $is_update = true;
+        if ($matched = $ec->get_result()->fetch_assoc()) {
+            if (strcasecmp(trim($matched['first_name']), $first_name) !== 0 || strcasecmp(trim($matched['last_name']), $last_name) !== 0
+                || ($dob && !empty($matched['date_of_birth']) && $dob !== $matched['date_of_birth'])) {
+                $row_issues[] = "Company ID {$employee_code} belongs to another employee. Check the ID and identity.";
+                $has_id_conflict = true;
+            } else {
+                $is_update = true;
+            }
+        }
         $ec->close();
     }
-    if (!$is_update && !empty($first_name) && !empty($last_name)) {
-        $nc = $conn->prepare("SELECT employee_id FROM employees WHERE first_name = ? AND last_name = ? LIMIT 1");
+    if (!$is_update && !$has_id_conflict && !empty($first_name) && !empty($last_name)) {
+        $nc = $conn->prepare("SELECT employee_id, employee_code FROM employees WHERE first_name = ? AND last_name = ? LIMIT 1");
         $nc->bind_param("ss", $first_name, $last_name);
         $nc->execute();
-        if ($nc->get_result()->num_rows > 0) $is_update = true;
+        if ($matched = $nc->get_result()->fetch_assoc()) {
+            if ($employee_code !== '' && !empty($matched['employee_code']) && strcasecmp($matched['employee_code'], $employee_code) !== 0) {
+                $row_issues[] = 'This name already has a different Company ID. Review the employee before changing their ID.';
+                $has_id_conflict = true;
+            } else {
+                $is_update = true;
+            }
+        }
         $nc->close();
     }
+
+    $is_fatal = $is_fatal || $has_id_conflict;
 
     // Normalize employment status
     foreach ($allowed_statuses as $as) {

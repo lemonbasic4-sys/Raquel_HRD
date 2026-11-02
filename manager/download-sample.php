@@ -33,7 +33,7 @@ $pds_sections = [
     'Real Properties' => ['Real Property 1 Description', 'Real Property 1 Market Value'],
     'Personal Properties' => ['Personal Property 1 Description', 'Personal Property 1 Cost'],
     'Liabilities' => ['Liability 1 Nature', 'Liability 1 Outstanding Balance'],
-    'Employment-Related Disclosures' => ['Related to Company (Yes/No)', 'Related Details', 'Admin Offense (Yes/No)', 'Admin Offense Details', 'Criminal Charge (Yes/No)', 'Criminal Charge Details', 'PWD Status (Yes/No)', 'Solo Parent Status (Yes/No)'],
+    'Employment-Related Disclosures' => ['Related to Company (Yes/No)', 'Related Details', 'Admin Offense (Yes/No)', 'Admin Offense Details', 'Criminal Charge (Yes/No)', 'Criminal Charge Details', 'Criminal Conviction (Yes/No)', 'Criminal Conviction Details', 'Previously Separated (Yes/No)', 'Separation Details', 'PWD Status (Yes/No)', 'PWD Details', 'Solo Parent Status (Yes/No)', 'Solo Parent Details', 'Recent Hospitalization (Yes/No)', 'Hospital Details', 'Current Treatment (Yes/No)', 'Treatment Details'],
     'Character References (3 persons not related)' => ['Reference 1 Name', 'Reference 1 Address', 'Reference 1 Contact Number', 'Reference 2 Name', 'Reference 2 Address', 'Reference 2 Contact Number', 'Reference 3 Name', 'Reference 3 Address', 'Reference 3 Contact Number'],
     'Employment Details' => ['Company ID', 'Hire Date', 'Job Title', 'Rank', 'Department', 'Branch', 'Employment Status', 'Employment Type', 'Contract Start Date', 'Contract End Date', 'Previous Company 1', 'Previous Position 1', 'Previous Monthly Salary 1', 'Previous Employment Period 1', 'Previous Reason for Leaving 1', 'Training Title 1', 'Training Conducted By 1', 'Training Hours 1'],
     'Emergency Contacts' => ['Emergency Contact Name', 'Emergency Contact Relationship', 'Emergency Contact Number'],
@@ -44,12 +44,12 @@ fputcsv($output, $headers);
 // ── LEGEND / HINT ROW ────────────────────────────────────────────────────────
 // This row explains accepted values for key fields. DELETE THIS ROW before uploading.
 $legend = array_fill_keys($headers, '');
-$legend['Company ID'] = 'Unique employee code, e.g. HRD-001 or AP-001. Existing codes update that employee. Login accounts are provisioned separately by Admin.';
+$legend['Company ID'] = 'Use a unique Company ID in your organization\'s format. HRD-001 and AP-001 are examples only. An existing ID updates only the matching employee; conflicting or repeated IDs are skipped for review. Login accounts are provisioned separately by Admin.';
 $legend['Job Title'] = '[Required] Use the configured job title';
 $legend['Graduate Studies School'] = 'Optional. Blank education fields preserve existing records on reimport.';
 $legend['First Name']                      = '[Required] Employee first name';
 $legend['Last Name']                       = '[Required] Employee last name';
-$legend['Birthday']                        = '[Required] Format: MM/DD/YYYY';
+$legend['Birthday']                        = '[Optional] Format: MM/DD/YYYY';
 $legend['Gender']                          = 'Male | Female | Other';
 $legend['Civil Status']                    = 'Single | Married | Widowed | Separated | Other';
 $legend['Blood Type']                      = 'A | B | AB | O  (optionally add + or -, e.g. O+)';
@@ -66,8 +66,12 @@ $legend['Rank']                            = 'Executives | Management Team | Man
 $legend['Related to Company (Yes/No)']     = 'Yes | No';
 $legend['Admin Offense (Yes/No)']          = 'Yes | No';
 $legend['Criminal Charge (Yes/No)']        = 'Yes | No';
+$legend['Criminal Conviction (Yes/No)']    = 'Yes | No';
+$legend['Previously Separated (Yes/No)']  = 'Yes | No';
 $legend['PWD Status (Yes/No)']             = 'Yes | No';
 $legend['Solo Parent Status (Yes/No)']     = 'Yes | No';
+$legend['Recent Hospitalization (Yes/No)'] = 'Yes | No';
+$legend['Current Treatment (Yes/No)']     = 'Yes | No';
 fputcsv($output, array_map(fn($h) => $legend[$h] ?? '', $headers));
 
 // ── SAMPLE ROWS (one per key Employment Status) ───────────────────────────────
@@ -123,7 +127,7 @@ $shared = [
 $samples = [
 
     // ── Regular ──────────────────────────────────────────────────────────────
-    // Hire Date = regularization date. Contract dates not needed.
+    // Hire Date = first engagement date. Contract dates not needed for Regular status.
     array_merge($shared, [
         'First Name' => 'Maria', 'Last Name' => 'Reyes', 'Middle Name' => 'Santos',
         'Birthday' => '03/15/1992', 'Gender' => 'Female', 'Civil Status' => 'Single',
@@ -131,9 +135,16 @@ $samples = [
         'SSS No' => '01-2345678-9', 'PhilHealth No' => '12-345678901-2',
         'Pag-IBIG No' => '1234-5678-9012', 'TIN No' => '123-456-789-000',
         'Mobile No' => '09171000001', 'Email' => 'maria.reyes@example.com',
-        'Company ID' => 'HRD-001', 'Hire Date' => '01/15/2020',
+        'Hire Date' => '01/15/2020',
         'Job Title' => 'HR Specialist', 'Rank' => 'R&F', 'Department' => 'Human Resources',
         'Employment Status' => 'Regular',
+        'Graduate Studies School' => 'Holy Angel University',
+        'Graduate Studies Degree/Course' => 'Master of Business Administration',
+        'Graduate Studies Year Graduated' => '2019',
+        'Eligibility License Title 1' => 'Civil Service Professional Eligibility',
+        'Eligibility License No 1' => 'SAMPLE-CSP-001',
+        'Recognition 1 Title' => 'Employee Service Award',
+        'Membership 1 Organization' => 'People Management Association of the Philippines',
         'Contract Start Date' => '', 'Contract End Date' => '',
         'Previous Company 1' => 'Santos & Co. Enterprises', 'Previous Position 1' => 'HR Assistant',
         'Previous Monthly Salary 1' => '18000', 'Previous Employment Period 1' => '2016-2019',
@@ -150,10 +161,18 @@ $samples = [
         'SSS No' => '01-3456789-0', 'PhilHealth No' => '12-456789012-3',
         'Pag-IBIG No' => '2345-6789-0123', 'TIN No' => '',
         'Mobile No' => '09171000002', 'Email' => 'carlo.santos@example.com',
-        'Company ID' => 'HRD-002', 'Hire Date' => '06/01/2026',
+        'Hire Date' => '06/01/2026',
         'Job Title' => 'OJT - Business Administration', 'Rank' => 'R&F',
         'Department' => 'Human Resources',
         'Employment Status' => 'OJT',
+        'Elementary Year Graduated' => '2015',
+        'High School Year Graduated' => '2019',
+        'Senior High School' => 'Angeles City Senior High School',
+        'Senior High School Degree/Course' => 'Accountancy, Business and Management',
+        'Senior High School Year Graduated' => '2021',
+        'College School' => 'Holy Angel University',
+        'College Degree/Course' => 'BS Business Administration',
+        'College Year Graduated' => '',
         'Contract Start Date' => '06/01/2026', 'Contract End Date' => '08/31/2026',
         'Training Title 1' => 'On-the-Job Training Orientation',
         'Training Conducted By 1' => 'Raquel Pawnshop HRD', 'Training Hours 1' => '400',
@@ -169,10 +188,20 @@ $samples = [
         'SSS No' => '01-4567890-1', 'PhilHealth No' => '12-567890123-4',
         'Pag-IBIG No' => '3456-7890-1234', 'TIN No' => '234-567-890-000',
         'Mobile No' => '09171000003', 'Email' => 'ana.bautista@example.com',
-        'Company ID' => 'OPS-001', 'Hire Date' => '05/01/2026',
+        'Hire Date' => '05/01/2026',
         'Job Title' => 'Operations Trainee', 'Rank' => 'R&F',
         'Department' => 'Operations',
         'Employment Status' => 'Trainee',
+        'Elementary Year Graduated' => '2013',
+        'High School Year Graduated' => '2017',
+        'Senior High School' => 'Angeles City Senior High School',
+        'Senior High School Degree/Course' => 'Technical-Vocational-Livelihood',
+        'Senior High School Year Graduated' => '2019',
+        'Vocational School' => 'Pampanga Technical Institute',
+        'Vocational Degree/Course' => 'Office Administration NC II',
+        'Vocational Year Graduated' => '2020',
+        'College School' => '', 'College Degree/Course' => '', 'College Year Graduated' => '',
+        'Recognition 1 Title' => 'Outstanding Training Participant',
         'Contract Start Date' => '05/01/2026', 'Contract End Date' => '10/31/2026',
         'Training Title 1' => 'Operations Fundamentals Training',
         'Training Conducted By 1' => 'Operations Department', 'Training Hours 1' => '240',
@@ -188,10 +217,16 @@ $samples = [
         'SSS No' => '01-5678901-2', 'PhilHealth No' => '12-678901234-5',
         'Pag-IBIG No' => '4567-8901-2345', 'TIN No' => '345-678-901-000',
         'Mobile No' => '09171000004', 'Email' => 'ramon.cruz@example.com',
-        'Company ID' => 'FIN-001', 'Hire Date' => '03/01/2026',
+        'Hire Date' => '03/01/2026',
         'Job Title' => 'Accounting Clerk', 'Rank' => 'R&F',
         'Department' => 'Finance',
         'Employment Status' => 'Probationary',
+        'Child 1 Surname' => 'Cruz', 'Child 1 First Name' => 'Mika',
+        'Child 1 Middle Name' => 'Torres', 'Child 1 Birthday' => '08/14/2021',
+        'Eligibility License Title 1' => 'Bookkeeping NC III',
+        'Eligibility License No 1' => 'SAMPLE-BK-001',
+        'Real Property 1 Description' => 'Residential lot in Angeles City',
+        'Real Property 1 Market Value' => '850000',
         'Contract Start Date' => '03/01/2026', 'Contract End Date' => '08/31/2026',
         'Previous Company 1' => 'XYZ Lending Corp.', 'Previous Position 1' => 'Accounting Assistant',
         'Previous Monthly Salary 1' => '18000', 'Previous Employment Period 1' => '2023-2025',
@@ -208,10 +243,17 @@ $samples = [
         'SSS No' => '01-6789012-3', 'PhilHealth No' => '12-789012345-6',
         'Pag-IBIG No' => '5678-9012-3456', 'TIN No' => '456-789-012-000',
         'Mobile No' => '09171000005', 'Email' => 'liza.mendoza@example.com',
-        'Company ID' => 'AP-001', 'Hire Date' => '07/01/2026',
+        'Hire Date' => '07/01/2026',
         'Job Title' => 'Project Coordinator', 'Rank' => 'Supervisor',
         'Department' => 'Acquired Properties',
         'Employment Status' => 'Project Based',
+        'Graduate Studies School' => 'University of the Philippines Diliman',
+        'Graduate Studies Degree/Course' => 'Master of Urban and Regional Planning',
+        'Graduate Studies Year Graduated' => '2018',
+        'Recognition 1 Title' => 'Project Delivery Award',
+        'Membership 1 Organization' => 'Philippine Association of Real Estate Boards',
+        'Real Property 1 Description' => 'Residential condominium unit',
+        'Real Property 1 Market Value' => '2200000',
         'Contract Start Date' => '07/01/2026', 'Contract End Date' => '12/31/2026',
         'Previous Company 1' => 'ABC Realty Inc.', 'Previous Position 1' => 'Property Coordinator',
         'Previous Monthly Salary 1' => '28000', 'Previous Employment Period 1' => '2020-2025',
@@ -220,9 +262,29 @@ $samples = [
 
 ];
 
+$code_check = $conn->prepare('SELECT employee_id FROM employees WHERE employee_code = ? LIMIT 1');
+$generated_codes = [];
+$department_prefixes = [
+    'Human Resources' => 'HRD',
+    'Operations' => 'OPS',
+    'Finance' => 'FIN',
+    'Acquired Properties' => 'AP',
+];
 foreach ($samples as $sample) {
+    // Use familiar department-number examples while avoiding IDs already in the database or this CSV.
+    $prefix = $department_prefixes[$sample['Department']] ?? 'EMP';
+    $number = 1;
+    do {
+        $sample_code = $prefix . '-' . str_pad((string) $number++, 3, '0', STR_PAD_LEFT);
+        $code_check->bind_param('s', $sample_code);
+        $code_check->execute();
+        $exists = $code_check->get_result()->num_rows > 0;
+    } while ($exists || isset($generated_codes[$sample_code]));
+    $generated_codes[$sample_code] = true;
+    $sample['Company ID'] = $sample_code;
     fputcsv($output, array_map(fn($h) => $sample[$h] ?? '', $headers));
 }
+$code_check->close();
 
 fclose($output);
 exit();

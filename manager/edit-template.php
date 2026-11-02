@@ -38,9 +38,9 @@ if (!$tmpl) {
 if (!canManageEvaluationTemplate($conn, $template_id, $current_user_id)) {
     redirectWith($template_list_url, 'danger', 'You can only edit templates you own or are authorized to manage as a same-level department peer.');
 }
-if (($tmpl['evaluation_type'] ?? '') === 'Annual'
+if (in_array($tmpl['evaluation_type'] ?? '', ['Annual','Quarterly'], true)
     && annualQuery($conn, 'SELECT evaluation_id FROM evaluations WHERE template_id=? LIMIT 1', [$template_id])) {
-    redirectWith($template_list_url, 'info', 'This Annual template already has evaluation records. Publish a new template to change its criteria without altering existing results.');
+    redirectWith($template_list_url, 'info', 'This template already has evaluation records. Publish a new template to change its criteria without altering existing results.');
 }
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -51,8 +51,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $behavior_framework_code = strtoupper(trim($_POST['behavior_framework_code'] ?? ''));
     $behavior_framework_version = trim($_POST['behavior_framework_version'] ?? '');
     $evaluation_type = $_POST['evaluation_type'] ?? 'Annual';
-    if ($evaluation_type === 'Annual' && annualQuery($conn, 'SELECT evaluation_id FROM evaluations WHERE template_id=? LIMIT 1', [$template_id])) {
-        redirectWith($template_list_url, 'info', 'Publish a new Annual template to preserve this template\'s existing evaluation records.');
+    if (in_array($evaluation_type, ['Annual','Quarterly'], true) && annualQuery($conn, 'SELECT evaluation_id FROM evaluations WHERE template_id=? LIMIT 1', [$template_id])) {
+        redirectWith($template_list_url, 'info', 'Publish a new template to preserve this template\'s existing evaluation records.');
     }
     $is_probationary_template = isset($_POST['probationary_template']) || in_array($evaluation_type, ['Initial', 'Final'], true);
     if (!in_array($evaluation_type, ['Initial', 'Final', 'Quarterly', 'Annual'], true)) $evaluation_type = 'Annual';
@@ -70,14 +70,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $beh_names = $_POST['behavior_name'] ?? [];
     $beh_kpis = $_POST['behavior_kpi'] ?? [];
-    if ($evaluation_type === 'Annual') {
+    if (in_array($evaluation_type, ['Annual','Quarterly'], true)) {
         if ((annualActor($conn, (int)$_SESSION['user_id'])['employment_status'] ?? '') !== 'Regular') {
-            redirectWith($template_list_url, 'danger', 'Only an active regular head may manage Annual templates for direct reports.');
+            redirectWith($template_list_url, 'danger', 'Only an active regular head may manage '.$evaluation_type.' templates for direct reports.');
         }
         try { annualValidateTemplateKras($kra_names, $kra_weights); }
         catch (DomainException $e) { redirectWith($template_edit_url . '?id=' . $template_id, 'danger', $e->getMessage()); }
         $kra_weight = 80; $behavior_weight = 20;
-        $behavior_framework_code = 'ANNUAL-CORE'; $behavior_framework_version = '1';
+        $behavior_framework_code = strtoupper($evaluation_type).'-CORE'; $behavior_framework_version = '1';
         $beh_names = array_column(annualCoreValues(), 'name');
         $beh_kpis = array_column(annualCoreValues(), 'kpi');
     }

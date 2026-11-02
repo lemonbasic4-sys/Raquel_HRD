@@ -272,6 +272,7 @@ document.addEventListener('DOMContentLoaded', () => new bootstrap.Modal(document
             <h4 class="text-white fw-bold mb-0 mt-1"><i class="fas fa-users-cog me-2" style="color:var(--primary-light);"></i>User Management</h4>
         </div>
         <div class="hero-actions d-flex gap-2 flex-wrap justify-content-end">
+            <a class="btn btn-outline-light" href="<?php echo BASE_URL; ?>/admin/add-hr-manager.php"><i class="fas fa-user-tie me-2"></i>Set Up HR Manager Employee</a>
             <button class="btn btn-outline-light" data-bs-toggle="modal" data-bs-target="#addAdminModal">
                 <i class="fas fa-user-shield me-2"></i>Add New Admin
             </button>
@@ -563,7 +564,7 @@ document.addEventListener('DOMContentLoaded', () => new bootstrap.Modal(document
                         <select class="form-select" name="employee_id" required onchange="prefillUserInfo(this)">
                             <option value="">Select Employee</option>
                             <?php while ($emp = $eligible_employees->fetch_assoc()): ?>
-                                <option value="<?php echo $emp['employee_id']; ?>"
+                                <option value="<?php echo $emp['employee_id']; ?>" <?php echo (int) ($_GET['setup_employee'] ?? 0) === (int) $emp['employee_id'] ? 'selected' : ''; ?>
                                     data-name="<?php echo e($emp['first_name'] . ' ' . $emp['last_name']); ?>"
                                     data-email="<?php echo e($emp['personal_email']); ?>"
                                     data-rank="<?php echo e($emp['rank_name'] ?? ''); ?>"
@@ -736,6 +737,10 @@ document.addEventListener('DOMContentLoaded', () => new bootstrap.Modal(document
 
     document.addEventListener('DOMContentLoaded', function () {
         const empSelect = document.querySelector('#addUserModal [name="employee_id"]');
+        if (empSelect && empSelect.value) {
+            prefillUserInfo(empSelect);
+            new bootstrap.Modal(document.getElementById('addUserModal')).show();
+        }
         const usernameField = document.getElementById('new_username');
         if (empSelect && usernameField) {
             empSelect.addEventListener('change', function () {

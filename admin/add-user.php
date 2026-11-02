@@ -65,6 +65,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (empty($full_name)) $errors[] = 'Full name is required.';
     if (!in_array($role, ['Admin', 'HR Manager', 'HR Supervisor', 'HR Staff', 'Employee'])) $errors[] = 'Invalid role.';
     if ($role !== 'Admin' && empty($employee_id)) $errors[] = 'Employee selection is required.';
+    if ($employee_id !== null && $role !== 'Employee') {
+        $account_check = $conn->prepare("SELECT user_id FROM users WHERE employee_id = ? AND role != 'Employee' LIMIT 1");
+        $account_check->bind_param('i', $employee_id);
+        $account_check->execute();
+        if ($account_check->get_result()->fetch_assoc()) $errors[] = 'This employee already has an HRIS account.';
+        $account_check->close();
+    }
     if (strlen($password) < 6) $errors[] = 'Password must be at least 6 characters.';
     if ($role !== 'Employee' && $employee_username !== '' && $username === $employee_username) $errors[] = 'HR and admin usernames must be custom and must not use the Employee ID.';
 

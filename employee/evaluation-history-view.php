@@ -2,6 +2,7 @@
 $page_title = 'Evaluation Details & Audit Log';
 require_once '../includes/session-check.php';
 require_once '../includes/functions.php';
+require_once '../includes/quarterly-evaluations.php';
 
 ensureOrganizationEvaluationPackageSchema($conn);
 $user_id = (int) ($_SESSION['user_id'] ?? 0);
@@ -36,16 +37,18 @@ if (!$evaluation) {
 }
 
 $is_probationary_evaluation = in_array($evaluation['evaluation_type'] ?? '', ['Initial', 'Final'], true);
-$is_annual_peer_evaluation = ($evaluation['evaluation_type'] ?? '') === 'Annual'
-    && annualUsesPeerWorkflow($conn, $evaluation_id);
-$annualResultMember=$is_annual_peer_evaluation ? annualMember($conn,$evaluation_id) : null;
-$annualResultComplete=$annualResultMember && count(annualPeers($conn,$annualResultMember))>=annualExpectedPeers($conn,(int)$annualResultMember['cycle_id'],(int)$annualResultMember['employee_id']);
-$annualOwnActor=$annualResultMember ? annualActor($conn,$user_id) : null;
-$annualNamedPeers=$annualOwnActor && annualCanSeeOwnPeerNames($conn,$annualOwnActor,$annualResultMember);
-$annualReceivedPeers=$annualResultMember ? annualPeers($conn,$annualResultMember,$annualNamedPeers) : [];
+$peerEvalType=($evaluation['evaluation_type'] ?? '') === 'Quarterly' ? 'quarterly' : 'annual';
+$is_annual_peer_evaluation = in_array($evaluation['evaluation_type'] ?? '', ['Annual','Quarterly'],true)
+    && ($peerEvalType === 'quarterly' ? quarterlyUsesPeerWorkflow($conn,$evaluation_id) : annualUsesPeerWorkflow($conn,$evaluation_id));
+$annualResultMember=$is_annual_peer_evaluation ? ($peerEvalType === 'quarterly' ? quarterlyMember($conn,$evaluation_id) : annualMember($conn,$evaluation_id)) : null;
+$annualReceivedPeers=$annualResultMember ? ($peerEvalType === 'quarterly' ? quarterlyPeers($conn,$annualResultMember) : annualPeers($conn,$annualResultMember)) : [];
+$annualResultComplete=$annualResultMember && count($annualReceivedPeers)>=($peerEvalType === 'quarterly' ? quarterlyExpectedPeers($conn,(int)$annualResultMember['cycle_id'],(int)$annualResultMember['employee_id']) : annualExpectedPeers($conn,(int)$annualResultMember['cycle_id'],(int)$annualResultMember['employee_id']));
+$annualOwnActor=$annualResultMember ? ($peerEvalType === 'quarterly' ? quarterlyActor($conn,$user_id) : annualActor($conn,$user_id)) : null;
+$annualNamedPeers=$annualOwnActor && ($peerEvalType === 'quarterly' ? quarterlyCanSeeOwnPeerNames($conn,$annualOwnActor,$annualResultMember) : annualCanSeeOwnPeerNames($conn,$annualOwnActor,$annualResultMember));
+$annualReceivedPeers=$annualResultMember ? ($peerEvalType === 'quarterly' ? quarterlyPeers($conn,$annualResultMember,$annualNamedPeers) : annualPeers($conn,$annualResultMember,$annualNamedPeers)) : [];
 $annualPeerSelf=$annualResultMember ? (json_decode($annualResultMember['self_values_json'] ?? '[]',true) ?: []) : [];
 $annualPeerBreakdown=$annualResultMember && count($annualPeerSelf)===count(annualCoreValues())
-    ? annualCandidate($conn,$annualResultMember) : null;
+    ? ($peerEvalType === 'quarterly' ? quarterlyCandidate($conn,$annualResultMember) : annualCandidate($conn,$annualResultMember)) : null;
 $criteria_stmt = $conn->prepare("SELECT ec.section, ec.criterion_name, ec.description, ec.weight, es.score_value,
         es.dept_manager_override_score, es.supervisor_override_score, es.manager_override_score,
         COALESCE(es.supervisor_override_score, es.dept_manager_override_score, es.manager_override_score, es.score_value) AS reviewed_score
@@ -71,7 +74,7 @@ $orig_kra_subtotal = 0.0;
 $orig_beh_total = 0.0;
 $orig_beh_count = 0;
 $has_any_adjustment = false;
-$annualBehaviorAverages=$annualResultMember && $show_reviewed_scores ? annualCandidate($conn,$annualResultMember)['item_averages'] : [];
+$annualBehaviorAverages=$annualResultMember && $show_reviewed_scores ? $annualPeerBreakdown['item_averages'] : [];
 $annualBehaviorIndex=0;
 
 foreach ($criteria as &$c) {
@@ -159,7 +162,7 @@ require_once '../includes/header.php';
                         <?php if ($is_probationary_evaluation): ?>
                             <strong>Probationary evaluation in progress:</strong> The evaluation is moving through its immediate-head and final approval steps. This is an individual review; it does not use a shared department behavior score.
                         <?php elseif ($is_annual_peer_evaluation): ?>
-                            <strong>Annual evaluation in progress:</strong> Your self-ratings and submitted department 360 ratings are shown here. The combined score is provisional until your immediate head approves the KRA and all required 360 ratings are received.
+                            <strong><?php echo e($evaluation['evaluation_type']); ?> evaluation in progress:</strong> Your self-ratings and submitted department 360 ratings are shown here. The combined score is provisional until your immediate head approves the KRA and all required 360 ratings are received.
                         <?php else: ?>
                             <strong>Consolidation &amp; Management Review in Progress:</strong> Your self-evaluation is currently undergoing departmental consolidation and governance routing. Official final scores, shared behavior metrics, and officer endorsements will be unlocked here once the Board of Directors approves the cycle.
                         <?php endif; ?>

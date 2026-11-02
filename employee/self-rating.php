@@ -3,6 +3,7 @@ $page_title = 'Self Rating';
 require_once '../includes/session-check.php';
 checkRole(['Employee']);
 require_once '../includes/functions.php';
+require_once '../includes/quarterly-evaluations.php';
 
 ensureEvaluationWorkflowSchema($conn);
 ensureProbationaryEvaluationSchema($conn);
@@ -87,6 +88,14 @@ if (($employee['employment_status'] ?? '') === 'Regular' && $is_managed_annual_e
 $ap_annual_waiting = ($employee['employment_status'] ?? '') === 'Regular'
     && annualUsesDepartmentCycle(['department_name'=>$employee['department_name'] ?? ''])
     && !$available_annual_cycle;
+$available_quarterly_cycle = null;
+if (($employee['employment_status'] ?? '') === 'Regular' && quarterlyUsesManagedCycle(['department_name'=>$employee['department_name'] ?? ''])) {
+    ensureQuarterlyEvaluationSchema($conn);
+    $available_quarterly_cycle = quarterlyCycleForSelfRating($conn,(int)$employee['department_id'],$employee_id);
+}
+$quarterly_waiting_flag = $available_quarterly_cycle ? 0 : 1;
+$quarterly_cycle_start_sql = $conn->real_escape_string((string)($available_quarterly_cycle['period_start'] ?? '0000-00-00'));
+$quarterly_cycle_end_sql = $conn->real_escape_string((string)($available_quarterly_cycle['period_end'] ?? '0000-00-00'));
 
 if (!$employee) {
     redirectWith(BASE_URL . '/employee/dashboard.php', 'danger', 'No employee record found for self-rating.');
@@ -206,6 +215,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($posted_template_type === 'Annual' && ($editing_id === 0 || in_array($existing_annual_status,['Draft','Pending Self-Rating'],true))) {
             $period_start = $available_annual_cycle['period_start'];
             $period_end = $available_annual_cycle['period_end'];
+        }
+    }
+    if ($template_id > 0 && $available_quarterly_cycle) {
+        $posted_template_type = quarterlyQuery($conn,'SELECT evaluation_type FROM evaluation_templates WHERE template_id=?',[$template_id])[0]['evaluation_type'] ?? '';
+        if ($posted_template_type === 'Quarterly') {
+            $period_start = $available_quarterly_cycle['period_start'];
+            $period_end = $available_quarterly_cycle['period_end'];
         }
     }
     $is_valid_existing_edit = false;
@@ -355,7 +371,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             FROM evaluations 
             WHERE employee_id = ? 
               AND template_id = ? 
-              AND (evaluation_type <> 'Annual' OR (evaluation_period_start = ? AND evaluation_period_end = ?))
+              AND (evaluation_type NOT IN ('Annual','Quarterly') OR (evaluation_period_start = ? AND evaluation_period_end = ?))
               AND status NOT IN ('Draft', 'Returned', 'Rejected', 'Pending Self-Rating')
               AND deleted_at IS NULL 
             LIMIT 1
@@ -393,6 +409,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($evaluation_type === 'Annual' && $ap_annual_waiting) {
         $errors[] = 'The department cycle owner has not started an available Annual cycle. Please wait before opening this self-rating form.';
     }
+    if ($evaluation_type === 'Quarterly' && !$available_quarterly_cycle) {
+        $errors[] = 'The department cycle owner has not started an available Quarterly cycle. Please wait before opening this self-rating form.';
+    }
     if (($employee['employment_status'] ?? '') === 'Probationary'
         && in_array($evaluation_type, ['Initial', 'Final'], true)
         && $evaluation_type !== $probationary_phase_type
@@ -425,21 +444,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $period_start = date('Y') . '-01-01';
                 $period_end = date('Y') . '-12-31';
             } elseif ($evaluation_type === 'Quarterly') {
-                $current_month = (int)date('n');
-                $current_year = date('Y');
-                if ($current_month <= 3) {
-                    $period_start = $current_year . '-01-01';
-                    $period_end = $current_year . '-03-31';
-                } elseif ($current_month <= 6) {
-                    $period_start = $current_year . '-04-01';
-                    $period_end = $current_year . '-06-30';
-                } elseif ($current_month <= 9) {
-                    $period_start = $current_year . '-07-01';
-                    $period_end = $current_year . '-09-30';
-                } else {
-                    $period_start = $current_year . '-10-01';
-                    $period_end = $current_year . '-12-31';
-                }
+                $period_start = $available_quarterly_cycle['period_start'] ?? null;
+                $period_end = $available_quarterly_cycle['period_end'] ?? null;
             } elseif ($evaluation_type === 'Initial') {
                 $period_start = $hire_date;
                 $period_end = date('Y-m-d', strtotime('+3 months', strtotime($hire_date)));
@@ -499,7 +505,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $kra_weight_pct = (float) ($template['kra_weight'] ?? 80);
     $beh_weight_pct = (float) ($template['behavior_weight'] ?? 20);
-    if (in_array($evaluation_type, ['Initial', 'Final', 'Annual'], true)) {
+    if (in_array($evaluation_type, ['Initial', 'Final', 'Annual', 'Quarterly'], true)) {
         $kra_weight_pct = 80;
         $beh_weight_pct = 20;
     }
@@ -548,12 +554,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $employee_signed_at = !empty($employee_signature_data) ? date('Y-m-d H:i:s') : null;
 
     $annual_save = $evaluation_type === 'Annual';
+    $quarterly_save = $evaluation_type === 'Quarterly';
     if ($annual_save) {
         ensureAnnualEvaluationSchema($conn);
         ensureAuditTrailSchema($conn);
     }
+    if ($quarterly_save) {
+        ensureQuarterlyEvaluationSchema($conn);
+        ensureAuditTrailSchema($conn);
+    }
     try {
-        if ($annual_save) $conn->begin_transaction();
+        if ($annual_save || $quarterly_save) $conn->begin_transaction();
 
         if ($editing_id > 0) {
             $stmt = $conn->prepare("
@@ -614,11 +625,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $conn->commit();
             if ($action === 'submit') redirectWith(BASE_URL . '/employee/annual-evaluations.php', 'success', 'Annual self-rating submitted. Complete department 360 ratings through your authorized portal.');
         }
+        if ($quarterly_save) {
+            if ($action === 'submit') {
+                quarterlyRegisterSubmission($conn, $eval_id);
+                logAudit($conn, $user_id, 'CREATE', 'Quarterly Evaluation', $eval_id, 'Quarterly self-rating submitted to department 360 workflow.');
+            }
+            $conn->commit();
+            if ($action === 'submit') redirectWith(BASE_URL . '/employee/quarterly-evaluations.php', 'success', 'Quarterly self-rating submitted. Complete department 360 ratings through your authorized portal.');
+        }
     } catch (Throwable $e) {
-        if (!$annual_save) throw $e;
+        if (!$annual_save && !$quarterly_save) throw $e;
         $conn->rollback();
-        error_log('Annual self-rating submission: ' . $e->getMessage());
-        $message = $e instanceof DomainException ? $e->getMessage() : 'Your Annual evaluation could not be saved. Please try again.';
+        error_log($evaluation_type.' self-rating submission: ' . $e->getMessage());
+        $message = $e instanceof DomainException ? $e->getMessage() : 'Your evaluation could not be saved. Please try again.';
         redirectWith(BASE_URL . '/employee/self-rating.php?template=' . $template_id . ($editing_id ? '&edit=' . $editing_id : ''), 'danger', $message);
     }
 
@@ -691,6 +710,7 @@ $templates_stmt = $conn->prepare("
             AND $legacy_probationary_rank_et))
       AND et.evaluation_type IN ($in_clause)
       AND (et.evaluation_type <> 'Annual' OR ? = 0)
+      AND (et.evaluation_type <> 'Quarterly' OR $quarterly_waiting_flag = 0)
       $probationary_phase_filter_et
       AND (et.evaluation_type <> 'Final' OR $initial_gate = 1)
       AND NOT EXISTS (
@@ -699,6 +719,7 @@ $templates_stmt = $conn->prepare("
           WHERE ev.employee_id = ?
             AND ev.template_id = et.template_id
             AND (et.evaluation_type <> 'Annual' OR YEAR(ev.evaluation_period_start) = YEAR(CURDATE()))
+            AND (et.evaluation_type <> 'Quarterly' OR (ev.evaluation_period_start = '$quarterly_cycle_start_sql' AND ev.evaluation_period_end = '$quarterly_cycle_end_sql'))
             AND ev.deleted_at IS NULL
             AND ev.status NOT IN ('Draft', 'Returned', 'Rejected', 'Pending Self-Rating')
             AND NOT ($initial_required_flag = 1 AND ev.status = 'Approved' AND ev.evaluation_type IN ('Initial', 'Final'))
@@ -735,6 +756,7 @@ if ($selected_template_id > 0) {
                       AND $legacy_probationary_rank_full))
               AND evaluation_type IN ($in_clause)
               AND (evaluation_type <> 'Annual' OR ? = 0)
+              AND (evaluation_type <> 'Quarterly' OR $quarterly_waiting_flag = 0)
               $probationary_phase_filter_full
               AND (evaluation_type <> 'Final' OR $initial_gate = 1)
             LIMIT 1
@@ -778,6 +800,7 @@ if ($selected_template_id > 0) {
               AND template_id = ? 
               AND status NOT IN ('Draft', 'Returned', 'Rejected', 'Pending Self-Rating')
               AND (evaluation_type <> 'Annual' OR YEAR(evaluation_period_start) = YEAR(CURDATE()))
+              AND (evaluation_type <> 'Quarterly' OR (evaluation_period_start = '$quarterly_cycle_start_sql' AND evaluation_period_end = '$quarterly_cycle_end_sql'))
               AND NOT ($initial_required_flag = 1 AND status = 'Approved' AND evaluation_type IN ('Initial', 'Final'))
               AND deleted_at IS NULL 
             LIMIT 1
@@ -2236,6 +2259,9 @@ require_once '../includes/header.php';
                         <?php if ($ap_annual_waiting && !$edit_eval): ?>
                             <div class="alert alert-info mb-3" role="status"><i class="fas fa-clock me-2" aria-hidden="true"></i>The Annual self-rating form will appear here after the department cycle owner starts the evaluation cycle.</div>
                         <?php endif; ?>
+                        <?php if ($quarterly_waiting_flag && !$edit_eval && ($employee['employment_status'] ?? '') === 'Regular'): ?>
+                            <div class="alert alert-info mb-3" role="status"><i class="fas fa-clock me-2" aria-hidden="true"></i>The Quarterly self-rating form will appear here after the department cycle owner starts a Quarterly cycle.</div>
+                        <?php endif; ?>
                         <div class="row g-3 mb-4">
                             <div class="col-12">
                                 <label class="form-label fw-bold text-primary" style="font-size: 0.95rem;">
@@ -2352,6 +2378,11 @@ require_once '../includes/header.php';
                             $display_start = $available_annual_cycle['period_start'];
                             $display_end = $available_annual_cycle['period_end'];
                         }
+                        if ($eval_type === 'Quarterly' && $available_quarterly_cycle
+                            && (!$edit_eval || in_array($edit_eval['status'] ?? '', ['Draft','Pending Self-Rating'], true))) {
+                            $display_start = $available_quarterly_cycle['period_start'];
+                            $display_end = $available_quarterly_cycle['period_end'];
+                        }
                         
                         if (empty($display_start) || empty($display_end)) {
                             $hire_date = $employee['hire_date'] ?? date('Y-m-d');
@@ -2360,21 +2391,8 @@ require_once '../includes/header.php';
                                 $display_start = $available_annual_cycle['period_start'] ?? date('Y') . '-01-01';
                                 $display_end = $available_annual_cycle['period_end'] ?? date('Y') . '-12-31';
                             } elseif ($eval_type === 'Quarterly') {
-                                $current_month = (int)date('n');
-                                $current_year = date('Y');
-                                if ($current_month <= 3) {
-                                    $display_start = $current_year . '-01-01';
-                                    $display_end = $current_year . '-03-31';
-                                } elseif ($current_month <= 6) {
-                                    $display_start = $current_year . '-04-01';
-                                    $display_end = $current_year . '-06-30';
-                                } elseif ($current_month <= 9) {
-                                    $display_start = $current_year . '-07-01';
-                                    $display_end = $current_year . '-09-30';
-                                } else {
-                                    $display_start = $current_year . '-10-01';
-                                    $display_end = $current_year . '-12-31';
-                                }
+                                $display_start = $available_quarterly_cycle['period_start'] ?? '';
+                                $display_end = $available_quarterly_cycle['period_end'] ?? '';
                             } elseif ($eval_type === 'Initial') {
                                 $display_start = $hire_date;
                                 $display_end = date('Y-m-d', strtotime('+3 months', strtotime($hire_date)));
@@ -2397,6 +2415,12 @@ require_once '../includes/header.php';
                             <?php else: ?>
                                 Your department cycle owner has not started an available Annual cycle. You can prepare a draft, but submission is unavailable until the cycle starts.
                             <?php endif; ?>
+                        </div>
+                        <?php endif; ?>
+                        <?php if (($eval_type ?? '') === 'Quarterly' && $available_quarterly_cycle): ?>
+                        <div class="alert alert-info mt-3 mb-3" role="status">
+                            <strong>Quarterly cycle:</strong> <?php echo e(formatDate($display_start)); ?> to <?php echo e(formatDate($display_end)); ?>.
+                            Self-rating deadline: <?php echo e(formatDate($available_quarterly_cycle['self_rating_deadline'])); ?>.
                         </div>
                         <?php endif; ?>
 

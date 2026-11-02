@@ -6,6 +6,7 @@
  */
 
 require_once __DIR__ . '/functions.php';
+require_once __DIR__ . '/quarterly-evaluations.php';
 if (!ensureHierarchicalEvaluationSchema($conn)) {
     http_response_code(500);
     exit('Evaluation template schema is unavailable.');
@@ -100,6 +101,7 @@ switch ($effective_role) {
         $_mgr_pkg_pending = countPendingOrganizationPackagesForUser($conn, (int)($_SESSION['user_id'] ?? 0));
         $_annual_manager_actor=annualActor($conn,(int)($_SESSION['user_id'] ?? 0));
         if ($_annual_manager_actor) $_mgr_pkg_pending+=annualPendingReviewCount($conn,$_annual_manager_actor);
+        if ($_annual_manager_actor) $_mgr_pkg_pending+=quarterlyPendingCount($conn,$_annual_manager_actor);
         $_mgr_approvals_pending = countManagerPendingApprovals($conn);
 
         $sidebar_menus = [
@@ -149,6 +151,7 @@ switch ($effective_role) {
         $_sup_pkg_pending = countPendingOrganizationPackagesForUser($conn, (int)($_SESSION['user_id'] ?? 0));
         $_annual_supervisor_actor=annualActor($conn,(int)($_SESSION['user_id'] ?? 0));
         if ($_annual_supervisor_actor) $_sup_pkg_pending+=annualPendingReviewCount($conn,$_annual_supervisor_actor);
+        if ($_annual_supervisor_actor) $_sup_pkg_pending+=quarterlyPendingCount($conn,$_annual_supervisor_actor);
 
         $sidebar_menus = [
             'MAIN' => [
@@ -258,6 +261,11 @@ switch ($effective_role) {
                 ensureAnnualEvaluationSchema($conn);
                 $_hdr_ap_annual_waiting = !annualCycleForSelfRating($conn,$_hdr_emp_department_id,$_hdr_emp_id);
             }
+            $_hdr_quarterly_cycle = $_hdr_emp_status === 'Regular'
+                ? quarterlyCycleForSelfRating($conn,$_hdr_emp_department_id,$_hdr_emp_id) : null;
+            $_hdr_quarterly_waiting = $_hdr_quarterly_cycle ? 0 : 1;
+            $_hdr_quarterly_start = $conn->real_escape_string((string)($_hdr_quarterly_cycle['period_start'] ?? '0000-00-00'));
+            $_hdr_quarterly_end = $conn->real_escape_string((string)($_hdr_quarterly_cycle['period_end'] ?? '0000-00-00'));
 
             $_hdr_allowed_eval_types = getAllowedEvaluationTypesForEmploymentStatus($_hdr_emp_status);
             $_hdr_in_clause = "'" . implode("','", $_hdr_allowed_eval_types) . "'";
@@ -278,6 +286,7 @@ switch ($effective_role) {
                         AND $_hdr_legacy_rank_sql))
                   AND et.evaluation_type IN ($_hdr_in_clause)
                   AND (et.evaluation_type <> 'Annual' OR ? = 0)
+                  AND (et.evaluation_type <> 'Quarterly' OR $_hdr_quarterly_waiting = 0)
                   AND (et.evaluation_type <> 'Final' OR $_hdr_final_gate = 1)
                   AND NOT EXISTS (
                       SELECT 1
@@ -285,6 +294,7 @@ switch ($effective_role) {
                       WHERE ev.employee_id = ?
                         AND ev.template_id = et.template_id
                         AND (et.evaluation_type <> 'Annual' OR YEAR(ev.evaluation_period_start) = YEAR(CURDATE()))
+                        AND (et.evaluation_type <> 'Quarterly' OR (ev.evaluation_period_start = '$_hdr_quarterly_start' AND ev.evaluation_period_end = '$_hdr_quarterly_end'))
                         AND ev.deleted_at IS NULL
                         AND ev.status NOT IN ('Draft', 'Returned', 'Rejected', 'Pending Self-Rating')
                   )
@@ -484,6 +494,14 @@ if ($annual_nav_actor && $annual_nav_actor['employment_status'] === 'Regular'
     $sidebar_menus[$annual_nav_section][] = ['icon'=>'fas fa-users-cog', 'label'=>'Annual & 360 Ratings',
         'url'=>annualUrl($annual_nav_actor), 'page'=>'annual-evaluations.php',
         'badge'=>$annual_nav_count ?: null, 'badge_class'=>'bg-warning text-dark'];
+}
+if ($annual_nav_actor && $annual_nav_actor['employment_status'] === 'Regular'
+    && in_array($annual_nav_actor['role'], ['Employee','President and CEO','HR Staff'], true)) {
+    $quarterly_nav_section = $annual_nav_actor['role'] === 'HR Staff' ? 'EVALUATIONS & MONITORING' : 'EVALUATIONS';
+    $quarterly_nav_count = quarterlyPendingCount($conn, $annual_nav_actor);
+    $sidebar_menus[$quarterly_nav_section][] = ['icon'=>'fas fa-calendar-alt', 'label'=>'Quarterly & 360 Ratings',
+        'url'=>quarterlyUrl($annual_nav_actor), 'page'=>'quarterly-evaluations.php',
+        'badge'=>$quarterly_nav_count ?: null, 'badge_class'=>'bg-warning text-dark'];
 }
 ?>
 <!DOCTYPE html>

@@ -52,14 +52,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Behavior criteria
     $beh_names = $_POST['behavior_name'] ?? [];
     $beh_kpis = $_POST['behavior_kpi'] ?? [];
-    if ($evaluation_type === 'Annual') {
+    if (in_array($evaluation_type, ['Annual','Quarterly'], true)) {
         if ((annualActor($conn, (int)$_SESSION['user_id'])['employment_status'] ?? '') !== 'Regular') {
-            redirectWith($template_list_url, 'danger', 'Only an active regular head may create Annual templates for direct reports.');
+            redirectWith($template_list_url, 'danger', 'Only an active regular head may create '.$evaluation_type.' templates for direct reports.');
         }
         try { annualValidateTemplateKras($kra_names, $kra_weights); }
         catch (DomainException $e) { redirectWith($template_create_url, 'danger', $e->getMessage()); }
         $kra_weight = 80; $behavior_weight = 20;
-        $behavior_framework_code = 'ANNUAL-CORE'; $behavior_framework_version = '1';
+        $behavior_framework_code = strtoupper($evaluation_type).'-CORE'; $behavior_framework_version = '1';
         $beh_names = array_column(annualCoreValues(), 'name');
         $beh_kpis = array_column(annualCoreValues(), 'kpi');
     }

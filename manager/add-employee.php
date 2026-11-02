@@ -77,6 +77,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['import_csv'])) {
     $updated = 0;
     $skipped = 0;
     $errors = [];
+    $seen_company_ids = [];
 
     $parseCsvDate = static function ($value) {
         $value = trim((string) $value);
@@ -214,25 +215,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['import_csv'])) {
             continue;
         }
 
+        if ($employee_code !== '') {
+            $code_key = strtolower($employee_code);
+            if (isset($seen_company_ids[$code_key])) {
+                $skipped++;
+                $errors[] = "Row ($first_name $last_name): Company ID $employee_code is repeated in this CSV. Review the rows before importing.";
+                continue;
+            }
+            $seen_company_ids[$code_key] = true;
+        }
+
         $existing_id = null;
         $existing_dept_id = null;
         if (!empty($employee_code)) {
-            $dc = $conn->prepare("SELECT employee_id, department_id FROM employees WHERE employee_code = ?");
+            $dc = $conn->prepare("SELECT employee_id, department_id, first_name, last_name, date_of_birth FROM employees WHERE employee_code = ?");
             $dc->bind_param("s", $employee_code);
             $dc->execute();
             $dr = $dc->get_result();
             if ($d = $dr->fetch_assoc()) {
+                if (strcasecmp(trim($d['first_name']), $first_name) !== 0 || strcasecmp(trim($d['last_name']), $last_name) !== 0
+                    || ($dob && !empty($d['date_of_birth']) && $dob !== $d['date_of_birth'])) {
+                    $skipped++;
+                    $errors[] = "Row ($first_name $last_name): Company ID $employee_code belongs to another employee. Check the ID and identity; no record was changed.";
+                    $dc->close();
+                    continue;
+                }
                 $existing_id = $d['employee_id'];
                 $existing_dept_id = $d['department_id'];
             }
             $dc->close();
         }
         if (!$existing_id) {
-            $dc = $conn->prepare("SELECT employee_id, department_id FROM employees WHERE first_name = ? AND last_name = ?");
+            $dc = $conn->prepare("SELECT employee_id, department_id, employee_code FROM employees WHERE first_name = ? AND last_name = ?");
             $dc->bind_param("ss", $first_name, $last_name);
             $dc->execute();
             $dr = $dc->get_result();
             if ($d = $dr->fetch_assoc()) {
+                if ($employee_code !== '' && !empty($d['employee_code']) && strcasecmp($d['employee_code'], $employee_code) !== 0) {
+                    $skipped++;
+                    $errors[] = "Row ($first_name $last_name): This name already has a different Company ID. Review the employee before changing their ID.";
+                    $dc->close();
+                    continue;
+                }
                 $existing_id = $d['employee_id'];
                 $existing_dept_id = $d['department_id'];
             }
@@ -662,11 +686,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['import_csv'])) {
             $admin_det   = $getV('Admin Offense Details', 82) ?: '';
             $has_crim    = (strtolower($getV('Criminal Charge (Yes/No)', 83)) === 'yes') ? 1 : 0;
             $crim_det    = $getV('Criminal Charge Details', 84) ?: '';
+            $has_conviction = (strtolower($getV('Criminal Conviction (Yes/No)')) === 'yes') ? 1 : 0;
+            $conviction_det = $getV('Criminal Conviction Details');
+            $has_separation = (strtolower($getV('Previously Separated (Yes/No)')) === 'yes') ? 1 : 0;
+            $separation_det = $getV('Separation Details');
             $is_pwd_csv  = (strtolower($getV('PWD Status (Yes/No)', 85)) === 'yes') ? 1 : 0;
+            $pwd_det = $getV('PWD Details');
             $is_solo_csv = (strtolower($getV('Solo Parent Status (Yes/No)', 86)) === 'yes') ? 1 : 0;
+            $solo_det = $getV('Solo Parent Details');
+            $recent_hospital = (strtolower($getV('Recent Hospitalization (Yes/No)')) === 'yes') ? 1 : 0;
+            $hospital_det = $getV('Hospital Details');
+            $current_treatment = (strtolower($getV('Current Treatment (Yes/No)')) === 'yes') ? 1 : 0;
+            $treatment_det = $getV('Treatment Details');
             $conn->query("DELETE FROM employee_disclosures WHERE employee_id = $eid");
-            $stmt = $conn->prepare("INSERT INTO employee_disclosures (employee_id, is_related_to_company, related_details, has_admin_offense, admin_offense_details, has_criminal_charge, criminal_charge_details, is_pwd, is_solo_parent) VALUES (?,?,?,?,?,?,?,?,?)");
-            $stmt->bind_param("iisisisii", $eid, $is_related, $related_det, $has_admin, $admin_det, $has_crim, $crim_det, $is_pwd_csv, $is_solo_csv);
+            $stmt = $conn->prepare("INSERT INTO employee_disclosures (employee_id, is_related_to_company, related_details, has_admin_offense, admin_offense_details, has_criminal_charge, criminal_charge_details, has_criminal_conviction, criminal_conviction_details, has_been_separated, separation_details, is_pwd, pwd_details, is_solo_parent, solo_parent_details, has_recent_hospital, hospital_details, has_current_treatment, treatment_details) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+            $stmt->bind_param("iisisisisisisisisis", $eid, $is_related, $related_det, $has_admin, $admin_det, $has_crim, $crim_det, $has_conviction, $conviction_det, $has_separation, $separation_det, $is_pwd_csv, $pwd_det, $is_solo_csv, $solo_det, $recent_hospital, $hospital_det, $current_treatment, $treatment_det);
             $stmt->execute(); $stmt->close();
 
             // Real Properties
@@ -774,7 +808,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['import_csv'])) {
     if ($created > 0 || $updated > 0) {
         $msg = "Success! Created: $created, Updated: $updated.";
         if ($skipped > 0)
-            $msg .= " Skipped $skipped rows.";
+            $msg .= " Skipped $skipped rows that need review; correct them in the CSV and preview again.";
         redirectWith($employee_portal_base . '/employees.php', 'success', $msg);
     } else {
         $err = "No records were imported. ($skipped rows skipped) Latest error: " . end($errors);
@@ -1526,7 +1560,7 @@ $stepLabels = [
                     <div class="alert alert-info d-flex align-items-center py-2 px-3 small mb-0 rounded-3">
                         <i class="fas fa-info-circle me-2 fs-5 flex-shrink-0"></i>
                         <div>
-                            Use Company ID codes such as HRD-001 or AP-001. Login accounts are created separately by Admin. Blank education fields preserve existing qualifications; other profile sections may be replaced on reimport. Need the official template?
+                            Enter each employee's unique Company ID in your organization's format. HRD-001 and AP-001 are examples only; they are not required formats. Login accounts are created separately by Admin. Blank education fields preserve existing qualifications; other profile sections may be replaced on reimport. Need the official template?
                             <a href="<?php echo BASE_URL; ?>/manager/download-sample.php" class="alert-link fw-semibold">Download CSV Template</a> with sample records and column guidelines.
                         </div>
                     </div>
