@@ -35,7 +35,9 @@ Local test password: `password`. The app may require a password change on first 
 
 ## Create the forms
 
-Use the portal's **Evaluation Templates** screen. Create separate Active forms for each type. Use the system's eight Core Behaviors & Values, 11 job-relevant KRA items totaling 100%, and the 80% KRA / 20% behavior split.
+For an automatic dry run, import the [template seed](../templates/README.md) after this department's employee SQL. It creates the forms listed below with 12 KRAs and the eight default behaviors. Skip manual form creation when using that seed.
+
+Use the portal's **Evaluation Templates** screen. Create separate Active forms for each type. Use the system's eight Core Behaviors & Values, at least 12 job-relevant KRA items totaling 100%, and the 80% KRA / 20% behavior split.
 
 | Sign in as | Form target | Types |
 | --- | --- | --- |

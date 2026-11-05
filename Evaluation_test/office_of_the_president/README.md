@@ -36,7 +36,9 @@ The verification report should show **eight people, eight accounts, sixteen addr
 
 ## Create the forms
 
-Sign in as Isabella. In **Evaluation Templates**, create separate Active forms for Executive Assistant I, II, and III, targeting **Office of the President**. For each position, create Quarterly and Annual forms. Also create Initial and Final forms for Executive Assistant I. Use 11 job-relevant KRAs totaling 100%, the eight Core Behaviors & Values, and the 80% KRA / 20% behavior split.
+For an automatic dry run, import the [template seed](../templates/README.md) after this department's employee SQL. It creates the forms listed below with 12 KRAs and the eight default behaviors. Skip manual form creation when using that seed.
+
+Sign in as Isabella. In **Evaluation Templates**, create separate Active forms for Executive Assistant I, II, and III, targeting **Office of the President**. For each position, create Quarterly and Annual forms. Also create Initial and Final forms for Executive Assistant I. Use at least 12 job-relevant KRAs totaling 100%, the eight Core Behaviors & Values, and the 80% KRA / 20% behavior split.
 
 Mara and Rhea share the Executive Assistant I Quarterly/Annual form. Rico and Faye share the Executive Assistant II form. Ella and Leo use the Executive Assistant I Initial/Final forms.
 

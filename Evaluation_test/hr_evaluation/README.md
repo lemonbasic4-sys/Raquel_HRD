@@ -45,7 +45,9 @@ If a count is lower, check the import command for an error before continuing.
 
 ## Create the forms in the portal
 
-Create **separate** forms for each evaluation type. Set them to **Active**. Use 11 KRA items whose weights total 100%, the eight system Core Behaviors & Values, and the system's 80% KRA / 20% behavior split.
+For an automatic dry run, import the [template seed](../templates/README.md) after this department's employee SQL. It creates the forms listed below with 12 KRAs and the eight default behaviors. Skip manual form creation when using that seed.
+
+Create **separate** forms for each evaluation type. Set them to **Active**. Use at least 12 KRA items whose weights total 100%, the eight system Core Behaviors & Values, and the system's 80% KRA / 20% behavior split.
 
 | Sign in as | Create forms for | Evaluation types |
 | --- | --- | --- |

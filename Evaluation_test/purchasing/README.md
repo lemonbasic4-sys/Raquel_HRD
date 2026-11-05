@@ -35,7 +35,9 @@ The verification report should show **seven people, seven accounts, fourteen add
 
 ## Create the forms
 
-Create separate Active forms for each type below. Target **Purchasing**. Use 11 job-relevant KRAs totaling 100%, the eight Core Behaviors & Values, and the 80% KRA / 20% behavior split.
+For an automatic dry run, import the [template seed](../templates/README.md) after this department's employee SQL. It creates the forms listed below with 12 KRAs and the eight default behaviors. Skip manual form creation when using that seed.
+
+Create separate Active forms for each type below. Target **Purchasing**. Use at least 12 job-relevant KRAs totaling 100%, the eight Core Behaviors & Values, and the 80% KRA / 20% behavior split.
 
 | Sign in as | Form target | Types |
 | --- | --- | --- |
