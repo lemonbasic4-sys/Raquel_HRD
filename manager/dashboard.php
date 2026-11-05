@@ -633,12 +633,27 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
         .hr-manager-dashboard .wl-row { flex-wrap: wrap; }
     }
     @media (max-width: 767.98px) {
-        .hr-manager-dashboard .page-hero { border-radius: 12px; padding: 20px 16px 16px; }
+        .hr-manager-dashboard { overflow-x: clip; }
+        .hr-manager-dashboard > .row { --bs-gutter-x: 1rem; --bs-gutter-y: 1rem; margin-bottom: 1rem !important; }
+        .hr-manager-dashboard .page-hero { border-radius: 14px; padding: 18px 14px 14px !important; margin-bottom: 1rem; }
         .hr-manager-dashboard .page-hero > .d-flex { align-items: flex-start !important; margin-bottom: 14px !important; }
-        .hr-manager-dashboard .page-hero .stat-card { height: 100%; min-height: 82px; padding: 12px; }
-        .hr-manager-dashboard .page-hero .stat-value { font-size: clamp(1.15rem, 5vw, 1.6rem); }
-        .hr-manager-dashboard .page-hero .stat-label { font-size: .66rem; line-height: 1.3; }
-        .hr-manager-dashboard .page-hero .stat-icon { font-size: 1.2rem; }
+        .hr-manager-dashboard .page-hero > .d-flex > div:last-child { font-size: .72rem !important; }
+        .hr-manager-dashboard .dashboard-stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+        .hr-manager-dashboard .dashboard-stats-grid > div { flex: initial !important; max-width: none !important; width: auto !important; }
+        .hr-manager-dashboard .page-hero .stat-card { height: 100%; min-height: 78px; padding: 10px 11px !important; }
+        .hr-manager-dashboard .page-hero .stat-value { font-size: clamp(1rem, 4.5vw, 1.35rem) !important; line-height: 1.15; white-space: nowrap; }
+        .hr-manager-dashboard .page-hero .stat-label { font-size: .62rem !important; line-height: 1.25; letter-spacing: .25px; white-space: normal !important; overflow-wrap: anywhere; }
+        .hr-manager-dashboard .page-hero .stat-icon { flex: 0 0 18px; font-size: 1rem; width: 18px; height: 20px; margin-left: 2px; color: rgba(255, 255, 255, .9) !important; opacity: 1; }
+        .hr-manager-dashboard .hub-card-body { padding: 16px !important; }
+        .hr-manager-dashboard .hub-card-body h5 { font-size: 1rem; line-height: 1.3; }
+        .hr-manager-dashboard .hub-quick-links { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+        .hr-manager-dashboard .hub-quick-links > [class*="col-"] { flex: initial !important; max-width: none !important; }
+        .hr-manager-dashboard .hub-link-card { display: flex; flex-direction: column; justify-content: center; min-height: 104px; padding: 10px 7px !important; }
+        .hr-manager-dashboard .hub-link-card i { font-size: 1.25rem; }
+        .hr-manager-dashboard .hub-link-title { font-size: .72rem; line-height: 1.25; overflow-wrap: anywhere; }
+        .hr-manager-dashboard .hub-link-subtitle { font-size: .62rem !important; line-height: 1.25; }
+        body.hr-mobile-active .hr-manager-dashboard .chart-card { background: #fff !important; border: 1px solid #eef2e8 !important; border-radius: 14px; box-shadow: 0 2px 12px rgba(41, 67, 6, .07) !important; margin-bottom: 0 !important; overflow: hidden !important; }
+        body.hr-mobile-active .hr-manager-dashboard .chart-card.allow-overflow { overflow: visible !important; }
         .hr-manager-dashboard .card-body { padding: 16px !important; }
         .hr-manager-dashboard .approval-queue-heading { padding: 12px 14px !important; }
         .hr-manager-dashboard #approvalQueueSection .approval-list { padding: 10px; }
@@ -646,14 +661,29 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
         .hr-manager-dashboard .approval-group-header { gap: 10px; padding: 12px; }
         .hr-manager-dashboard .approval-item .emp-info { align-items: flex-start; }
         .hr-manager-dashboard .approval-item .btn-review,
-        .hr-manager-dashboard .approval-group-header .btn-review { align-self: flex-start; width: auto; }
+        .hr-manager-dashboard .approval-group-header .btn-review,
+        .hr-manager-dashboard .approval-group-entry .btn-review { align-self: stretch; width: 100%; min-height: 38px; }
+        .hr-manager-dashboard .approval-group-entries { padding: 0 10px 10px; }
         .hr-manager-dashboard .chart-card .cc-header { align-items: flex-start !important; gap: 8px; padding: 14px; }
         .hr-manager-dashboard .chart-card .cc-header h5 { font-size: .95rem; line-height: 1.35; }
+        .hr-manager-dashboard .chart-card .cc-header > .badge,
+        .hr-manager-dashboard .chart-card .cc-header > .btn,
+        .hr-manager-dashboard .chart-card .cc-header > select { max-width: 100%; }
+        .hr-manager-dashboard .chart-card .cc-body:not(.p-0) { padding: 14px; }
         .hr-manager-dashboard #topPerformerBranchFilter { max-width: 100%; width: 100% !important; }
+        .hr-manager-dashboard .dashboard-quick-search .d-flex > .form-select { flex: 1 1 0; width: 0; }
+        .hr-manager-dashboard .dashboard-quick-search .d-flex > .btn { flex: 0 0 42px; }
         .hr-manager-dashboard .chart-container,
         .hr-manager-dashboard .dashboard-chart-wrap { height: 230px !important; }
         .hr-manager-dashboard #topPerformerContainer { height: 290px !important; }
-        .hr-manager-dashboard .insight-card { min-height: 280px; padding: 20px 16px; }
+        .hr-manager-dashboard .insight-card { min-height: 0; height: auto; padding: 18px 14px; }
+        .hr-manager-dashboard .insight-card .branch-identity { margin-bottom: 16px; }
+        .hr-manager-dashboard .insight-card .branch-identity h4 { font-size: 1.15rem; overflow-wrap: anywhere; }
+        .hr-manager-dashboard .insight-card .stats-grid { gap: 8px; }
+        .hr-manager-dashboard .insight-card .stat-box { min-width: 0; padding: 11px; }
+        .hr-manager-dashboard .insight-card .stat-box small { font-size: .62rem; line-height: 1.25; }
+        .hr-manager-dashboard .insight-card .distribution-bar { margin-top: 16px; }
+        .hr-manager-dashboard .insight-card .btn-explore { margin-top: 16px; min-height: 42px; }
         .hr-manager-dashboard .watchlist-header { padding: 14px 16px; }
         .hr-manager-dashboard .watchlist-header-left { flex: 1 1 100%; }
         .hr-manager-dashboard .watchlist-view-btn { margin-left: auto; }
@@ -663,15 +693,16 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
         .hr-manager-dashboard .list-group-item { min-width: 0; }
     }
     @media (max-width: 420px) {
-        .hr-manager-dashboard .page-hero { padding-left: 12px; padding-right: 12px; }
-        .hr-manager-dashboard .page-hero .row { --bs-gutter-x: .6rem; --bs-gutter-y: .6rem; }
+        .hr-manager-dashboard .page-hero { padding-left: 12px !important; padding-right: 12px !important; }
         .hr-manager-dashboard .hub-card-body { padding: 14px !important; }
-        .hr-manager-dashboard .hub-link-card { min-height: 112px; padding: 10px 7px !important; }
-        .hr-manager-dashboard .hub-link-card i { font-size: 1.35rem; }
-        .hr-manager-dashboard .hub-link-card .hub-link-title { font-size: .7rem; line-height: 1.25; }
-        .hr-manager-dashboard .hub-link-card .hub-link-subtitle { font-size: .61rem !important; line-height: 1.25; }
         .hr-manager-dashboard .approval-item .avatar-circle { height: 36px; width: 36px; }
+        .hr-manager-dashboard .list-group-item { flex-wrap: wrap; }
+        .hr-manager-dashboard .list-group-item > .text-end { margin-left: auto; }
         .hr-manager-dashboard .watchlist-body { padding: 10px; }
+    }
+    @media (max-width: 350px) {
+        .hr-manager-dashboard .dashboard-stats-grid { grid-template-columns: minmax(0, 1fr); }
+        .hr-manager-dashboard .insight-card .stats-grid { grid-template-columns: minmax(0, 1fr); }
     }
 </style>
 
