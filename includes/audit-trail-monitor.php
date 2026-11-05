@@ -23,7 +23,6 @@ $filters = [
     'action' => trim((string) ($filter_request['action'] ?? '')),
     'status' => trim((string) ($filter_request['status'] ?? '')),
     'actor' => max(0, (int) ($filter_request['actor'] ?? 0)),
-    'employee' => trim((string) ($filter_request['employee'] ?? '')),
     'branch' => max(0, (int) ($filter_request['branch'] ?? 0)),
     'department' => max(0, (int) ($filter_request['department'] ?? 0)),
     'date_from' => trim((string) ($filter_request['date_from'] ?? '')),
@@ -86,7 +85,6 @@ foreach (['module' => 'al.module_name', 'action' => 'al.action_type', 'status' =
 if ($filters['actor']) { $conditions[] = 'al.user_id = ?'; $params[] = $filters['actor']; $types .= 'i'; }
 if ($filters['branch']) { $conditions[] = 'al.branch_id = ?'; $params[] = $filters['branch']; $types .= 'i'; }
 if ($filters['department']) { $conditions[] = 'al.department_id = ?'; $params[] = $filters['department']; $types .= 'i'; }
-if ($filters['employee'] !== '') { $conditions[] = "CONCAT(COALESCE(e.first_name,''), ' ', COALESCE(e.last_name,''), ' ', COALESCE(e.employee_code,'')) LIKE ?"; $params[] = '%' . $filters['employee'] . '%'; $types .= 's'; }
 if ($filters['date_from'] !== '') { $conditions[] = 'DATE(al.timestamp) >= ?'; $params[] = $filters['date_from']; $types .= 's'; }
 if ($filters['date_to'] !== '') { $conditions[] = 'DATE(al.timestamp) <= ?'; $params[] = $filters['date_to']; $types .= 's'; }
 if ($filters['search'] !== '') { $conditions[] = "CONCAT_WS(' ', al.log_id, al.entity_id, al.action_type, al.entity_type, al.module_name, al.details, al.ip_address, al.user_agent, u.full_name, e.first_name, e.last_name, e.employee_code) LIKE ?"; $params[] = '%' . $filters['search'] . '%'; $types .= 's'; }
@@ -180,52 +178,9 @@ $departments = $conn->query('SELECT department_id, department_name FROM departme
 $record_type_rows = $conn->query("SELECT DISTINCT al.entity_type FROM $audit_source WHERE al.entity_type IS NOT NULL AND al.entity_type <> '' ORDER BY al.entity_type")->fetch_all(MYSQLI_ASSOC);
 $record_types = array_column($record_type_rows, 'entity_type');
 
-$admin_metrics = ['total' => 0, 'users' => 0, 'changes' => 0, 'logins' => 0];
 $demo_audit_count = 0;
-$action_summary = [];
-$module_summary = [];
-$top_users = [];
 if ($is_admin) {
     $demo_audit_count = (int) ($conn->query("SELECT COUNT(*) AS total FROM audit_logs WHERE details LIKE '[DEMO AUDIT %'")->fetch_assoc()['total'] ?? 0);
-}
-if ($is_admin || in_array($viewer_role, ['HR Manager', 'HR Supervisor', 'HR Staff'], true)) {
-    $metric_conditions = [];
-    $metric_params = [];
-    $metric_types = '';
-    if (!$is_admin) { $metric_conditions[] = $scope_sql; $metric_params = $scope_params; $metric_types = $scope_types; }
-    if ($filters['date_from'] !== '') { $metric_conditions[] = 'DATE(al.timestamp) >= ?'; $metric_params[] = $filters['date_from']; $metric_types .= 's'; }
-    if ($filters['date_to'] !== '') { $metric_conditions[] = 'DATE(al.timestamp) <= ?'; $metric_params[] = $filters['date_to']; $metric_types .= 's'; }
-    $metric_where = $metric_conditions ? ' WHERE ' . implode(' AND ', $metric_conditions) : '';
-    $metric_from = "$audit_source LEFT JOIN users u ON u.user_id = al.user_id";
-    $metric_stmt = $conn->prepare("SELECT COUNT(*) AS total, COUNT(DISTINCT al.user_id) AS users, SUM(al.action_type IN ('CREATE','UPDATE','DELETE','IMPORT','EDIT_STEP')) AS changes_count, SUM(al.action_type = 'LOGIN') AS logins_count, SUM(al.action_type = 'LOGIN' AND al.action_status = 'Failed') AS failed_signins FROM $metric_from{$metric_where}");
-    if ($metric_params) $metric_stmt->bind_param($metric_types, ...$metric_params);
-    $metric_stmt->execute();
-    $metric_row = $metric_stmt->get_result()->fetch_assoc();
-    $metric_stmt->close();
-    $admin_metrics = [
-        'total' => (int) ($metric_row['total'] ?? 0),
-        'users' => (int) ($metric_row['users'] ?? 0),
-        'changes' => (int) ($metric_row['changes_count'] ?? 0),
-        'logins' => (int) ($metric_row['logins_count'] ?? 0),
-        'failed_signins' => (int) ($metric_row['failed_signins'] ?? 0),
-    ];
-
-    $summary_scope = $metric_conditions ? ' AND ' . implode(' AND ', $metric_conditions) : '';
-    $action_stmt = $conn->prepare("SELECT al.action_type, COUNT(*) AS total FROM $metric_from{$metric_where} GROUP BY al.action_type ORDER BY total DESC");
-    if ($metric_params) $action_stmt->bind_param($metric_types, ...$metric_params);
-    $action_stmt->execute();
-    $action_summary = $action_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-    $action_stmt->close();
-    $module_stmt = $conn->prepare("SELECT COALESCE(NULLIF(al.module_name,''), 'System Activity') AS module_name, COUNT(*) AS total FROM $metric_from{$metric_where} GROUP BY al.module_name ORDER BY total DESC LIMIT 7");
-    if ($metric_params) $module_stmt->bind_param($metric_types, ...$metric_params);
-    $module_stmt->execute();
-    $module_summary = $module_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-    $module_stmt->close();
-    $users_stmt = $conn->prepare("SELECT al.user_id, COALESCE(u.full_name, 'Demo actor') AS full_name, u.role, COUNT(*) AS total FROM $audit_source LEFT JOIN users u ON u.user_id = al.user_id WHERE (al.user_id IS NOT NULL OR al.details LIKE '[DEMO AUDIT %'){$summary_scope} GROUP BY al.user_id, u.full_name, u.role ORDER BY total DESC LIMIT 5");
-    if ($metric_params) $users_stmt->bind_param($metric_types, ...$metric_params);
-    $users_stmt->execute();
-    $top_users = $users_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-    $users_stmt->close();
 }
 
 $lookup_name = static function (array $rows, string $id_key, string $name_key, int $id): string {
@@ -239,7 +194,7 @@ foreach ($actors as $actor) $actor_names[(int) $actor['user_id']] = $actor['full
 $active_filter_labels = [];
 foreach ([
     'search' => 'Search', 'module' => 'Module', 'action' => 'Action', 'status' => 'Outcome',
-    'employee' => 'Target', 'record_type' => 'Record type', 'ip_address' => 'IP address', 'date_from' => 'From date', 'date_to' => 'To date',
+    'record_type' => 'Record type', 'ip_address' => 'IP address', 'date_from' => 'From date', 'date_to' => 'To date',
 ] as $key => $label) {
     if ($filters[$key] !== '') $active_filter_labels[] = $label . ': ' . $filters[$key];
 }
@@ -315,18 +270,13 @@ if (defined('AUDIT_TRAIL_EXPORT_ONLY')) {
     </div>
     <?php if ($demo_audit_count > 0): ?><div class="audit-demo-notice" role="note"><i class="fas fa-flask"></i><span><strong>Demo audit data is present.</strong> <?php echo number_format($demo_audit_count); ?> clearly labeled fictional event<?php echo $demo_audit_count === 1 ? '' : 's'; ?> were added for interface testing; they do not represent real actions.</span></div><?php endif; ?>
     <?php if ($filter_errors): ?><div class="alert alert-warning py-2"><?php echo e(implode(' ', $filter_errors)); ?></div><?php endif; ?>
-    <div class="audit-admin-stats mb-3">
-        <?php foreach ([['Total Events', $admin_metrics['total'], 'fa-file-alt', 'Events in selected date range'], ['Unique Users', $admin_metrics['users'], 'fa-user', 'Accounts with recorded activity'], ['Data Changes', $admin_metrics['changes'], 'fa-cog', 'Create, update, delete, and import'], ['Failed Sign-ins', $admin_metrics['failed_signins'], 'fa-shield-alt', 'Rejected login attempts']] as $stat): ?>
-        <div class="audit-admin-stat"><div class="audit-admin-stat-icon"><i class="fas <?php echo $stat[2]; ?>"></i></div><div><div class="audit-admin-stat-label"><?php echo e($stat[0]); ?></div><div class="audit-admin-stat-value"><?php echo number_format($stat[1]); ?></div><div class="text-muted" style="font-size:.64rem"><?php echo e($stat[3]); ?></div></div></div>
-        <?php endforeach; ?>
-    </div>
     <details class="audit-admin-filter mb-3" <?php echo $filter_errors ? 'open' : ''; ?>>
         <summary class="audit-filter-toggle"><span><i class="fas fa-filter me-2"></i>Filters<?php if ($active_filter_labels): ?><span class="audit-filter-count"><?php echo count($active_filter_labels); ?> active</span><?php endif; ?></span><i class="fas fa-chevron-down audit-filter-chevron" aria-hidden="true"></i></summary>
-        <div class="audit-filter-body"><div class="audit-filter-actions"><a href="audit-trail.php" class="small text-success"><i class="fas fa-undo me-1"></i>Reset filters</a></div>
-        <form method="get" class="row g-2 align-items-end">
+        <div class="audit-filter-body">
+        <form method="get" class="audit-filter-form">
             <input type="hidden" name="view" value="<?php echo e($filters['view']); ?>">
-            <div class="col-12 col-lg-6"><label class="form-label mb-1">Search</label><input class="form-control form-control-sm" name="search" value="<?php echo e($filters['search']); ?>" placeholder="Search user, employee ID, action, module, or details..."></div>
-            <div class="col-12 col-lg-6"><label class="form-label mb-1">Date range</label><div class="d-flex gap-1"><input class="form-control form-control-sm" type="date" name="date_from" value="<?php echo e($filters['date_from']); ?>"><input class="form-control form-control-sm" type="date" name="date_to" value="<?php echo e($filters['date_to']); ?>"></div></div>
+            <div class="audit-filter-search"><label class="form-label mb-1" for="auditSearch">Search logs</label><input id="auditSearch" class="form-control form-control-sm" name="search" value="<?php echo e($filters['search']); ?>" placeholder="User, employee ID, action, module, or details"></div>
+            <div class="audit-filter-dates"><span class="form-label mb-1">Date range</span><div class="audit-date-fields"><label><span>From</span><input class="form-control form-control-sm" type="date" name="date_from" value="<?php echo e($filters['date_from']); ?>"></label><label><span>To</span><input class="form-control form-control-sm" type="date" name="date_to" value="<?php echo e($filters['date_to']); ?>"></label></div></div>
             <div class="col-6 col-lg-2"><label class="form-label mb-1">User</label><select class="form-select form-select-sm" name="actor"><option value="0">All users</option><?php foreach ($actors as $actor): ?><option value="<?php echo (int) $actor['user_id']; ?>" <?php echo $filters['actor'] === (int) $actor['user_id'] ? 'selected' : ''; ?>><?php echo e($actor['full_name']); ?></option><?php endforeach; ?></select></div>
             <div class="col-6 col-lg-2"><label class="form-label mb-1">Action type</label><select class="form-select form-select-sm" name="action"><option value="">All actions</option><?php foreach ($allowed_actions as $action): ?><option value="<?php echo e($action); ?>" <?php echo $filters['action'] === $action ? 'selected' : ''; ?>><?php echo e(ucwords(strtolower(str_replace('_', ' ', $action)))); ?></option><?php endforeach; ?></select></div>
             <div class="col-6 col-lg-2"><label class="form-label mb-1">Module</label><select class="form-select form-select-sm" name="module"><option value="">All modules</option><?php foreach ($allowed_modules as $module): ?><option value="<?php echo e($module); ?>" <?php echo $filters['module'] === $module ? 'selected' : ''; ?>><?php echo e($module); ?></option><?php endforeach; ?></select></div>
@@ -334,12 +284,11 @@ if (defined('AUDIT_TRAIL_EXPORT_ONLY')) {
             <div class="col-6 col-lg-2"><label class="form-label mb-1">Result</label><select class="form-select form-select-sm" name="status"><option value="">All results</option><?php foreach ($allowed_statuses as $status): ?><option value="<?php echo e($status); ?>" <?php echo $filters['status'] === $status ? 'selected' : ''; ?>><?php echo e($status); ?></option><?php endforeach; ?></select></div>
             <div class="col-6 col-lg-2"><label class="form-label mb-1">IP address</label><input class="form-control form-control-sm" name="ip_address" value="<?php echo e($filters['ip_address']); ?>" placeholder="Enter IP address"></div>
             <?php if (!$is_admin): ?>
-            <div class="col-6 col-lg-2"><label class="form-label mb-1">Target employee</label><input class="form-control form-control-sm" name="employee" value="<?php echo e($filters['employee']); ?>" placeholder="Name or employee ID"></div>
             <div class="col-6 col-lg-2"><label class="form-label mb-1">Branch</label><select class="form-select form-select-sm" name="branch"><option value="0">All branches</option><?php foreach ($branches as $branch): ?><option value="<?php echo (int) $branch['branch_id']; ?>" <?php echo $filters['branch'] === (int) $branch['branch_id'] ? 'selected' : ''; ?>><?php echo e($branch['branch_name']); ?></option><?php endforeach; ?></select></div>
             <div class="col-6 col-lg-2"><label class="form-label mb-1">Department</label><select class="form-select form-select-sm" name="department"><option value="0">All departments</option><?php foreach ($departments as $department): ?><option value="<?php echo (int) $department['department_id']; ?>" <?php echo $filters['department'] === (int) $department['department_id'] ? 'selected' : ''; ?>><?php echo e($department['department_name']); ?></option><?php endforeach; ?></select></div>
             <?php endif; ?>
             <div class="col-6 col-lg-2"><label class="form-label mb-1">Sort by</label><select class="form-select form-select-sm" name="sort"><option value="DESC" <?php echo $filters['sort'] === 'DESC' ? 'selected' : ''; ?>>Newest first</option><option value="ASC" <?php echo $filters['sort'] === 'ASC' ? 'selected' : ''; ?>>Oldest first</option></select></div>
-            <div class="col-12 col-lg-2"><button class="btn btn-sm btn-success w-100"><i class="fas fa-filter me-1"></i>Apply filters</button></div>
+            <div class="audit-filter-submit"><a href="audit-trail.php" class="btn btn-sm btn-outline-secondary"><i class="fas fa-undo me-1"></i>Reset</a><button class="btn btn-sm btn-success"><i class="fas fa-filter me-1"></i>Apply filters</button></div>
         </form>
         <?php if ($active_filter_labels): ?><div class="small text-muted mt-2">Active: <?php echo e(implode(' · ', $active_filter_labels)); ?></div><?php endif; ?>
         </div>
@@ -381,7 +330,7 @@ if (defined('AUDIT_TRAIL_EXPORT_ONLY')) {
                                 'action' => ucwords(strtolower(str_replace('_', ' ', $log['action_type']))),
                                 'module' => $log['module_name'] ?? 'System Activity', 'record' => $record_label,
                                 'result' => $log['action_status'] ?? 'Successful', 'ip' => $log['ip_address'] ?? 'Not recorded',
-                                'device' => $log['user_agent'] ?? 'Not recorded', 'branch' => $log['branch_name'] ?? 'Not applicable',
+                                'branch' => $log['branch_name'] ?? 'Not applicable',
                                 'department' => $log['department_name'] ?? 'Not applicable',
                                 'id' => $audit_reference,
                                 'previous' => $log['previous_value'] ?? '', 'new' => $log['new_value'] ?? '',
@@ -402,7 +351,7 @@ if (defined('AUDIT_TRAIL_EXPORT_ONLY')) {
                                 <div class="audit-inline-detail">
                                     <div class="audit-inline-detail-head"><div><span class="audit-inline-kicker">Log Details <span><?php echo e($audit_reference); ?></span></span><h6><?php echo e($event_title); ?></h6><p><?php echo e($event_payload['details']); ?></p></div><span class="audit-outcome <?php echo e($initial_status); ?>"><?php echo e($event_payload['result']); ?></span></div>
                                     <div class="audit-inline-detail-grid">
-                                        <?php foreach ([['Date & time', $event_payload['timestamp']], ['User', $event_payload['actor']], ['Action', $event_payload['action']], ['Module', $event_payload['module']], ['Record', $event_payload['record']], ['IP address', $event_payload['ip']], ['Device', $event_payload['device']], ['Branch', $event_payload['branch']], ['Department', $event_payload['department']]] as $detail): ?><div class="audit-inline-fact"><strong><?php echo e($detail[0]); ?></strong><span><?php echo e($detail[1] ?: 'Not recorded'); ?></span></div><?php endforeach; ?>
+                                        <?php foreach ([['Date & time', $event_payload['timestamp']], ['User', $event_payload['actor']], ['Action', $event_payload['action']], ['Module', $event_payload['module']], ['Record', $event_payload['record']], ['IP address', $event_payload['ip']], ['Branch', $event_payload['branch']], ['Department', $event_payload['department']]] as $detail): ?><div class="audit-inline-fact"><strong><?php echo e($detail[0]); ?></strong><span><?php echo e($detail[1] ?: 'Not recorded'); ?></span></div><?php endforeach; ?>
                                     </div>
                                     <?php if ($event_payload['previous'] !== '' || $event_payload['new'] !== ''): ?><div class="audit-inline-changes"><div><strong>Previous value</strong><p><?php echo e($event_payload['previous'] ?: 'Not recorded'); ?></p></div><div><strong>New value</strong><p><?php echo e($event_payload['new'] ?: 'Not recorded'); ?></p></div></div><?php endif; ?>
                                 </div>
@@ -414,42 +363,6 @@ if (defined('AUDIT_TRAIL_EXPORT_ONLY')) {
                 </div>
                 <?php if ($total_pages > 1): ?><div class="audit-admin-footer d-flex flex-wrap justify-content-between align-items-center gap-2"><span class="small text-muted">Showing <?php echo number_format($offset + 1); ?> to <?php echo number_format($offset + count($logs)); ?> of <?php echo number_format($total); ?> entries</span><nav class="audit-pagination d-flex gap-1" aria-label="Audit event pages"><?php $page_start = max(1, $page - 2); $page_end = min($total_pages, $page + 2); ?><a class="btn btn-sm btn-outline-secondary <?php echo $page <= 1 ? 'disabled' : ''; ?>" href="audit-trail.php?<?php echo e(http_build_query(array_merge($filters, ['page' => max(1, $page - 1)]))); ?>" aria-label="Previous page">&laquo;</a><?php for ($page_number = $page_start; $page_number <= $page_end; $page_number++): ?><a class="btn btn-sm <?php echo $page_number === $page ? 'btn-success' : 'btn-outline-secondary'; ?>" href="audit-trail.php?<?php echo e(http_build_query(array_merge($filters, ['page' => $page_number]))); ?>"><?php echo $page_number; ?></a><?php endfor; ?><a class="btn btn-sm btn-outline-secondary <?php echo $page >= $total_pages ? 'disabled' : ''; ?>" href="audit-trail.php?<?php echo e(http_build_query(array_merge($filters, ['page' => min($total_pages, $page + 1)]))); ?>" aria-label="Next page">&raquo;</a></nav></div><?php endif; ?>
             </section>
-            <?php
-                $action_buckets = ['Login / Logout' => 0, 'Create' => 0, 'Update' => 0, 'View' => 0, 'Delete' => 0, 'Others' => 0];
-                foreach ($action_summary as $summary) {
-                    $action_name = strtoupper((string) $summary['action_type']);
-                    $bucket = in_array($action_name, ['LOGIN', 'LOGOUT'], true) ? 'Login / Logout'
-                        : (in_array($action_name, ['CREATE', 'UPDATE', 'VIEW', 'DELETE'], true) ? ucfirst(strtolower($action_name)) : 'Others');
-                    $action_buckets[$bucket] += (int) $summary['total'];
-                }
-                $action_colors = ['Login / Logout' => '#648e52', 'Create' => '#2c5926', 'Update' => '#ebc774', 'View' => '#a88e5c', 'Delete' => '#b54148', 'Others' => '#c9cec7'];
-                $action_total = array_sum($action_buckets);
-                $pie_stops = [];
-                $pie_position = 0;
-                foreach ($action_buckets as $bucket => $bucket_count) {
-                    if ($bucket_count === 0 || $action_total === 0) continue;
-                    $next_position = $pie_position + $bucket_count * 100 / $action_total;
-                    $pie_stops[] = $action_colors[$bucket] . ' ' . round($pie_position, 2) . '% ' . round($next_position, 2) . '%';
-                    $pie_position = $next_position;
-                }
-                $pie_background = $pie_stops ? 'conic-gradient(' . implode(', ', $pie_stops) . ')' : '#e8ede6';
-                $max_module_count = $module_summary ? max(array_map(static fn($row) => (int) $row['total'], $module_summary)) : 0;
-                $max_user_count = $top_users ? max(array_map(static fn($row) => (int) $row['total'], $top_users)) : 0;
-            ?>
-            <div class="audit-summary-cards">
-                <section class="audit-admin-card audit-summary-card">
-                    <h5><i class="fas fa-chart-pie"></i> Events by Action Type</h5>
-                    <div class="audit-action-chart"><div class="audit-donut" style="background:<?php echo e($pie_background); ?>"><div><strong><?php echo number_format($action_total); ?></strong><span>Total Events</span></div></div><div class="audit-action-legend"><?php foreach ($action_buckets as $bucket => $bucket_count): ?><div><i style="background:<?php echo e($action_colors[$bucket]); ?>"></i><span><?php echo e($bucket); ?></span><strong><?php echo number_format($bucket_count); ?> <small>(<?php echo $action_total ? round($bucket_count * 100 / $action_total) : 0; ?>%)</small></strong></div><?php endforeach; ?></div></div>
-                </section>
-                <section class="audit-admin-card audit-summary-card">
-                    <h5><i class="fas fa-chart-bar"></i> Events by Module</h5>
-                    <div class="audit-module-list"><?php foreach ($module_summary as $summary): $amount = (int) $summary['total']; ?><div class="audit-module-item"><span title="<?php echo e($summary['module_name']); ?>"><?php echo e($summary['module_name']); ?></span><div class="audit-module-track"><i style="width:<?php echo $max_module_count ? round($amount * 100 / $max_module_count) : 0; ?>%"></i></div><strong><?php echo number_format($amount); ?></strong></div><?php endforeach; ?><?php if (!$module_summary): ?><p class="text-muted small">No recorded modules yet.</p><?php endif; ?></div>
-                </section>
-                <section class="audit-admin-card audit-summary-card">
-                    <h5><i class="fas fa-users"></i> Top 5 Active Users</h5>
-                    <div class="audit-ranked-users"><?php foreach ($top_users as $rank => $user): $amount = (int) $user['total']; $initials = strtoupper(substr(preg_replace('/[^A-Za-z]/', '', (string) $user['full_name']) ?: 'U', 0, 2)); ?><div class="audit-ranked-user"><span class="audit-user-rank"><?php echo $rank + 1; ?></span><span class="audit-avatar"><?php echo e($initials); ?></span><div><span><?php echo e($user['full_name']); ?></span><div class="audit-module-track"><i style="width:<?php echo $max_user_count ? round($amount * 100 / $max_user_count) : 0; ?>%"></i></div></div><strong><?php echo number_format($amount); ?></strong></div><?php endforeach; ?><?php if (!$top_users): ?><p class="text-muted small">No user activity in this period.</p><?php endif; ?></div>
-                </section>
-            </div>
         </div>
     </div>
 </div>
@@ -496,7 +409,7 @@ document.addEventListener('DOMContentLoaded', function () {
 foreach ($stats as $stat): ?>
 <div class="<?php echo $is_admin ? 'col-6 col-lg-3' : 'col-6 col-lg-2'; ?>"><?php if ($is_admin && $stat[3] !== 'all'): ?><a class="audit-stat-link" href="audit-trail.php?<?php echo e(http_build_query(array_merge($filters, ['view' => $stat[3], 'page' => 1]))); ?>"><?php endif; ?><div class="audit-stat"><i class="fas <?php echo $stat[2]; ?> mb-2" style="color:#d3973e"></i><div class="value"><?php echo number_format($stat[1]); ?></div><div class="label"><?php echo e($stat[0]); ?></div></div><?php if ($is_admin && $stat[3] !== 'all'): ?></a><?php endif; ?></div>
 <?php endforeach; ?></div>
-<div class="audit-filter mb-4 fadeup-2"><form method="get" class="row g-2 align-items-end"><input type="hidden" name="view" value="<?php echo e($filters['view']); ?>"><div class="col-md-4"><label class="form-label small mb-1">Search investigation</label><input class="form-control form-control-sm" name="search" value="<?php echo e($filters['search']); ?>" placeholder="Actor, target, event ID, action, or description"></div><div class="col-6 col-md-2"><label class="form-label small mb-1">Module</label><select class="form-select form-select-sm" name="module"><option value="">All activity</option><?php foreach($allowed_modules as $module): ?><option value="<?php echo e($module); ?>" <?php echo $filters['module']===$module?'selected':''; ?>><?php echo e($module); ?></option><?php endforeach; ?></select></div><div class="col-6 col-md-2"><label class="form-label small mb-1">Action</label><select class="form-select form-select-sm" name="action"><option value="">All actions</option><?php foreach($allowed_actions as $action): ?><option value="<?php echo e($action); ?>" <?php echo $filters['action']===$action?'selected':''; ?>><?php echo e(ucwords(strtolower(str_replace('_', ' ', $action)))); ?></option><?php endforeach; ?></select></div><div class="col-6 col-md-2"><label class="form-label small mb-1">Outcome</label><select class="form-select form-select-sm" name="status"><option value="">Any outcome</option><?php foreach($allowed_statuses as $status): ?><option value="<?php echo e($status); ?>" <?php echo $filters['status']===$status?'selected':''; ?>><?php echo e($status); ?></option><?php endforeach; ?></select></div><div class="col-6 col-md-2"><label class="form-label small mb-1">From</label><input class="form-control form-control-sm" type="date" name="date_from" value="<?php echo e($filters['date_from']); ?>"></div><div class="col-6 col-md-2"><label class="form-label small mb-1">To</label><input class="form-control form-control-sm" type="date" name="date_to" value="<?php echo e($filters['date_to']); ?>"></div><div class="col-md-3"><label class="form-label small mb-1">Actor</label><select class="form-select form-select-sm" name="actor"><option value="0">All authorized actors</option><?php foreach($actors as $actor): ?><option value="<?php echo (int)$actor['user_id']; ?>" <?php echo $filters['actor']==$actor['user_id']?'selected':''; ?>><?php echo e($actor['full_name'].' - '.$actor['role']); ?></option><?php endforeach; ?></select></div><div class="col-md-3"><label class="form-label small mb-1">Target employee</label><input class="form-control form-control-sm" name="employee" value="<?php echo e($filters['employee']); ?>" placeholder="Name or employee ID"></div><div class="col-md-2"><label class="form-label small mb-1">Branch</label><select class="form-select form-select-sm" name="branch"><option value="0">All branches</option><?php foreach($branches as $branch): ?><option value="<?php echo (int)$branch['branch_id']; ?>" <?php echo $filters['branch']==$branch['branch_id']?'selected':''; ?>><?php echo e($branch['branch_name']); ?></option><?php endforeach; ?></select></div><div class="col-md-2"><label class="form-label small mb-1">Department</label><select class="form-select form-select-sm" name="department"><option value="0">All departments</option><?php foreach($departments as $department): ?><option value="<?php echo (int)$department['department_id']; ?>" <?php echo $filters['department']==$department['department_id']?'selected':''; ?>><?php echo e($department['department_name']); ?></option><?php endforeach; ?></select></div><?php if ($is_admin): ?><div class="col-md-3"><label class="form-label small mb-1">IP address</label><input class="form-control form-control-sm" name="ip_address" value="<?php echo e($filters['ip_address']); ?>" placeholder="Exact or partial IP"></div><div class="col-md-2"><label class="form-label small mb-1">Entity ID</label><input class="form-control form-control-sm" type="number" min="1" name="entity_id" value="<?php echo $filters['entity_id'] ?: ''; ?>" placeholder="Record ID"></div><?php endif; ?><div class="col-md-2"><button class="btn btn-sm btn-primary w-100"><i class="fas fa-filter me-1"></i>Apply</button></div><div class="col-md-2"><a class="btn btn-sm btn-outline-secondary w-100" href="audit-trail.php">Clear all</a></div></form></div>
+<div class="audit-filter mb-4 fadeup-2"><form method="get" class="row g-2 align-items-end"><input type="hidden" name="view" value="<?php echo e($filters['view']); ?>"><div class="col-md-4"><label class="form-label small mb-1">Search investigation</label><input class="form-control form-control-sm" name="search" value="<?php echo e($filters['search']); ?>" placeholder="Actor, target, event ID, action, or description"></div><div class="col-6 col-md-2"><label class="form-label small mb-1">Module</label><select class="form-select form-select-sm" name="module"><option value="">All activity</option><?php foreach($allowed_modules as $module): ?><option value="<?php echo e($module); ?>" <?php echo $filters['module']===$module?'selected':''; ?>><?php echo e($module); ?></option><?php endforeach; ?></select></div><div class="col-6 col-md-2"><label class="form-label small mb-1">Action</label><select class="form-select form-select-sm" name="action"><option value="">All actions</option><?php foreach($allowed_actions as $action): ?><option value="<?php echo e($action); ?>" <?php echo $filters['action']===$action?'selected':''; ?>><?php echo e(ucwords(strtolower(str_replace('_', ' ', $action)))); ?></option><?php endforeach; ?></select></div><div class="col-6 col-md-2"><label class="form-label small mb-1">Outcome</label><select class="form-select form-select-sm" name="status"><option value="">Any outcome</option><?php foreach($allowed_statuses as $status): ?><option value="<?php echo e($status); ?>" <?php echo $filters['status']===$status?'selected':''; ?>><?php echo e($status); ?></option><?php endforeach; ?></select></div><div class="col-6 col-md-2"><label class="form-label small mb-1">From</label><input class="form-control form-control-sm" type="date" name="date_from" value="<?php echo e($filters['date_from']); ?>"></div><div class="col-6 col-md-2"><label class="form-label small mb-1">To</label><input class="form-control form-control-sm" type="date" name="date_to" value="<?php echo e($filters['date_to']); ?>"></div><div class="col-md-3"><label class="form-label small mb-1">Actor</label><select class="form-select form-select-sm" name="actor"><option value="0">All authorized actors</option><?php foreach($actors as $actor): ?><option value="<?php echo (int)$actor['user_id']; ?>" <?php echo $filters['actor']==$actor['user_id']?'selected':''; ?>><?php echo e($actor['full_name'].' - '.$actor['role']); ?></option><?php endforeach; ?></select></div><div class="col-md-2"><label class="form-label small mb-1">Branch</label><select class="form-select form-select-sm" name="branch"><option value="0">All branches</option><?php foreach($branches as $branch): ?><option value="<?php echo (int)$branch['branch_id']; ?>" <?php echo $filters['branch']==$branch['branch_id']?'selected':''; ?>><?php echo e($branch['branch_name']); ?></option><?php endforeach; ?></select></div><div class="col-md-2"><label class="form-label small mb-1">Department</label><select class="form-select form-select-sm" name="department"><option value="0">All departments</option><?php foreach($departments as $department): ?><option value="<?php echo (int)$department['department_id']; ?>" <?php echo $filters['department']==$department['department_id']?'selected':''; ?>><?php echo e($department['department_name']); ?></option><?php endforeach; ?></select></div><?php if ($is_admin): ?><div class="col-md-3"><label class="form-label small mb-1">IP address</label><input class="form-control form-control-sm" name="ip_address" value="<?php echo e($filters['ip_address']); ?>" placeholder="Exact or partial IP"></div><div class="col-md-2"><label class="form-label small mb-1">Entity ID</label><input class="form-control form-control-sm" type="number" min="1" name="entity_id" value="<?php echo $filters['entity_id'] ?: ''; ?>" placeholder="Record ID"></div><?php endif; ?><div class="col-md-2"><button class="btn btn-sm btn-primary w-100"><i class="fas fa-filter me-1"></i>Apply</button></div><div class="col-md-2"><a class="btn btn-sm btn-outline-secondary w-100" href="audit-trail.php">Clear all</a></div></form></div>
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3"><div><h5 class="mb-0"><?php echo $is_admin ? 'Audit events' : 'Activity timeline'; ?></h5><small class="text-muted">Showing <?php echo $total === 0 ? '0' : number_format($offset + 1) . '–' . number_format($offset + count($logs)); ?> of <?php echo number_format($total); ?> matching records</small></div><div class="d-flex align-items-center gap-3"><span class="small text-muted"><i class="fas fa-lock me-1"></i>Read-only historical record</span><?php if ($active_filter_labels): ?><a class="btn btn-sm btn-outline-secondary" href="audit-trail.php">Clear all</a><?php endif; ?></div></div>
 <?php if ($filter_errors): ?><div class="alert alert-warning"><?php echo e(implode(' ', $filter_errors)); ?></div><?php endif; ?>
 <?php if ($active_filter_labels): ?><div class="small text-muted mb-3">Active filters: <?php echo e(implode(' · ', $active_filter_labels)); ?></div><?php endif; ?>

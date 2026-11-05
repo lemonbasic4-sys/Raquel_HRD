@@ -350,7 +350,7 @@ if (in_array($_ft_role, ['HR Manager', 'HR Supervisor', 'HR Staff', 'Admin'])):
 <script src="<?php echo BASE_URL; ?>/assets/js/zebra-stripe.js?v=<?php echo time(); ?>"></script>
 <script src="<?php echo BASE_URL; ?>/assets/js/main.js?v=<?php echo time(); ?>"></script>
 <?php if (isset($_SESSION['role'])): ?>
-<!-- Global Sound Effects & UX Feedback System — loaded for all HRIS & Admin roles -->
+<!-- Global UX feedback system — loaded for all HRIS and Admin roles -->
 <script src="<?php echo BASE_URL; ?>/assets/js/employee-portal-feedback.js?v=<?php echo time(); ?>" defer></script>
 <?php endif; ?>
 <?php if (isset($_SESSION['role']) && $_SESSION['role'] === 'Employee'): ?>

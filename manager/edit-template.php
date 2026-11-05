@@ -717,11 +717,17 @@ require_once '../includes/header.php';
                 <div class="col-md-6">
                     <!-- Score Computation Guide -->
                     <div class="p-3 bg-light rounded-3 border h-100">
-                        <h6 class="fw-bold text-dark mb-2"><i class="fas fa-calculator text-primary me-2"></i>Evaluation Score Formula</h6>
-                        <p class="small text-muted mb-2">Each KRA item carries a weight % (summing to 100% in Section I). Shared core values ratings are averaged across all Section II items.</p>
-                        <div class="p-3 bg-white rounded border font-monospace small text-dark">
-                            
+                        <div class="d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2">
+                            <h6 class="fw-bold text-dark mb-0"><i class="fas fa-calculator text-primary me-2"></i>Evaluation Score Formula</h6>
+                            <select id="formulaEvalTypeSelect" class="form-select form-select-sm w-auto" style="min-width:140px;" onchange="renderFormulaBox()">
+                                <option value="Annual">Annual</option>
+                                <option value="Quarterly">Quarterly</option>
+                                <option value="Initial">Initial (Probationary)</option>
+                                <option value="Final">Final (Probationary)</option>
+                            </select>
                         </div>
+                        <p class="small text-muted mb-2" id="formulaSubtitle"></p>
+                        <div class="p-3 bg-white rounded border small text-dark" id="formulaBox" style="line-height:1.75;"></div>
                     </div>
                 </div>
                 <div class="col-md-6">
@@ -1322,6 +1328,69 @@ function syncWeights(source) {
     updateWeightSplit();
 }
 
+function renderFormulaBox() {
+    const sel    = document.getElementById('formulaEvalTypeSelect');
+    const box    = document.getElementById('formulaBox');
+    const sub    = document.getElementById('formulaSubtitle');
+    const kraEl  = document.getElementById('kraWeight');
+    const behEl  = document.getElementById('behaviorWeight');
+    if (!sel || !box) return;
+
+    const type   = sel.value;
+    const kraW   = parseFloat(kraEl?.value) || 80;
+    const behW   = parseFloat(behEl?.value) || 20;
+
+    const isProbationary = type === 'Initial' || type === 'Final';
+    const kPct   = isProbationary ? 80 : kraW;
+    const bPct   = isProbationary ? 20 : behW;
+
+    const subtitles = {
+        Annual:    'Each KRA item has a weight % (summing to 100%). Core Behaviors & Values are rated via a 360° department peer review — self-rating + all same-department peers, then averaged across the 8 items.',
+        Quarterly: 'Each KRA item has a weight % (summing to 100%). Core Behaviors & Values are rated via department peers (self + peers averaged) across the 8 standard items.',
+        Initial:   'Probationary Initial phase. KRA and Core Values are rated individually by the immediate head. Core Values score = simple average of all Core Values items rated. Weights are fixed at 80/20.',
+        Final:     'Probationary Final phase. KRA and Core Values are rated individually by the immediate head. Core Values score = simple average of all Core Values items rated. Weights are fixed at 80/20.',
+    };
+
+    const peerNote = {
+        Annual:    '<span style="color:#1565c0;font-size:0.82em;">★ 360° avg = (self + all same-dept peers) ÷ (peer count + 1), per item</span>',
+        Quarterly: '<span style="color:#1565c0;font-size:0.82em;">★ Dept avg = (self + dept peers) ÷ (peer count + 1), per item</span>',
+        Initial:   '<span style="color:#6a1b9a;font-size:0.82em;">★ Supervisor-rated individual score — no peer review</span>',
+        Final:     '<span style="color:#6a1b9a;font-size:0.82em;">★ Supervisor-rated individual score — no peer review</span>',
+    };
+
+    const overrideNote = {
+        Annual:    '<span style="color:#555;font-size:0.82em;">ℹ KRA ratings may be overridden by the immediate head before finalization</span>',
+        Quarterly: '<span style="color:#555;font-size:0.82em;">ℹ KRA ratings may be overridden by the immediate head before finalization</span>',
+        Initial:   '<span style="color:#555;font-size:0.82em;">ℹ Scores may be overridden at dept-manager or HR level during review</span>',
+        Final:     '<span style="color:#555;font-size:0.82em;">ℹ Scores may be overridden at dept-manager or HR level during review</span>',
+    };
+
+    if (sub) sub.textContent = subtitles[type] || '';
+
+    box.innerHTML =
+        '<div style="margin-bottom:0.5rem;">' +
+            '<span style="color:#1b5e20;font-weight:600;">Step 1 — KRA Subtotal</span><br>' +
+            '<code style="background:#f1f8e9;padding:2px 6px;border-radius:4px;font-size:0.85em;">' +
+                'KRA Subtotal = &Sigma; ( KRA Item Weight% &divide; 100 &times; Rating )' +
+            '</code>' +
+        '</div>' +
+        '<div style="margin-bottom:0.5rem;">' +
+            '<span style="color:#0d47a1;font-weight:600;">Step 2 — Core Values Average</span><br>' +
+            '<code style="background:#e3f2fd;padding:2px 6px;border-radius:4px;font-size:0.85em;">' +
+                'Core Avg = &Sigma; ( Per-item Avg ) &divide; 8 items' +
+            '</code><br>' +
+            peerNote[type] +
+        '</div>' +
+        '<div style="margin-bottom:0.5rem;">' +
+            '<span style="color:#b71c1c;font-weight:600;">Step 3 — Final Score</span><br>' +
+            '<code style="background:#fff3e0;padding:2px 6px;border-radius:4px;font-size:0.85em;">' +
+                'Final Score = ( KRA Subtotal &times; <strong>' + kPct + '%</strong> ) + ( Core Avg &times; <strong>' + bPct + '%</strong> )' +
+            '</code>' +
+            (isProbationary ? ' <span style="color:#b71c1c;font-size:0.78em;">(fixed)</span>' : '') +
+        '</div>' +
+        '<div>' + overrideNote[type] + '</div>';
+}
+
 function updateWeightSplit() {
     const kra = parseFloat(document.getElementById('kraWeight').value) || 0;
     const beh = parseFloat(document.getElementById('behaviorWeight').value) || 0;
@@ -1339,6 +1408,7 @@ function updateWeightSplit() {
         if (msg) { msg.innerHTML = '<i class="fas fa-exclamation-circle me-1"></i>Invalid Split'; msg.className = 'text-danger mb-0'; }
         if (status) status.style.background = '#ffebee';
     }
+    renderFormulaBox();
 }
 
 function escAttr(str) {
@@ -1646,6 +1716,10 @@ document.addEventListener('DOMContentLoaded', function() {
     evaluationType?.addEventListener('change', function() {
         if (probationToggle) probationToggle.checked = ['Initial', 'Final'].includes(evaluationType.value);
         updateProbationaryFields();
+        // Sync the formula dropdown to match the main eval type selector
+        const fSel = document.getElementById('formulaEvalTypeSelect');
+        if (fSel && evaluationType.value) fSel.value = evaluationType.value;
+        renderFormulaBox();
     });
     const filterTargetPositions = function() {
         if (!targetDepartment || !targetPosition) return;
@@ -1680,6 +1754,11 @@ document.addEventListener('DOMContentLoaded', function() {
     updateWeightSplit();
     updateWizardUI();
     updateTemplateIdentifierMarquee();
+    // Init formula box and sync dropdown to main eval type
+    const fSel = document.getElementById('formulaEvalTypeSelect');
+    const mainType = document.getElementById('inputEvalType');
+    if (fSel && mainType && mainType.value) fSel.value = mainType.value;
+    renderFormulaBox();
 
     const form = document.getElementById('templateForm');
     if (form) {
