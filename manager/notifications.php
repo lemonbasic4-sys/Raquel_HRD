@@ -176,6 +176,14 @@ while ($row = $summary_result->fetch_assoc()) {
     $total_unread += (int) $row['unread'];
 }
 $summary->close();
+$action_count = 0;
+if ($notification_center_role === 'Admin') {
+    $action_stmt = $conn->prepare("SELECT COUNT(*) FROM notifications WHERE $scope AND needs_action = 1 AND is_read = 0");
+    $action_stmt->bind_param('i', $user_id);
+    $action_stmt->execute();
+    $action_count = (int)$action_stmt->get_result()->fetch_row()[0];
+    $action_stmt->close();
+}
 
 $where = $scope;
 $types = 'i';
@@ -232,6 +240,11 @@ function managerNotifLink($link): ?string {
     return $link;
 }
 require_once '../includes/header.php';
+if ($notification_center_role === 'Admin') {
+    require __DIR__ . '/../includes/admin-notifications-view.php';
+    require_once '../includes/footer.php';
+    return;
+}
 ?>
 <link rel="stylesheet" href="<?php echo BASE_URL; ?>/assets/css/manager-notifications.css">
 <div class="notification-center-page">

@@ -208,13 +208,11 @@ document.addEventListener('DOMContentLoaded', () => new bootstrap.Modal(document
 <!-- Page Header -->
 <style>
     .user-management .page-hero { position: relative; overflow: hidden; }
-    .user-management .page-hero::after { content: ''; position: absolute; width: 190px; height: 190px; right: -78px; top: -100px; border: 1px solid rgba(255,255,255,.13); border-radius: 50%; box-shadow: 0 0 0 26px rgba(255,255,255,.035), 0 0 0 52px rgba(255,255,255,.02); pointer-events: none; }
     .user-management .hero-content { position: relative; z-index: 1; }
     .user-management .access-overview { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:1rem; margin-bottom:1.5rem; }
     .user-management .overview-stat { position:relative; display:flex; align-items:center; gap:.9rem; min-width:0; padding:1rem 1.05rem; border-radius:14px; overflow:hidden; }
     .user-management .access-overview .overview-stat.page-hero { margin:0; padding:1rem 1.05rem; min-height:92px; background:linear-gradient(135deg,var(--hero-from) 0%,var(--hero-mid) 50%,var(--hero-to) 100%); border:1px solid rgba(255,255,255,.1); box-shadow:0 8px 22px rgba(23,75,18,.16); }
     .user-management .overview-stat::before { content:''; position:absolute; inset:0; opacity:.07; background-image:radial-gradient(circle at 1px 1px,#fff 1px,transparent 0); background-size:18px 18px; pointer-events:none; }
-    .user-management .overview-stat::after { content:''; position:absolute; width:72px; height:72px; right:-30px; bottom:-36px; border:1px solid rgba(255,255,255,.12); border-radius:50%; background:rgba(255,255,255,.025); box-shadow:0 0 0 18px rgba(255,255,255,.025); }
     .user-management .overview-icon { position:relative; z-index:1; width:42px; height:42px; flex:0 0 42px; display:grid; place-items:center; border-radius:12px; color:#f4cb53; background:rgba(255,255,255,.1); }
     .user-management .overview-copy { min-width:0; }
     .user-management .overview-value, .user-management .overview-value.text-success, .user-management .overview-value.text-danger, .user-management .overview-value.text-warning { position:relative; z-index:1; color:#fff !important; font-size:1.55rem; font-weight:800; line-height:1.1; letter-spacing:-.04em; }

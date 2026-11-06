@@ -94,6 +94,7 @@ $pending_account_setup_count = (int) ($conn->query("
         AND u.role IN ('HR Manager', 'HR Supervisor', 'HR Staff')
     WHERE e.is_active = 1
       AND e.deleted_at IS NULL
+      AND e.employment_status = 'Regular'
       AND d.department_name = 'Human Resources'
       AND u.user_id IS NULL
 ")->fetch_assoc()['c'] ?? 0);
@@ -106,6 +107,7 @@ $pending_account_setup = $conn->query("
         AND u.role IN ('HR Manager', 'HR Supervisor', 'HR Staff')
     WHERE e.is_active = 1
       AND e.deleted_at IS NULL
+      AND e.employment_status = 'Regular'
       AND d.department_name = 'Human Resources'
       AND u.user_id IS NULL
     ORDER BY e.last_name, e.first_name
@@ -186,7 +188,12 @@ $audit_logs = $conn->query("SELECT al.*, u.full_name FROM audit_logs al LEFT JOI
 
 <style>
     .admin-dashboard .page-hero { position: relative; overflow: hidden; }
-    .admin-dashboard .page-hero::after { content: ''; position: absolute; width: 180px; height: 180px; right: -70px; top: -95px; border: 1px solid rgba(255,255,255,.12); border-radius: 50%; box-shadow: 0 0 0 26px rgba(255,255,255,.035), 0 0 0 52px rgba(255,255,255,.025); pointer-events: none; }
+    .admin-dashboard .stat-card.admin-summary-card.page-hero { height:100%; margin:0; padding:20px; background:linear-gradient(135deg,var(--hero-from) 0%,var(--hero-mid) 50%,var(--hero-to) 100%); border:1px solid rgba(255,255,255,.12); box-shadow:0 8px 22px rgba(23,75,18,.16); }
+    .admin-dashboard .admin-summary-card::before,
+    .admin-dashboard .admin-summary-card::after { content:none; background:none; }
+    .admin-dashboard .admin-summary-card .stat-info h3 { color:#fff; }
+    .admin-dashboard .admin-summary-card .stat-info p { color:rgba(255,255,255,.75); }
+    .admin-dashboard .admin-summary-card .stat-icon { background:rgba(255,255,255,.12) !important; color:#f4cb53 !important; }
     .admin-dashboard .dashboard-hero-content { position: relative; z-index: 1; }
     .admin-dashboard .hero-refresh { color: rgba(255,255,255,.7); font-size: .8rem; }
     .admin-dashboard .hero-refresh i { color: #ffd97d; }
@@ -235,25 +242,25 @@ $audit_logs = $conn->query("SELECT al.*, u.full_name FROM audit_logs al LEFT JOI
 <!-- Statistics Cards -->
 <div class="row g-3 mb-4">
     <div class="col-lg-3 col-md-6">
-        <div class="stat-card">
+        <div class="stat-card page-hero fadeup admin-summary-card">
             <div class="stat-icon blue"><i class="fas fa-users-cog"></i></div>
             <div class="stat-info"><h3><?php echo $total_users; ?></h3><p>Total User Accounts</p></div>
         </div>
     </div>
     <div class="col-lg-3 col-md-6">
-        <div class="stat-card">
+        <div class="stat-card page-hero fadeup admin-summary-card">
             <div class="stat-icon green"><i class="fas fa-user-check"></i></div>
             <div class="stat-info"><h3><?php echo $active_users; ?></h3><p>Active Accounts</p></div>
         </div>
     </div>
     <div class="col-lg-3 col-md-6">
-        <div class="stat-card">
+        <div class="stat-card page-hero fadeup admin-summary-card">
             <div class="stat-icon purple"><i class="fas fa-building"></i></div>
             <div class="stat-info"><h3><?php echo $total_branches; ?></h3><p>Registered Branches</p></div>
         </div>
     </div>
     <div class="col-lg-3 col-md-6">
-        <div class="stat-card">
+        <div class="stat-card page-hero fadeup admin-summary-card">
             <div class="stat-icon gold"><i class="fas fa-file-invoice"></i></div>
             <div class="stat-info"><h3><?php echo $recent_logs; ?></h3><p>Security Events (24h)</p></div>
         </div>
@@ -282,7 +289,7 @@ $audit_logs = $conn->query("SELECT al.*, u.full_name FROM audit_logs al LEFT JOI
                                         <span class="display-6 fw-bold text-primary lh-1"><?php echo $pending_account_setup_count; ?></span>
                                         <span class="text-muted small ms-2">employees</span>
                                     </div>
-                                    <p class="small text-muted mb-0 mt-2">Active HR employees without system accounts.</p>
+                                    <p class="small text-muted mb-0 mt-2">Active, regular HR employees without system accounts.</p>
                                 </div>
                                 <span class="rounded-circle d-inline-flex align-items-center justify-content-center text-primary" style="width:42px;height:42px;background:#dbeafe;flex:0 0 42px;">
                                     <i class="fas fa-user-plus"></i>
