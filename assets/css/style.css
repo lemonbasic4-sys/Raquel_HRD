@@ -1738,13 +1738,13 @@ select option.position-group-label {
 }
 
 .notification-dropdown .notification-item .notif-avatar.return {
-    background: rgba(225, 35, 42, 0.12);
-    color: #E1232A;
+    background: #fff1d5;
+    color: #946500;
 }
 
 .notification-dropdown .notification-item .notif-avatar.system {
-    background: rgba(8, 145, 178, 0.12);
-    color: #0891b2;
+    background: #e8f1e5;
+    color: #2c6728;
 }
 
 .notification-dropdown .notification-item .notif-avatar.login,
@@ -1759,13 +1759,17 @@ select option.position-group-label {
 }
 .notification-dropdown .notification-item .notif-avatar.accounts,
 .notification-dropdown .notification-item .notif-avatar.employees {
-    background: #e8eafb;
-    color: #5143aa;
+    background: #e7f0e6;
+    color: #2f612f;
 }
-.notification-dropdown .notification-item .notif-avatar.career { background:#e2f4f2; color:#087c72; }
+.notification-dropdown .notification-item .notif-avatar.peer { background:#e4f1e8; color:#145d32; }
+.notification-dropdown .notification-item .notif-avatar.kra { background:#f7edcd; color:#8a6400; }
+.notification-dropdown .notification-item .notif-avatar.self-rating { background:#eef4df; color:#4d7015; }
+.notification-dropdown .notification-item .notif-avatar.probation { background:#e9f0e3; color:#315c21; }
+.notification-dropdown .notification-item .notif-avatar.career { background:#edf3df; color:#637615; }
 .notification-dropdown .notification-item .notif-avatar.backups,
 .notification-dropdown .notification-item .notif-avatar.settings,
-.notification-dropdown .notification-item .notif-avatar.audit { background:#f1eaf9; color:#7446a0; }
+.notification-dropdown .notification-item .notif-avatar.audit { background:#eeeede; color:#626d2b; }
 
 .notification-dropdown .notification-item .notif-content-area {
     flex: 1;

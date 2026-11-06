@@ -96,7 +96,7 @@ $annualSetupCollapsed=$cycleSetupReadOnly || ($annualSetupPending && !isset($_GE
         <div class="modal-content">
             <div class="modal-header">
                 <h2 class="modal-title h5 mb-0" id="annualCycleStartConfirmTitle"><i class="fas fa-calendar-check me-2" aria-hidden="true"></i>Start Annual cycle?</h2>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
                 <p class="mb-3">Start the department Annual cycle and notify the employees shown above?</p>

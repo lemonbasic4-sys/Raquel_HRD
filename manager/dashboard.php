@@ -1133,7 +1133,7 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
 
 <div class="row g-4 mb-4">
     <!-- Performance Distribution -->
-    <div class="col-12 col-xl-6 col-xxl-4">
+    <div class="col-12 col-xl-4">
         <div class="chart-card h-100">
             <div class="cc-header">
                 <h5><i class="fas fa-chart-pie me-2"></i>Performance Distribution <small class="text-muted fw-normal">· Regular evaluations</small></h5>
@@ -1147,7 +1147,7 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
     </div>
 
     <!-- Top Performers -->
-    <div class="col-12 col-xl-6 col-xxl-4">
+    <div class="col-12 col-xl-4">
         <div class="chart-card h-100">
             <div class="cc-header d-flex justify-content-between align-items-center">
                 <h5 class="mb-0"><i class="fas fa-trophy text-warning me-2"></i>Top Performers</h5>
@@ -1203,7 +1203,7 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
     </div>
 
     <!-- Evaluation Status -->
-    <div class="col-12 col-xl-6 col-xxl-4">
+    <div class="col-12 col-xl-4">
         <div class="chart-card h-100">
             <div class="cc-header">
                 <h5><i class="fas fa-tasks me-2"></i>Status Overview <small class="text-muted fw-normal">· Regular evaluations</small></h5>

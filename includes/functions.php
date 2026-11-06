@@ -1166,6 +1166,9 @@ function getNotifIconInfo($title, $category = '')
     if (str_contains($t, 'successful login') || str_contains($t, 'signed in')) {
         return ['icon' => 'fas fa-right-to-bracket', 'class' => 'login'];
     }
+    if (str_contains($t, 'kra review') || str_contains($t, 'kra approval')) {
+        return ['icon' => 'fas fa-bullseye', 'class' => 'kra'];
+    }
     if (str_contains($t, 'approved') || str_contains($t, 'approval') || str_contains($t, 'confirmed') || str_contains($t, 'endorsed')) {
         return ['icon' => 'fas fa-check-circle', 'class' => 'approve'];
     }
@@ -1174,6 +1177,15 @@ function getNotifIconInfo($title, $category = '')
     }
     if (str_contains($t, 'returned') || str_contains($t, 'revision')) {
         return ['icon' => 'fas fa-undo-alt', 'class' => 'return'];
+    }
+    if (str_contains($t, '360') || str_contains($t, 'peer rating')) {
+        return ['icon' => 'fas fa-users', 'class' => 'peer'];
+    }
+    if (str_contains($t, 'self-rating') || str_contains($t, 'self rating')) {
+        return ['icon' => 'fas fa-star', 'class' => 'self-rating'];
+    }
+    if (str_contains($t, 'probation') || $category === 'probation') {
+        return ['icon' => 'fas fa-user-clock', 'class' => 'probation'];
     }
     if (str_contains($t, 'evaluation') || str_contains($t, 'validation') || str_contains($t, 'rating') || str_contains($t, 'pending')) {
         return ['icon' => 'fas fa-clipboard-check', 'class' => 'eval'];

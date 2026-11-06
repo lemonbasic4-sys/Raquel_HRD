@@ -611,9 +611,9 @@ require_once __DIR__ . '/header.php';
             <?php if (!$member['reviewer_position_id']): ?><div class="alert alert-warning">Configure this position's Reports To relationship in Position Management before finalizing this evaluation.</div><?php endif; ?>
             <?php if ($member['revision_pending']): ?><div class="alert alert-warning">Late 360 · Revision pending. The official score remains <?php echo number_format((float)$member['official_score'],2); ?> until the immediate head re-finalizes.</div><?php endif; ?>
             <div class="row g-3 quarterly-summary">
-                <div class="col-sm-4"><div class="p-3 bg-light rounded"><span>Reviewed KRA · 80%</span><strong><?php echo number_format($candidate['kra'],2); ?></strong></div></div>
-                <div class="col-sm-4"><div class="p-3 bg-light rounded"><span>Self + peer Core Values · 20%</span><strong><?php echo number_format($candidate['core'],2); ?></strong><small><?php echo count($peers); ?> of <?php echo $expected; ?> peer ratings received</small></div></div>
-                <div class="col-sm-4"><div class="p-3 bg-light rounded"><span><?php echo $member['current_version'] ? 'Official final score' : 'Provisional combined score'; ?></span><strong><?php echo number_format((float)($member['current_version'] ? $member['official_score'] : $candidate['total']),2); ?></strong>
+                <div class="col-sm-4"><div class="stat-card page-hero fadeup"><span>Reviewed KRA · 80%</span><strong><?php echo number_format($candidate['kra'],2); ?></strong></div></div>
+                <div class="col-sm-4"><div class="stat-card page-hero fadeup"><span>Self + peer Core Values · 20%</span><strong><?php echo number_format($candidate['core'],2); ?></strong><small><?php echo count($peers); ?> of <?php echo $expected; ?> peer ratings received</small></div></div>
+                <div class="col-sm-4"><div class="stat-card page-hero fadeup"><span><?php echo $member['current_version'] ? 'Official final score' : 'Provisional combined score'; ?></span><strong><?php echo number_format((float)($member['current_version'] ? $member['official_score'] : $candidate['total']),2); ?></strong>
                     <?php if ($member['revision_pending']): ?><small>Pending candidate: <?php echo number_format($candidate['total'],2); ?></small><?php endif; ?></div></div>
             </div>
         </section>
