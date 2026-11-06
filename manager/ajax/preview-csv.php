@@ -284,6 +284,7 @@ while (($row = fgetcsv($file)) !== false) {
 
     $preview_rows[] = [
         'row_num'        => $row_count,
+        'values'         => array_map(static fn($value) => mb_convert_encoding((string)($value ?? ''), 'UTF-8', 'UTF-8, ISO-8859-1, Windows-1252'), $row),
         'employee_code'  => $employee_code ?: '—',
         'name'           => trim($last_name . ', ' . $first_name . ($middle_name ? ' ' . $middle_name : '')),
         'job_title'      => $job_title_name ?: '—',
@@ -307,6 +308,7 @@ fclose($file);
 echo json_encode([
     'success'  => true,
     'summary'  => $summary,
+    'headers'  => array_map(static fn($header) => mb_convert_encoding(trim((string)$header), 'UTF-8', 'UTF-8, ISO-8859-1, Windows-1252'), $headers),
     'rows'     => $preview_rows,
     'filename' => htmlspecialchars($uploadedName),
 ]);

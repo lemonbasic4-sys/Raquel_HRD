@@ -1592,11 +1592,22 @@ $stepLabels = [
                                         <th>Hire Date</th>
                                         <th>Status</th>
                                         <th>Issues / Notes</th>
+                                        <th>Details</th>
                                     </tr>
                                 </thead>
                                 <tbody id="csvPreviewBody"></tbody>
                             </table>
                         </div>
+                        <section id="csvEmployeeDetails" class="border rounded-3 mt-3 d-none" tabindex="-1">
+                            <div class="d-flex align-items-start justify-content-between gap-3 px-3 py-3 border-bottom bg-light">
+                                <div>
+                                    <div class="small text-uppercase text-muted fw-semibold">CSV row details</div>
+                                    <h6 class="mb-0 fw-bold" id="csvEmployeeDetailsTitle"></h6>
+                                </div>
+                                <button type="button" class="btn-close" id="csvEmployeeDetailsClose" aria-label="Close employee details"></button>
+                            </div>
+                            <div id="csvEmployeeDetailsBody" class="p-3"></div>
+                        </section>
                     </div>
                 </div>
             </div>
@@ -1640,6 +1651,77 @@ $stepLabels = [
 
     const CSRF_TOKEN = document.querySelector('#csvConfirmForm input[name="csrf_token"]')?.value ?? '';
     const PREVIEW_URL = '<?php echo BASE_URL; ?>/manager/ajax/preview-csv.php';
+    let previewRows = [];
+    let previewHeaders = [];
+
+    const detailSections = {
+        'First Name': 'Basic identity', 'Birthday': 'Birth and status',
+        'Height (m)': 'Physical details and citizenship', 'SSS No': 'Government IDs',
+        'Permanent Region': 'Permanent address', 'Residential Region': 'Residential address',
+        'Telephone No': 'Contact information', 'Spouse Name': 'Spouse',
+        'Father Surname': 'Father', 'Mother Maiden Surname': 'Mother',
+        'Child 1 Surname': 'Children', 'Sibling 1 Surname': 'Siblings',
+        'Elementary School': 'Education', 'Eligibility License Title 1': 'Eligibility and licenses',
+        'Skill/Hobby 1': 'Skills', 'Recognition 1 Title': 'Recognition',
+        'Membership 1 Organization': 'Memberships',
+        'Real Property 1 Description': 'Real property',
+        'Personal Property 1 Description': 'Personal property',
+        'Liability 1 Nature': 'Liabilities',
+        'Related to Company (Yes/No)': 'Employment disclosures',
+        'Reference 1 Name': 'Character references',
+        'Company ID': 'Employment details',
+        'Emergency Contact Name': 'Emergency contact'
+    };
+
+    document.getElementById('csvPreviewBody').addEventListener('click', event => {
+        const button = event.target.closest('[data-csv-row-index]');
+        if (button) showCsvEmployeeDetails(Number(button.dataset.csvRowIndex));
+    });
+    document.getElementById('csvEmployeeDetailsClose').addEventListener('click', hideCsvEmployeeDetails);
+
+    function hideCsvEmployeeDetails() {
+        document.getElementById('csvEmployeeDetails').classList.add('d-none');
+        document.querySelectorAll('#csvPreviewBody [data-csv-row-index]').forEach(button => {
+            button.setAttribute('aria-expanded', 'false');
+        });
+    }
+
+    function showCsvEmployeeDetails(index) {
+        const row = previewRows[index];
+        if (!row) return;
+        const panel = document.getElementById('csvEmployeeDetails');
+        document.getElementById('csvEmployeeDetailsTitle').textContent = `${row.name} · ${row.employee_code}`;
+
+        let html = `<div class="alert ${row.action === 'skip' ? 'alert-danger' : row.action === 'update' ? 'alert-warning' : 'alert-success'} py-2 small mb-3">
+            <strong>${esc(row.action === 'skip' ? 'Skipped' : row.action === 'update' ? 'Update' : 'New record')}</strong>
+            ${row.issues.length ? ' · ' + row.issues.map(esc).join('; ') : ' · No issues found in the preview.'}
+        </div>`;
+        let groupOpen = false;
+        let firstGroup = true;
+        previewHeaders.forEach((header, column) => {
+            if (!groupOpen || detailSections[header]) {
+                if (groupOpen) html += '</div></details>';
+                html += `<details class="border rounded-2 mb-2 p-2" ${firstGroup ? 'open' : ''}>
+                    <summary class="fw-bold text-success px-2 py-1" style="cursor:pointer">${esc(detailSections[header] || 'CSV fields')}</summary>
+                    <div class="row g-2 p-2">`;
+                groupOpen = true;
+                firstGroup = false;
+            }
+            const value = String(row.values?.[column] ?? '').trim();
+            html += `<div class="col-12 col-md-6 col-xl-4"><div class="border rounded-2 p-2 h-100 bg-light">
+                <div class="text-muted small">${esc(header)}</div>
+                <div class="small fw-semibold text-break ${value ? 'text-dark' : 'text-muted'}">${value ? esc(value) : 'Not provided'}</div>
+            </div></div>`;
+        });
+        if (groupOpen) html += '</div></details>';
+        document.getElementById('csvEmployeeDetailsBody').innerHTML = html;
+        panel.classList.remove('d-none');
+        document.querySelectorAll('#csvPreviewBody [data-csv-row-index]').forEach(button => {
+            button.setAttribute('aria-expanded', button.dataset.csvRowIndex === String(index) ? 'true' : 'false');
+        });
+        panel.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        panel.focus({ preventScroll: true });
+    }
 
     // Reset modal to Step 1 when it is hidden
     document.getElementById('importModal')?.addEventListener('hidden.bs.modal', resetCsvModal);
@@ -1693,6 +1775,7 @@ $stepLabels = [
     };
 
     window.csvGoBack = function () {
+        hideCsvEmployeeDetails();
         document.getElementById('csvModalIcon').className = 'fas fa-file-csv me-2';
         document.getElementById('csvModalTitleText').textContent = 'Import Employees from CSV';
 
@@ -1735,11 +1818,17 @@ $stepLabels = [
         document.getElementById('csvSummaryBar').innerHTML = '';
         document.getElementById('csvGlobalWarnings').innerHTML = '';
         document.getElementById('csvPreviewBody').innerHTML = '';
+        previewRows = [];
+        previewHeaders = [];
+        document.getElementById('csvEmployeeDetailsBody').innerHTML = '';
         document.getElementById('csvConfirmBtn').disabled = true;
     }
 
     function renderPreview(data, originalFile) {
         const s = data.summary;
+        previewRows = data.rows;
+        previewHeaders = data.headers || [];
+        hideCsvEmployeeDetails();
 
         // ── Summary bar ───────────────────────────────────────────────────────
         const summaryBar = document.getElementById('csvSummaryBar');
@@ -1792,10 +1881,10 @@ $stepLabels = [
         tbody.innerHTML = '';
 
         if (!data.rows.length) {
-            tbody.innerHTML = '<tr><td colspan="10" class="text-center text-muted py-4">No data rows found.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="11" class="text-center text-muted py-4">No data rows found.</td></tr>';
         }
 
-        data.rows.forEach(r => {
+        data.rows.forEach((r, index) => {
             const actionBadge = r.action === 'new'
                 ? '<span class="badge bg-success">New</span>'
                 : r.action === 'update'
@@ -1827,6 +1916,7 @@ $stepLabels = [
                     <td>${esc(r.hire_date)}</td>
                     <td><span class="badge bg-secondary">${esc(r.emp_status)}</span></td>
                     <td>${issuesList}</td>
+                    <td><button type="button" class="btn btn-sm btn-outline-success text-nowrap" data-csv-row-index="${index}" aria-expanded="false" aria-controls="csvEmployeeDetails"><i class="fas fa-eye me-1"></i>View details</button></td>
                 </tr>`;
         });
 
