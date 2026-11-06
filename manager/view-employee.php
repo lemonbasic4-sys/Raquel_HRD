@@ -1264,7 +1264,7 @@ $hero_name = trim($emp['first_name'] . ' ' . ($emp['middle_name'] ? $emp['middle
     background: #294306 !important;
     color: #fff !important;
 }
-/* + Add Record button */
+/* Section details button */
 .ep-section-actions .btn-outline-secondary {
     font-size: .74rem !important;
     font-weight: 600 !important;
@@ -1419,6 +1419,13 @@ $hero_name = trim($emp['first_name'] . ' ' . ($emp['middle_name'] ? $emp['middle
 }
 .ep-hero-info {
     flex: 1;
+}
+.ep-hero-heading,
+.ep-hero-heading-badges {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
 }
 .ep-hero-role {
     font-size: 0.95rem;
@@ -1615,12 +1622,23 @@ $hero_name = trim($emp['first_name'] . ' ' . ($emp['middle_name'] ? $emp['middle
     .ep-hero-info .d-flex {
         justify-content: center !important;
     }
+    .ep-hero-heading {
+        width: 100%;
+        flex-direction: column;
+        justify-content: center;
+        gap: 8px;
+    }
+    .ep-hero-heading-badges {
+        justify-content: center;
+    }
     .ep-name {
         font-size: 1.25rem !important;
         font-weight: 800 !important;
         color: #142236 !important;
         word-break: break-word !important;
         line-height: 1.25 !important;
+        width: 100%;
+        text-align: center;
     }
     .ep-hero-role {
         font-size: 0.92rem !important;
@@ -1668,9 +1686,9 @@ $hero_name = trim($emp['first_name'] . ' ' . ($emp['middle_name'] ? $emp['middle
     .ep-meta-box strong {
         font-size: 0.78rem !important;
         display: block !important;
-        overflow: hidden !important;
-        text-overflow: ellipsis !important;
-        white-space: nowrap !important;
+        white-space: normal !important;
+        overflow-wrap: anywhere;
+        line-height: 1.3;
     }
     .ep-service-years {
         grid-column: 1 / -1 !important;
@@ -1957,14 +1975,16 @@ foreach ($completionSections as $k => $done) {
         <!-- avatar wrapper end -->
         </div>
         <div class="ep-hero-info">
-            <div class="d-flex align-items-center gap-2 flex-wrap">
+            <div class="ep-hero-heading">
                 <h2 class="ep-name"><?php echo e($hero_name); ?></h2>
-                <span class="badge ep-badge-status <?php echo $emp['is_active'] ? 'ep-status-active' : 'ep-status-inactive'; ?>">
-                    <i class="fas fa-circle me-1" style="font-size:0.4rem; vertical-align: middle;"></i><?php echo $emp['is_active'] ? 'Active' : 'Inactive'; ?>
-                </span>
-                <?php if ($missingHrisAccount): ?>
-                    <span class="ep-hris-missing" role="status" title="This Human Resources employee does not have an HRIS portal account."><i class="fas fa-user-lock" aria-hidden="true"></i> No HRIS account</span>
-                <?php endif; ?>
+                <div class="ep-hero-heading-badges">
+                    <span class="badge ep-badge-status <?php echo $emp['is_active'] ? 'ep-status-active' : 'ep-status-inactive'; ?>">
+                        <i class="fas fa-circle me-1" style="font-size:0.4rem; vertical-align: middle;"></i><?php echo $emp['is_active'] ? 'Active' : 'Inactive'; ?>
+                    </span>
+                    <?php if ($missingHrisAccount): ?>
+                        <span class="ep-hris-missing" role="status" title="This Human Resources employee does not have an HRIS portal account."><i class="fas fa-user-lock" aria-hidden="true"></i> No HRIS account</span>
+                    <?php endif; ?>
+                </div>
             </div>
             <div class="ep-hero-role mt-1">
                 <?php echo e($emp['job_title']); ?>
@@ -2378,7 +2398,7 @@ foreach ($completionSections as $k => $done) {
             </div>
             <div class="ep-section-actions">
                 <?php echo (empty($family) && empty($children)) ? '<span class="badge bg-secondary">No records</span>' : '<span class="badge bg-success">Has records</span>'; ?>
-                <button class='btn btn-sm btn-outline-success'>+ Add Record</button>
+                <button class='btn btn-sm btn-outline-success'>View Details</button>
                 <i class="fas fa-chevron-down ep-chevron " id="chevron-family"></i>
             </div>
         </div>
@@ -2500,7 +2520,7 @@ foreach ($completionSections as $k => $done) {
             </div>
             <div class="ep-section-actions">
                 <?php echo empty($education) ? '<span class="badge bg-secondary">No records</span>' : '<span class="badge bg-success">' . count($education) . ' records</span>'; ?>
-                <button class='btn btn-sm btn-outline-success'>+ Add Record</button>
+                <button class='btn btn-sm btn-outline-success'>View Details</button>
                 <i class="fas fa-chevron-down ep-chevron " id="chevron-education"></i>
             </div>
         </div>
@@ -2559,7 +2579,7 @@ foreach ($completionSections as $k => $done) {
             </div>
             <div class="ep-section-actions">
                 <?php echo empty($work) ? '<span class="badge bg-secondary">No records</span>' : '<span class="badge bg-success">' . count($work) . ' records</span>'; ?>
-                <button class='btn btn-sm btn-outline-success'>+ Add Record</button>
+                <button class='btn btn-sm btn-outline-success'>View Details</button>
                 <i class="fas fa-chevron-down ep-chevron " id="chevron-work"></i>
             </div>
         </div>
@@ -2625,7 +2645,7 @@ foreach ($completionSections as $k => $done) {
             </div>
             <div class="ep-section-actions">
                 <?php echo (empty($trainings) && empty($eligibility)) ? '<span class="badge bg-secondary">No records</span>' : '<span class="badge bg-success">' . (count($trainings) + count($eligibility)) . ' records</span>'; ?>
-                <button class='btn btn-sm btn-outline-success'>+ Add Record</button>
+                <button class='btn btn-sm btn-outline-success'>View Details</button>
                 <i class="fas fa-chevron-down ep-chevron " id="chevron-training"></i>
             </div>
         </div>
@@ -2767,7 +2787,7 @@ foreach ($completionSections as $k => $done) {
             </div>
             <div class="ep-section-actions">
                 <?php echo (empty($skills) && empty($recognitions) && empty($memberships)) ? '<span class="badge bg-secondary">No records</span>' : '<span class="badge bg-success">' . (count($skills) + count($recognitions) + count($memberships)) . ' records</span>'; ?>
-                <button class='btn btn-sm btn-outline-success'>+ Add Record</button>
+                <button class='btn btn-sm btn-outline-success'>View Details</button>
                 <i class="fas fa-chevron-down ep-chevron " id="chevron-skills"></i>
             </div>
         </div>
@@ -2933,7 +2953,7 @@ foreach ($completionSections as $k => $done) {
             </div>
             <div class="ep-section-actions">
                 <?php echo (empty($real_props) && empty($personal_props) && empty($liabilities)) ? '<span class="badge bg-secondary">No records</span>' : '<span class="badge bg-success">' . (count($real_props) + count($personal_props) + count($liabilities)) . ' records</span>'; ?>
-                <button class='btn btn-sm btn-outline-success'>+ Add Record</button>
+                <button class='btn btn-sm btn-outline-success'>View Details</button>
                 <i class="fas fa-chevron-down ep-chevron " id="chevron-assets"></i>
             </div>
         </div>
@@ -3056,7 +3076,7 @@ foreach ($completionSections as $k => $done) {
             </div>
             <div class="ep-section-actions">
                 <?php echo empty($refs) ? '<span class="badge bg-secondary">No records</span>' : '<span class="badge bg-success">' . count($refs) . ' records</span>'; ?>
-                <button class='btn btn-sm btn-outline-success'>+ Add Record</button>
+                <button class='btn btn-sm btn-outline-success'>View Details</button>
                 <i class="fas fa-chevron-down ep-chevron " id="chevron-references"></i>
             </div>
         </div>

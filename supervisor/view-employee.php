@@ -1203,7 +1203,7 @@ $hero_name = trim($emp['first_name'] . ' ' . ($emp['middle_name'] ? $emp['middle
     background: #294306 !important;
     color: #fff !important;
 }
-/* + Add Record button */
+/* Section details button */
 .ep-section-actions .btn-outline-secondary {
     font-size: .74rem !important;
     font-weight: 600 !important;
@@ -1903,7 +1903,7 @@ foreach ($completionSections as $k => $done) {
             </div>
             <div class="ep-section-actions">
                 <?php echo (empty($family) && empty($children)) ? '<span class="badge bg-secondary">No records</span>' : '<span class="badge bg-success">Has records</span>'; ?>
-                <button class='btn btn-sm btn-outline-success'>+ Add Record</button>
+                <button class='btn btn-sm btn-outline-success'>View Details</button>
                 <i class="fas fa-chevron-down ep-chevron " id="chevron-family"></i>
             </div>
         </div>
@@ -2025,7 +2025,7 @@ foreach ($completionSections as $k => $done) {
             </div>
             <div class="ep-section-actions">
                 <?php echo empty($education) ? '<span class="badge bg-secondary">No records</span>' : '<span class="badge bg-success">' . count($education) . ' records</span>'; ?>
-                <button class='btn btn-sm btn-outline-success'>+ Add Record</button>
+                <button class='btn btn-sm btn-outline-success'>View Details</button>
                 <i class="fas fa-chevron-down ep-chevron " id="chevron-education"></i>
             </div>
         </div>
@@ -2084,7 +2084,7 @@ foreach ($completionSections as $k => $done) {
             </div>
             <div class="ep-section-actions">
                 <?php echo empty($work) ? '<span class="badge bg-secondary">No records</span>' : '<span class="badge bg-success">' . count($work) . ' records</span>'; ?>
-                <button class='btn btn-sm btn-outline-success'>+ Add Record</button>
+                <button class='btn btn-sm btn-outline-success'>View Details</button>
                 <i class="fas fa-chevron-down ep-chevron " id="chevron-work"></i>
             </div>
         </div>
@@ -2150,7 +2150,7 @@ foreach ($completionSections as $k => $done) {
             </div>
             <div class="ep-section-actions">
                 <?php echo (empty($trainings) && empty($eligibility)) ? '<span class="badge bg-secondary">No records</span>' : '<span class="badge bg-success">' . (count($trainings) + count($eligibility)) . ' records</span>'; ?>
-                <button class='btn btn-sm btn-outline-success'>+ Add Record</button>
+                <button class='btn btn-sm btn-outline-success'>View Details</button>
                 <i class="fas fa-chevron-down ep-chevron " id="chevron-training"></i>
             </div>
         </div>
@@ -2292,7 +2292,7 @@ foreach ($completionSections as $k => $done) {
             </div>
             <div class="ep-section-actions">
                 <?php echo (empty($skills) && empty($recognitions) && empty($memberships)) ? '<span class="badge bg-secondary">No records</span>' : '<span class="badge bg-success">' . (count($skills) + count($recognitions) + count($memberships)) . ' records</span>'; ?>
-                <button class='btn btn-sm btn-outline-success'>+ Add Record</button>
+                <button class='btn btn-sm btn-outline-success'>View Details</button>
                 <i class="fas fa-chevron-down ep-chevron " id="chevron-skills"></i>
             </div>
         </div>
@@ -2458,7 +2458,7 @@ foreach ($completionSections as $k => $done) {
             </div>
             <div class="ep-section-actions">
                 <?php echo (empty($real_props) && empty($personal_props) && empty($liabilities)) ? '<span class="badge bg-secondary">No records</span>' : '<span class="badge bg-success">' . (count($real_props) + count($personal_props) + count($liabilities)) . ' records</span>'; ?>
-                <button class='btn btn-sm btn-outline-success'>+ Add Record</button>
+                <button class='btn btn-sm btn-outline-success'>View Details</button>
                 <i class="fas fa-chevron-down ep-chevron " id="chevron-assets"></i>
             </div>
         </div>
@@ -2581,7 +2581,7 @@ foreach ($completionSections as $k => $done) {
             </div>
             <div class="ep-section-actions">
                 <?php echo empty($refs) ? '<span class="badge bg-secondary">No records</span>' : '<span class="badge bg-success">' . count($refs) . ' records</span>'; ?>
-                <button class='btn btn-sm btn-outline-success'>+ Add Record</button>
+                <button class='btn btn-sm btn-outline-success'>View Details</button>
                 <i class="fas fa-chevron-down ep-chevron " id="chevron-references"></i>
             </div>
         </div>
