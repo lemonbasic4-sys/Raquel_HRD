@@ -31,8 +31,8 @@ if (!empty($_SESSION['employee_id'])) {
     $emp_stmt->execute();
     $linked_employee = $emp_stmt->get_result()->fetch_assoc();
     $emp_stmt->close();
-} elseif (!empty($_SESSION['email'])) {
-    // Fallback to email matching if employee_id is not in session (e.g. for Admin who might not have linked employee_id)
+} elseif (($_SESSION['role'] ?? '') !== 'Admin' && !empty($_SESSION['email'])) {
+    // Legacy HR accounts may have no employee ID in their session.
     $emp_stmt = $conn->prepare("SELECT e.*, b.branch_name, d.department_name as department, ec.personal_email, ec.mobile_number, ec.telephone_number 
         FROM employees e 
         LEFT JOIN branches b ON e.branch_id = b.branch_id
@@ -62,8 +62,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             $error_msg = 'Image must be under 2MB.';
         } else {
             $ext = pathinfo($file['name'], PATHINFO_EXTENSION);
-            $filename = 'emp_' . ($linked_employee ? $linked_employee['employee_id'] : $user_id) . '_' . time() . '.' . $ext;
-            $upload_dir = __DIR__ . '/../assets/img/employees/';
+            $filename = ($linked_employee ? 'emp_' . $linked_employee['employee_id'] : 'user_' . $user_id) . '_' . time() . '.' . $ext;
+            $upload_dir = __DIR__ . '/../assets/img/' . ($linked_employee ? 'employees/' : 'users/');
             
             if (!is_dir($upload_dir)) {
                 mkdir($upload_dir, 0755, true);
@@ -83,9 +83,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                     $upd->execute();
                     $upd->close();
                     $linked_employee['profile_picture'] = $filename;
+                } else {
+                    $upd = $conn->prepare("UPDATE users SET profile_picture = ? WHERE user_id = ?");
+                    $upd->bind_param("si", $filename, $user_id);
+                    $upd->execute();
+                    $upd->close();
+                    $user['profile_picture'] = $filename;
                 }
                 
-                logAudit($conn, $user_id, 'UPDATE', 'Employee Profile', $linked_employee ? $linked_employee['employee_id'] : 0, 'Updated profile picture');
+                logAudit($conn, $user_id, 'UPDATE', $linked_employee ? 'Employee Profile' : 'User Profile', $linked_employee ? $linked_employee['employee_id'] : $user_id, 'Updated profile picture');
                 $success_msg = 'Profile picture updated successfully!';
             } else {
                 $error_msg = 'Failed to upload image. Please try again.';
@@ -158,16 +164,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     }
 }
 
-// Determine the current avatar
-$current_avatar = '';
-if ($linked_employee && !empty($linked_employee['profile_picture'])) {
-    $current_avatar = getEmployeeAvatar($linked_employee['profile_picture']);
-} else {
-    $role_img = 'staff.png';
-    if ($_SESSION['role'] === 'HR Manager') $role_img = 'manager.png';
-    elseif ($_SESSION['role'] === 'HR Supervisor') $role_img = 'supervisor.png';
-    $current_avatar = BASE_URL . '/assets/img/avatars/' . $role_img;
-}
+// Use the same avatar fallback as the navbar when no photo is available.
+$current_avatar = getUserAvatar(
+    $user['profile_picture'] ?? null,
+    $linked_employee['profile_picture'] ?? null
+);
 
 require_once __DIR__ . '/header.php';
 ?>

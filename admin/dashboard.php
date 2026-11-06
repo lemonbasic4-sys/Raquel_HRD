@@ -4,27 +4,23 @@ require_once '../includes/session-check.php';
 checkRole(['Admin']);
 require_once '../includes/header.php';
 
-// Fetch stats - only count valid HR system users (Admin and HR roles), exclude orphaned accounts
+// Account cards count employee-linked HRIS accounts; standalone admins are separate.
 $total_users = $conn->query("
     SELECT COUNT(*) as c 
     FROM users u
-    LEFT JOIN employees e ON u.employee_id = e.employee_id
-    LEFT JOIN departments d ON e.department_id = d.department_id
-    WHERE (u.role = 'Admin' AND u.employee_id IS NULL)
-       OR (u.role IN ('HR Manager', 'HR Supervisor', 'HR Staff') 
-           AND e.employee_id IS NOT NULL 
-           AND d.department_name = 'Human Resources')
+    JOIN employees e ON u.employee_id = e.employee_id
+    JOIN departments d ON e.department_id = d.department_id
+    WHERE u.role IN ('HR Manager', 'HR Supervisor', 'HR Staff')
+      AND d.department_name = 'Human Resources'
 ")->fetch_assoc()['c'];
 $active_users = $conn->query("
     SELECT COUNT(*) as c 
     FROM users u
-    LEFT JOIN employees e ON u.employee_id = e.employee_id
-    LEFT JOIN departments d ON e.department_id = d.department_id
+    JOIN employees e ON u.employee_id = e.employee_id
+    JOIN departments d ON e.department_id = d.department_id
     WHERE u.is_active = 1
-      AND ((u.role = 'Admin' AND u.employee_id IS NULL)
-       OR (u.role IN ('HR Manager', 'HR Supervisor', 'HR Staff') 
-           AND e.employee_id IS NOT NULL 
-           AND d.department_name = 'Human Resources'))
+      AND u.role IN ('HR Manager', 'HR Supervisor', 'HR Staff')
+      AND d.department_name = 'Human Resources'
 ")->fetch_assoc()['c'];
 $total_branches = $conn->query("SELECT COUNT(*) as c FROM branches WHERE deleted_at IS NULL")->fetch_assoc()['c'];
 $recent_logs = $conn->query("SELECT COUNT(*) as c FROM audit_logs WHERE timestamp >= DATE_SUB(NOW(), INTERVAL 24 HOUR)")->fetch_assoc()['c'];
@@ -119,30 +115,26 @@ $pending_account_setup = $conn->query("
 $first_signin_count = (int) ($conn->query("
     SELECT COUNT(*) AS c
     FROM users u
-    LEFT JOIN employees e ON u.employee_id = e.employee_id
-    LEFT JOIN departments d ON e.department_id = d.department_id
+    JOIN employees e ON u.employee_id = e.employee_id
+    JOIN departments d ON e.department_id = d.department_id
     WHERE u.is_active = 1
       AND u.first_login_completed = 0
-      AND ((u.role = 'Admin' AND u.employee_id IS NULL)
-        OR (u.role IN ('HR Manager', 'HR Supervisor', 'HR Staff')
-          AND e.employee_id IS NOT NULL
-          AND e.is_active = 1
-          AND e.deleted_at IS NULL
-          AND d.department_name = 'Human Resources'))
+      AND u.role IN ('HR Manager', 'HR Supervisor', 'HR Staff')
+      AND e.is_active = 1
+      AND e.deleted_at IS NULL
+      AND d.department_name = 'Human Resources'
 ")->fetch_assoc()['c'] ?? 0);
 $first_signin_users = $conn->query("
     SELECT u.user_id, u.full_name, u.role, u.created_at
     FROM users u
-    LEFT JOIN employees e ON u.employee_id = e.employee_id
-    LEFT JOIN departments d ON e.department_id = d.department_id
+    JOIN employees e ON u.employee_id = e.employee_id
+    JOIN departments d ON e.department_id = d.department_id
     WHERE u.is_active = 1
       AND u.first_login_completed = 0
-      AND ((u.role = 'Admin' AND u.employee_id IS NULL)
-        OR (u.role IN ('HR Manager', 'HR Supervisor', 'HR Staff')
-          AND e.employee_id IS NOT NULL
-          AND e.is_active = 1
-          AND e.deleted_at IS NULL
-          AND d.department_name = 'Human Resources'))
+      AND u.role IN ('HR Manager', 'HR Supervisor', 'HR Staff')
+      AND e.is_active = 1
+      AND e.deleted_at IS NULL
+      AND d.department_name = 'Human Resources'
     ORDER BY u.created_at ASC
     LIMIT 3
 ");

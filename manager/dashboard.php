@@ -196,6 +196,9 @@ $age_dist_q = $conn->query("
         SELECT FLOOR(DATEDIFF(CURRENT_DATE, date_of_birth) / 365.25) as age
         FROM employees
         WHERE is_active = 1
+        AND date_of_birth IS NOT NULL
+        AND date_of_birth <= CURRENT_DATE
+        AND TIMESTAMPDIFF(YEAR, date_of_birth, CURRENT_DATE) >= 18
         AND employee_id NOT IN (SELECT employee_id FROM users WHERE role = 'Admin' AND employee_id IS NOT NULL)
     ) as employee_ages
     GROUP BY age_group

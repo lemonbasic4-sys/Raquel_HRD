@@ -481,7 +481,7 @@ switch ($effective_role) {
 
         $sidebar_menus['ACCOUNT'] = [
             ['icon' => 'fas fa-bell',     'label' => 'Notifications', 'url' => BASE_URL . '/employee/notifications.php',   'page' => 'notifications.php'],
-            ['icon' => 'fas fa-user-cog', 'label' => 'Change Password', 'url' => BASE_URL . '/employee/profile-settings.php', 'page' => 'profile-settings.php'],
+            ['icon' => 'fas fa-user-cog', 'label' => 'Profile & Settings', 'url' => BASE_URL . '/employee/profile-settings.php', 'page' => 'profile-settings.php'],
         ];
         break;
 
@@ -742,7 +742,16 @@ if ($annual_nav_actor && $annual_nav_actor['employment_status'] === 'Regular'
                 <?php endforeach; ?>
             <?php endforeach; ?>
 
-            <div class="nav-label">ACCOUNT</div>
+            <?php if ($effective_role !== 'Employee'): ?><div class="nav-label">ACCOUNT</div><?php endif; ?>
+            <?php if ($effective_role !== 'Employee'):
+                $account_portal = ['Admin' => 'admin', 'HR Manager' => 'manager', 'HR Supervisor' => 'supervisor', 'HR Staff' => 'staff'][$effective_role] ?? null;
+                if ($account_portal): ?>
+                    <a href="<?php echo BASE_URL . '/' . $account_portal; ?>/profile-settings.php" class="<?php echo $current_page === 'profile-settings.php' ? 'active' : ''; ?>" title="Profile &amp; Settings">
+                        <i class="fas fa-user-cog"></i>
+                        <span class="nav-text">Profile &amp; Settings</span>
+                    </a>
+                <?php endif; ?>
+            <?php endif; ?>
             <a href="<?php echo BASE_URL; ?>/logout.php" title="Logout">
                 <i class="fas fa-sign-out-alt"></i>
                 <span class="nav-text">Logout</span>
@@ -840,44 +849,6 @@ if ($annual_nav_actor && $annual_nav_actor['employment_status'] === 'Regular'
                     </div>
                 </div>
 
-            </div>
-
-            <!-- User Dropdown -->
-            <div class="dropdown user-dropdown <?php echo ($effective_role === 'Employee') ? 'd-none d-md-block' : ''; ?>">
-                <button class="btn dropdown-toggle" data-bs-toggle="dropdown">
-                    <div class="user-avatar">
-                        <img src="<?php echo $display_avatar . '?v=' . time(); ?>" alt="Avatar">
-                    </div>
-                    <span class="d-none d-md-inline"><?php echo e($_SESSION['full_name']); ?></span>
-                </button>
-                <ul class="dropdown-menu dropdown-menu-end">
-                    <li><span class="dropdown-item-text"><small
-                                class="text-muted"><?php echo e($_SESSION['role']); ?></small></span></li>
-                    <li>
-                        <hr class="dropdown-divider">
-                    </li>
-                    <?php
-                    $profile_settings_url = '';
-                    if ($effective_role === 'HR Manager') {
-                        $profile_settings_url = BASE_URL . '/manager/profile-settings.php';
-                    } elseif ($effective_role === 'HR Supervisor') {
-                        $profile_settings_url = BASE_URL . '/supervisor/profile-settings.php';
-                    } elseif ($effective_role === 'HR Staff') {
-                        $profile_settings_url = BASE_URL . '/staff/profile-settings.php';
-                    } elseif ($effective_role === 'Employee') {
-                        $profile_settings_url = BASE_URL . '/employee/profile-settings.php';
-                    }
-                    ?>
-                    <?php if (!empty($profile_settings_url)): ?>
-                        <li><a class="dropdown-item" href="<?php echo $profile_settings_url; ?>"><i
-                                    class="fas fa-user-cog me-2"></i>Profile & Settings</a></li>
-                        <li>
-                            <hr class="dropdown-divider">
-                        </li>
-                    <?php endif; ?>
-                    <li><a class="dropdown-item" href="<?php echo BASE_URL; ?>/logout.php"><i
-                                class="fas fa-sign-out-alt me-2"></i>Logout</a></li>
-                </ul>
             </div>
 
             <?php if ($effective_role === 'Employee'): ?>

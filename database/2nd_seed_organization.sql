@@ -195,6 +195,9 @@ WHERE (job_title_id = 301 AND job_title = 'Business Development Staff on Trainin
    OR (job_title_id = 1201 AND job_title = 'Purchasing Supervisor on Training');
 
 REPLACE INTO job_titles (job_title_id, job_title, rank_category_id, department_id, is_active, is_head, reports_to, created_at, updated_at) VALUES
+-- Referenced heads must exist first when the importer enforces foreign keys.
+(1100, 'President and CEO', 1, 10, 1, 1, NULL, NOW(), NOW()),
+(1000, 'VP for Operations', 1, 11, 1, 0, 1100, NOW(), NOW()),
 -- Acquired Properties (100-119)
 (100, 'VP for Acquired Properties', 1, 1, 1, 1, 1100, NOW(), NOW()),
 (101, 'AP Manager I', 3, 1, 1, 1, 100, NOW(), NOW()),
@@ -323,7 +326,6 @@ REPLACE INTO job_titles (job_title_id, job_title, rank_category_id, department_i
 (904, 'Marketing Staff I', 5, 9, 1, 0, 902, NOW(), NOW()),
 (905, 'Marketing Staff II', 5, 9, 1, 0, 902, NOW(), NOW()),
 -- Operations (1000-1049)
-(1000, 'VP for Operations', 1, 11, 1, 0, 1100, NOW(), NOW()),
 (1001, 'Regional Manager I', 3, 11, 1, 1, 1000, NOW(), NOW()),
 (1002, 'Regional Manager II', 3, 11, 1, 1, 1000, NOW(), NOW()),
 (1004, 'Area Coordinator I', 4, 11, 1, 1, 1001, NOW(), NOW()),
@@ -340,7 +342,6 @@ REPLACE INTO job_titles (job_title_id, job_title, rank_category_id, department_i
 (1015, 'Branch Staff IV', 5, 11, 1, 0, 1007, NOW(), NOW()),
 (1016, 'Branch Staff V', 5, 11, 1, 0, 1007, NOW(), NOW()),
 -- Office of the President (1100-1119)
-(1100, 'President and CEO', 1, 10, 1, 1, NULL, NOW(), NOW()),
 (1101, 'Executive Assistant I', 5, 10, 1, 0, 1100, NOW(), NOW()),
 (1102, 'Executive Assistant II', 5, 10, 1, 0, 1100, NOW(), NOW()),
 (1103, 'Executive Assistant III', 5, 10, 1, 0, 1100, NOW(), NOW()),

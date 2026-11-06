@@ -70,6 +70,15 @@ $total_users_result = $conn->query("
            AND e.department_id = (SELECT department_id FROM departments WHERE department_name = 'Human Resources' LIMIT 1))
 ");
 $total_users = (int) ($total_users_result->fetch_assoc()['total'] ?? 0);
+$hris_users_result = $conn->query("
+    SELECT COUNT(*) AS total
+    FROM users u
+    JOIN employees e ON e.employee_id = u.employee_id
+    JOIN departments d ON d.department_id = e.department_id
+    WHERE u.role IN ('HR Manager', 'HR Supervisor', 'HR Staff')
+      AND d.department_name = 'Human Resources'
+");
+$hris_users_count = (int) ($hris_users_result->fetch_assoc()['total'] ?? 0);
 $active_users_result = $conn->query("\n    SELECT COUNT(*) AS total\n    FROM users u\n    LEFT JOIN employees e ON u.employee_id = e.employee_id\n    WHERE u.is_active = 1 AND COALESCE(u.account_hold, 0) = 0\n      AND ((u.role = 'Admin')\n       OR (u.role IN ('HR Manager', 'HR Supervisor', 'HR Staff')\n           AND e.employee_id IS NOT NULL\n           AND e.department_id = (SELECT department_id FROM departments WHERE department_name = 'Human Resources' LIMIT 1)))\n");
 $active_users_count = (int) ($active_users_result->fetch_assoc()['total'] ?? 0);
 $inactive_users_result = $conn->query("\n    SELECT COUNT(*) AS total\n    FROM users u\n    LEFT JOIN employees e ON u.employee_id = e.employee_id\n    WHERE u.is_active = 0\n      AND ((u.role = 'Admin')\n       OR (u.role IN ('HR Manager', 'HR Supervisor', 'HR Staff')\n           AND e.employee_id IS NOT NULL\n           AND e.department_id = (SELECT department_id FROM departments WHERE department_name = 'Human Resources' LIMIT 1)))\n");
@@ -287,7 +296,7 @@ document.addEventListener('DOMContentLoaded', () => new bootstrap.Modal(document
 
 <div class="access-overview" data-flash-toast-anchor>
     <div class="overview-stat page-hero fadeup">
-        <div class="overview-icon"><i class="fas fa-users"></i></div><div class="overview-copy"><div class="overview-value"><?php echo $total_users; ?></div><div class="overview-label">HRIS accounts</div></div>
+        <div class="overview-icon"><i class="fas fa-users"></i></div><div class="overview-copy"><div class="overview-value"><?php echo $hris_users_count; ?></div><div class="overview-label">HRIS accounts</div></div>
     </div>
     <div class="overview-stat page-hero fadeup">
         <div class="overview-icon"><i class="fas fa-user-check"></i></div><div class="overview-copy"><div class="overview-value text-success"><?php echo $active_users_count; ?></div><div class="overview-label">Active</div></div>
