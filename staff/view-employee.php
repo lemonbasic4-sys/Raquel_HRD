@@ -1504,8 +1504,8 @@ foreach ($completionSections as $k => $done) {
         <div class="ep-hero-info">
             <div class="d-flex align-items-center gap-2 flex-wrap">
                 <h2 class="ep-name"><?php echo e($hero_name); ?></h2>
-                <span class="badge ep-badge-status <?php echo $emp['is_active'] ? 'ep-status-active' : 'ep-status-inactive'; ?>">
-                    <i class="fas fa-circle me-1" style="font-size:0.4rem; vertical-align: middle;"></i><?php echo $emp['is_active'] ? 'Active' : 'Inactive'; ?>
+                <span class="badge ep-badge-status <?php echo $emp['is_active'] ? 'ep-status-active' : 'ep-status-inactive'; ?>" tabindex="0" data-status-help="<?php echo $emp['is_active'] ? 'Active employee record. This does not indicate login or attendance.' : 'Inactive employee record. This does not indicate login or attendance.'; ?>" aria-label="<?php echo $emp['is_active'] ? 'Active employee record; login and attendance are not shown.' : 'Inactive employee record; login and attendance are not shown.'; ?>">
+                    <span class="ep-presence-dot" aria-hidden="true"></span><?php echo $emp['is_active'] ? 'Active' : 'Inactive'; ?>
                 </span>
             </div>
             <div class="ep-hero-role mt-1">

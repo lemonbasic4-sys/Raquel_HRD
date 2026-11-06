@@ -7585,3 +7585,102 @@ label {
     body.role-employee .main-content .form-control,
     body.role-employee .main-content .form-select { max-width: 100%; }
 }
+
+/* Employee profile employment status, distinct from online presence. */
+.employee-profile-page .ep-badge-status,
+.employee-profile-page .ep-hris-missing {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: help;
+    overflow: visible;
+    transition: transform .2s ease, box-shadow .2s ease;
+}
+
+.employee-profile-page .ep-badge-status:hover,
+.employee-profile-page .ep-badge-status:focus-visible {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 14px rgba(15, 83, 36, .18);
+    outline: 2px solid #147d4b;
+    outline-offset: 2px;
+}
+
+.employee-profile-page .ep-hris-missing:hover,
+.employee-profile-page .ep-hris-missing:focus-visible {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 14px rgba(128, 81, 0, .2);
+    outline: 2px solid #b77a05;
+    outline-offset: 2px;
+}
+
+.employee-profile-page .ep-presence-dot {
+    width: 8px;
+    height: 8px;
+    flex: none;
+    border-radius: 50%;
+    background: #13a65d;
+    box-shadow: 0 0 0 2px rgba(19, 166, 93, .18);
+    animation: ep-status-pulse 2.4s ease-in-out infinite;
+}
+
+.employee-profile-page .ep-status-inactive .ep-presence-dot {
+    background: #b91c1c;
+    box-shadow: 0 0 0 2px rgba(185, 28, 28, .14);
+    animation: none;
+}
+
+.employee-profile-page .ep-badge-status::after,
+.employee-profile-page .ep-hris-missing::after {
+    content: attr(data-status-help);
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + 9px);
+    width: min(220px, calc(100vw - 40px));
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: #143b22;
+    color: #fff;
+    font-size: .72rem;
+    font-weight: 500;
+    line-height: 1.4;
+    text-align: center;
+    white-space: normal;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, .2);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translate(-50%, 4px);
+    transition: opacity .18s ease, transform .18s ease, visibility .18s ease;
+    z-index: 20;
+}
+
+.employee-profile-page .ep-badge-status:hover::after,
+.employee-profile-page .ep-badge-status:focus-visible::after {
+    opacity: 1;
+    visibility: visible;
+    transform: translate(-50%, 0);
+}
+
+.employee-profile-page .ep-hris-missing::after {
+    background: #664500;
+}
+
+.employee-profile-page .ep-hris-missing:hover::after,
+.employee-profile-page .ep-hris-missing:focus-visible::after {
+    opacity: 1;
+    visibility: visible;
+    transform: translate(-50%, 0);
+}
+
+@keyframes ep-status-pulse {
+    50% { box-shadow: 0 0 0 5px rgba(19, 166, 93, .12); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .employee-profile-page .ep-presence-dot { animation: none; }
+    .employee-profile-page .ep-badge-status,
+    .employee-profile-page .ep-badge-status::after,
+    .employee-profile-page .ep-hris-missing,
+    .employee-profile-page .ep-hris-missing::after { transition: none; }
+}

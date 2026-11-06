@@ -1847,6 +1847,51 @@ $hero_name = trim($emp['first_name'] . ' ' . ($emp['middle_name'] ? $emp['middle
     }
 }
 
+/* The section navigator is visible through tablet widths (d-lg-none). */
+@media (min-width: 768px) and (max-width: 991.98px) {
+    .ep-mobile-nav {
+        position: sticky;
+        top: 60px;
+        z-index: 1020;
+        background: #ffffff;
+        padding: 8px 0;
+        margin: 0 0 1rem;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(15, 23, 42, .06);
+    }
+    .ep-mobile-nav-inner {
+        display: flex;
+        gap: 8px;
+        overflow-x: auto;
+        flex-wrap: nowrap;
+        padding: 2px 12px;
+        scrollbar-width: none;
+        -webkit-overflow-scrolling: touch;
+    }
+    .ep-mobile-nav-inner::-webkit-scrollbar { display: none; }
+    .ep-mobile-nav-pill {
+        flex: 0 0 auto;
+        padding: 7px 13px;
+        border: 1px solid #cbd5e1;
+        border-radius: 999px;
+        background: #f8fafc;
+        color: #334155;
+        font-size: .8rem;
+        font-weight: 600;
+        white-space: nowrap;
+        cursor: pointer;
+        transition: background .2s ease, color .2s ease, border-color .2s ease;
+    }
+    .ep-mobile-nav-pill:hover { border-color: #294306; color: #294306; }
+    .ep-mobile-nav-pill.active,
+    .ep-mobile-nav-pill:active {
+        background: #082E06;
+        border-color: #082E06;
+        color: #ffffff;
+    }
+}
+
 @media (max-width: 575.98px) {
     .detail-grid {
         grid-template-columns: 1fr !important;
@@ -1978,11 +2023,11 @@ foreach ($completionSections as $k => $done) {
             <div class="ep-hero-heading">
                 <h2 class="ep-name"><?php echo e($hero_name); ?></h2>
                 <div class="ep-hero-heading-badges">
-                    <span class="badge ep-badge-status <?php echo $emp['is_active'] ? 'ep-status-active' : 'ep-status-inactive'; ?>">
-                        <i class="fas fa-circle me-1" style="font-size:0.4rem; vertical-align: middle;"></i><?php echo $emp['is_active'] ? 'Active' : 'Inactive'; ?>
+                    <span class="badge ep-badge-status <?php echo $emp['is_active'] ? 'ep-status-active' : 'ep-status-inactive'; ?>" tabindex="0" data-status-help="<?php echo $emp['is_active'] ? 'Active employee record. This does not indicate login or attendance.' : 'Inactive employee record. This does not indicate login or attendance.'; ?>" aria-label="<?php echo $emp['is_active'] ? 'Active employee record; login and attendance are not shown.' : 'Inactive employee record; login and attendance are not shown.'; ?>">
+                        <span class="ep-presence-dot" aria-hidden="true"></span><?php echo $emp['is_active'] ? 'Active' : 'Inactive'; ?>
                     </span>
                     <?php if ($missingHrisAccount): ?>
-                        <span class="ep-hris-missing" role="status" title="This Human Resources employee does not have an HRIS portal account."><i class="fas fa-user-lock" aria-hidden="true"></i> No HRIS account</span>
+                        <span class="ep-hris-missing" role="status" tabindex="0" data-status-help="This employee does not have an HRIS portal account yet. Their employment status is separate." aria-label="No HRIS account. This employee does not have an HRIS portal account yet."><i class="fas fa-user-lock" aria-hidden="true"></i> No HRIS account</span>
                     <?php endif; ?>
                 </div>
             </div>
