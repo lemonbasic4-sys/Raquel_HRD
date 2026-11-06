@@ -195,6 +195,7 @@ $selected_branch = $_GET['branch'] ?? $user_assigned_branch_name;
     /* ── Job Title Rank Badges ───────────────────────── */
     .job-badge {
         display: inline-block;
+        max-width: 100%;
         padding: 2px 9px;
         border-radius: 12px;
         font-size: .72rem;
@@ -203,6 +204,13 @@ $selected_branch = $_GET['branch'] ?? $user_assigned_branch_name;
         white-space: normal;
         overflow-wrap: anywhere;
         word-break: break-word;
+    }
+    #empTable th:nth-child(3),
+    #empTable td:nth-child(3) {
+        width: 155px;
+        min-width: 155px;
+        max-width: 155px;
+        white-space: normal;
     }
     .job-badge-executive   { background: #fff3cd; color: #856404; border: 1px solid #ffc107; }
     .job-badge-mgmt-team   { background: #ede7f6; color: #5e35b1; border: 1px solid #9c77e0; }
@@ -753,7 +761,6 @@ $selected_branch = $_GET['branch'] ?? $user_assigned_branch_name;
                        class="text-decoration-none d-flex align-items-center gap-3 mb-2 employee-view-link"
                        data-base-href="<?php echo BASE_URL; ?>/manager/view-employee.php?id=<?php echo $emp['employee_id']; ?>">
                         <img src="<?php echo getEmployeeAvatar($emp['profile_picture']); ?>" alt="Profile" class="rounded-circle flex-shrink-0" style="width: 52px; height: 52px; aspect-ratio: 1 / 1; object-fit: cover; object-position: center; border: 2.5px solid #ffffff; box-shadow: 0 0 0 1.5px rgba(8, 46, 6, 0.16), 0 3px 8px rgba(0,0,0,0.08);">
-                             class="rounded-circle border flex-shrink-0" style="width: 50px; height: 50px; object-fit: cover;">
                         <div style="flex:1; min-width:0;">
                             <div class="d-flex align-items-center justify-content-between gap-1">
                                 <h6 class="fw-bold mb-0 text-truncate" style="font-size: 0.98rem; color: #142236;">
