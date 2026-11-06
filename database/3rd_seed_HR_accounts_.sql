@@ -1,9 +1,4 @@
--- ============================================================================
--- HRIS user accounts and employee data seed file
--- Standalone admin account
--- Essential file for creating the initial admin account and HRD team employees
--- ============================================================================
-
+SET NAMES utf8mb4;
 USE raquel_hris;
 SET FOREIGN_KEY_CHECKS = 0;
 

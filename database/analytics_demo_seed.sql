@@ -1,24 +1,3 @@
--- ============================================================
--- Analytics Demonstration Seed
--- Covers all 12 departments with realistic employee data,
--- portal user accounts, evaluations, career movements, and
--- audit logs to drive every analytics dashboard widget.
---
--- Departments:
---   1  Acquired Properties (AP)   | IDs 9100–9109
---   2  Audit                      | IDs 9200–9206
---   3  Business Development (BD)  | IDs 9300–9304
---   4  Compliance                 | IDs 9400–9405
---   5  Finance                    | IDs 9500–9509
---   6  General Services (GS)      | IDs 9600–9610
---   7  Human Resources (HR)       | IDs 9700–9705 (+ system HR accounts 101,301,302)
---   8  Information Technology     | IDs 9800–9808
---   9  Marketing                  | IDs 9900–9905
---  10  Office of the President    | IDs 9010–9013
---  11  Operations                 | IDs 9110–9117
---  12  Purchasing                 | IDs 9120–9124
--- ============================================================
-
 USE raquel_hris;
 SET FOREIGN_KEY_CHECKS = 0;
 

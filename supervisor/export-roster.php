@@ -19,7 +19,7 @@ function supervisorRosterDate($value): string
 function supervisorRosterFilterValue(string $value, int $limit = 80): string
 {
     $value = trim($value);
-    return strlen($value) > $limit ? substr($value, 0, $limit) : $value;
+    return mb_strlen($value, 'UTF-8') > $limit ? mb_substr($value, 0, $limit, 'UTF-8') : $value;
 }
 
 $search = supervisorRosterFilterValue($_GET['search'] ?? '');
@@ -114,6 +114,7 @@ header('Pragma: no-cache');
 header('Expires: 0');
 
 $output = fopen('php://output', 'w');
+fwrite($output, "\xEF\xBB\xBF");
 fputcsv($output, ['Supervisor Employee Directory']);
 fputcsv($output, ['Scope', 'All non-admin employees']);
 fputcsv($output, ['Generated', date('M d, Y h:i A')]);

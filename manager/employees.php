@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 /**
  * Returns the CSS class for a job title badge based on rank_category_id.
  *  1 = Executives      → gold
@@ -374,16 +374,34 @@ $selected_branch = $_GET['branch'] ?? $user_assigned_branch_name;
         }
         #paginationWrapper {
             flex-direction: column;
-            gap: 15px;
+            gap: 12px;
             text-align: center;
+            padding: 1rem !important;
+        }
+        #paginationNumbers {
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 4px;
+        }
+        #paginationNumbers .page-link {
+            border-radius: 8px !important;
+            padding: 6px 12px;
+            font-size: 0.8rem;
         }
     }
 
     @media (max-width: 575.98px) {
-        .page-hero { padding: 20px 16px; }
-        .page-hero > .row { --bs-gutter-x: .75rem; --bs-gutter-y: .75rem; }
-        .page-hero .stat-card { min-height: 86px; padding: 12px; }
-        .page-hero .stat-label { font-size: .68rem; }
+        .page-hero { padding: 18px 14px; border-radius: 14px; }
+        .page-hero > .row { --bs-gutter-x: .5rem; --bs-gutter-y: .5rem; }
+        .page-hero .stat-card { min-height: 80px; padding: 10px 12px; border-radius: 12px; }
+        .page-hero .stat-card .stat-value { font-size: 1.35rem; }
+        .page-hero .stat-label { font-size: .66rem; }
+        .mobile-list-view { padding: 0.75rem !important; }
+        .hr-mobile-card {
+            border-radius: 14px !important;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05) !important;
+            border: 1px solid #e8ecf1 !important;
+        }
     }
 </style>
 
@@ -396,8 +414,13 @@ $selected_branch = $_GET['branch'] ?? $user_assigned_branch_name;
             <h4 class="text-white fw-bold mb-0 mt-1"><i class="fas fa-users me-2" style="color:#BD9414;"></i>All Employees</h4>
             <p class="text-white-50 small mb-0 mt-2">View, search, and manage employee records, employment status, and assigned organizational details.</p>
         </div>
-        <div style="color:rgba(255,255,255,.6);font-size:.8rem;">
-            <i class="fas fa-sync-alt me-1"></i>Data as of <?php echo date('F d, Y'); ?>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <a href="<?php echo BASE_URL; ?>/manager/add-employee.php" class="btn btn-sm btn-warning fw-bold text-dark px-3 py-2 shadow-sm rounded-pill d-inline-flex align-items-center gap-1">
+                <i class="fas fa-user-plus"></i> Add Employee
+            </a>
+            <div style="color:rgba(255,255,255,.6);font-size:.8rem;">
+                <i class="fas fa-sync-alt me-1"></i>Data as of <?php echo date('F d, Y'); ?>
+            </div>
         </div>
     </div>
 
@@ -454,7 +477,7 @@ $selected_branch = $_GET['branch'] ?? $user_assigned_branch_name;
     <div class="hr-mobile-search-bar d-lg-none px-3 pt-3 pb-1">
         <div class="hr-search-input-wrap">
             <i class="fas fa-search hr-search-icon"></i>
-            <input type="search" class="hr-search-input" id="mobileSearchEmp" placeholder="Search by name, employee ID, position, or department" aria-label="Search employees by name, employee ID, position, or department" title="Search by name, employee ID, position, or department">
+            <input type="search" class="hr-search-input" id="mobileSearchEmp" placeholder="Search employees..." aria-label="Search employees by name, employee ID, position, or department" title="Search by name, employee ID, position, or department">
         </div>
         <button type="button" class="hr-filter-btn" id="mobileFilterOpenBtn" data-hr-filter-open>
             <i class="fas fa-sliders-h"></i> Filters
@@ -725,14 +748,19 @@ $selected_branch = $_GET['branch'] ?? $user_assigned_branch_name;
                         </div>
                     </div>
 
-                    <!-- Main Card Body: Avatar + Name + Rank Badge -->
-                    <div class="d-flex align-items-center gap-3 mb-2">
-                        <img src="<?php echo getEmployeeAvatar($emp['profile_picture']); ?>" alt="Profile"
-                             class="rounded-circle border flex-shrink-0" style="width: 48px; height: 48px; object-fit: cover;">
+                    <!-- Main Card Body: Clickable Avatar + Name + Rank Badge -->
+                    <a href="<?php echo BASE_URL; ?>/manager/view-employee.php?id=<?php echo $emp['employee_id']; ?>" 
+                       class="text-decoration-none d-flex align-items-center gap-3 mb-2 employee-view-link"
+                       data-base-href="<?php echo BASE_URL; ?>/manager/view-employee.php?id=<?php echo $emp['employee_id']; ?>">
+                        <img src="<?php echo getEmployeeAvatar($emp['profile_picture']); ?>" alt="Profile" class="rounded-circle flex-shrink-0" style="width: 52px; height: 52px; aspect-ratio: 1 / 1; object-fit: cover; object-position: center; border: 2.5px solid #ffffff; box-shadow: 0 0 0 1.5px rgba(8, 46, 6, 0.16), 0 3px 8px rgba(0,0,0,0.08);">
+                             class="rounded-circle border flex-shrink-0" style="width: 50px; height: 50px; object-fit: cover;">
                         <div style="flex:1; min-width:0;">
-                            <h6 class="fw-bold mb-0 text-truncate" style="font-size: 0.95rem; color: #1c271b;">
-                                <?php echo e($emp['last_name'] . ', ' . $emp['first_name']); ?>
-                            </h6>
+                            <div class="d-flex align-items-center justify-content-between gap-1">
+                                <h6 class="fw-bold mb-0 text-truncate" style="font-size: 0.98rem; color: #142236;">
+                                    <?php echo e($emp['last_name'] . ', ' . $emp['first_name']); ?>
+                                </h6>
+                                <i class="fas fa-chevron-right text-muted opacity-50" style="font-size: 0.72rem;"></i>
+                            </div>
                             <div class="text-muted small mb-1">ID: <span class="company-id-value"><?php echo e(getEmployeeDisplayId($emp)); ?></span></div>
                             <div class="d-flex align-items-center gap-1 flex-wrap">
                                 <?php
@@ -742,9 +770,9 @@ $selected_branch = $_GET['branch'] ?? $user_assigned_branch_name;
                                 <span class="job-badge <?php echo $badgeClassMob; ?>"><?php echo e($emp['job_title'] ?? 'N/A'); ?></span>
                             </div>
                         </div>
-                    </div>
+                    </a>
 
-                    <!-- Full-Width Metadata Grid (makes the design feel rich & occupied) -->
+                    <!-- Full-Width Metadata Grid -->
                     <div class="p-2.5 rounded-2 bg-light border text-muted small mt-2">
                         <div class="d-flex align-items-center justify-content-between mb-1 gap-2">
                             <span class="text-truncate"><i class="fas fa-sitemap me-1 opacity-75" style="color:var(--hrm-green-mid);"></i><strong>Dept:</strong> <?php echo e($emp['department_name'] ?? 'N/A'); ?></span>
@@ -753,6 +781,22 @@ $selected_branch = $_GET['branch'] ?? $user_assigned_branch_name;
                         <div class="text-truncate">
                             <i class="fas fa-building me-1 opacity-75" style="color:var(--hrm-green-mid);"></i><strong>Branch:</strong> <?php echo e($emp['branch_name'] ?? 'N/A'); ?>
                         </div>
+                    </div>
+
+                    <!-- Mobile Action Footer: Touch-Friendly View & Edit -->
+                    <div class="d-flex align-items-center gap-2 mt-2 pt-2 border-top">
+                        <a href="<?php echo BASE_URL; ?>/manager/view-employee.php?id=<?php echo $emp['employee_id']; ?>" 
+                           class="btn btn-sm btn-primary flex-fill rounded-pill py-1.5 d-flex align-items-center justify-content-center gap-1.5 employee-view-link shadow-none" 
+                           data-base-href="<?php echo BASE_URL; ?>/manager/view-employee.php?id=<?php echo $emp['employee_id']; ?>"
+                           style="font-size: 0.82rem; font-weight: 600;">
+                            <i class="fas fa-id-card"></i> View Profile
+                        </a>
+                        <a href="<?php echo BASE_URL; ?>/manager/edit-employee.php?id=<?php echo $emp['employee_id']; ?>" 
+                           class="btn btn-sm btn-light border rounded-pill px-3 py-1.5 d-flex align-items-center gap-1.5 text-secondary employee-edit-link shadow-none" 
+                           data-base-href="<?php echo BASE_URL; ?>/manager/edit-employee.php?id=<?php echo $emp['employee_id']; ?>"
+                           style="font-size: 0.82rem; font-weight: 600;" title="Edit Employee">
+                            <i class="fas fa-pen text-primary"></i> Edit
+                        </a>
                     </div>
                 </div>
                 <?php endwhile; ?>
@@ -1440,18 +1484,38 @@ $selected_branch = $_GET['branch'] ?? $user_assigned_branch_name;
     function handleNoResults(totalItems, filterInput, tbody) {
         const hasDropdownFilter = filterSelects.some(id => document.getElementById(id).value !== '');
         let noResultsRow = tbody.querySelector('.no-results-row');
+        const mobileList = document.querySelector(".mobile-list-view .student-list");
+        let mobileNoResults = mobileList ? mobileList.querySelector('.mobile-no-results') : null;
+
         if (totalItems === 0 && (filterInput !== "" || hasDropdownFilter)) {
+            let msg = 'No employees match the current filters.';
+            if (filterInput !== '') msg = `No employees found matching "<strong>${filterInput}</strong>"`;
+            
             if (!noResultsRow) {
                 noResultsRow = document.createElement('tr');
                 noResultsRow.className = 'no-results-row text-center';
                 tbody.appendChild(noResultsRow);
             }
-            let msg = 'No employees match the current filters.';
-            if (filterInput !== '') msg = `No employees found matching "<strong>${filterInput}</strong>"`;
             noResultsRow.innerHTML = `<td colspan="8" class="py-4 text-muted"><i class="fas fa-filter fa-2x mb-3 d-block" style="opacity:0.2;"></i>${msg}</td>`;
             noResultsRow.style.display = '';
-        } else if (noResultsRow) {
-            noResultsRow.remove();
+
+            // Also render empty state in mobile view
+            if (mobileList) {
+                if (!mobileNoResults) {
+                    mobileNoResults = document.createElement('div');
+                    mobileNoResults.className = 'mobile-no-results text-center py-5 px-3 bg-white rounded-3 border shadow-sm my-3';
+                    mobileList.appendChild(mobileNoResults);
+                }
+                mobileNoResults.innerHTML = `
+                    <div class="mb-3 text-muted"><i class="fas fa-user-slash fa-3x" style="opacity:0.35;"></i></div>
+                    <h6 class="fw-bold text-dark mb-1">No Employees Found</h6>
+                    <p class="text-muted small mb-0">${msg}</p>
+                `;
+                mobileNoResults.style.display = 'block';
+            }
+        } else {
+            if (noResultsRow) noResultsRow.remove();
+            if (mobileNoResults) mobileNoResults.remove();
         }
     }
 

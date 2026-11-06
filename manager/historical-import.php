@@ -91,6 +91,7 @@ if (isset($_GET['download']) && $_GET['download'] === 'template') {
     header('Content-Type: text/csv; charset=utf-8');
     header('Content-Disposition: attachment; filename=historical_evaluations_template.csv');
     $output = fopen('php://output', 'w');
+    fwrite($output, "\xEF\xBB\xBF");
     fputcsv($output, [
         'employee_code',
         'evaluation_type',
@@ -144,6 +145,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $message_type = 'danger';
             } else {
                 $headers = fgetcsv($handle);
+                if ($headers !== false && isset($headers[0])) {
+                    $headers[0] = preg_replace('/^\xEF\xBB\xBF/', '', $headers[0]);
+                }
                 if ($headers === false || $headers === [null]) {
                     $message = 'The CSV file is empty or missing a header row.';
                     $message_type = 'danger';

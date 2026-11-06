@@ -225,6 +225,7 @@ if (defined('AUDIT_TRAIL_EXPORT_ONLY')) {
     header('Content-Disposition: attachment; filename="audit-trail-' . date('Y-m-d-His') . '.csv"');
     header('Cache-Control: no-store, no-cache, must-revalidate');
     $output = fopen('php://output', 'w');
+    fwrite($output, "\xEF\xBB\xBF");
     fputcsv($output, ['Audit ID', 'Timestamp', 'Actor', 'Role', 'Action', 'Entity type', 'Entity ID', 'Module', 'Outcome', 'Details', 'Previous value', 'New value', 'Target employee', 'Branch', 'Department', 'IP address', 'Browser / device']);
     while ($log = $export_result->fetch_assoc()) {
         $target = trim(($log['employee_code'] ? $log['employee_code'] . ' - ' : '') . trim(($log['first_name'] ?? '') . ' ' . ($log['last_name'] ?? '')));

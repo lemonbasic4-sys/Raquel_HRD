@@ -169,6 +169,7 @@ if ($export_type === 'csv') {
     header('Expires: 0');
 
     $output = fopen('php://output', 'w');
+    fwrite($output, "\xEF\xBB\xBF");
 
     // Report title row
     fputcsv($output, [$report_title . ' - Generated ' . date('M d, Y h:i A')]);
@@ -302,8 +303,8 @@ if ($export_type === 'pdf') {
         for ($c = 0; $c < $colCount; $c++) {
             $value = isset($row[$c]) ? $row[$c] : '';
             // Truncate long text
-            if (strlen($value) > 25 && $c !== 0) {
-                $value = substr($value, 0, 23) . '..';
+            if (mb_strlen($value, 'UTF-8') > 25 && $c !== 0) {
+                $value = mb_substr($value, 0, 23, 'UTF-8') . '..';
             }
             $pdf->Cell($colWidths[$c], 6, utf8_decode($value), 1, 0, ($c === 0 ? 'C' : 'L'), true);
         }

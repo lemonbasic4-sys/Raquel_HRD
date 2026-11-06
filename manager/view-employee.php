@@ -858,16 +858,54 @@ $hero_name = trim($emp['first_name'] . ' ' . ($emp['middle_name'] ? $emp['middle
     margin-bottom: 18px;
     border: 1px solid #e8edf0;
 }
+.ep-avatar-wrapper {
+    position: relative;
+    display: inline-block;
+    flex-shrink: 0;
+}
+.ep-avatar-badge {
+    position: absolute;
+    bottom: 2px;
+    right: 2px;
+    width: 26px;
+    height: 26px;
+    background: #082E06;
+    color: #BD9414;
+    border: 2px solid #ffffff;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.22);
+    transition: transform 0.2s ease, background 0.2s ease;
+    pointer-events: none;
+}
+.ep-avatar-wrapper:hover .ep-avatar-badge {
+    transform: scale(1.12);
+    background: #BD9414;
+    color: #082E06;
+}
 .ep-avatar {
-    width: 90px; height: 90px; border-radius: 50%;
+    width: 92px; height: 92px; border-radius: 50%;
     object-fit: cover;
-    border: 4px solid #f0f4ee;
-    box-shadow: 0 4px 12px rgba(15,23,42,.12);
+    object-position: center;
+    border: 3.5px solid #ffffff;
+    box-shadow: 0 0 0 2.5px rgba(8, 46, 6, 0.16), 0 8px 20px rgba(15,23,42,.12);
     cursor: pointer;
     transition: transform 0.2s, box-shadow 0.2s;
     flex-shrink: 0;
+    display: block;
 }
-.ep-avatar:hover { transform: scale(1.05); box-shadow: 0 6px 18px rgba(41,67,6,.2); }
+
+
+
+
+
+
+
+
+.ep-avatar:hover { transform: scale(1.04); box-shadow: 0 0 0 2.5px #BD9414, 0 10px 24px rgba(41,67,6,.22); }
 .ep-name {
     font-size: 1.35rem;
     font-weight: 800;
@@ -1463,6 +1501,395 @@ $hero_name = trim($emp['first_name'] . ' ' . ($emp['middle_name'] ? $emp['middle
     line-height: 1.1;
     margin-top: 2px;
 }
+/* ═══════════════════════ MOBILE & RESPONSIVE FIXES ═══════════════════════ */
+@media (max-width: 991.98px) {
+    .employee-profile-page {
+        overflow-x: hidden;
+    }
+    
+    .performance-career-panel .col-lg-4.border-start {
+        border-left: none !important;
+        border-top: 1px solid #eef2f6 !important;
+        margin-top: 14px !important;
+        padding-top: 14px !important;
+    }
+}
+
+@media (max-width: 767.98px) {
+    .employee-profile-page {
+        overflow-x: hidden;
+        padding-bottom: 20px;
+    }
+
+    /* Page Hero Action Buttons */
+    .page-hero {
+        padding: 16px 14px !important;
+        border-radius: 14px !important;
+    }
+    .page-hero .employee-page-title {
+        font-size: 1.35rem !important;
+    }
+    .page-hero .d-flex.gap-2.flex-wrap {
+        width: 100% !important;
+        display: flex !important;
+        gap: 8px !important;
+        margin-top: 6px;
+    }
+    .page-hero .d-flex.gap-2.flex-wrap > a.btn-primary {
+        flex: 1 1 auto !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        font-size: 0.85rem !important;
+        padding: 8px 14px !important;
+        border-radius: 999px !important;
+    }
+    .page-hero .d-flex.gap-2.flex-wrap > button.btn-light,
+    .page-hero .d-flex.gap-2.flex-wrap > a.btn-light {
+        flex: 0 0 auto !important;
+        padding: 8px 14px !important;
+        border-radius: 999px !important;
+    }
+
+    /* Hero Card Mobile Styling: Centered, Clean & Balanced */
+    .ep-hero-card {
+        padding: 24px 16px 16px !important;
+        gap: 14px !important;
+        border-radius: 18px !important;
+        margin-bottom: 12px !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        text-align: center !important;
+        background: #ffffff !important;
+        border: 1px solid #e2e8f0 !important;
+        box-shadow: 0 4px 16px rgba(15, 23, 42, 0.05) !important;
+    }
+    .ep-hero-left {
+        min-width: 0 !important;
+        width: 100% !important;
+        gap: 14px !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        text-align: center !important;
+    }
+    .ep-avatar-wrapper {
+        position: relative !important;
+        display: inline-block !important;
+        margin: 0 auto !important;
+        flex-shrink: 0 !important;
+    }
+    .ep-avatar {
+        width: 96px !important;
+        height: 96px !important;
+        flex: 0 0 96px !important;
+        border-radius: 50% !important;
+        object-fit: cover !important;
+        object-position: center !important;
+        border: 4px solid #ffffff !important;
+        box-shadow: 0 0 0 2.5px #BD9414, 0 8px 24px rgba(8, 46, 6, 0.16) !important;
+        display: block !important;
+    }
+    .ep-avatar-badge {
+        position: absolute !important;
+        bottom: 2px !important;
+        right: 2px !important;
+        width: 26px !important;
+        height: 26px !important;
+        background: #082E06 !important;
+        color: #BD9414 !important;
+        border: 2px solid #ffffff !important;
+        border-radius: 50% !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        font-size: 11px !important;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.25) !important;
+    }
+    .ep-hero-info {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        text-align: center !important;
+        width: 100% !important;
+    }
+    .ep-hero-info .d-flex {
+        justify-content: center !important;
+    }
+    .ep-name {
+        font-size: 1.25rem !important;
+        font-weight: 800 !important;
+        color: #142236 !important;
+        word-break: break-word !important;
+        line-height: 1.25 !important;
+    }
+    .ep-hero-role {
+        font-size: 0.92rem !important;
+        font-weight: 700 !important;
+        color: #294306 !important;
+        margin-top: 3px !important;
+    }
+    .ep-hero-sub {
+        font-size: 0.78rem !important;
+        color: #64748b !important;
+        margin-top: 2px !important;
+    }
+    .ep-status-pills {
+        justify-content: center !important;
+        gap: 6px !important;
+        margin-top: 10px !important;
+        flex-wrap: wrap !important;
+    }
+    .ep-pill {
+        font-size: 0.72rem !important;
+        padding: 4px 10px !important;
+    }
+    .ep-hero-right {
+        width: 100% !important;
+        flex-shrink: 1 !important;
+        display: grid !important;
+        grid-template-columns: 1fr 1fr !important;
+        gap: 8px !important;
+        margin-top: 14px !important;
+        padding-top: 14px !important;
+        border-top: 1px solid #edf2f7 !important;
+    }
+    .ep-meta-box {
+        padding: 8px 10px !important;
+        border-radius: 10px !important;
+        gap: 8px !important;
+        min-width: 0 !important;
+    }
+    .ep-meta-icon {
+        font-size: 0.95rem !important;
+    }
+    .ep-meta-box small {
+        font-size: 0.62rem !important;
+    }
+    .ep-meta-box strong {
+        font-size: 0.78rem !important;
+        display: block !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+    }
+    .ep-service-years {
+        grid-column: 1 / -1 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 12px !important;
+        padding: 10px 14px !important;
+        border-radius: 12px !important;
+        background: #f0fdf4 !important;
+        border: 1.5px solid #bbf7d0 !important;
+        min-width: 0 !important;
+    }
+    .ep-service-years .number {
+        font-size: 1.5rem !important;
+        display: inline-block !important;
+    }
+    .ep-service-years .label {
+        font-size: 0.65rem !important;
+        display: inline-block !important;
+        margin-top: 0 !important;
+        text-align: left !important;
+    }
+    /* Sticky Mobile Section Navigator */
+    .ep-mobile-nav {
+        position: sticky;
+        top: 60px;
+        z-index: 1020;
+        background: #ffffff;
+        padding: 8px 0;
+        margin: 0 -0.5rem 1rem -0.5rem;
+        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+        border-bottom: 1px solid #e2e8f0;
+    }
+    .ep-mobile-nav-inner {
+        display: flex;
+        gap: 6px;
+        overflow-x: auto;
+        padding: 2px 12px;
+        scrollbar-width: none;
+        -webkit-overflow-scrolling: touch;
+    }
+    .ep-mobile-nav-inner::-webkit-scrollbar {
+        display: none;
+    }
+    .ep-mobile-nav-pill {
+        flex-shrink: 0;
+        padding: 6px 13px;
+        border-radius: 999px;
+        border: 1px solid #cbd5e1;
+        background: #f8fafc;
+        color: #334155;
+        font-size: 0.74rem;
+        font-weight: 600;
+        white-space: nowrap;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        text-decoration: none;
+    }
+    .ep-mobile-nav-pill:active,
+    .ep-mobile-nav-pill.active {
+        background: #082E06 !important;
+        border-color: #082E06 !important;
+        color: #ffffff !important;
+    }
+
+    /* Section Accordion Headers on Mobile */
+    .ep-section-header {
+        padding: 12px 14px !important;
+        gap: 10px !important;
+    }
+    .ep-section-icon {
+        width: 34px !important;
+        height: 34px !important;
+        font-size: 0.88rem !important;
+        border-radius: 8px !important;
+    }
+    .ep-section-title {
+        font-size: 0.88rem !important;
+    }
+    .ep-section-desc {
+        font-size: 0.72rem !important;
+        display: -webkit-box;
+        -webkit-line-clamp: 1;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+    /* Hide redundant "View Details" text button inside accordion header on mobile */
+    .ep-section-actions .btn,
+    .ep-section-btn {
+        display: none !important;
+    }
+    .ep-badge-count {
+        font-size: 0.68rem !important;
+        padding: 2px 7px !important;
+    }
+    .ep-section-content {
+        padding: 12px 10px 14px !important;
+    }
+
+    /* Completion Banner on Mobile */
+    .ep-completion-banner {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 10px !important;
+        padding: 12px 14px !important;
+    }
+    .ep-completion-banner .btn-outline-primary {
+        width: 100% !important;
+        text-align: center !important;
+    }
+
+    /* Detail Grids on Mobile */
+    .detail-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 8px !important;
+    }
+    .contact-channels-grid {
+        grid-template-columns: 1fr !important;
+    }
+    .detail-item {
+        padding: 8px 10px !important;
+        border-radius: 10px !important;
+    }
+    .detail-label {
+        font-size: 0.65rem !important;
+        margin-bottom: 2px !important;
+    }
+    .detail-value {
+        font-size: 0.84rem !important;
+    }
+
+    /* Employee Tables on Mobile (.employee-table-wrap) */
+    .employee-table-wrap tr {
+        padding: 0.85rem !important;
+        margin-bottom: 0.75rem !important;
+        border: 1px solid #e2e8f0 !important;
+        border-radius: 12px !important;
+        background: #ffffff !important;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.03) !important;
+    }
+    .employee-table-wrap td {
+        padding: 3px 0 !important;
+    }
+    .employee-table-wrap td::before {
+        font-size: 0.65rem !important;
+        color: #64748b !important;
+        font-weight: 700 !important;
+        margin-bottom: 1px !important;
+    }
+    
+    .ep-sidebar-card {
+        border-radius: 14px !important;
+        padding: 14px !important;
+        margin-bottom: 14px !important;
+    }
+}
+
+@media (max-width: 575.98px) {
+    .detail-grid {
+        grid-template-columns: 1fr !important;
+    }
+}
+#imageModal {
+    background: rgba(0, 0, 0, 0.88);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    z-index: 2000;
+}
+#imageModal .modal-dialog {
+    max-width: min(92vw, 420px);
+    margin: 1.5rem auto;
+}
+#imageModal .image-modal-close-btn {
+    position: fixed;
+    top: max(16px, env(safe-area-inset-top, 16px));
+    right: 16px;
+    z-index: 2150;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.65);
+    border: 2px solid rgba(255, 255, 255, 0.7);
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    transition: all 0.2s ease;
+}
+#imageModal .image-modal-close-btn:hover,
+#imageModal .image-modal-close-btn:active {
+    background: rgba(0, 0, 0, 0.88);
+    color: #ffffff;
+    transform: scale(1.06);
+}
+.image-frame-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    max-width: 100%;
+}
+#imageModal #fullImage {
+    max-width: min(84vw, 360px) !important;
+    max-height: min(52vh, 360px) !important;
+    width: auto !important;
+    height: auto !important;
+    object-fit: contain !important;
+    border-radius: 18px !important;
+    border: 3.5px solid #ffffff !important;
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5) !important;
+    background: #ffffff !important;
+    display: block !important;
+    margin: 0 auto !important;
+}
 </style>
 
 
@@ -1524,8 +1951,10 @@ foreach ($completionSections as $k => $done) {
 
 <div class="ep-hero-card">
     <div class="ep-hero-left">
-        <div class="position-relative cursor-pointer" onclick="viewFullImage('<?php echo getEmployeeAvatar($emp['profile_picture']); ?>', '<?php echo e($hero_name); ?>')">
+        <div class="ep-avatar-wrapper position-relative cursor-pointer" onclick="viewFullImage('<?php echo getEmployeeAvatar($emp['profile_picture']); ?>', '<?php echo e($hero_name); ?>')" title="Tap to view full image">
             <img src="<?php echo getEmployeeAvatar($emp['profile_picture']); ?>" class="ep-avatar" alt="Employee profile photo">
+            <span class="ep-avatar-badge" title="Enlarge photo"><i class="fas fa-search-plus"></i></span>
+        <!-- avatar wrapper end -->
         </div>
         <div class="ep-hero-info">
             <div class="d-flex align-items-center gap-2 flex-wrap">
@@ -1615,6 +2044,23 @@ foreach ($completionSections as $k => $done) {
     <button class="btn btn-sm btn-outline-primary" onclick="document.querySelector('.profile-sticky-col').scrollIntoView({behavior: 'smooth'})">View Details &rarr;</button>
 </div>
 
+<!-- Mobile Sticky Section Navigator -->
+<div class="ep-mobile-nav d-lg-none" id="epMobileNav">
+    <div class="ep-mobile-nav-inner">
+        <button type="button" class="ep-mobile-nav-pill active" onclick="scrollToSection('performance')"><i class="fas fa-chart-line me-1"></i>Performance</button>
+        <button type="button" class="ep-mobile-nav-pill" onclick="scrollToSection('personal')"><i class="fas fa-user me-1"></i>Personal</button>
+        <button type="button" class="ep-mobile-nav-pill" onclick="scrollToSection('contact')"><i class="fas fa-phone me-1"></i>Contact</button>
+        <button type="button" class="ep-mobile-nav-pill" onclick="scrollToSection('family')"><i class="fas fa-people-group me-1"></i>Family</button>
+        <button type="button" class="ep-mobile-nav-pill" onclick="scrollToSection('education')"><i class="fas fa-graduation-cap me-1"></i>Education</button>
+        <button type="button" class="ep-mobile-nav-pill" onclick="scrollToSection('work')"><i class="fas fa-briefcase me-1"></i>Work</button>
+        <button type="button" class="ep-mobile-nav-pill" onclick="scrollToSection('training')"><i class="fas fa-certificate me-1"></i>Training</button>
+        <button type="button" class="ep-mobile-nav-pill" onclick="scrollToSection('skills')"><i class="fas fa-star me-1"></i>Skills</button>
+        <button type="button" class="ep-mobile-nav-pill" onclick="scrollToSection('disclosures')"><i class="fas fa-clipboard-list me-1"></i>IDs & Disclosures</button>
+        <button type="button" class="ep-mobile-nav-pill" onclick="scrollToSection('assets')"><i class="fas fa-home me-1"></i>Assets</button>
+        <button type="button" class="ep-mobile-nav-pill" onclick="scrollToSection('references')"><i class="fas fa-address-book me-1"></i>References</button>
+        <button type="button" class="ep-mobile-nav-pill" onclick="scrollToSection('history')"><i class="fas fa-clock-rotate-left me-1"></i>History</button>
+    </div>
+</div>
 <div class="row g-4">
     <div class="col-lg-8">
 
@@ -2677,7 +3123,7 @@ foreach ($completionSections as $k => $done) {
     
     <div class="col-lg-4 profile-sticky-col">
         <!-- 1. Quick Navigation Card (Top) -->
-        <div class="ep-sidebar-card">
+        <div class="ep-sidebar-card d-none d-lg-block">
             <h4 class="ep-sidebar-title"><i class="fas fa-compass text-primary"></i> Quick Navigation</h4>
             <ul class="ep-quick-nav">
                 <li><a href="javascript:void(0)" onclick="scrollToSection('performance')"><div class="ep-quick-nav-icon"><i class="fas fa-chart-line"></i></div> <span>Performance & Career</span> <i class="fas fa-chevron-right ms-auto" style="font-size:0.65rem; color:#9ca3af;"></i></a></li>
@@ -2833,14 +3279,20 @@ foreach ($completionSections as $k => $done) {
 
 <!-- Full Image View Modal -->
 <div class="modal fade" id="imageModal" tabindex="-1" aria-hidden="true">
+    <!-- Floating Top-Right Close Button fixed to viewport with safe area -->
+    <button type="button" class="image-modal-close-btn" data-bs-dismiss="modal" aria-label="Close" title="Close photo viewer">
+        <i class="fas fa-times"></i>
+    </button>
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content bg-transparent border-0 shadow-lg position-relative">
-            <button type="button" class="btn-close btn-close-white p-2 rounded-circle shadow position-absolute" 
-                style="top: 15px; right: 15px; z-index: 1100; background-color: rgba(0,0,0,0.6); border: none;"
-                data-bs-dismiss="modal" aria-label="Close"></button>
-            <div class="modal-body p-0 text-center">
-                <img id="fullImage" src="" class="img-fluid rounded shadow" style="max-height: 85vh; background-color: #ffffff;">
-                <h6 id="fullImageName" class="text-white mt-3 fw-bold"></h6>
+        <div class="modal-content bg-transparent border-0 shadow-none position-relative">
+            <div class="modal-body p-2 text-center d-flex flex-column align-items-center justify-content-center">
+                <div class="image-frame-container mb-2">
+                    <img id="fullImage" src="" alt="Employee Profile Photo">
+                </div>
+                <h6 id="fullImageName" class="text-white fw-bold mb-2" style="font-size: 1rem; text-shadow: 0 2px 6px rgba(0,0,0,0.7);"></h6>
+                <button type="button" class="btn btn-sm btn-light rounded-pill px-4 py-1.5 fw-semibold shadow-sm" data-bs-dismiss="modal" style="font-size: 0.85rem;">
+                    <i class="fas fa-times me-1"></i> Close
+                </button>
             </div>
         </div>
     </div>
@@ -2973,27 +3425,47 @@ foreach ($completionSections as $k => $done) {
 function toggleSection(id) {
     const content = document.getElementById('content-' + id);
     const chevron = document.getElementById('chevron-' + id);
+    if (!content) return;
     if (content.classList.contains('active')) {
         content.classList.remove('active');
-        chevron.classList.remove('open');
+        if (chevron) chevron.classList.remove('open');
     } else {
         content.classList.add('active');
-        chevron.classList.add('open');
-    }
-}
-function scrollToSection(id) {
-    const section = document.getElementById('section-' + id);
-    if (section) {
-        section.scrollIntoView({behavior: 'smooth', block: 'start'});
-        const content = document.getElementById('content-' + id);
-        const chevron = document.getElementById('chevron-' + id);
-        if (!content.classList.contains('active')) {
-            content.classList.add('active');
-            chevron.classList.add('open');
-        }
+        if (chevron) chevron.classList.add('open');
+        // Update active mobile pill
+        document.querySelectorAll('.ep-mobile-nav-pill').forEach(btn => {
+            const isMatch = btn.getAttribute('onclick')?.includes("'" + id + "'");
+            btn.classList.toggle('active', !!isMatch);
+        });
     }
 }
 
+function scrollToSection(id) {
+    const section = document.getElementById('section-' + id);
+    if (section) {
+        const content = document.getElementById('content-' + id);
+        const chevron = document.getElementById('chevron-' + id);
+        if (content && !content.classList.contains('active')) {
+            content.classList.add('active');
+            if (chevron) chevron.classList.add('open');
+        }
+
+        // Highlight active mobile pill & center in view
+        document.querySelectorAll('.ep-mobile-nav-pill').forEach(btn => {
+            const isMatch = btn.getAttribute('onclick')?.includes("'" + id + "'");
+            btn.classList.toggle('active', !!isMatch);
+            if (isMatch) {
+                btn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+            }
+        });
+
+        // Offset for top-navbar + mobile pill nav
+        const isMobile = window.innerWidth < 992;
+        const navOffset = isMobile ? 120 : 80;
+        const targetY = section.getBoundingClientRect().top + window.pageYOffset - navOffset;
+        window.scrollTo({ top: Math.max(0, targetY), behavior: 'smooth' });
+    }
+}
 </script>
 
 <?php require_once '../includes/footer.php'; ?>

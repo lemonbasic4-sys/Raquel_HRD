@@ -42,7 +42,6 @@ $branches_insights_res = $conn->query("
     ORDER BY b.branch_name ASC
 ");
 $branches_insights = $branches_insights_res->fetch_all(MYSQLI_ASSOC);
-$departments_dashboard = $conn->query("SELECT department_id, department_name FROM departments WHERE is_active = 1 AND deleted_at IS NULL ORDER BY department_name")->fetch_all(MYSQLI_ASSOC);
 $total_emp_calc = $total_employees > 0 ? $total_employees : 1;
 
 $recent_evaluations = $conn->query("SELECT ev.evaluation_id, ev.evaluation_type, ev.status, ev.total_score,
@@ -582,9 +581,12 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
     .hr-manager-dashboard .approval-item .details h6 { white-space: normal; overflow-wrap: anywhere; }
     .hr-manager-dashboard .approval-item .details,
     .hr-manager-dashboard .approval-item .status-meta { min-width: 0; overflow-wrap: anywhere; }
-    .hr-manager-dashboard .dashboard-quick-search .form-select { min-width: 0; }
-    .hr-manager-dashboard .custom-select-wrapper,
-    .hr-manager-dashboard .select-trigger { max-width: 100%; min-width: 0; }
+    .hr-manager-dashboard .insight-toolbar { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 12px 20px; margin-bottom: 18px; }
+    .hr-manager-dashboard .insight-toolbar .insight-label { margin: 0; padding-top: 8px; }
+    .hr-manager-dashboard .insight-branch-picker { width: min(100%, 300px); min-width: 0; }
+    .hr-manager-dashboard .insight-branch-picker label { display: block; margin-bottom: 5px; font-size: .72rem; font-weight: 700; }
+    .hr-manager-dashboard .insight-branch-picker .form-select { min-height: 38px; padding: 6px 32px 6px 12px; border-radius: 9px; font-size: .84rem; background-color: #fff; color: #263626; }
+    .hr-manager-dashboard .premium-branch-bg .insight-branch-picker label { color: #fff; }
     .hr-manager-dashboard .hub-quick-links {
         display: grid !important;
         gap: 16px;
@@ -671,12 +673,14 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
         .hr-manager-dashboard .chart-card .cc-header > select { max-width: 100%; }
         .hr-manager-dashboard .chart-card .cc-body:not(.p-0) { padding: 14px; }
         .hr-manager-dashboard #topPerformerBranchFilter { max-width: 100%; width: 100% !important; }
-        .hr-manager-dashboard .dashboard-quick-search .d-flex > .form-select { flex: 1 1 0; width: 0; }
-        .hr-manager-dashboard .dashboard-quick-search .d-flex > .btn { flex: 0 0 42px; }
         .hr-manager-dashboard .chart-container,
         .hr-manager-dashboard .dashboard-chart-wrap { height: 230px !important; }
         .hr-manager-dashboard #topPerformerContainer { height: 290px !important; }
         .hr-manager-dashboard .insight-card { min-height: 0; height: auto; padding: 18px 14px; }
+        .hr-manager-dashboard .insight-toolbar { gap: 10px; margin-bottom: 16px; }
+        .hr-manager-dashboard .insight-toolbar .insight-label { padding-top: 0; }
+        .hr-manager-dashboard .insight-branch-picker { width: 100%; }
+        .hr-manager-dashboard .insight-branch-picker .form-select { min-height: 42px; }
         .hr-manager-dashboard .insight-card .branch-identity { margin-bottom: 16px; }
         .hr-manager-dashboard .insight-card .branch-identity h4 { font-size: 1.15rem; overflow-wrap: anywhere; }
         .hr-manager-dashboard .insight-card .stats-grid { gap: 8px; }
@@ -1048,85 +1052,40 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
     </div>
 </div>
 
-<!-- Branch Distribution Insights (Professional Section) -->
+<!-- Branch Distribution Insights -->
 <div class="row g-4 mb-4 branch-insights-section">
-    <div class="col-12 col-xl-4">
-        <div class="chart-card allow-overflow h-100">
-            <div class="cc-header">
-                <h5><i class="fas fa-search me-2"></i>Quick Search</h5>
-            </div>
-            <div class="cc-body">
-                <form action="employees.php" method="get" class="dashboard-quick-search mb-4">
-                    <label class="small text-muted mb-2" for="dashboardEmployeeSearch">Find an employee</label>
-                    <div class="input-group mb-2">
-                        <span class="input-group-text bg-white"><i class="fas fa-search text-muted"></i></span>
-                        <input type="search" class="form-control" name="search" id="dashboardEmployeeSearch" placeholder="Name, position, or department">
-                    </div>
-                    <div class="d-flex gap-2">
-                        <select class="form-select" name="department" aria-label="Filter by department">
-                            <option value="">All Departments</option>
-                            <?php foreach ($departments_dashboard as $department): ?>
-                                <option value="<?php echo e($department['department_name']); ?>"><?php echo e($department['department_name']); ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                        <button class="btn btn-outline-primary" type="submit" aria-label="Search employees"><i class="fas fa-arrow-right"></i></button>
-                    </div>
-                </form>
-                <div class="border-top pt-3">
-                    <h6 class="small fw-bold mb-2"><i class="fas fa-map-marker-alt me-2"></i>Branch Workforce</h6>
-                    <p class="text-muted small mb-3">Choose a location to view detailed workforce distribution.</p>
-
-                    <div id="branchSelector">
-                        <div class="custom-select-wrapper">
-                            <div class="select-trigger" id="customSelectTrigger">
-                                <span class="selected-text text-muted">Pick a branch...</span>
-                                <i class="fas fa-chevron-down ms-2"></i>
-                            </div>
-                            <div class="select-dropdown" id="customSelectDropdown">
-                                <div class="search-container">
-                                    <input type="text" placeholder="Search branches..." id="branchSearchInput">
-                                </div>
-                                <div class="results-container" id="branchResultsList">
-                                <?php foreach ($branches_insights as $br): 
-                                    // Resolve background image server-side — no JS probing needed
-                                    $bg_dir   = __DIR__ . '/../assets/img/logo/branch_background_images/';
-                                    $bg_url   = '';
-                                    $bid      = $br['branch_id'];
-                                    foreach (['jpg','jpeg','png','webp'] as $ext) {
-                                        if (file_exists($bg_dir . 'branch_' . $bid . '.' . $ext)) {
-                                            $bg_url = BASE_URL . '/assets/img/logo/branch_background_images/branch_' . $bid . '.' . $ext;
-                                            break;
-                                        }
-                                    }
-                                    // Main Office always uses its dedicated image
-                                    if ($br['branch_name'] === 'Raquel Pawnshop Main Office') {
-                                        $bg_url = BASE_URL . '/assets/img/logo/branch_background_images/main_branch.jpg';
-                                    }
-                                ?>
-                                    <div class="select-option" data-id="<?php echo $br['branch_id']; ?>"
-                                        data-name="<?php echo e($br['branch_name']); ?>"
-                                        data-location="<?php echo e($br['location']); ?>"
-                                        data-count="<?php echo $br['emp_count']; ?>"
-                                        data-percent="<?php echo round(($br['emp_count'] / $total_emp_calc) * 100, 1); ?>"
-                                        data-bg="<?php echo e($bg_url); ?>">
-                                        <div class="branch-name"><?php echo e($br['branch_name']); ?></div>
-                                        <div class="emp-badge"><?php echo $br['emp_count']; ?> Staff</div>
-                                    </div>
-                                <?php endforeach; ?>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+    <div class="col-12">
+        <div class="insight-card" id="branchInsightCard">
+            <div class="insight-toolbar">
+                <span class="insight-label">Workforce Insight</span>
+                <div class="insight-branch-picker">
+                    <label for="branchWorkforceSelect">Branch Workforce</label>
+                    <select class="form-select form-select-sm" id="branchWorkforceSelect">
+                        <option value="" disabled selected>Select a branch</option>
+                        <?php foreach ($branches_insights as $br):
+                            $bg_dir = __DIR__ . '/../assets/img/logo/branch_background_images/';
+                            $bg_url = '';
+                            $bid = $br['branch_id'];
+                            foreach (['jpg', 'jpeg', 'png', 'webp'] as $ext) {
+                                if (file_exists($bg_dir . 'branch_' . $bid . '.' . $ext)) {
+                                    $bg_url = BASE_URL . '/assets/img/logo/branch_background_images/branch_' . $bid . '.' . $ext;
+                                    break;
+                                }
+                            }
+                            if ($br['branch_name'] === 'Raquel Pawnshop Main Office') {
+                                $bg_url = BASE_URL . '/assets/img/logo/branch_background_images/main_branch.jpg';
+                            }
+                        ?>
+                            <option value="<?php echo (int) $bid; ?>"
+                                data-name="<?php echo e($br['branch_name']); ?>"
+                                data-location="<?php echo e($br['location']); ?>"
+                                data-count="<?php echo (int) $br['emp_count']; ?>"
+                                data-percent="<?php echo round(($br['emp_count'] / $total_emp_calc) * 100, 1); ?>"
+                                data-bg="<?php echo e($bg_url); ?>"><?php echo e($br['branch_name']); ?></option>
+                        <?php endforeach; ?>
+                    </select>
                 </div>
             </div>
-        </div>
-    </div>
-
-    <div class="col-12 col-xl-8">
-        <div class="insight-card" id="branchInsightCard">
-            <i class="fas fa-building card-bg-icon"></i>
-            <span class="insight-label">Workforce Insight</span>
-
             <div id="insightPlaceholder" class="text-center py-5">
                 <i class="fas fa-mouse-pointer fa-3x mb-3 text-muted" style="opacity: 0.3;"></i>
                 <p class="text-muted">Select a branch to see detailed statistics.</p>
@@ -1383,52 +1342,17 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
             }
         }
 
-        // --- Professional Branch Selector Logic ---
-        const trigger = document.getElementById('customSelectTrigger');
-        const dropdown = document.getElementById('customSelectDropdown');
-        const searchInput = document.getElementById('branchSearchInput');
-        const options = document.querySelectorAll('.select-option');
-        const selectedText = trigger.querySelector('.selected-text');
+        // Branch selector updates the workforce card without a page reload.
+        const branchSelect = document.getElementById('branchWorkforceSelect');
 
         const insightCard = document.getElementById('branchInsightCard');
         const insightPlaceholder = document.getElementById('insightPlaceholder');
         const insightContent = document.getElementById('insightContent');
 
-        // Toggle Dropdown
-        trigger.addEventListener('click', (e) => {
-            e.stopPropagation();
-            dropdown.classList.toggle('show');
-            trigger.classList.toggle('active');
-            if (dropdown.classList.contains('show')) searchInput.focus();
+        branchSelect.addEventListener('change', function () {
+            const branch = this.selectedOptions[0];
+            if (branch && branch.value) updateInsightCard(branch.dataset);
         });
-
-        // Search Filter
-        searchInput.addEventListener('input', (e) => {
-            const term = e.target.value.toLowerCase();
-            options.forEach(opt => {
-                const name = opt.dataset.name.toLowerCase();
-                opt.style.display = name.includes(term) ? 'flex' : 'none';
-            });
-        });
-
-        // Selection Handler
-        options.forEach(opt => {
-            opt.addEventListener('click', function () {
-                // Update UI
-                options.forEach(o => o.classList.remove('selected'));
-                this.classList.add('selected');
-                selectedText.innerText = this.dataset.name;
-                selectedText.classList.remove('text-muted');
-                dropdown.classList.remove('show');
-                trigger.classList.remove('active');
-
-                // Animate Insight Card
-                updateInsightCard(this.dataset);
-            });
-        });
-
-        // Base URL for branch background images
-        const BRANCH_BG_BASE = window.APP_BASE_URL + '/assets/img/logo/branch_background_images/';
 
         /**
          * Applies branch background using the server-resolved data-bg URL.
@@ -1493,25 +1417,13 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
             });
         }
 
-        // Close dropdown on click outside
-        document.addEventListener('click', () => {
-            dropdown.classList.remove('show');
-            trigger.classList.remove('active');
-        });
-
         // --- Auto-select the user's assigned branch on page load ---
         if (USER_ASSIGNED_BRANCH) {
-            const defaultOption = Array.from(options).find(
+            const defaultOption = Array.from(branchSelect.options).find(
                 opt => opt.dataset.name === USER_ASSIGNED_BRANCH
             );
             if (defaultOption) {
-                // Mark as selected
-                options.forEach(o => o.classList.remove('selected'));
-                defaultOption.classList.add('selected');
-                // Update the trigger text
-                selectedText.innerText = defaultOption.dataset.name;
-                selectedText.classList.remove('text-muted');
-                // Populate the Workforce Insight card
+                branchSelect.value = defaultOption.value;
                 updateInsightCard(defaultOption.dataset);
             }
         }

@@ -11,6 +11,7 @@ header('Content-Type: text/csv; charset=utf-8');
 header('Content-Disposition: attachment; filename=sample_employees.csv');
 
 $output = fopen('php://output', 'w');
+fwrite($output, "\xEF\xBB\xBF");
 
 // PDS column order. Section names are kept here for maintenance; the CSV still has one header row for importing.
 $pds_sections = [

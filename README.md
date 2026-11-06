@@ -29,6 +29,12 @@ Evaluation Platform is a role-based Human Resource Information System for managi
    database/3rd_seed_HR_accounts_.sql
    ```
 
+   When importing UTF-8 SQL through the Windows MySQL command-line client, use
+   `--default-character-set=utf8mb4`. Its default console encoding can corrupt
+   names such as Biñan and Dasmariñas during import.
+   For an existing database with corrupted box-drawing characters in place
+   of ñ, back up the affected records and run `database/repair_enye_encoding.sql`.
+
 5. If necessary, update the database credentials in `config/database.php`:
 
    ```php

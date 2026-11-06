@@ -1,8 +1,4 @@
--- ============================================
--- Organizational Structure Seed
--- (Branches, Rank Categories, Departments, Job Titles)
--- ============================================
-
+SET NAMES utf8mb4;
 USE raquel_hris;
 SET FOREIGN_KEY_CHECKS = 0;
 

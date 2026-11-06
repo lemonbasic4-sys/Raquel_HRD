@@ -1,21 +1,8 @@
 -- ============================================
--- Raquel HRIS Database Schema
--- Includes:
--- setup database, branches, rank categories, departments, job titles,
--- employees, users, employee PDS submissions, employee details,
--- government IDs, addresses, contacts, emergency contacts,
--- disclosures, family, children, siblings, education, work experience,
--- evaluation templates, evaluation criteria, evaluations,
--- evaluation scores, evaluation development plans, career movements,
--- notifications, audit logs, system settings, additional PDS records,
--- login attempts, and performance indexes.
--- ============================================
-
-
--- ============================================
 -- 1. Setup Database
 -- ============================================
 
+SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 DROP DATABASE IF EXISTS raquel_hris;
 CREATE DATABASE IF NOT EXISTS raquel_hris;

@@ -475,6 +475,7 @@ if ($export_type === 'csv') {
     header('Expires: 0');
 
     $output = fopen('php://output', 'w');
+    fwrite($output, "\xEF\xBB\xBF");
     fputcsv($output, [$report['title']]);
     fputcsv($output, ['Branch', $branch_name]);
     fputcsv($output, ['Generated', date('M d, Y h:i A')]);

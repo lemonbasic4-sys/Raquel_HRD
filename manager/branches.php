@@ -8,6 +8,7 @@ if (isset($_GET['download_sample'])) {
     header('Content-Type: text/csv; charset=utf-8');
     header('Content-Disposition: attachment; filename=branch_import_sample.csv');
     $output = fopen('php://output', 'w');
+    fwrite($output, "\xEF\xBB\xBF");
     fputcsv($output, ['Branch Name', 'Location']);
     
     // Attempt to fetch the Main Office as a sample
