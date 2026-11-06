@@ -145,7 +145,7 @@ $total_pages = max(1, (int) ceil($total / $page_size));
 $page = min($page, $total_pages);
 $offset = ($page - 1) * $page_size;
 $order_direction = $filters['sort'] === 'ASC' ? 'ASC' : 'DESC';
-$query = "SELECT al.*, u.full_name, u.role, u.profile_picture AS actor_user_picture, actor_employee.profile_picture AS actor_employee_picture, e.employee_code, e.first_name, e.last_name, b.branch_name, d.department_name $base_from WHERE $where ORDER BY al.timestamp {$order_direction}, al.log_id {$order_direction} LIMIT ? OFFSET ?";
+$query = "SELECT al.*, u.full_name, u.role, u.profile_picture AS actor_user_picture, actor_employee.profile_picture AS actor_employee_picture, actor_employee.job_title AS actor_position, e.employee_code, e.first_name, e.last_name, b.branch_name, d.department_name $base_from WHERE $where ORDER BY al.timestamp {$order_direction}, al.log_id {$order_direction} LIMIT ? OFFSET ?";
 $stmt = $conn->prepare($query);
 $page_params = array_merge($params, [$page_size, $offset]);
 $stmt->bind_param($types . 'ii', ...$page_params);
@@ -327,7 +327,7 @@ if (defined('AUDIT_TRAIL_EXPORT_ONLY')) {
                                 'title' => $event_title,
                                 'details' => $log['details'] ?: 'No additional description was recorded.',
                                 'timestamp' => date('M j, Y g:i A', strtotime($log['timestamp'])),
-                                'actor' => $actor_name . (!empty($log['role']) ? ' (' . $log['role'] . ')' : ''), 'role' => $is_demo ? 'Fictional' : ($log['role'] ?? 'Unknown / not resolved'),
+                                'actor' => $actor_name . (!empty($log['actor_position']) ? ' (' . $log['actor_position'] . ')' : (!empty($log['role']) ? ' (' . $log['role'] . ')' : '')), 'role' => $is_demo ? 'Fictional' : ($log['role'] ?? 'Unknown / not resolved'),
                                 'action' => ucwords(strtolower(str_replace('_', ' ', $log['action_type']))),
                                 'module' => $log['module_name'] ?? 'System Activity', 'record' => $record_label,
                                 'result' => $log['action_status'] ?? 'Successful', 'ip' => $log['ip_address'] ?? 'Not recorded',

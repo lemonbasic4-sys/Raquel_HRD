@@ -20,22 +20,26 @@ if (preg_match('/^\d{4}-\d{2}-\d{2}$/',$periodFrom) && preg_match('/^\d{4}-\d{2}
 $hrdRoster=annualCycleRosterPreview($conn,$hrdDepartmentId);
 $hrdReady=$hrdRoster && !array_filter($hrdRoster,static fn($row)=>!empty($row['issues']));
 $positionRoster=annualCyclePositionReadinessRows($hrdRoster);
+$annualFormCount=(int)(annualQuery($conn,"SELECT COUNT(*) AS total FROM evaluation_templates
+    WHERE target_department_id=? AND evaluation_type='Annual' AND status='Active' AND deleted_at IS NULL",[$hrdDepartmentId])[0]['total'] ?? 0);
+$annualSetupPending=!$hrdOpenCycle && $annualFormCount===0;
+$annualSetupCollapsed=$cycleSetupReadOnly || ($annualSetupPending && !isset($_GET['cycle_from']));
 ?>
 <section class="content-card p-3 p-md-4 mb-4" id="annual-cycle-start" aria-labelledby="hrdCycleStartTitle">
-    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap <?php echo $cycleSetupReadOnly ? 'mb-0' : 'mb-3'; ?>">
+    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap <?php echo $annualSetupCollapsed ? 'mb-0' : 'mb-3'; ?>">
         <div>
             <h2 class="h5 fw-bold mb-1" id="hrdCycleStartTitle"><i class="fas fa-calendar-check me-2" aria-hidden="true"></i><?php echo e($cycleDepartmentName); ?> Annual cycle</h2>
-            <p class="small text-muted mb-0"><?php echo $cycleSetupReadOnly ? ($hrdOpenCycle ? formatDate($hrdOpenCycle['period_start']).' to '.formatDate($hrdOpenCycle['period_end']).' · View cycle details below.' : 'Read-only form readiness. The '.e($cycleOwnerName).' starts the cycle.') : 'Start this department cycle after each immediate head has created the Annual form for their direct reports.'; ?></p>
+            <p class="small text-muted mb-0"><?php echo $cycleSetupReadOnly ? ($hrdOpenCycle ? formatDate($hrdOpenCycle['period_start']).' to '.formatDate($hrdOpenCycle['period_end']).' · View cycle details below.' : 'Read-only form readiness. The '.e($cycleOwnerName).' starts the cycle.') : ($annualSetupPending ? 'No Annual forms are ready yet. Open setup requirements when you are ready to prepare an Annual cycle.' : 'Start this department cycle after each immediate head has created the Annual form for their direct reports.'); ?></p>
         </div>
         <div class="d-flex gap-2 align-items-center">
             <?php if ($cycleSetupReadOnly): ?><span class="badge bg-secondary">Read only</span><?php endif; ?>
             <span class="badge <?php echo $hrdOpenCycle ? 'bg-info text-dark' : ($hrdReady && !$hrdOverlap ? 'bg-success' : 'bg-warning text-dark'); ?>">
-                <?php echo $hrdOpenCycle ? 'Cycle open' : ($hrdOverlap ? 'Period already exists' : ($hrdReady ? 'Forms ready' : 'Forms or accounts needed')); ?>
+                <?php echo $hrdOpenCycle ? 'Cycle open' : ($hrdOverlap ? 'Period already exists' : ($annualSetupPending ? 'Setup pending' : ($hrdReady ? 'Forms ready' : 'Forms or accounts needed'))); ?>
             </span>
-            <?php if ($cycleSetupReadOnly): ?><button class="btn btn-outline-success btn-sm collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#annualCycleReadOnlyDetails" aria-expanded="false" aria-controls="annualCycleReadOnlyDetails"><i class="fas fa-chevron-down me-1" aria-hidden="true"></i>Details</button><?php endif; ?>
+            <?php if ($annualSetupCollapsed): ?><button class="btn btn-outline-success btn-sm collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#annualCycleSetupDetails" aria-expanded="false" aria-controls="annualCycleSetupDetails"><i class="fas fa-chevron-down me-1" aria-hidden="true"></i><?php echo $cycleSetupReadOnly ? 'Details' : 'View setup'; ?></button><?php endif; ?>
         </div>
     </div>
-    <div<?php if ($cycleSetupReadOnly): ?> class="collapse pt-3" id="annualCycleReadOnlyDetails"<?php endif; ?>>
+    <div<?php if ($annualSetupCollapsed): ?> class="collapse pt-3" id="annualCycleSetupDetails"<?php endif; ?>>
     <?php if ($hrdOpenCycle): ?>
         <p class="mb-0">The <?php echo e(formatDate($hrdOpenCycle['period_start'])); ?> to <?php echo e(formatDate($hrdOpenCycle['period_end'])); ?> cycle is open. <?php echo $cycleSetupReadOnly ? 'The '.e($cycleOwnerName).' will approve it after all required ratings are complete.' : 'Complete and approve it before starting another period.'; ?></p>
     <?php elseif (!$cycleSetupReadOnly): ?>

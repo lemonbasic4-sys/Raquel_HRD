@@ -249,7 +249,8 @@ function quarterlyPortal(array $actor): string
 
 function quarterlyUrl(array $actor, string $query = ''): string
 {
-    if (in_array($actor['role'], ['HR Manager', 'HR Supervisor'], true)) {
+    if (in_array($actor['role'], ['HR Manager', 'HR Supervisor'], true)
+        || (!empty($GLOBALS['quarterly_in_performance_page']) && $actor['role'] === 'Employee')) {
         return BASE_URL . '/employee/team-evaluation-packages.php?category=quarterly'
             . ($query !== '' ? '&' . ltrim($query, '?&') : '');
     }
@@ -298,7 +299,7 @@ function quarterlyExpectedPeers($conn, int $cycleId, int $employeeId): int
 function quarterlyCycleRosterPreview($conn, int $departmentId): array
 {
     $employees = quarterlyQuery($conn, "SELECT e.employee_id,e.first_name,e.last_name,e.job_title_id,
-            j.job_title,j.reports_to,h.job_title AS reviewer_position_name
+            j.job_title,j.reports_to,h.job_title AS reviewer_position_name,d.department_name
         FROM employees e LEFT JOIN job_titles j ON j.job_title_id=e.job_title_id
         JOIN departments d ON d.department_id=e.department_id
         LEFT JOIN job_titles h ON h.job_title_id=j.reports_to
@@ -309,6 +310,11 @@ function quarterlyCycleRosterPreview($conn, int $departmentId): array
     foreach ($employees as &$employee) {
         $issues = [];
         $positionId = (int)$employee['job_title_id'];
+        $hrSupervisorTarget = strcasecmp((string)$employee['department_name'], 'Human Resources') === 0
+            && preg_match('/^HR Supervisor\b/i', (string)$employee['job_title'])
+            && preg_match('/^HR Manager\b/i', (string)$employee['reviewer_position_name']);
+        $employee['form_creator_position_name'] = $hrSupervisorTarget
+            ? 'HR Manager (any level)' : $employee['reviewer_position_name'];
         if (!$positionId || !$employee['job_title']) $issues[] = 'Active position missing';
         if (!$employee['reports_to'] || !quarterlyQuery($conn, "SELECT 1 FROM employees h
                 JOIN users u ON u.employee_id=h.employee_id
@@ -318,16 +324,19 @@ function quarterlyCycleRosterPreview($conn, int $departmentId): array
         if (!quarterlyQuery($conn, "SELECT 1 FROM users WHERE employee_id=? AND role='Employee'
                 AND is_active=1 AND deleted_at IS NULL AND COALESCE(account_hold,0)=0 LIMIT 1",
                 [(int)$employee['employee_id']])) $issues[] = 'Employee Portal account missing';
-        $templates = quarterlyQuery($conn, "SELECT t.template_id,t.kra_weight,t.behavior_weight FROM evaluation_templates t
+        $templates = quarterlyQuery($conn, "SELECT t.template_id,t.kra_weight,t.behavior_weight,creator.job_title AS creator_position_name FROM evaluation_templates t
             JOIN evaluation_template_positions p ON p.template_id=t.template_id
             JOIN users creator_account ON creator_account.user_id=t.created_by
             JOIN employees creator ON creator.employee_id=creator_account.employee_id
             WHERE t.target_department_id=? AND p.job_title_id=? AND t.evaluation_type='Quarterly'
               AND t.status='Active' AND t.deleted_at IS NULL
-              AND creator.job_title_id=? AND creator.is_active=1 AND creator.deleted_at IS NULL
+              AND (creator.job_title_id=? OR (?=1 AND creator.department_id=?
+                   AND creator.rank_category_id=3 AND creator.job_title LIKE 'HR Manager%'
+                   AND creator_account.role='HR Manager'))
+              AND creator.is_active=1 AND creator.deleted_at IS NULL
               AND creator_account.is_active=1 AND creator_account.deleted_at IS NULL
               AND COALESCE(creator_account.account_hold,0)=0",
-            [$departmentId,$positionId,(int)$employee['reports_to']]);
+            [$departmentId,$positionId,(int)$employee['reports_to'],$hrSupervisorTarget ? 1 : 0,$departmentId]);
         $validTemplate = false;
         foreach ($templates as $template) {
             $criteria = quarterlyQuery($conn, "SELECT section,criterion_name,weight FROM evaluation_criteria
@@ -337,7 +346,9 @@ function quarterlyCycleRosterPreview($conn, int $departmentId): array
             if ($kra && (int)round(array_sum(array_column($kra,'weight'))*100)===10000
                 && array_column($behavior,'criterion_name')===array_column(quarterlyCoreValues(),'name')
                 && (float)$template['kra_weight']===80.0 && (float)$template['behavior_weight']===20.0) {
-                $validTemplate = true; break;
+                $validTemplate = true;
+                $employee['form_creator_position_name'] = $template['creator_position_name'];
+                break;
             }
         }
         if (!$validTemplate) $issues[] = 'Quarterly form from immediate head missing or invalid (80/20, eight Core Values, KRA 100%)';
@@ -347,29 +358,41 @@ function quarterlyCycleRosterPreview($conn, int $departmentId): array
     return $employees;
 }
 
-/** Collapse employee readiness into one row per position without hiding individual blockers. */
+/** Group HR position levels for the cycle summary while retaining every employee's blockers. */
 function quarterlyCyclePositionReadinessRows(array $employees): array
 {
     $positions=[];
     foreach ($employees as $employee) {
         $positionId=(int)($employee['job_title_id'] ?? 0);
-        $key=$positionId ? 'position-'.$positionId : 'employee-'.(int)$employee['employee_id'];
+        $jobTitle=(string)($employee['job_title'] ?? '');
+        $hrFamily=strcasecmp((string)($employee['department_name'] ?? ''),'Human Resources')===0
+            && preg_match('/^(HR (?:Manager|Supervisor|Staff)) [IVXLCDM]+$/i',$jobTitle,$matches)
+            ? $matches[1] : null;
+        $key=$hrFamily ? 'hr-family-'.strtolower($hrFamily)
+            : ($positionId ? 'position-'.$positionId : 'employee-'.(int)$employee['employee_id']);
+        $creatorName=(string)($employee['form_creator_position_name'] ?? $employee['reviewer_position_name'] ?? '');
         if (!isset($positions[$key])) {
             $positions[$key]=[
-                'job_title'=>$employee['job_title'] ?: 'Position missing',
-                'reviewer_position_name'=>$employee['reviewer_position_name'] ?? null,
+                'job_title'=>$hrFamily ?: ($jobTitle ?: 'Position missing'),
+                'reviewer_position_name'=>'',
+                'creator_positions'=>[],
                 'employee_count'=>0,
                 'blocked_count'=>0,
                 'issues'=>[],
             ];
         }
+        if ($creatorName !== '') $positions[$key]['creator_positions'][$creatorName]=true;
         $positions[$key]['employee_count']++;
         if (!empty($employee['issues'])) {
             $positions[$key]['blocked_count']++;
             foreach ($employee['issues'] as $issue) $positions[$key]['issues'][$issue]=true;
         }
     }
-    foreach ($positions as &$position) $position['issues']=array_keys($position['issues']);
+    foreach ($positions as &$position) {
+        $position['issues']=array_keys($position['issues']);
+        $position['reviewer_position_name']=implode(', ',array_keys($position['creator_positions']));
+        unset($position['creator_positions']);
+    }
     unset($position);
     return array_values($positions);
 }

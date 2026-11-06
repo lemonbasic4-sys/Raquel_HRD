@@ -31,8 +31,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $template_name = trim($_POST['template_name'] ?? '');
     $description = trim($_POST['description'] ?? '');
     $target_department = trim($_POST['target_department'] ?? '');
-    $behavior_framework_code = strtoupper(trim($_POST['behavior_framework_code'] ?? ''));
-    $behavior_framework_version = trim($_POST['behavior_framework_version'] ?? '');
+    $behavior_framework_code = '';
+    $behavior_framework_version = '';
     $evaluation_type = $_POST['evaluation_type'] ?? 'Annual';
     $is_probationary_template = isset($_POST['probationary_template']) || in_array($evaluation_type, ['Initial', 'Final'], true);
     if (!in_array($evaluation_type, ['Initial', 'Final', 'Quarterly', 'Annual'], true)) $evaluation_type = 'Annual';
@@ -101,11 +101,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (abs(($kra_weight + $behavior_weight) - 100) > 0.01) {
         redirectWith($template_create_url, 'danger', 'KRA weight + Behavior weight must equal 100%.');
     }
-    if ($evaluation_type === 'Quarterly' && ($behavior_framework_code === '' || $behavior_framework_version === '')) {
-        redirectWith($template_create_url, 'danger', 'Behavior Framework Code and Version are required for Quarterly templates.');
-    }
     if ($evaluation_type === 'Quarterly' && !evaluationBehaviorFrameworkMatchesExisting($conn, $behavior_framework_code, $behavior_framework_version, $beh_names, $beh_kpis)) {
-        redirectWith($template_create_url, 'danger', 'Behavior items must match other active forms using this Behavior Framework Code and Version.');
+        redirectWith($template_create_url, 'danger', 'Quarterly behavior items must match the standard Core Behaviors & Values.');
     }
     if ($is_probationary_template) {
         $behavior_framework_code = '';
@@ -169,7 +166,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     $beh_stmt->close();
 
-    logAudit($conn, $_SESSION['user_id'], 'CREATE', 'Template', $template_id, "Created evaluation template: $template_name");
+    $creator_position = trim((string)($creator_context['position_title'] ?? ''));
+    $creator_label = $creator_position !== '' ? " by {$creator_position}" : '';
+    logAudit($conn, $_SESSION['user_id'], 'CREATE', 'Template', $template_id, "Created evaluation template: $template_name$creator_label");
     notifyHrStaffOfTemplateChange($conn, $template_id, 'Published');
     redirectWith($template_list_url, 'success', "Template '$template_name' created successfully.");
 }
@@ -352,6 +351,33 @@ require_once '../includes/header.php';
     }
     .wizard-pane.active {
         display: block;
+    }
+    #wizardStep3 .kra-sticky-header,
+    #wizardStep4 .behavior-sticky-header {
+        position: sticky;
+        top: var(--header-height, 70px);
+        z-index: 20;
+        box-shadow: 0 4px 12px rgba(8, 46, 6, .1);
+    }
+    #wizardStep3 .kra-weight-total {
+        display: inline-flex;
+        align-items: center;
+        gap: .55rem;
+        min-height: 36px;
+        padding: .35rem .8rem;
+        border: 1px solid #e6d39a;
+        border-radius: 999px;
+        background: #fff8e6;
+        color: #72500b;
+        white-space: nowrap;
+    }
+    #wizardStep3 .kra-weight-total .kra-total-label { font-size: .72rem; font-weight: 700; }
+    #wizardStep3 .kra-weight-total strong { font-size: .88rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+    #wizardStep3 .kra-weight-total[data-state="complete"] { border-color: #a8d7b4; background: #e8f6eb; color: #11632f; }
+    #wizardStep3 .kra-weight-total[data-state="over"] { border-color: #edb5b5; background: #fff0f0; color: #a42d2d; }
+    @media (max-width: 575px) {
+        #wizardStep3 .kra-sticky-header > div { width: 100%; justify-content: space-between; }
+        #wizardStep4 .behavior-sticky-header > button { width: 100%; }
     }
 
     @keyframes wizardFadeIn {
@@ -569,7 +595,7 @@ require_once '../includes/header.php';
             </div>
             <div id="probationaryTargetFields">
             <div class="row mb-3">
-                <div class="col-md-6">
+                <div class="col-12">
                     <label class="form-label fw-semibold">Target Position(s) <span class="text-danger">*</span></label>
                     <select class="form-select" id="inputTargetPosition" multiple disabled size="4" aria-describedby="targetPositionHelp">
                         <?php foreach ($target_positions as $position): ?>
@@ -577,14 +603,6 @@ require_once '../includes/header.php';
                         <?php endforeach; ?>
                     </select>
                     <div class="form-text" id="targetPositionHelp">All active positions assigned to your role in the selected department are included automatically.</div>
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label fw-semibold">Behavior Framework Code <span class="text-danger">*</span></label>
-                    <input type="text" class="form-control" name="behavior_framework_code" maxlength="80" required placeholder="e.g., CORE-2026">
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label fw-semibold">Framework Version <span class="text-danger">*</span></label>
-                    <input type="text" class="form-control" name="behavior_framework_version" maxlength="40" required placeholder="e.g., 1.0">
                 </div>
             </div>
             </div>
@@ -734,12 +752,12 @@ require_once '../includes/header.php';
 <!-- ============================================================ -->
 <div class="wizard-pane" id="wizardStep3">
     <div class="content-card mb-4 border-0 shadow-sm border-start border-4 border-success">
-        <div class="card-header bg-white border-bottom pb-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div class="card-header kra-sticky-header bg-white border-bottom pb-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
             <h5 class="mb-0 text-success fw-bold">
                 <i class="fas fa-bullseye me-2"></i>Stage 3: Key Result Areas (KRA)
             </h5>
             <div class="d-flex align-items-center gap-2">
-                <span class="badge bg-primary px-3 py-2 shadow-sm fs-6" id="kraWeightBadge">Total: 0%</span>
+                <span class="kra-weight-total" id="kraWeightBadge" data-state="pending" role="status" aria-live="polite"><i class="fas fa-chart-pie" aria-hidden="true"></i><span class="kra-total-label">Total weight</span><strong id="kraWeightValue">0.00%</strong></span>
                 <button type="button" class="btn btn-sm btn-success rounded-pill px-3 shadow-sm" onclick="addKRA()">
                     <i class="fas fa-plus me-1"></i>Add KRA Item
                 </button>
@@ -776,7 +794,7 @@ require_once '../includes/header.php';
 <!-- ============================================================ -->
 <div class="wizard-pane" id="wizardStep4">
     <div class="content-card mb-4 border-0 shadow-sm border-start border-4 border-info">
-        <div class="card-header bg-white border-bottom pb-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div class="card-header behavior-sticky-header bg-white border-bottom pb-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
             <h5 class="mb-0 text-info fw-bold">
                 <i class="fas fa-heart me-2"></i>Stage 4: Core Behaviors &amp; Values
             </h5>
@@ -1246,8 +1264,9 @@ function updateKRAWeight() {
     const total = totalCents / 100;
     const badge = document.getElementById('kraWeightBadge');
     if (badge) {
-        badge.textContent = 'Total: ' + total.toFixed(2) + '%';
-        badge.className = 'badge px-3 py-2 shadow-sm fs-6 ' + (totalCents === 10000 ? 'bg-success' : 'bg-danger');
+        document.getElementById('kraWeightValue').textContent = total.toFixed(2) + '%';
+        badge.dataset.state = totalCents === 10000 ? 'complete' : (totalCents > 10000 ? 'over' : 'pending');
+        badge.setAttribute('aria-label', 'Total KRA weight: ' + total.toFixed(2) + '%');
     }
 }
 
@@ -1680,8 +1699,6 @@ function collectDraft() {
         template_name: document.querySelector('[name="template_name"]')?.value || '',
         description: document.getElementById('inputDescription')?.value || '',
         target_department: document.querySelector('[name="target_department"]')?.value || '',
-        behavior_framework_code: document.querySelector('[name="behavior_framework_code"]')?.value || '',
-        behavior_framework_version: document.querySelector('[name="behavior_framework_version"]')?.value || '',
         evaluation_type: document.querySelector('[name="evaluation_type"]')?.value || '',
         probationary_template: document.getElementById('probationaryTemplateToggle')?.checked || false,
         kra_weight: document.getElementById('kraWeight')?.value || '80',
@@ -1718,8 +1735,6 @@ function restoreDraft(draft) {
     setVal('[name="template_name"]', draft.template_name);
     setVal('#inputDescription', draft.description);
     setVal('[name="target_department"]', draft.target_department);
-    setVal('[name="behavior_framework_code"]', draft.behavior_framework_code);
-    setVal('[name="behavior_framework_version"]', draft.behavior_framework_version);
     setVal('[name="evaluation_type"]', draft.evaluation_type);
     const probationToggle = document.getElementById('probationaryTemplateToggle');
     if (probationToggle) probationToggle.checked = draft.probationary_template !== undefined
@@ -1845,7 +1860,6 @@ document.addEventListener('DOMContentLoaded', function() {
         probationaryFields.classList.toggle('d-none', enabled);
         probationaryFields.querySelectorAll('input').forEach(input => {
             input.disabled = enabled;
-            if (input.name === 'behavior_framework_code' || input.name === 'behavior_framework_version') input.required = !enabled;
         });
         if (kraWeightInput && behaviorWeightInput) {
             if (enabled) { kraWeightInput.value = '80'; behaviorWeightInput.value = '20'; }

@@ -3,6 +3,20 @@ $page_title = 'Performance Evaluation';
 require_once '../includes/session-check.php';
 require_once '../includes/functions.php';
 
+// HR staff manage their own ratings from the staff portal, not this team page.
+// Employee-role HR personnel use HRIS for team management.
+$_session_role = $_SESSION['role'] ?? '';
+if ($_session_role === 'HR Staff' ||
+    ($_session_role === 'Employee' && (function() use ($conn) {
+        $employee_id = (int)($_SESSION['employee_id'] ?? 0);
+        $s = $conn->prepare("SELECT d.department_name FROM employees e LEFT JOIN departments d ON e.department_id = d.department_id WHERE e.employee_id = ? LIMIT 1");
+        $s->bind_param('i', $employee_id); $s->execute();
+        $dept = $s->get_result()->fetch_assoc()['department_name'] ?? ''; $s->close();
+        return strcasecmp($dept, 'Human Resources') === 0;
+    })())) {
+    redirectWith(BASE_URL . '/employee/dashboard.php', 'info', 'Human Resource personnel perform self-rating only on the Employee Portal. Team management is handled via HRIS.');
+}
+
 // An Annual-only workload must not land on the empty legacy package screen.
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && !isset($_GET['category'])
     && in_array($_SESSION['role'] ?? '', ['HR Manager','HR Supervisor'],true)) {
@@ -36,32 +50,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && !isset($_GET['category'])
 
 // Managed regular-employee cycles use their own review engines.
 if (($_GET['category'] ?? '') === 'quarterly') {
-    $quarterly_in_performance_page = in_array($_SESSION['role'] ?? '', ['HR Manager', 'HR Supervisor'], true);
+    $quarterly_in_performance_page = true;
     require_once __DIR__ . '/../includes/quarterly-evaluations.php';
     require __DIR__ . '/../includes/quarterly-evaluation-page.php';
     exit;
 }
 
 // The Regular tab uses the Annual engine, not the legacy package pipeline.
-if (in_array($_SESSION['role'] ?? '', ['HR Manager', 'HR Supervisor'], true)
-    && ($_GET['category'] ?? '') === 'regular') {
+if (($_GET['category'] ?? '') === 'regular') {
     $annual_in_performance_page = true;
+    require_once __DIR__ . '/../includes/annual-evaluations.php';
     require __DIR__ . '/../includes/annual-evaluation-page.php';
     exit;
-}
-
-// HR Manager and HR Supervisor consolidate via HRIS (their sidebar links here directly).
-// Only HR Staff and Employee-role users in HR dept are blocked from team management.
-$_session_role = $_SESSION['role'] ?? '';
-if ($_session_role === 'HR Staff' ||
-    ($_session_role === 'Employee' && (function() use ($conn) {
-        $employee_id = (int)($_SESSION['employee_id'] ?? 0);
-        $s = $conn->prepare("SELECT d.department_name FROM employees e LEFT JOIN departments d ON e.department_id = d.department_id WHERE e.employee_id = ? LIMIT 1");
-        $s->bind_param('i', $employee_id); $s->execute();
-        $dept = $s->get_result()->fetch_assoc()['department_name'] ?? ''; $s->close();
-        return strcasecmp($dept, 'Human Resources') === 0;
-    })())) {
-    redirectWith(BASE_URL . '/employee/dashboard.php', 'info', 'Human Resource personnel perform self-rating only on the Employee Portal. Team management is handled via HRIS.');
 }
 
 ensureOrganizationEvaluationPackageSchema($conn);
@@ -806,50 +806,10 @@ if (in_array($session_role, ['HR Manager', 'HR Supervisor', 'Admin'], true) || $
 }
 $probationary_package_count = count(array_filter($packages, static fn($package) => in_array($package['evaluation_type'] ?? '', ['Initial', 'Final'], true)))
     + count(array_filter($waiting_packages, static fn($package) => in_array($package['evaluation_type'] ?? '', ['Initial', 'Final'], true)));
-$regular_package_count = count($packages) + count($waiting_packages) - $probationary_package_count;
-$active_package_tab = in_array($_SESSION['role'] ?? '', ['HR Manager','HR Supervisor'],true)
-    ? 'probationary' : ($probationary_package_count > 0 ? 'probationary' : 'regular');
+$active_package_tab = 'probationary';
 ?>
 <div class="evaluation-packages">
-    <?php $shared_performance_heading=in_array($_SESSION['role'] ?? '', ['HR Manager','HR Supervisor'],true); ?>
-    <?php if ($shared_performance_heading): require __DIR__.'/../includes/performance-evaluation-heading.php'; else: ?>
-    <section class="package-hero">
-        <p class="mb-1 text-uppercase fw-bold" style="letter-spacing:1px; color:var(--rp-primary-gold-light); font-size:0.85rem;">
-            Performance Evaluation Process
-        </p>
-        <h1 class="h3 mb-2 fw-bold">Performance Evaluation</h1>
-        <p class="mb-3">
-            Review submitted employee ratings and follow their approval progress.
-        </p>
-        <?php
-        $is_hris_user = in_array($_SESSION['role'] ?? '', ['Admin', 'HR Manager', 'HR Supervisor', 'HR Staff']);
-        ?>
-        <?php if (!$is_hris_user): ?>
-            <div class="d-flex flex-wrap gap-2">
-                <a class="btn btn-sm btn-outline-light px-3 py-2 fw-semibold" href="<?php echo BASE_URL; ?>/employee/evaluation-history.php">
-                    <i class="fas fa-history me-1"></i>My Evaluation History
-                </a>
-                <a class="btn btn-sm btn-outline-light px-3 py-2 fw-semibold" href="<?php echo BASE_URL; ?>/employee/team-evaluation-history.php">
-                    <i class="fas fa-users me-1"></i>Team Evaluation History
-                </a>
-            </div>
-        <?php endif; ?>
-        <div class="d-flex flex-wrap gap-2 pt-2 border-top border-white-10">
-        <span class="badge" style="background:rgba(40,167,69,0.2); border:1px solid rgba(40,167,69,0.4); color:#96e0a8;">
-            <i class="fas fa-star me-1"></i> Outstanding (3.60 – 4.00)
-        </span>
-        <span class="badge" style="background:rgba(23,162,184,0.2); border:1px solid rgba(23,162,184,0.4); color:#9de0ec;">
-            <i class="fas fa-thumbs-up me-1"></i> Exceeds Expectations (2.60 – 3.59)
-        </span>
-        <span class="badge" style="background:rgba(255,193,7,0.2); border:1px solid rgba(255,193,7,0.4); color:#ffe699;">
-            <i class="fas fa-check-circle me-1"></i> Meets Expectations (2.00 – 2.59)
-        </span>
-        <span class="badge" style="background:rgba(220,53,69,0.2); border:1px solid rgba(220,53,69,0.4); color:#f5a3ab;">
-            <i class="fas fa-exclamation-triangle me-1"></i> Needs Improvement (1.00 – 1.99)
-        </span>
-    </div>
-    </section>
-    <?php endif; ?>
+    <?php $shared_performance_heading=true; require __DIR__ . '/../includes/performance-evaluation-heading.php'; ?>
 
     <?php if ($packages || $waiting_packages || in_array($_SESSION['role'] ?? '', ['HR Manager','HR Supervisor'],true)): ?>
         <style>
@@ -868,40 +828,11 @@ $active_package_tab = in_array($_SESSION['role'] ?? '', ['HR Manager','HR Superv
             .package-card.package-card--probationary .package-card__header{border-left:4px solid #3730a3}
             @media(max-width:575.98px){.package-category-tabs{gap:.4rem}.package-category-tab{flex:1;min-width:0;padding:.65rem .5rem;gap:.45rem}.package-category-tab__icon{width:30px;height:30px}.package-category-tab__copy strong{font-size:.76rem}.package-category-tab__copy small{font-size:.65rem}}
         </style>
-        <?php if (!$shared_performance_heading): ?>
-        <nav class="package-category-tabs" aria-label="Evaluation review type">
-            <?php $annual_link_actor=annualActor($conn,(int)$_SESSION['user_id']); $integrated_annual=in_array($_SESSION['role'] ?? '', ['HR Manager','HR Supervisor'],true); if ($annual_link_actor && !$integrated_annual): ?>
-            <a class="package-category-tab" href="<?php echo annualUrl($annual_link_actor); ?>">
-                <span class="package-category-tab__icon"><i class="fas fa-users-cog"></i></span>
-                <span class="package-category-tab__copy"><strong>Annual &amp; 360 Ratings</strong><small>Regular employees · individual results</small></span>
-            </a>
-            <?php endif; ?>
-            <button type="button" class="package-category-tab <?php echo $active_package_tab === 'probationary' ? 'active' : ''; ?>" data-package-category-tab="probationary" aria-pressed="<?php echo $active_package_tab === 'probationary' ? 'true' : 'false'; ?>" <?php echo $probationary_package_count === 0 ? 'disabled' : ''; ?>>
-                <span class="package-category-tab__icon"><i class="fas fa-users"></i></span>
-                <span class="package-category-tab__copy"><strong>Probationary Employee</strong><small>Initial and Final evaluations</small></span>
-                <span class="package-category-tab__count"><?php echo $probationary_package_count; ?></span>
-            </button>
-            <?php if ($integrated_annual): ?>
-            <a class="package-category-tab" href="<?php echo annualUrl($annual_link_actor ?? ['role'=>$_SESSION['role']]); ?>">
-                <span class="package-category-tab__icon"><i class="fas fa-user"></i></span>
-                <span class="package-category-tab__copy"><strong>Regular Employee</strong><small>Annual evaluations &amp; 360 ratings</small></span>
-            </a>
-            <?php else: ?>
-            <button type="button" class="package-category-tab <?php echo $active_package_tab === 'regular' ? 'active' : ''; ?>" data-package-category-tab="regular" aria-pressed="<?php echo $active_package_tab === 'regular' ? 'true' : 'false'; ?>" <?php echo $regular_package_count === 0 ? 'disabled' : ''; ?>>
-                <span class="package-category-tab__icon"><i class="fas fa-user"></i></span>
-                <span class="package-category-tab__copy"><strong>Regular Employee</strong><small>Annual team evaluations</small></span>
-                <span class="package-category-tab__count"><?php echo $regular_package_count; ?></span>
-            </button>
-            <?php endif; ?>
-            <a class="package-category-tab" href="<?php echo BASE_URL; ?>/employee/team-evaluation-packages.php?category=quarterly">
-                <span class="package-category-tab__icon"><i class="fas fa-calendar-alt" aria-hidden="true"></i></span>
-                <span class="package-category-tab__copy"><strong>Quarterly Evaluation</strong><small>Quarterly cycles &amp; 360 ratings</small></span>
-            </a>
-        </nav>
-        <?php endif; ?>
+        <?php if (in_array($_SESSION['role'] ?? '', ['HR Manager', 'HR Supervisor'], true)): ?>
         <nav class="d-flex flex-wrap gap-2 mb-3" aria-label="Probationary evaluation history">
             <a class="btn btn-success" style="background:#294306;border-color:#294306;color:#fff" href="<?php echo BASE_URL; ?>/employee/probationary-evaluation-history.php"><i class="fas fa-history me-2" aria-hidden="true"></i>Probationary Evaluation History</a>
         </nav>
+        <?php endif; ?>
         <?php if ($packages || $waiting_packages): ?>
         <div id="packageFilterEmpty" class="package-empty d-none" role="status">
             <i class="fas fa-filter fa-2x text-muted mb-2" style="opacity:0.4;"></i>
@@ -915,7 +846,7 @@ $active_package_tab = in_array($_SESSION['role'] ?? '', ['HR Manager','HR Superv
     <?php if (!$packages && !$waiting_packages): ?>
         <section class="package-empty">
             <i class="fas fa-layer-group fa-3x text-muted mb-3" style="opacity:0.4;"></i>
-            <h2 class="h5 fw-bold"><?php echo in_array($_SESSION['role'] ?? '', ['HR Manager','HR Supervisor'],true) ? 'No probationary evaluation is currently waiting for your review' : 'No performance evaluation is currently waiting for your review'; ?></h2>
+            <h2 class="h5 fw-bold">No probationary evaluation is currently waiting for your review</h2>
             <p class="mb-0 text-muted">
                 Eligible supervisors and managers can view department evaluation reviews here. For an unclaimed stage, the first eligible reviewer to claim it becomes responsible for that stage.
             </p>

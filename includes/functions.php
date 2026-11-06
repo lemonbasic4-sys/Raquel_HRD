@@ -3660,10 +3660,11 @@ function ensureHierarchicalEvaluationSchema($conn)
 function getEvaluationTemplateCreatorContext($conn, $user_id)
 {
     $stmt = $conn->prepare("SELECT u.role, e.employee_id, e.department_id, e.job_title_id, e.rank_category_id,
-            jt.job_title AS position_title
+            jt.job_title AS position_title, d.department_name
         FROM users u
         LEFT JOIN employees e ON e.employee_id = u.employee_id
         LEFT JOIN job_titles jt ON jt.job_title_id = e.job_title_id
+        LEFT JOIN departments d ON d.department_id = e.department_id
         WHERE u.user_id = ? AND u.is_active = 1 AND COALESCE(u.account_hold, 0) = 0
           AND u.deleted_at IS NULL LIMIT 1");
     $user_id = (int) $user_id;
@@ -3680,18 +3681,38 @@ function getEvaluationTemplateCreatorContext($conn, $user_id)
     // Template-authoring eligibility follows the configured organization tree:
     // any supported employee account with active direct-report positions can create.
     $has_direct_report_positions = false;
-    $creator_position_id = (int)($context['job_title_id'] ?? 0);
-    if ($creator_position_id > 0 && in_array($role, ['Employee', 'HR Manager', 'HR Supervisor'], true)) {
-        $reports_stmt = $conn->prepare('SELECT 1 FROM job_titles WHERE reports_to = ? AND is_active = 1 LIMIT 1');
-        $reports_stmt->bind_param('i', $creator_position_id);
-        $reports_stmt->execute();
-        $has_direct_report_positions = (bool)$reports_stmt->get_result()->fetch_row();
-        $reports_stmt->close();
+    if (in_array($role, ['Employee', 'HR Manager', 'HR Supervisor'], true)) {
+        $creator_positions = getEvaluationTemplateCreatorPositionIds($conn, $context);
+        if ($creator_positions) {
+            $position_ids = implode(',', array_map('intval', $creator_positions));
+            $has_direct_report_positions = (bool)$conn->query("SELECT 1 FROM job_titles WHERE reports_to IN ($position_ids) AND is_active = 1 LIMIT 1")->fetch_row();
+        }
     }
     $can_create = $is_ceo || $has_direct_report_positions;
     $context['is_ceo'] = $is_ceo;
     $context['can_create_templates'] = $can_create;
     return $context;
+}
+
+/** HR Manager levels share the HR department's supervisor form targets. */
+function getEvaluationTemplateCreatorPositionIds($conn, $context): array
+{
+    $position_id = (int)($context['job_title_id'] ?? 0);
+    if ($position_id <= 0) return [];
+    if (($context['role'] ?? '') !== 'HR Manager'
+        || strcasecmp((string)($context['department_name'] ?? ''), 'Human Resources') !== 0
+        || !preg_match('/^HR Manager\b/i', (string)($context['position_title'] ?? ''))) {
+        return [$position_id];
+    }
+    $department_id = (int)$context['department_id'];
+    $stmt = $conn->prepare("SELECT job_title_id FROM job_titles
+        WHERE department_id = ? AND rank_category_id = 3 AND job_title LIKE 'HR Manager%'
+          AND is_active = 1");
+    $stmt->bind_param('i', $department_id);
+    $stmt->execute();
+    $ids = array_map('intval', array_column($stmt->get_result()->fetch_all(MYSQLI_ASSOC), 'job_title_id'));
+    $stmt->close();
+    return $ids;
 }
 
 function canViewEvaluationTemplates($context)
@@ -3776,12 +3797,13 @@ function getEvaluationTemplateTargetPositions($conn, $context, $department_id = 
 {
     if (!$context || empty($context['can_create_templates'])) return [];
     $department_id = (int) $department_id;
-    $creator_position_id = (int)($context['job_title_id'] ?? 0);
-    if ($creator_position_id <= 0) return [];
+    $creator_positions = getEvaluationTemplateCreatorPositionIds($conn, $context);
+    if (!$creator_positions) return [];
+    $position_ids = implode(',', array_map('intval', $creator_positions));
     $stmt = $conn->prepare("SELECT job_title_id, job_title, department_id
         FROM job_titles WHERE (? = 0 OR department_id = ?)
-          AND is_active = 1 AND reports_to = ? ORDER BY department_id, job_title");
-    $stmt->bind_param('iii', $department_id, $department_id, $creator_position_id);
+          AND is_active = 1 AND reports_to IN ($position_ids) ORDER BY department_id, job_title");
+    $stmt->bind_param('ii', $department_id, $department_id);
     $stmt->execute();
     $positions = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
@@ -3793,11 +3815,12 @@ function getProbationaryTemplateTargetPositions($conn, $context, $department_id 
 {
     if (!$context || empty($context['can_create_templates'])) return [];
     $department_id = (int)$department_id;
-    $creator_position_id = (int)($context['job_title_id'] ?? 0);
-    if ($creator_position_id <= 0) return [];
+    $creator_positions = getEvaluationTemplateCreatorPositionIds($conn, $context);
+    if (!$creator_positions) return [];
+    $position_ids = implode(',', array_map('intval', $creator_positions));
     $stmt = $conn->prepare("SELECT job_title_id, job_title, department_id FROM job_titles
-        WHERE department_id = ? AND reports_to = ? AND is_active = 1 ORDER BY job_title");
-    $stmt->bind_param('ii', $department_id, $creator_position_id);
+        WHERE department_id = ? AND reports_to IN ($position_ids) AND is_active = 1 ORDER BY job_title");
+    $stmt->bind_param('i', $department_id);
     $stmt->execute();
     $positions = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $stmt->close();

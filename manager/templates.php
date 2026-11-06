@@ -305,9 +305,7 @@ $templates = $conn->query("SELECT et.*,
               AND NOT EXISTS (SELECT 1 FROM evaluation_template_positions etp WHERE etp.template_id = et.template_id)
         )) AS target_position_name,
     u.full_name as created_by_name,
-    CASE WHEN u.role = 'Employee' AND creator_emp.rank_category_id IN (3, 4)
-         THEN COALESCE(creator_position.job_title, u.role)
-         ELSE u.role END AS created_by_role,
+    COALESCE(creator_position.job_title, creator_emp.job_title, u.role) AS created_by_position,
     (SELECT COUNT(*) FROM evaluation_criteria WHERE template_id = et.template_id AND section='KRA') as kra_count,
     (SELECT COUNT(*) FROM evaluation_criteria WHERE template_id = et.template_id AND section='Behavior') as behavior_count,
     (SELECT SUM(weight) FROM evaluation_criteria WHERE template_id = et.template_id AND section='KRA') as kra_total_weight,
@@ -502,7 +500,7 @@ $used_template_count = (int) $conn->query("SELECT COUNT(DISTINCT ev.template_id)
 
                         <h6 class="fw-bold mb-2 template-list-card-title"><?php echo e($t['template_name']); ?></h6>
                         <div class="small text-muted mb-2">
-                            <i class="fas fa-user-edit me-1"></i>Created by <?php echo e($t['created_by_name'] ?? 'Unknown'); ?><?php if (!empty($t['created_by_role'])): ?> · <?php echo e($t['created_by_role']); ?><?php endif; ?>
+                            <i class="fas fa-user-edit me-1"></i>Created by <?php echo e($t['created_by_name'] ?? 'Unknown'); ?><?php if (!empty($t['created_by_position'])): ?> · <?php echo e($t['created_by_position']); ?><?php endif; ?>
                             <?php if ($is_template_owner): ?>
                                 <span class="badge bg-success-subtle text-success border ms-1">You own this</span>
                             <?php elseif ($is_template_manager): ?>

@@ -1150,7 +1150,7 @@ $rankCategories = $rankCategories ?? [
     <div class="row">
         <div class="col-md-3 mb-3">
             <label class="form-label">Rank</label>
-            <select class="form-select" name="rank_category_id" id="rank_category_id">
+            <select class="form-select bg-light" id="rank_category_id" disabled aria-describedby="rankAutofillHelp">
                 <option value="">Select Rank</option>
                 <?php foreach ($rankCategories as $rank): ?>
                     <option value="<?php echo (int) $rank['rank_category_id']; ?>" <?php echo (($e['rank_category_id'] ?? '') == $rank['rank_category_id']) ? 'selected' : ''; ?>>
@@ -1158,6 +1158,7 @@ $rankCategories = $rankCategories ?? [
                     </option>
                 <?php endforeach; ?>
             </select>
+            <div class="form-text" id="rankAutofillHelp">Set automatically from the selected job title.</div>
         </div>
         <div class="col-md-3 mb-3">
             <label class="form-label">Branch</label>

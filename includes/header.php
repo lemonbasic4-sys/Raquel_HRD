@@ -427,7 +427,6 @@ switch ($effective_role) {
         if (!$is_probationary_employee && !$is_hr_personnel && ($is_supervisor_menu || $m_pending_pkg_count > 0 || $is_ceo_employee_portal)) {
             $menu_my_team[] = ['icon' => 'fas fa-users',       'label' => 'My Team',                  'url' => BASE_URL . '/employee/team-list.php',              'page' => 'team-list.php'];
             $menu_my_team[] = ['icon' => 'fas fa-layer-group', 'label' => 'Performance Evaluation', 'url' => BASE_URL . '/employee/team-evaluation-packages.php', 'page' => 'team-evaluation-packages.php', 'badge' => $m_pending_pkg_count ?: null, 'badge_class' => 'bg-warning text-dark'];
-            $menu_my_team[] = ['icon' => 'fas fa-history',     'label' => 'Team Evaluation History',  'url' => BASE_URL . '/employee/team-evaluation-history.php', 'page' => 'team-evaluation-history.php'];
         }
 
         // ── Section 4: Career (rank-based) ─────────────────────────────────
@@ -491,17 +490,37 @@ if ($annual_nav_actor && $annual_nav_actor['employment_status'] === 'Regular'
     && in_array($annual_nav_actor['role'], ['Employee','President and CEO','HR Staff'], true)) {
     $annual_nav_section = $annual_nav_actor['role'] === 'HR Staff' ? 'EVALUATIONS & MONITORING' : 'EVALUATIONS';
     $annual_nav_count = annualPendingCount($conn, $annual_nav_actor);
-    $sidebar_menus[$annual_nav_section][] = ['icon'=>'fas fa-users-cog', 'label'=>'Annual & 360 Ratings',
-        'url'=>annualUrl($annual_nav_actor), 'page'=>'annual-evaluations.php',
-        'badge'=>$annual_nav_count ?: null, 'badge_class'=>'bg-warning text-dark'];
+    if (!isset($sidebar_menus['MY TEAM']) || $annual_nav_actor['role'] === 'HR Staff') {
+        $sidebar_menus[$annual_nav_section][] = ['icon'=>'fas fa-users-cog', 'label'=>'Annual & 360 Ratings',
+            'url'=>annualUrl($annual_nav_actor), 'page'=>'annual-evaluations.php',
+            'badge'=>$annual_nav_count ?: null, 'badge_class'=>'bg-warning text-dark'];
+    } else {
+        foreach ($sidebar_menus['MY TEAM'] as &$team_nav_item) {
+            if (($team_nav_item['page'] ?? '') === 'team-evaluation-packages.php') {
+                $team_nav_item['badge'] = (int)($team_nav_item['badge'] ?? 0) + $annual_nav_count;
+                break;
+            }
+        }
+        unset($team_nav_item);
+    }
 }
 if ($annual_nav_actor && $annual_nav_actor['employment_status'] === 'Regular'
     && in_array($annual_nav_actor['role'], ['Employee','President and CEO','HR Staff'], true)) {
     $quarterly_nav_section = $annual_nav_actor['role'] === 'HR Staff' ? 'EVALUATIONS & MONITORING' : 'EVALUATIONS';
     $quarterly_nav_count = quarterlyPendingCount($conn, $annual_nav_actor);
-    $sidebar_menus[$quarterly_nav_section][] = ['icon'=>'fas fa-calendar-alt', 'label'=>'Quarterly & 360 Ratings',
-        'url'=>quarterlyUrl($annual_nav_actor), 'page'=>'quarterly-evaluations.php',
-        'badge'=>$quarterly_nav_count ?: null, 'badge_class'=>'bg-warning text-dark'];
+    if (!isset($sidebar_menus['MY TEAM']) || $annual_nav_actor['role'] === 'HR Staff') {
+        $sidebar_menus[$quarterly_nav_section][] = ['icon'=>'fas fa-calendar-alt', 'label'=>'Quarterly & 360 Ratings',
+            'url'=>quarterlyUrl($annual_nav_actor), 'page'=>'quarterly-evaluations.php',
+            'badge'=>$quarterly_nav_count ?: null, 'badge_class'=>'bg-warning text-dark'];
+    } else {
+        foreach ($sidebar_menus['MY TEAM'] as &$team_nav_item) {
+            if (($team_nav_item['page'] ?? '') === 'team-evaluation-packages.php') {
+                $team_nav_item['badge'] = (int)($team_nav_item['badge'] ?? 0) + $quarterly_nav_count;
+                break;
+            }
+        }
+        unset($team_nav_item);
+    }
 }
 ?>
 <!DOCTYPE html>

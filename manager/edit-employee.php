@@ -202,7 +202,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $job_title_id = !empty($_POST['job_title_id']) ? (int) $_POST['job_title_id'] : null;
     $job_title = trim($_POST['job_title'] ?? '');
     $department_id = !empty($_POST['department_id']) ? (int) $_POST['department_id'] : null;
-    $rank_category_id = !empty($_POST['rank_category_id']) ? (int) $_POST['rank_category_id'] : null;
+    $rank_category_id = $emp['rank_category_id'] ?? null;
     $branch_id = !empty($_POST['branch_id']) ? (int) $_POST['branch_id'] : null;
     $employment_status = $_POST['employment_status'] ?? ($emp['employment_status'] ?? 'Regular');
     $employment_type = $_POST['employment_type'] ?? 'Full-time';
@@ -223,7 +223,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $separation_remarks = $emp['separation_remarks'] ?? null;
 
     if ($job_title_id !== null) {
-        $jtStmt = $conn->prepare("SELECT job_title, department_id, is_active FROM job_titles WHERE job_title_id = ?");
+        $jtStmt = $conn->prepare("SELECT job_title, department_id, rank_category_id, is_active FROM job_titles WHERE job_title_id = ?");
         $jtStmt->bind_param("i", $job_title_id);
         $jtStmt->execute();
         $jtRow = $jtStmt->get_result()->fetch_assoc();
@@ -240,6 +240,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         $job_title = (string) $jtRow['job_title'];
+        $rank_category_id = (int) $jtRow['rank_category_id'];
     }
 
     if (empty($first_name) || empty($last_name) || empty($hire_date) || empty($department_id) || ($job_title_id === null && $job_title === '')) {
