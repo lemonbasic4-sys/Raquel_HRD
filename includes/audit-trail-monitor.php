@@ -139,13 +139,13 @@ if ($is_admin) {
     }
     $audit_source = '(' . implode(' UNION ALL ', $source_queries) . ') al';
 }
-$base_from = "FROM $audit_source LEFT JOIN users u ON u.user_id = al.user_id LEFT JOIN employees e ON e.employee_id = al.target_employee_id LEFT JOIN branches b ON b.branch_id = al.branch_id LEFT JOIN departments d ON d.department_id = al.department_id";
+$base_from = "FROM $audit_source LEFT JOIN users u ON u.user_id = al.user_id LEFT JOIN employees actor_employee ON actor_employee.employee_id = u.employee_id LEFT JOIN employees e ON e.employee_id = al.target_employee_id LEFT JOIN branches b ON b.branch_id = al.branch_id LEFT JOIN departments d ON d.department_id = al.department_id";
 $total = auditCount($conn, $base_from, $where, $types, $params);
 $total_pages = max(1, (int) ceil($total / $page_size));
 $page = min($page, $total_pages);
 $offset = ($page - 1) * $page_size;
 $order_direction = $filters['sort'] === 'ASC' ? 'ASC' : 'DESC';
-$query = "SELECT al.*, u.full_name, u.role, e.employee_code, e.first_name, e.last_name, b.branch_name, d.department_name $base_from WHERE $where ORDER BY al.timestamp {$order_direction}, al.log_id {$order_direction} LIMIT ? OFFSET ?";
+$query = "SELECT al.*, u.full_name, u.role, u.profile_picture AS actor_user_picture, actor_employee.profile_picture AS actor_employee_picture, e.employee_code, e.first_name, e.last_name, b.branch_name, d.department_name $base_from WHERE $where ORDER BY al.timestamp {$order_direction}, al.log_id {$order_direction} LIMIT ? OFFSET ?";
 $stmt = $conn->prepare($query);
 $page_params = array_merge($params, [$page_size, $offset]);
 $stmt->bind_param($types . 'ii', ...$page_params);
@@ -337,11 +337,11 @@ if (defined('AUDIT_TRAIL_EXPORT_ONLY')) {
                                 'previous' => $log['previous_value'] ?? '', 'new' => $log['new_value'] ?? '',
                             ];
                             $initial_status = strtolower($event_payload['result']);
-                            $initial_avatar = strtoupper(substr(preg_replace('/[^A-Za-z]/', '', $actor_name) ?: 'S', 0, 2));
+                            $actor_avatar = getUserAvatar($log['actor_user_picture'] ?? null, $log['actor_employee_picture'] ?? null);
                         ?>
                             <tr class="audit-admin-row" tabindex="0" role="button" aria-expanded="false" aria-controls="audit-details-<?php echo $index; ?>" aria-label="View details for <?php echo e($event_payload['title']); ?>">
                                 <td><span><?php echo date('M j, Y', strtotime($log['timestamp'])); ?></span><br><small class="text-muted"><?php echo date('g:i A', strtotime($log['timestamp'])); ?></small></td>
-                                <td><div class="audit-user-cell"><span class="audit-avatar"><?php echo e($initial_avatar); ?></span><span class="text-truncate"><?php echo e($actor_name); ?></span></div></td>
+                                <td><div class="audit-user-cell"><img class="audit-avatar" src="<?php echo e($actor_avatar); ?>" alt=""><span class="text-truncate"><?php echo e($actor_name); ?></span></div></td>
                                 <td><i class="fas <?php echo $log['action_type'] === 'LOGIN' ? 'fa-right-to-bracket' : 'fa-pen-to-square'; ?> me-1 text-muted"></i><?php echo e(ucwords(strtolower(str_replace('_', ' ', $log['action_type'])))); ?><?php if ($is_demo): ?><span class="audit-demo-badge">Demo</span><?php endif; ?></td>
                                 <td><?php echo e($log['module_name'] ?? 'System Activity'); ?></td>
                                 <td><?php echo e($record_label); ?></td>

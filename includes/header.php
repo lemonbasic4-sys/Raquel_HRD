@@ -806,7 +806,7 @@ if ($annual_nav_actor && $annual_nav_actor['employment_status'] === 'Regular'
                             </div>
                         <?php else: ?>
                             <?php foreach ($notifications as $notif): 
-                                $icon_info = getNotifIconInfo($notif['title']);
+                                $icon_info = getNotifIconInfo($notif['title'], $notif['category'] ?? '');
                             ?>
                                 <a href="<?php echo in_array($effective_role, ['HR Manager', 'HR Supervisor', 'HR Staff', 'Employee', 'Admin'], true) ? e(BASE_URL . '/' . (['HR Manager' => 'manager', 'HR Supervisor' => 'supervisor', 'HR Staff' => 'staff', 'Employee' => 'employee', 'Admin' => 'admin'][$effective_role]) . '/notifications.php?id=' . (int) $notif['notification_id']) : e($notif['link'] ?? '#'); ?>"
                                     class="notification-item <?php echo $notif['is_read'] ? '' : 'unread'; ?>">

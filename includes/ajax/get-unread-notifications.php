@@ -68,7 +68,7 @@ $notif_stmt->close();
 // 3. Fetch the recent 5 unread/read notifications for the dropdown list
 // (We fetch recent 5 notifications to update the dropdown list dynamically)
 $recent_notifications = [];
-$recent_sql = "SELECT notification_id, title, message, link, is_read, created_at FROM notifications WHERE user_id = ?";
+$recent_sql = "SELECT notification_id, title, message, link, category, is_read, created_at FROM notifications WHERE user_id = ?";
 $recent_sql .= notificationRouteRepairDuplicateFilterSql();
 if ($context === 'employee') {
     $recent_sql .= " AND (link LIKE '%/employee/%' OR link IS NULL OR link = '')";
@@ -87,6 +87,7 @@ while ($row = $res_recent->fetch_assoc()) {
         'title' => $row['title'],
         'message' => $row['message'],
         'link' => $row['link'] ?: '',
+        'category' => $row['category'] ?? '',
         'is_read' => (int) $row['is_read'],
         'created_at' => $row['created_at']
     ];

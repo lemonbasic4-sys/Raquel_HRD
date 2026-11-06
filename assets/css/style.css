@@ -1747,6 +1747,26 @@ select option.position-group-label {
     color: #0891b2;
 }
 
+.notification-dropdown .notification-item .notif-avatar.login,
+.notification-dropdown .notification-item .notif-avatar.approve {
+    background: #e0f4e5;
+    color: #087a39;
+}
+.notification-dropdown .notification-item .notif-avatar.security,
+.notification-dropdown .notification-item .notif-avatar.reject {
+    background: #fde8e6;
+    color: #b42e32;
+}
+.notification-dropdown .notification-item .notif-avatar.accounts,
+.notification-dropdown .notification-item .notif-avatar.employees {
+    background: #e8eafb;
+    color: #5143aa;
+}
+.notification-dropdown .notification-item .notif-avatar.career { background:#e2f4f2; color:#087c72; }
+.notification-dropdown .notification-item .notif-avatar.backups,
+.notification-dropdown .notification-item .notif-avatar.settings,
+.notification-dropdown .notification-item .notif-avatar.audit { background:#f1eaf9; color:#7446a0; }
+
 .notification-dropdown .notification-item .notif-content-area {
     flex: 1;
     min-width: 0;

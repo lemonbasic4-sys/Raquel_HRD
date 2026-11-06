@@ -314,8 +314,15 @@ function showLiveToast(title, message, link) {
     setTimeout(function () { _hrdDismissToast(toast); }, 8000);
 }
 
-function getNotifIconInfoJS(title) {
+function getNotifIconInfoJS(title, category = '') {
     const t = (title || '').toLowerCase();
+    const group = (category || '').toLowerCase();
+    if (t.includes('failed login') || t.includes('security alert') || t.includes('account hold') || t.includes('access denied')) {
+        return { icon: 'fas fa-shield-halved', class: 'security' };
+    }
+    if (t.includes('successful login') || t.includes('signed in')) {
+        return { icon: 'fas fa-right-to-bracket', class: 'login' };
+    }
     if (t.includes('approved') || t.includes('approval') || t.includes('confirmed') || t.includes('endorsed')) {
         return { icon: 'fas fa-check-circle', class: 'approve' };
     }
@@ -327,6 +334,20 @@ function getNotifIconInfoJS(title) {
     }
     if (t.includes('evaluation') || t.includes('validation') || t.includes('rating') || t.includes('pending')) {
         return { icon: 'fas fa-clipboard-check', class: 'eval' };
+    }
+    const categoryIcons = {
+        security: ['fas fa-shield-halved', 'security'],
+        accounts: ['fas fa-user-shield', 'accounts'],
+        portal: ['fas fa-id-card', 'accounts'],
+        employees: ['fas fa-users', 'employees'],
+        evaluations: ['fas fa-clipboard-check', 'eval'],
+        career: ['fas fa-arrow-trend-up', 'career'],
+        backups: ['fas fa-database', 'backups'],
+        settings: ['fas fa-gear', 'settings'],
+        audit: ['fas fa-clock-rotate-left', 'audit']
+    };
+    if (categoryIcons[group]) {
+        return { icon: categoryIcons[group][0], class: categoryIcons[group][1] };
     }
     return { icon: 'fas fa-bell', class: 'system' };
 }
@@ -388,7 +409,7 @@ function updateNotificationDOM(unreadCount, recentNotifications) {
                     : (notif.link || '#');
                 itemEl.className = `notification-item ${notif.is_read ? '' : 'unread'}`;
                 
-                const iconInfo = getNotifIconInfoJS(notif.title);
+                const iconInfo = getNotifIconInfoJS(notif.title, notif.category);
                 const timeStr = formatDateTimeString(notif.created_at);
                 
                 itemEl.innerHTML = `

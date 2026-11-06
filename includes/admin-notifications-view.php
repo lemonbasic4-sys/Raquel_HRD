@@ -21,6 +21,15 @@ $adminNotificationUrl = static fn(array $changes = []) => e(managerNotifUrl(arra
 .admin-notice-event summary { list-style:none; cursor:pointer; padding:17px; display:grid; grid-template-columns:42px minmax(0,1fr) auto; gap:13px; align-items:start; }
 .admin-notice-event summary::-webkit-details-marker { display:none; }
 .admin-notice-icon { display:grid; place-items:center; width:40px; height:40px; border-radius:11px; background:#e6f0e1; color:#225a26; }
+.admin-notice-icon i { font-size:1.15rem; }
+.admin-notice-icon.login { background:#e3f4e8; color:#08753c; }
+.admin-notice-icon.security, .admin-notice-icon.reject { background:#fde8e6; color:#b42e32; }
+.admin-notice-icon.approve { background:#e0f4e5; color:#087a39; }
+.admin-notice-icon.return { background:#fff0d2; color:#946500; }
+.admin-notice-icon.eval { background:#e7efff; color:#285fc0; }
+.admin-notice-icon.accounts, .admin-notice-icon.employees { background:#e8eafb; color:#5143aa; }
+.admin-notice-icon.career { background:#e2f4f2; color:#087c72; }
+.admin-notice-icon.backups, .admin-notice-icon.settings, .admin-notice-icon.audit { background:#f1eaf9; color:#7446a0; }
 .admin-notice-title { font-weight:700; color:#17391d; overflow-wrap:anywhere; }
 .admin-notice-meta { color:#68776a; font-size:.8rem; margin-top:3px; }
 .admin-notice-preview { color:#405047; font-size:.88rem; margin-top:7px; overflow-wrap:anywhere; }
@@ -56,8 +65,8 @@ $adminNotificationUrl = static fn(array $changes = []) => e(managerNotifUrl(arra
     </div>
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3"><div><h2 class="h5 mb-0">Notification activity</h2><small class="text-muted">Showing <?php echo $total_filtered ? number_format($offset + 1) . '–' . number_format($offset + count($manager_notif_items)) : '0'; ?> of <?php echo number_format($total_filtered); ?> matching notifications</small></div><span class="small text-muted"><i class="fas fa-circle-info me-1"></i>Expand a notice to view details and actions</span></div>
     <?php if (!$manager_notif_items): ?><div class="text-center text-muted bg-light rounded-4 py-5"><i class="far fa-bell-slash fa-2x mb-3"></i><br>No notifications match these filters.</div><?php endif; ?>
-    <?php foreach ($manager_notif_items as $item): $id = (int)$item['notification_id']; $meta = $categories[$item['category'] ?? 'system'] ?? $categories['system']; $target = managerNotifLink($item['link']); ?>
-        <details class="admin-notice-event" <?php echo $selected_id === $id ? 'open' : ''; ?>><summary><div class="admin-notice-icon"><i class="<?php echo e($meta[1]); ?>"></i></div><div><div class="admin-notice-title"><?php echo e($item['title']); ?></div><div class="admin-notice-meta"><?php echo e($meta[0]); ?> · <?php echo e(formatDateTime($item['created_at'])); ?></div><div class="admin-notice-preview"><?php echo e(mb_strimwidth($item['message'], 0, 150, '…')); ?></div></div><span class="admin-notice-pill <?php echo $item['is_read'] ? '' : 'unread'; ?>"><?php echo $item['is_read'] ? 'Read' : 'Unread'; ?></span></summary>
+    <?php foreach ($manager_notif_items as $item): $id = (int)$item['notification_id']; $meta = $categories[$item['category'] ?? 'system'] ?? $categories['system']; $icon_info = getNotifIconInfo($item['title'], $item['category'] ?? ''); $target = managerNotifLink($item['link']); ?>
+        <details class="admin-notice-event" <?php echo $selected_id === $id ? 'open' : ''; ?>><summary><div class="admin-notice-icon <?php echo e($icon_info['class']); ?>"><i class="<?php echo e($icon_info['icon']); ?>"></i></div><div><div class="admin-notice-title"><?php echo e($item['title']); ?></div><div class="admin-notice-meta"><?php echo e($meta[0]); ?> · <?php echo e(formatDateTime($item['created_at'])); ?></div><div class="admin-notice-preview"><?php echo e(mb_strimwidth($item['message'], 0, 150, '…')); ?></div></div><span class="admin-notice-pill <?php echo $item['is_read'] ? '' : 'unread'; ?>"><?php echo $item['is_read'] ? 'Read' : 'Unread'; ?></span></summary>
             <div class="admin-notice-detail"><p><?php echo e($item['message']); ?></p><div class="admin-notice-actions">
                 <?php if ($target): ?><form method="post"><?php echo csrfField(); ?><input type="hidden" name="notification_id" value="<?php echo $id; ?>"><button class="btn btn-sm btn-success" name="inbox_action" value="open_related"><i class="fas fa-arrow-up-right-from-square me-1"></i>Open related page</button></form><?php endif; ?>
                 <form method="post"><?php echo csrfField(); ?><input type="hidden" name="notification_id" value="<?php echo $id; ?>"><button class="btn btn-sm btn-outline-secondary" name="inbox_action" value="<?php echo $item['is_read'] ? 'mark_unread' : 'mark_read'; ?>"><?php echo $item['is_read'] ? 'Mark unread' : 'Mark read'; ?></button></form>

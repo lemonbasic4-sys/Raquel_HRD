@@ -1156,9 +1156,16 @@ function notificationRouteRepairDuplicateFilterSql(): string
 /**
  * Get category icon and CSS class for a notification title
  */
-function getNotifIconInfo($title)
+function getNotifIconInfo($title, $category = '')
 {
     $t = strtolower($title ?? '');
+    $category = strtolower($category ?? '');
+    if (str_contains($t, 'failed login') || str_contains($t, 'security alert') || str_contains($t, 'account hold') || str_contains($t, 'access denied')) {
+        return ['icon' => 'fas fa-shield-halved', 'class' => 'security'];
+    }
+    if (str_contains($t, 'successful login') || str_contains($t, 'signed in')) {
+        return ['icon' => 'fas fa-right-to-bracket', 'class' => 'login'];
+    }
     if (str_contains($t, 'approved') || str_contains($t, 'approval') || str_contains($t, 'confirmed') || str_contains($t, 'endorsed')) {
         return ['icon' => 'fas fa-check-circle', 'class' => 'approve'];
     }
@@ -1170,6 +1177,20 @@ function getNotifIconInfo($title)
     }
     if (str_contains($t, 'evaluation') || str_contains($t, 'validation') || str_contains($t, 'rating') || str_contains($t, 'pending')) {
         return ['icon' => 'fas fa-clipboard-check', 'class' => 'eval'];
+    }
+    $category_icons = [
+        'security' => ['fas fa-shield-halved', 'security'],
+        'accounts' => ['fas fa-user-shield', 'accounts'],
+        'portal' => ['fas fa-id-card', 'accounts'],
+        'employees' => ['fas fa-users', 'employees'],
+        'evaluations' => ['fas fa-clipboard-check', 'eval'],
+        'career' => ['fas fa-arrow-trend-up', 'career'],
+        'backups' => ['fas fa-database', 'backups'],
+        'settings' => ['fas fa-gear', 'settings'],
+        'audit' => ['fas fa-clock-rotate-left', 'audit'],
+    ];
+    if (isset($category_icons[$category])) {
+        return ['icon' => $category_icons[$category][0], 'class' => $category_icons[$category][1]];
     }
     return ['icon' => 'fas fa-bell', 'class' => 'system'];
 }

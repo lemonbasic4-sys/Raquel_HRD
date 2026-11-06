@@ -161,7 +161,7 @@
 .admin-audit-trail-page .audit-admin-table th:nth-child(6) { min-width: 80px; }
 .admin-audit-trail-page .audit-admin-table th:nth-child(7) { min-width: 95px; }
 .admin-audit-trail-page .audit-user-cell { display: flex; align-items: center; gap: 8px; max-width: 180px; }
-.admin-audit-trail-page .audit-avatar { display: grid; place-items: center; flex: 0 0 26px; width: 26px; height: 26px; border-radius: 50%; background: #e1eee0; color: #1b602f; font-size: .62rem; font-weight: 800; }
+.admin-audit-trail-page .audit-avatar { display: block; flex: 0 0 26px; width: 26px; height: 26px; border-radius: 50%; border: 1px solid #dce8d9; background: #fff; object-fit: cover; }
 .admin-audit-trail-page .audit-outcome { display: inline-block; padding: 4px 9px; border-radius: 99px; background: #e2f5e8; color: #146b31; font-size: .66rem; font-weight: 750; }
 .admin-audit-trail-page .audit-outcome.failed { background: #fde8e7; color: #a33c34; }
 .admin-audit-trail-page .audit-outcome.cancelled { background: #fff4d5; color: #795d09; }
