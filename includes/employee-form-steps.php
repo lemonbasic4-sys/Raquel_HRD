@@ -1146,8 +1146,10 @@ $rankCategories = $rankCategories ?? [
                 <?php endif; ?>
             <?php endif; ?>
         </div>
+    </div>
+    <div class="row">
         <div class="col-md-3 mb-3">
-            <label class="form-label">RANK</label>
+            <label class="form-label">Rank</label>
             <select class="form-select" name="rank_category_id" id="rank_category_id">
                 <option value="">Select Rank</option>
                 <?php foreach ($rankCategories as $rank): ?>
@@ -1157,9 +1159,7 @@ $rankCategories = $rankCategories ?? [
                 <?php endforeach; ?>
             </select>
         </div>
-    </div>
-    <div class="row">
-        <div class="col-md-4 mb-3">
+        <div class="col-md-3 mb-3">
             <label class="form-label">Branch</label>
             <select class="form-select" name="branch_id">
                 <option value="">Select Branch</option>
@@ -1174,22 +1174,32 @@ $rankCategories = $rankCategories ?? [
                 <?php endwhile; ?>
             </select>
         </div>
-        <div class="col-md-4 mb-3">
+        <div class="col-md-3 mb-3">
             <label class="form-label">Employment Status <span class="text-danger">*</span></label>
             <?php
             $employmentStatuses = ['OJT', 'Probationary', 'Project Based', 'Regular', 'Separated', 'Trainee', 'AWOL', 'Retirement', 'Death', 'Permanent or Total Disability', 'Resignation', 'Failed in Training', 'Termination for Cause'];
             $employmentStatusValue = $e['employment_status'] ?? 'Regular';
             ?>
-            <select class="form-select" name="employment_status" id="employment_status_select" required>
-                <?php foreach ($employmentStatuses as $status): ?>
-                    <option value="<?php echo e($status); ?>" <?php echo $employmentStatusValue === $status ? 'selected' : ''; ?>>
-                        <?php echo e($status); ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
+            <?php
+            $separationStatuses = ['Separated', 'AWOL', 'Retirement', 'Death', 'Permanent or Total Disability', 'Resignation', 'Failed in Training', 'Termination for Cause', 'Others'];
+            $lockedSeparationStatus = $isEdit && in_array($employmentStatusValue, $separationStatuses, true);
+            ?>
+            <?php if ($lockedSeparationStatus): ?>
+                <div class="form-control bg-light"><?php echo e($employmentStatusValue); ?></div>
+                <input type="hidden" name="employment_status" value="<?php echo e($employmentStatusValue); ?>">
+            <?php else: ?>
+                <select class="form-select" name="employment_status" id="employment_status_select" required>
+                    <?php foreach ($employmentStatuses as $status): ?>
+                        <?php if ($isEdit && in_array($status, $separationStatuses, true)) continue; ?>
+                        <option value="<?php echo e($status); ?>" <?php echo $employmentStatusValue === $status ? 'selected' : ''; ?>>
+                            <?php echo e($status); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            <?php endif; ?>
             <small class="text-muted">OJT / Trainee / Probationary / Project Based require contract dates below.</small>
         </div>
-        <div class="col-md-4 mb-3">
+        <div class="col-md-3 mb-3">
             <label class="form-label">Employment Type</label>
             <select class="form-select" name="employment_type">
                 <option value="Full-time" <?php echo $sel('employment_type', 'Full-time'); ?>>Full-time</option>
@@ -1248,45 +1258,6 @@ $rankCategories = $rankCategories ?? [
             <small class="text-muted">Expected end date. Leave blank if ongoing.</small>
         </div>
     </div>
-
-    <?php if ($isEdit): ?>
-        <div class="row">
-            <?php if ($_SESSION['role'] === 'HR Supervisor'): ?>
-                <div class="col-md-4 mb-3">
-                    <label class="form-label">Employee Record Status</label>
-                    <div>
-                        <span class="badge <?php echo !empty($e['is_active']) ? 'bg-success' : 'bg-danger'; ?> px-3 py-2">
-                            <?php echo !empty($e['is_active']) ? 'Active Employee' : 'Inactive Employee'; ?>
-                        </span>
-                    </div>
-                    <small class="text-muted">Activation changes are handled by HR Manager.</small>
-                </div>
-            <?php else: ?>
-                <div class="col-md-4 mb-3">
-                    <div class="form-check form-switch mt-4">
-                        <input class="form-check-input" type="checkbox" name="is_active" id="isActive" <?php echo $chk('is_active'); ?>>
-                        <label class="form-check-label" for="isActive">Active Employee</label>
-                    </div>
-                    <div class="d-flex flex-wrap gap-2 mt-2">
-                        <button type="button" class="btn btn-sm btn-outline-danger" id="separateEmployeeBtn"><i class="fas fa-user-slash me-1"></i>Separate Employee</button>
-                        <button type="button" class="btn btn-sm btn-outline-success" id="reactivateEmployeeBtn"><i class="fas fa-user-check me-1"></i>Reactivate Employee</button>
-                    </div>
-                    <small class="text-muted">Choose a separation reason below, then save the employee record.</small>
-                </div>
-            <?php endif; ?>
-        </div>
-        <div class="row" id="separationFieldsRow" style="<?php echo (empty($e['is_active']) || !empty($e['separation_date'])) ? '' : 'display:none;'; ?>">
-            <div class="col-md-4 mb-3">
-                <label class="form-label text-danger fw-semibold"><i class="fas fa-calendar-times me-1"></i>Separation Effective Date <span class="text-danger">*</span></label>
-                <input type="date" class="form-control" name="separation_date" id="separation_date" value="<?php echo $v('separation_date'); ?>">
-                <small class="text-muted">Effective date when the separation officially takes effect.</small>
-            </div>
-            <div class="col-md-8 mb-3">
-                <label class="form-label fw-semibold">Separation Remarks / Notes</label>
-                <input type="text" class="form-control" name="separation_remarks" id="separation_remarks" value="<?php echo $v('separation_remarks'); ?>" placeholder="Separation notes, turnover details, or clearance remarks">
-            </div>
-        </div>
-    <?php endif; ?>
 
     <div class="form-section-title mt-4"><i class="fas fa-heartbeat"></i> Emergency Contacts</div>
     
@@ -1470,12 +1441,5 @@ document.addEventListener("DOMContentLoaded", function() {
     // Run once on load so the list is correct in edit mode.
     updateJobTitles();
 
-    const activeToggle = document.getElementById('isActive');
-    const sepRow = document.getElementById('separationFieldsRow');
-    if (activeToggle && sepRow) {
-        activeToggle.addEventListener('change', function() {
-            sepRow.style.display = this.checked ? 'none' : 'flex';
-        });
-    }
 });
 </script>

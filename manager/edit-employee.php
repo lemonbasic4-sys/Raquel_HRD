@@ -204,26 +204,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $department_id = !empty($_POST['department_id']) ? (int) $_POST['department_id'] : null;
     $rank_category_id = !empty($_POST['rank_category_id']) ? (int) $_POST['rank_category_id'] : null;
     $branch_id = !empty($_POST['branch_id']) ? (int) $_POST['branch_id'] : null;
-    $employment_status = $_POST['employment_status'] ?? 'Regular';
+    $employment_status = $_POST['employment_status'] ?? ($emp['employment_status'] ?? 'Regular');
     $employment_type = $_POST['employment_type'] ?? 'Full-time';
     $employee_code = strtoupper(trim($_POST['employee_code'] ?? ''));
     if ($employee_code === '') $employee_code = null;
-    $is_active = $_SESSION['role'] === 'HR Supervisor'
-        ? (int) ($emp['is_active'] ?? 1)
-        : (isset($_POST['is_active']) ? 1 : 0);
     $separationStatuses = ['Separated', 'AWOL', 'Retirement', 'Death', 'Permanent or Total Disability', 'Resignation', 'Failed in Training', 'Termination for Cause', 'Others'];
-    $is_separation_status = in_array($employment_status, $separationStatuses, true);
-    if ($is_separation_status) $is_active = 0;
+    $previouslySeparated = in_array((string)($emp['employment_status'] ?? ''), $separationStatuses, true);
+    if ($previouslySeparated) {
+        $employment_status = $emp['employment_status'];
+    } elseif (in_array($employment_status, $separationStatuses, true)) {
+        redirectWith($return_to, 'danger', 'Use Employee Separation to change the employee record status.');
+    }
+    $is_active = (int)($emp['is_active'] ?? 1);
     // emergency contact fields are now arrays — handled in the save block below
     $contract_start_date = !empty($_POST['contract_start_date']) ? $_POST['contract_start_date'] : null;
     $contract_end_date = !empty($_POST['contract_end_date']) ? $_POST['contract_end_date'] : null;
-    $separation_date = (!empty($_POST['separation_date']) && $is_active == 0) ? $_POST['separation_date'] : null;
-    $separation_remarks = ($is_active == 0 && !empty(trim($_POST['separation_remarks'] ?? ''))) ? trim($_POST['separation_remarks']) : null;
-    if ($is_separation_status && empty($separation_date)) $separation_date = date('Y-m-d');
-    if ($is_active == 1) {
-        $separation_date = null;
-        $separation_remarks = null;
-    }
+    $separation_date = $emp['separation_date'] ?? null;
+    $separation_remarks = $emp['separation_remarks'] ?? null;
 
     if ($job_title_id !== null) {
         $jtStmt = $conn->prepare("SELECT job_title, department_id, is_active FROM job_titles WHERE job_title_id = ?");
