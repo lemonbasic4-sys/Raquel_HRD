@@ -134,22 +134,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $tin_number = trim($_POST['tin_number'] ?? '');
 
     // Addresses
-    $res_region = trim($_POST['res_region'] ?? '');
-    $res_house_no = trim($_POST['res_house_no'] ?? '');
-    $res_street = trim($_POST['res_street'] ?? '');
-    $res_subdivision = trim($_POST['res_subdivision'] ?? '');
-    $res_barangay = trim($_POST['res_barangay'] ?? '');
-    $res_city = trim($_POST['res_city'] ?? '');
-    $res_province = trim($_POST['res_province'] ?? '');
-    $res_zip_code = trim($_POST['res_zip_code'] ?? '');
-    $perm_region = trim($_POST['perm_region'] ?? '');
-    $perm_house_no = trim($_POST['perm_house_no'] ?? '');
-    $perm_street = trim($_POST['perm_street'] ?? '');
-    $perm_subdivision = trim($_POST['perm_subdivision'] ?? '');
-    $perm_barangay = trim($_POST['perm_barangay'] ?? '');
-    $perm_city = trim($_POST['perm_city'] ?? '');
-    $perm_province = trim($_POST['perm_province'] ?? '');
-    $perm_zip_code = trim($_POST['perm_zip_code'] ?? '');
+    // Location selects are disabled until their parent list loads, so absent
+    // POST keys mean "unchanged", not "clear the saved address".
+    $addressInput = static function (string $key) use ($emp): string {
+        return trim((string)($_POST[$key] ?? $emp[$key] ?? ''));
+    };
+    $res_region = $addressInput('res_region');
+    $res_house_no = $addressInput('res_house_no');
+    $res_street = $addressInput('res_street');
+    $res_subdivision = $addressInput('res_subdivision');
+    $res_barangay = $addressInput('res_barangay');
+    $res_city = $addressInput('res_city');
+    $res_province = $addressInput('res_province');
+    $res_zip_code = $addressInput('res_zip_code');
+    $perm_region = $addressInput('perm_region');
+    $perm_house_no = $addressInput('perm_house_no');
+    $perm_street = $addressInput('perm_street');
+    $perm_subdivision = $addressInput('perm_subdivision');
+    $perm_barangay = $addressInput('perm_barangay');
+    $perm_city = $addressInput('perm_city');
+    $perm_province = $addressInput('perm_province');
+    $perm_zip_code = $addressInput('perm_zip_code');
 
     // Contact
     $telephone_number = trim($_POST['telephone_number'] ?? '');

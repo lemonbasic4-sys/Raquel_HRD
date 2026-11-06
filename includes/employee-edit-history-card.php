@@ -21,7 +21,7 @@ $edit_history = getEmployeeEditHistory($conn, (int)$eid, 50);
                 <h5 class="mb-0">Profile Edit History</h5>
             </div>
             <span class="badge px-3 py-2" style="background:#f0fdf4; color:#15803d; border:1px solid #bbf7d0; font-size:0.78rem; font-weight:700; border-radius:999px;">
-                <i class="fas fa-list-check me-1"></i><?php echo count($edit_history); ?> Edit Record<?php echo count($edit_history) !== 1 ? 's' : ''; ?>
+                <i class="fas fa-list-check me-1"></i><?php echo count($edit_history); ?> Activity Record<?php echo count($edit_history) !== 1 ? 's' : ''; ?>
             </span>
         </div>
 
@@ -29,7 +29,7 @@ $edit_history = getEmployeeEditHistory($conn, (int)$eid, 50);
             <?php if (empty($edit_history)): ?>
                 <div class="empty-state">
                     <i class="fas fa-shield-check d-block" style="color: var(--primary-blue); opacity: 0.35;"></i>
-                    <p>No manual profile edits have been recorded for this employee.</p>
+                    <p>No profile edits or separation actions have been recorded for this employee.</p>
                 </div>
             <?php else: ?>
                 <div class="d-grid gap-2">

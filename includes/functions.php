@@ -9153,7 +9153,45 @@ function getEmployeeEditHistory($conn, int $employee_id, int $limit = 50): array
         }
         $stmt->close();
     }
-    return $records;
+
+    // Separation and reactivation from the employee list were logged in the
+    // master audit trail, including events recorded before this timeline update.
+    $audit_stmt = $conn->prepare("SELECT a.log_id, a.user_id, a.details, a.timestamp,
+            COALESCE(NULLIF(u.full_name, ''), NULLIF(u.username, ''), 'System / HR Personnel') AS editor_name,
+            COALESCE(u.role, 'HR Personnel') AS editor_role
+        FROM audit_logs a
+        LEFT JOIN users u ON u.user_id = a.user_id
+        WHERE a.entity_type = 'Employee' AND a.entity_id = ?
+          AND a.action_type = 'UPDATE' AND a.action_status = 'Successful'
+          AND (a.details LIKE 'Separated employee with status:%'
+               OR a.details = 'Reactivated employee and reset separation record')
+        ORDER BY a.timestamp DESC, a.log_id DESC LIMIT ?");
+    if ($audit_stmt) {
+        $audit_stmt->bind_param('ii', $employee_id, $limit);
+        $audit_stmt->execute();
+        $audit_rows = $audit_stmt->get_result();
+        while ($audit = $audit_rows->fetch_assoc()) {
+            $is_separation = str_starts_with((string)$audit['details'], 'Separated employee with status:');
+            $records[] = [
+                'edit_id' => -(int)$audit['log_id'],
+                'employee_id' => $employee_id,
+                'edited_by' => (int)($audit['user_id'] ?? 0),
+                'editor_name' => $audit['editor_name'],
+                'editor_role' => $audit['editor_role'],
+                'step_name' => $is_separation ? 'Employee Separation' : 'Employee Reactivation',
+                'change_summary' => $audit['details'],
+                'changes_data' => [],
+                'created_at' => $audit['timestamp'],
+            ];
+        }
+        $audit_stmt->close();
+    }
+
+    usort($records, static function ($a, $b) {
+        $by_date = strcmp((string)$b['created_at'], (string)$a['created_at']);
+        return $by_date !== 0 ? $by_date : ((int)$b['edit_id'] <=> (int)$a['edit_id']);
+    });
+    return array_slice($records, 0, $limit);
 }
 
 /**
