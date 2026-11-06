@@ -126,6 +126,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_SESSION['first_login_completed'] = (bool) ($user['first_login_completed'] ?? false);
 
                 logLoginAudit($conn, $username, 'HRIS Portal', 'Successful', '', (int)$user['user_id']);
+                if (empty($user['first_login_completed'])) {
+                    $first_signin = $conn->prepare('UPDATE users SET first_login_completed = 1 WHERE user_id = ? AND first_login_completed = 0');
+                    $first_signin->bind_param('i', $user['user_id']);
+                    $first_signin->execute();
+                    $first_signin->close();
+                    $_SESSION['first_login_completed'] = true;
+                }
 
                 // Clear brute force attempts on successful login
                 clearLoginAttempts($conn, $username, $ip);

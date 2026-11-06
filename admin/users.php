@@ -223,7 +223,14 @@ document.addEventListener('DOMContentLoaded', () => new bootstrap.Modal(document
     .user-management .user-toolbar { display:grid !important; grid-template-columns:minmax(220px,1fr) 170px 170px; background:#fbfdfb; border-bottom:1px solid var(--glass-border); border-top:1px solid var(--glass-border); padding:.9rem 1.25rem; }
     .user-management .user-toolbar .search-box { width:100%; }
     .user-management .user-toolbar .form-select { width:100%; min-width:0; }
-    .user-management .users-table { margin:0; }
+    .user-management .users-table-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:thin; scrollbar-color:#9eae95 #edf3e9; }
+    .user-management .users-table-hint { display:none; }
+    @media (min-width:768px) and (max-width:1550px) { .user-management .users-table-hint { display:block; } }
+    .user-management .users-table { margin:0; min-width:1160px; }
+    .user-management .users-table th:nth-child(5), .user-management .users-table td:nth-child(5) { min-width:210px; }
+    .user-management .users-table th:nth-child(7), .user-management .users-table td:nth-child(7) { min-width:130px; }
+    .user-management .users-table th:nth-child(8), .user-management .users-table td:nth-child(8) { min-width:145px; }
+    .user-management .users-table th:last-child, .user-management .users-table td:last-child { min-width:130px; }
     .user-management .users-table th { white-space:nowrap; padding:.8rem .7rem; color:#536455; background:#f1f6ef; border-bottom:1px solid #dfe9dc; font-size:.7rem; letter-spacing:.045em; text-transform:uppercase; }
     .user-management .users-table td { vertical-align: middle; }
     .user-management .users-table tbody tr { transition:background-color .18s ease; border-color:#edf1eb; }
@@ -336,7 +343,8 @@ document.addEventListener('DOMContentLoaded', () => new bootstrap.Modal(document
         </select>
     </div>
     <div class="card-body p-0">
-        <div class="table-responsive d-none d-md-block">
+        <div class="users-table-hint small text-muted px-3 py-2"><i class="fas fa-arrows-alt-h me-1"></i>Scroll sideways to view every column and action.</div>
+        <div class="table-responsive users-table-wrap d-none d-md-block" role="region" aria-label="All users table; scroll horizontally to view more columns" tabindex="0">
             <table class="table table-hover users-table" id="usersTable">
                 <thead>
                     <tr>
@@ -386,10 +394,10 @@ document.addEventListener('DOMContentLoaded', () => new bootstrap.Modal(document
                             </td>
                             <td>
                                 <?php if ($user['user_id'] != $_SESSION['user_id']): ?>
-                                    <!-- Edit -->
+                                    <!-- Password reset -->
                                     <a href="<?php echo BASE_URL; ?>/admin/edit-user.php?id=<?php echo $user['user_id']; ?>"
-                                        class="btn btn-sm btn-outline-primary" title="Edit User">
-                                        <i class="fas fa-edit"></i>
+                                        class="btn btn-sm btn-outline-primary" title="<?php echo !empty($user['account_hold']) ? 'Manage Account Access' : 'Reset Password'; ?>" aria-label="<?php echo !empty($user['account_hold']) ? 'Manage Account Access' : 'Reset Password'; ?>">
+                                        <i class="fas fa-key"></i>
                                     </a>
                                     <!-- Toggle Status -->
                                     <form method="post" class="d-inline">
@@ -470,10 +478,10 @@ document.addEventListener('DOMContentLoaded', () => new bootstrap.Modal(document
                             <div class="ms-auto text-end d-flex flex-column gap-2 justify-content-center">
                                 <?php if ($user['user_id'] != $_SESSION['user_id']): ?>
                                     <div class="d-flex gap-1">
-                                        <!-- Edit -->
+                                        <!-- Password reset -->
                                         <a href="<?php echo BASE_URL; ?>/admin/edit-user.php?id=<?php echo $user['user_id']; ?>"
-                                            class="btn btn-sm btn-outline-primary" title="Edit User" style="padding: 5px 8px; border-radius: 6px;">
-                                            <i class="fas fa-edit"></i>
+                                            class="btn btn-sm btn-outline-primary" title="<?php echo !empty($user['account_hold']) ? 'Manage Account Access' : 'Reset Password'; ?>" aria-label="<?php echo !empty($user['account_hold']) ? 'Manage Account Access' : 'Reset Password'; ?>" style="padding: 5px 8px; border-radius: 6px;">
+                                            <i class="fas fa-key"></i>
                                         </a>
                                         <!-- Toggle Status -->
                                         <form method="post" class="d-inline">

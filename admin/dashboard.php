@@ -25,12 +25,6 @@ $active_users = $conn->query("
 $total_branches = $conn->query("SELECT COUNT(*) as c FROM branches WHERE deleted_at IS NULL")->fetch_assoc()['c'];
 $recent_logs = $conn->query("SELECT COUNT(*) as c FROM audit_logs WHERE timestamp >= DATE_SUB(NOW(), INTERVAL 24 HOUR)")->fetch_assoc()['c'];
 
-// 1. Employee Account Issuance Stats
-$total_employees = $conn->query("SELECT COUNT(*) as c FROM employees WHERE is_active = 1")->fetch_assoc()['c'];
-$employees_with_accounts = $conn->query("SELECT COUNT(DISTINCT employee_id) as c FROM users WHERE employee_id IS NOT NULL")->fetch_assoc()['c'];
-$employees_no_accounts = max(0, $total_employees - $employees_with_accounts);
-$issued_pct = ($total_employees > 0) ? ($employees_with_accounts / $total_employees) * 100 : 0;
-
 // --- SYSTEM ANALYTICS ---
 
 // 1. User Roles Distribution - only valid HR system users, excludes orphaned accounts
@@ -114,31 +108,18 @@ $pending_account_setup = $conn->query("
     LIMIT 3
 ");
 
-$first_signin_count = (int) ($conn->query("
-    SELECT COUNT(*) AS c
-    FROM users u
-    JOIN employees e ON u.employee_id = e.employee_id
-    JOIN departments d ON e.department_id = d.department_id
-    WHERE u.is_active = 1
-      AND u.first_login_completed = 0
-      AND u.role IN ('HR Manager', 'HR Supervisor', 'HR Staff')
-      AND e.is_active = 1
-      AND e.deleted_at IS NULL
-      AND d.department_name = 'Human Resources'
+$failed_signin_count = (int) ($conn->query("
+    SELECT COUNT(*) AS c FROM audit_logs
+    WHERE action_type = 'LOGIN' AND entity_type = 'Authentication'
+      AND action_status = 'Failed' AND details LIKE 'Portal: HRIS Portal;%'
+      AND timestamp >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
 ")->fetch_assoc()['c'] ?? 0);
-$first_signin_users = $conn->query("
-    SELECT u.user_id, u.full_name, u.role, u.created_at
-    FROM users u
-    JOIN employees e ON u.employee_id = e.employee_id
-    JOIN departments d ON e.department_id = d.department_id
-    WHERE u.is_active = 1
-      AND u.first_login_completed = 0
-      AND u.role IN ('HR Manager', 'HR Supervisor', 'HR Staff')
-      AND e.is_active = 1
-      AND e.deleted_at IS NULL
-      AND d.department_name = 'Human Resources'
-    ORDER BY u.created_at ASC
-    LIMIT 3
+$failed_signins = $conn->query("
+    SELECT log_id, details, ip_address, timestamp FROM audit_logs
+    WHERE action_type = 'LOGIN' AND entity_type = 'Authentication'
+      AND action_status = 'Failed' AND details LIKE 'Portal: HRIS Portal;%'
+      AND timestamp >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+    ORDER BY timestamp DESC, log_id DESC LIMIT 3
 ");
 
 $held_account_count = (int) ($conn->query("
@@ -202,10 +183,6 @@ $audit_logs = $conn->query("SELECT al.*, u.full_name FROM audit_logs al LEFT JOI
     .admin-dashboard .dashboard-section-heading p { margin: .2rem 0 0; color: var(--text-muted); font-size: .84rem; }
     .admin-dashboard .chart-card .card-body { padding: 1rem 1.25rem 1.25rem; }
     .admin-dashboard .chart-card canvas { height: 230px !important; max-height: 230px; }
-    .admin-dashboard .coverage-panel { background: linear-gradient(135deg, #f0f8f2 0%, #fbfdfb 100%); border: 1px solid #d9ecdf; border-radius: 14px; }
-    .admin-dashboard .coverage-number { color: #16703a; font-size: 2rem; font-weight: 800; letter-spacing: -.06em; line-height: 1; }
-    .admin-dashboard .coverage-label { color: #427453; font-size: .73rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
-    .admin-dashboard .issuance-stat + .issuance-stat { border-left: 1px solid #dce9df; }
     .admin-dashboard .audit-card .card-body { min-height: 288px; }
     .admin-dashboard .audit-card .table thead th { font-size: .72rem; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; }
     .admin-dashboard .audit-card .table td { vertical-align: middle; }
@@ -214,7 +191,6 @@ $audit_logs = $conn->query("SELECT al.*, u.full_name FROM audit_logs al LEFT JOI
         .admin-dashboard .hero-actions { width: 100%; }
         .admin-dashboard .hero-actions .btn { width: 100%; }
         .admin-dashboard .chart-card canvas { height: 210px !important; }
-        .admin-dashboard .issuance-stat + .issuance-stat { border-left: 0; border-top: 1px solid #dce9df; margin-top: .85rem; padding-top: .85rem; }
     }
 </style>
 
@@ -301,15 +277,15 @@ $audit_logs = $conn->query("SELECT al.*, u.full_name FROM audit_logs al LEFT JOI
                         <div class="border rounded-3 p-3 h-100" style="background:linear-gradient(135deg, #fff8e8 0%, #fffdf8 100%); border-color:#f6dfac !important;">
                             <div class="d-flex align-items-start justify-content-between gap-3">
                                 <div>
-                                    <div class="text-warning small fw-semibold text-uppercase" style="letter-spacing:.05em;">Awaiting first sign-in</div>
+                                    <div class="text-warning small fw-semibold text-uppercase" style="letter-spacing:.05em;">Failed HRIS sign-ins (24h)</div>
                                     <div class="d-flex align-items-baseline mt-1">
-                                        <span class="display-6 fw-bold text-warning lh-1"><?php echo $first_signin_count; ?></span>
-                                        <span class="text-muted small ms-2">accounts</span>
+                                        <span class="display-6 fw-bold text-warning lh-1"><?php echo $failed_signin_count; ?></span>
+                                        <span class="text-muted small ms-2">attempts</span>
                                     </div>
-                                    <p class="small text-muted mb-0 mt-2">Issued accounts not yet activated by users.</p>
+                                    <p class="small text-muted mb-0 mt-2">Review failed access attempts in the audit trail.</p>
                                 </div>
                                 <span class="rounded-circle d-inline-flex align-items-center justify-content-center text-warning" style="width:42px;height:42px;background:#fff0c7;flex:0 0 42px;">
-                                    <i class="fas fa-key"></i>
+                                        <i class="fas fa-shield-alt"></i>
                                 </span>
                             </div>
                         </div>
@@ -332,10 +308,10 @@ $audit_logs = $conn->query("SELECT al.*, u.full_name FROM audit_logs al LEFT JOI
                     </div>
                 </div>
 
-                <?php if ($pending_account_setup_count === 0 && $first_signin_count === 0 && $held_account_count === 0 && !$backup_attention): ?>
+                <?php if ($pending_account_setup_count === 0 && $failed_signin_count === 0 && $held_account_count === 0 && !$backup_attention): ?>
                     <div class="d-flex align-items-center justify-content-center gap-2 rounded-3 py-3 px-4" style="background:#edf9f1; color:#277a47;">
                         <i class="fas fa-check-circle"></i>
-                        <span class="small fw-semibold">All HR employee accounts are set up and activated.</span>
+                        <span class="small fw-semibold">No account setup, access, or backup issues need attention.</span>
                     </div>
                 <?php else: ?>
                     <?php if ($pending_account_setup_count > 0): ?>
@@ -356,16 +332,27 @@ $audit_logs = $conn->query("SELECT al.*, u.full_name FROM audit_logs al LEFT JOI
                         </div>
                     <?php endif; ?>
 
-                    <?php if ($first_signin_count > 0): ?>
+                    <?php if ($failed_signin_count > 0): ?>
                         <div class="mb-3">
-                            <strong class="small text-warning d-block mb-2"><i class="fas fa-key me-1"></i>Accounts awaiting first sign-in</strong>
-                            <?php while ($user = $first_signin_users->fetch_assoc()): ?>
+                            <div class="d-flex justify-content-between align-items-center mb-2"><strong class="small text-warning"><i class="fas fa-shield-alt me-1"></i>Failed sign-in attempts</strong><a href="<?php echo BASE_URL; ?>/admin/audit-trail.php?view=security&amp;action=LOGIN&amp;status=Failed" class="btn btn-sm btn-link text-decoration-none py-0">Investigate <i class="fas fa-arrow-right ms-1"></i></a></div>
+                            <?php while ($attempt = $failed_signins->fetch_assoc()):
+                                preg_match('/account: ([^;]+);/', $attempt['details'], $account_match);
+                                preg_match('/Reason: (.+)$/', $attempt['details'], $reason_match);
+                                $attempted_username = trim($account_match[1] ?? 'Unknown account');
+                                $failure_reason = trim($reason_match[1] ?? 'Sign-in failed', " .");
+                                $failure_reason = match ($failure_reason) {
+                                    'Account was not found' => 'Account not found',
+                                    'Password did not match the account' => 'Incorrect password',
+                                    'Blocked by login rate limit' => 'Temporarily blocked after repeated attempts',
+                                    default => $failure_reason,
+                                };
+                            ?>
                                 <div class="d-flex justify-content-between align-items-center rounded-3 px-3 py-2 mb-2 small" style="background:#fffcf5;">
                                     <div class="pe-3">
-                                        <strong><?php echo e($user['full_name']); ?></strong>
-                                        <div class="text-muted mt-1"><?php echo e($user['role']); ?> · created <?php echo date('M j, Y', strtotime($user['created_at'])); ?></div>
+                                        <strong><?php echo e($attempted_username); ?></strong>
+                                        <div class="text-muted mt-1"><?php echo e($failure_reason); ?> · <?php echo e(formatDateTime($attempt['timestamp'])); ?> · IP <?php echo e($attempt['ip_address'] ?: 'not recorded'); ?></div>
                                     </div>
-                                    <a href="<?php echo BASE_URL; ?>/admin/edit-user.php?id=<?php echo $user['user_id']; ?>" class="btn btn-sm btn-outline-warning">Review</a>
+                                    <a href="<?php echo BASE_URL; ?>/admin/audit-trail.php?view=security&amp;action=LOGIN&amp;status=Failed" class="btn btn-sm btn-outline-warning">Review</a>
                                 </div>
                             <?php endwhile; ?>
                         </div>
@@ -432,49 +419,8 @@ $audit_logs = $conn->query("SELECT al.*, u.full_name FROM audit_logs al LEFT JOI
 </div>
 
 <div class="row g-4 mb-4">
-    <!-- Employee Account Issuance -->
-    <div class="col-lg-4">
-        <div class="content-card h-100">
-            <div class="card-header">
-                <h5><i class="fas fa-id-badge me-2"></i>Employee Account Issuance</h5>
-            </div>
-            <div class="card-body">
-                <div class="coverage-panel p-3 mb-3">
-                    <div class="d-flex align-items-end justify-content-between gap-3">
-                        <div>
-                            <div class="coverage-label">Account coverage</div>
-                            <div class="coverage-number mt-1"><?php echo round($issued_pct, 1); ?>%</div>
-                        </div>
-                        <i class="fas fa-shield-alt fa-2x" style="color:#5ca973;"></i>
-                    </div>
-                    <div class="progress mt-3" style="height:8px; background:#dceee1;">
-                        <div class="progress-bar bg-success" role="progressbar" style="width: <?php echo $issued_pct; ?>%" aria-valuenow="<?php echo $issued_pct; ?>" aria-valuemin="0" aria-valuemax="100"></div>
-                    </div>
-                </div>
-                <div class="row text-center">
-                    <div class="col-6 issuance-stat">
-                        <div class="p-1">
-                            <h2 class="fw-bold text-success mb-1"><?php echo $employees_with_accounts; ?></h2>
-                            <p class="text-muted small mb-0">Accounts issued</p>
-                        </div>
-                    </div>
-                    <div class="col-6 issuance-stat">
-                        <div class="p-1">
-                            <h2 class="fw-bold text-warning mb-1"><?php echo $employees_no_accounts; ?></h2>
-                            <p class="text-muted small mb-0">Not issued yet</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="d-flex justify-content-between border-top mt-3 pt-3">
-                    <small class="text-muted">Across all active employees</small>
-                    <small class="fw-semibold text-dark"><?php echo $total_employees; ?> total</small>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <!-- Recent Security Activity -->
-    <div class="col-lg-8">
+    <div class="col-12">
         <div class="content-card audit-card h-100">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h5><i class="fas fa-history me-2"></i>Recent Security Activity</h5>
