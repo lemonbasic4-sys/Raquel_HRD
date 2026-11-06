@@ -14,6 +14,7 @@ $selected_department = isset($_GET['department']) && $_GET['department'] !== '' 
 $selected_position   = isset($_GET['position'])   && $_GET['position']   !== '' ? trim($_GET['position'])   : '';
 $employee_search     = trim($_GET['search'] ?? '');
 $selected_employment = in_array($_GET['employment'] ?? '', ['Regular', 'Probationary'], true) ? $_GET['employment'] : '';
+$has_portal_filters = $selected_department > 0 || $selected_position !== '' || $selected_employment !== '' || $employee_search !== '';
 
 $department_options = $conn->query("
     SELECT department_id, department_name
@@ -229,6 +230,12 @@ document.addEventListener('DOMContentLoaded', () => new bootstrap.Modal(document
 <style>
     .admin-employee-accounts-page .portal-accounts-card { overflow:hidden; border-radius:16px; }
     .admin-employee-accounts-page .portal-accounts-card > .card-header { padding:1rem 1.2rem; background:#fff; border-bottom:0; }
+    .admin-employee-accounts-page .portal-filters-toggle { display:flex; align-items:center; justify-content:space-between; gap:.75rem; padding:.7rem 1.2rem; border-top:1px solid #e5ece3; color:#183c1b; font-size:.85rem; font-weight:700; cursor:pointer; list-style:none; }
+    .admin-employee-accounts-page .portal-filters-toggle::-webkit-details-marker { display:none; }
+    .admin-employee-accounts-page .portal-filters-toggle:hover { background:#f3f8f1; }
+    .admin-employee-accounts-page .portal-filters-toggle:focus-visible { outline:2px solid #21834a; outline-offset:-3px; }
+    .admin-employee-accounts-page .portal-filters-toggle .portal-filters-chevron { transition:transform .2s ease; }
+    .admin-employee-accounts-page .portal-filters-collapse[open] .portal-filters-chevron { transform:rotate(180deg); }
     .admin-employee-accounts-page .portal-filterbar { display:grid; grid-template-columns:minmax(0,1fr); gap:.75rem; padding:.9rem 1.2rem; background:#f8fbf7; border-top:1px solid #e5ece3; border-bottom:1px solid #dfe8dd; }
     .admin-employee-accounts-page .portal-filter-form { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.65rem; align-items:center; min-width:0; }
     .admin-employee-accounts-page .portal-filter-form > [name="search"] { grid-column:1 / 2; }
@@ -281,6 +288,11 @@ document.addEventListener('DOMContentLoaded', () => new bootstrap.Modal(document
         <h5 class="mb-0"><i class="fas fa-user-lock me-2"></i>Portal Account Status</h5>
         <span class="badge rounded-pill" style="background:#edf5eb;color:#37633a;"><?php echo $total_accounts; ?> employees</span>
     </div>
+    <details class="portal-filters-collapse" <?php echo $has_portal_filters ? 'open' : ''; ?>>
+        <summary class="portal-filters-toggle">
+            <span><i class="fas fa-filter me-2"></i>Filters<?php if ($has_portal_filters): ?> <span class="badge rounded-pill ms-1" style="background:#e5f5e9;color:#237242;">Applied</span><?php endif; ?></span>
+            <i class="fas fa-chevron-down portal-filters-chevron" aria-hidden="true"></i>
+        </summary>
     <div class="portal-filterbar">
             <form method="GET" class="portal-filter-form mb-0">
                 <select class="form-select form-select-sm" id="department_filter" name="department" aria-label="Filter portal accounts by department">
@@ -306,7 +318,7 @@ document.addEventListener('DOMContentLoaded', () => new bootstrap.Modal(document
                 </select>
                 <input type="search" class="form-control form-control-sm" name="search" value="<?php echo e($employee_search); ?>" placeholder="Name or employee ID" aria-label="Search all employees">
                 <button class="btn btn-sm btn-primary" type="submit"><i class="fas fa-search me-1"></i>Find</button>
-                <?php if ($selected_department > 0 || $selected_position !== '' || $selected_employment !== '' || $employee_search !== ''): ?>
+                <?php if ($has_portal_filters): ?>
                     <a href="employee-accounts.php" class="btn btn-sm btn-outline-secondary" title="Clear filters">
                         <i class="fas fa-times me-1"></i>Clear
                     </a>
@@ -317,6 +329,7 @@ document.addEventListener('DOMContentLoaded', () => new bootstrap.Modal(document
                 <input type="text" class="form-control form-control-sm" id="searchPortal" placeholder="Filter this page..." onkeyup="filterTable('searchPortal', 'portalTable')">
             </div>
     </div>
+    </details>
     <div class="card-body p-0">
         <div class="table-responsive d-none d-md-block">
             <table class="table table-hover portal-accounts-table" id="portalTable">
