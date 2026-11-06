@@ -6934,6 +6934,43 @@ body.has-wizard-footer {
     }
 }
 
+/* On HRIS desktop pages, slide the sidebar completely out of view. */
+@media (min-width: 993px) {
+    body.hris-area .sidebar {
+        transition: transform .45s ease, visibility 0s linear .45s;
+    }
+
+    body.hris-area .top-navbar {
+        transition: left .45s ease, width .45s ease;
+    }
+
+    body.hris-area .main-content {
+        transition: margin-left .45s ease, width .45s ease;
+    }
+
+    html.sidebar-collapsed body.hris-area .sidebar {
+        width: var(--sidebar-width) !important;
+        transform: translateX(-100%);
+        visibility: hidden;
+        pointer-events: none;
+    }
+
+    html:not(.sidebar-collapsed) body.hris-area .sidebar {
+        visibility: visible;
+        transition: transform .45s ease, visibility 0s;
+    }
+
+    html.sidebar-collapsed body.hris-area .top-navbar {
+        left: 0 !important;
+        width: 100% !important;
+    }
+
+    html.sidebar-collapsed body.hris-area .main-content {
+        margin-left: 0 !important;
+        width: 100% !important;
+    }
+}
+
 /* ── 8. LAPTOPS & SMALL MONITORS (992px – 1366.98px) ───────────────── */
 @media (min-width: 992px) and (max-width: 1366.98px) {
     .main-content {

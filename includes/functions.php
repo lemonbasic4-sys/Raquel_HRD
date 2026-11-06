@@ -4956,13 +4956,14 @@ function renderOrganizationPackageAuditTrail($conn, $package_id)
     return $html;
 }
 
-function countPendingOrganizationPackagesForUser($conn, $user_id)
+function countPendingOrganizationPackagesForUser($conn, $user_id, $probationary_only = false)
 {
     $user_id = (int) $user_id;
     if ($user_id <= 0 || !ensureOrganizationEvaluationPackageSchema($conn)) {
         return 0;
     }
     $match = organizationPackageReviewerMatchSql('rs');
+    $type_filter = $probationary_only ? " AND ep.evaluation_type IN ('Initial', 'Final')" : '';
     $stmt = $conn->prepare("SELECT COUNT(DISTINCT ep.package_id) AS total
         FROM evaluation_packages ep
         JOIN evaluation_package_route_steps rs ON rs.package_id = ep.package_id
@@ -4981,7 +4982,7 @@ function countPendingOrganizationPackagesForUser($conn, $user_id)
               (rs.step_order = 1 AND rs.action_status IN ('Pending', 'Waiting'))
               OR (rs.step_order > 1 AND rs.action_status = 'Pending')
           )
-          AND ep.status NOT IN ('Approved and Applied', 'Cancelled')");
+          AND ep.status NOT IN ('Approved and Applied', 'Cancelled') $type_filter");
     $stmt->bind_param('iiiiiii', $user_id, $user_id, $user_id, $user_id, $user_id, $user_id, $user_id);
     $stmt->execute();
     $total = (int) ($stmt->get_result()->fetch_assoc()['total'] ?? 0);

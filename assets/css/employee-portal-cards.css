@@ -111,6 +111,15 @@
   transition: all var(--transition-base);
 }
 
+/* Keep the template wizard's KRA and behavior controls sticky while scrolling. */
+body.role-employee .template-create-page #wizardStep3 > .content-card,
+body.role-employee .template-create-page #wizardStep4 > .content-card,
+body.role-employee .template-edit-page #wizardStep3 > .content-card,
+body.role-employee .template-edit-page #wizardStep4 > .content-card {
+  overflow: visible;
+  height: auto;
+}
+
 /* Mobile: let cards size to their content instead of stretching to fill column height */
 @media (max-width: 991.98px) {
   .content-card {

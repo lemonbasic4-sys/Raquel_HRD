@@ -593,7 +593,7 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
     .hr-manager-dashboard .hub-quick-links {
         display: grid !important;
         gap: 16px;
-        grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr));
+        grid-template-columns: repeat(3, minmax(0, 1fr));
         margin: 0 !important;
         padding-top: 8px !important;
     }
@@ -630,6 +630,7 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
     .hr-manager-dashboard .dashboard-stats-grid .stat-icon { flex-shrink: 0; }
     .hr-manager-dashboard .dashboard-stats-grid .stat-label { line-height: 1.4; }
     @media (max-width: 1199.98px) {
+        .hr-manager-dashboard .hub-quick-links { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         .hr-manager-dashboard .dashboard-stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         .hr-manager-dashboard .chart-container { height: clamp(220px, 30vw, 280px) !important; }
         .hr-manager-dashboard .dashboard-chart-wrap { height: clamp(220px, 30vw, 280px) !important; }

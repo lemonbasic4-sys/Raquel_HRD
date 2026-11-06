@@ -591,7 +591,7 @@ if ($annual_nav_actor && $annual_nav_actor['employment_status'] === 'Regular'
     </script>
 </head>
 
-<body class="<?php echo ($current_dir === 'admin' ? 'admin-area' : '') . ($effective_role === 'Employee' ? ' role-employee' : ''); ?>">
+<body class="<?php echo ($current_dir === 'admin' ? 'admin-area' : '') . ($effective_role === 'Employee' ? ' role-employee' : '') . (in_array($effective_role, ['HR Manager', 'HR Supervisor', 'HR Staff'], true) ? ' hris-area' : ''); ?>">
 
         <!-- __ Connection Status Toast ______________________________________________
          Modern toast-style offline/reconnect indicator (bottom-right).
