@@ -133,10 +133,10 @@ require_once '../includes/header.php';
     </div>
 
     <div class="template-stat-grid mb-4">
-        <div class="template-stat"><span class="template-stat-icon green"><i class="fas fa-list-check"></i></span><div><strong><?php echo count($criteria); ?></strong><small>Scoring criteria</small></div></div>
-        <div class="template-stat"><span class="template-stat-icon green"><i class="fas fa-bullseye"></i></span><div><strong><?php echo $kra_count; ?></strong><small>KRA criteria</small></div></div>
-        <div class="template-stat"><span class="template-stat-icon gold"><i class="fas fa-heart"></i></span><div><strong><?php echo $behavior_count; ?></strong><small>Behavior criteria</small></div></div>
-        <div class="template-stat"><span class="template-stat-icon <?php echo abs($master_weight_total - 100) < 0.01 ? 'green' : 'gold'; ?>"><i class="fas fa-scale-balanced"></i></span><div><strong><?php echo number_format($master_weight_total, 0); ?>%</strong><small>Weight allocation</small></div></div>
+        <div class="template-stat page-hero fadeup"><span class="template-stat-icon green"><i class="fas fa-list-check"></i></span><div><strong><?php echo count($criteria); ?></strong><small>Scoring criteria</small></div></div>
+        <div class="template-stat page-hero fadeup"><span class="template-stat-icon green"><i class="fas fa-bullseye"></i></span><div><strong><?php echo $kra_count; ?></strong><small>KRA criteria</small></div></div>
+        <div class="template-stat page-hero fadeup"><span class="template-stat-icon gold"><i class="fas fa-heart"></i></span><div><strong><?php echo $behavior_count; ?></strong><small>Behavior criteria</small></div></div>
+        <div class="template-stat page-hero fadeup"><span class="template-stat-icon <?php echo abs($master_weight_total - 100) < 0.01 ? 'green' : 'gold'; ?>"><i class="fas fa-scale-balanced"></i></span><div><strong><?php echo number_format($master_weight_total, 0); ?>%</strong><small>Weight allocation</small></div></div>
     </div>
 
     <div class="row g-4">
@@ -281,6 +281,10 @@ require_once '../includes/header.php';
 .template-stat small { color: var(--template-muted); display: block; font-size: .68rem; margin-top: 4px; }
 .template-stat-icon { align-items: center; border-radius: 9px; display: inline-flex; flex: 0 0 34px; height: 34px; justify-content: center; width: 34px; }
 .template-stat-icon.green { background: #e8f3e8; color: var(--template-green-mid); }.template-stat-icon.gold { background: #faf2d9; color: #8c6c0b; }
+.template-stat.page-hero { background: linear-gradient(135deg, var(--hero-from) 0%, var(--hero-mid) 50%, var(--hero-to) 100%); border-color: rgba(255,255,255,.12); margin-bottom: 0; padding: 16px !important; box-shadow: 0 5px 14px rgba(8,46,6,.1); }
+.template-stat.page-hero strong { color: #fff; }
+.template-stat.page-hero small { color: rgba(255,255,255,.75); }
+.template-stat.page-hero .template-stat-icon { background: rgba(255,255,255,.12); color: #f0d775; }
 .template-panel { background: #fff; border: 1px solid var(--template-line); border-radius: 12px; box-shadow: 0 4px 16px rgba(20,35,10,.045); overflow: hidden; }
 .template-panel-header { align-items: center; background: #fff; border-bottom: 1px solid var(--template-line); display: flex; justify-content: space-between; padding: 14px 16px; }
 .template-panel-header h2 { align-items: center; color: var(--template-ink); display: flex; font-size: .98rem; font-weight: 700; gap: 9px; margin: 0; }
