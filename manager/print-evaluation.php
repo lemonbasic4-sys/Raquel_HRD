@@ -55,6 +55,10 @@ $result = $conn->query($query);
 if (!$result || $result->num_rows === 0)
   die("Evaluation not found.");
 $row = $result->fetch_assoc();
+if (($row['status'] ?? '') === 'Imported') {
+  http_response_code(403);
+  exit('Imported historical records have no new HRIS approval or signature form. View the record in Evaluation History.');
+}
 $annual_print_member=null;
 $annual_print_candidate=null;
 if (($row['evaluation_type'] ?? '') === 'Annual') {

@@ -2776,6 +2776,9 @@ function ensureHistoricalImportSchema($conn)
                 $conn->query($sql);
             }
         }
+        if (!evaluationsStatusSupports($conn, ['Imported'])) {
+            $conn->query("ALTER TABLE evaluations MODIFY COLUMN status ENUM('Draft','Pending Self-Rating','Pending Reporting Review','Pending Dept Supervisor','Pending Dept Manager','Pending Supervisor','Pending HR Consolidation','Pending Team Consolidation','Pending Manager','Supervisor Confirmed','Approved','Imported','Rejected','Returned') DEFAULT 'Draft'");
+        }
 
         $batch_columns = getTableColumns($conn, 'evaluation_import_batches');
         if (!isset($batch_columns['import_batch_id'])) {
@@ -2902,6 +2905,7 @@ function ensureEvaluationWorkflowSchema($conn)
             'Pending Manager',
             'Supervisor Confirmed',
             'Approved',
+            'Imported',
             'Rejected',
             'Returned'
         ];
@@ -2921,6 +2925,7 @@ function ensureEvaluationWorkflowSchema($conn)
                     'Pending Manager',
                     'Supervisor Confirmed',
                     'Approved',
+                    'Imported',
                     'Rejected',
                     'Returned'
                 ) DEFAULT 'Draft'

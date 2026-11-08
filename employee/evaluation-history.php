@@ -19,6 +19,7 @@ $evaluations = [];
 if ($employee_id > 0) {
     $history_stmt = $conn->prepare("SELECT ev.evaluation_id, ev.evaluation_type, ev.evaluation_period_start, ev.evaluation_period_end,
             ev.kra_subtotal, ev.behavior_average, ev.total_score, ev.performance_level, ev.status, ev.submitted_date,
+            ev.is_historical, ev.record_source, ev.legacy_reference,
             et.template_name, ep.package_id, ep.status AS package_status, ep.shared_behavior_score,
             (
                 SELECT ROUND(SUM((ec.weight / 100.0) * es.score_value), 2)
@@ -45,7 +46,7 @@ if ($employee_id > 0) {
     $history_stmt->close();
 }
 $history_ongoing = count(array_filter($evaluations, static function (array $evaluation): bool {
-    return !in_array($evaluation['status'] ?? '', ['Approved', 'Rejected'], true);
+    return !in_array($evaluation['status'] ?? '', ['Approved', 'Imported', 'Rejected'], true);
 }));
 
 require_once '../includes/header.php';
@@ -257,7 +258,7 @@ require_once '../includes/header.php';
                     <?php
                         $annualHistoryMember=$ev['evaluation_type']==='Annual' && annualUsesPeerWorkflow($conn,(int)$ev['evaluation_id']) ? annualMember($conn,(int)$ev['evaluation_id']) : null;
                         $annualHistoryComplete=$annualHistoryMember && count(annualPeers($conn,$annualHistoryMember))>=annualExpectedPeers($conn,(int)$annualHistoryMember['cycle_id'],$employee_id);
-                        $is_completed = ($ev['package_status'] === 'Approved and Applied' || $ev['status'] === 'Approved');
+                        $is_completed = ($ev['package_status'] === 'Approved and Applied' || in_array($ev['status'], ['Approved', 'Imported'], true));
                         $has_total    = $is_completed && ($ev['total_score'] !== null);
                         $level        = $is_completed ? ($ev['performance_level'] ?: null) : null;
                         $submitted    = !empty($ev['submitted_date']) ? date('M d, Y', strtotime($ev['submitted_date'])) : null;
@@ -304,17 +305,17 @@ require_once '../includes/header.php';
                             </div>
                         </div>
                         <?php
-                        $display_kra = $is_completed ? (float)$ev['kra_subtotal'] : (float)($ev['orig_kra_subtotal'] ?? $ev['kra_subtotal']);
-                        $display_beh = $is_completed ? (float)$ev['behavior_average'] : (float)($ev['orig_behavior_average'] ?? $ev['behavior_average']);
+                        $display_kra = $is_completed ? $ev['kra_subtotal'] : ($ev['orig_kra_subtotal'] ?? $ev['kra_subtotal']);
+                        $display_beh = $is_completed ? $ev['behavior_average'] : ($ev['orig_behavior_average'] ?? $ev['behavior_average']);
                         ?>
                         <div class="eh-card__scores">
                             <div class="eh-score-pill">
                                 <span class="eh-score-pill__label">KRA</span>
-                                <span class="eh-score-pill__value"><?php echo number_format($display_kra, 2); ?></span>
+                                <span class="eh-score-pill__value"><?php echo $display_kra === null ? '—' : number_format((float)$display_kra, 2); ?></span>
                             </div>
                             <div class="eh-score-pill">
                                 <span class="eh-score-pill__label">Behavior</span>
-                                <span class="eh-score-pill__value"><?php echo number_format($display_beh, 2); ?></span>
+                                <span class="eh-score-pill__value"><?php echo $display_beh === null ? '—' : number_format((float)$display_beh, 2); ?></span>
                             </div>
                             <div class="eh-score-pill <?php echo $pill_class; ?>">
                                 <span class="eh-score-pill__label">Total</span>

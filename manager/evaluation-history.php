@@ -45,13 +45,14 @@ $history = $conn->query("SELECT ev.*, CONCAT(e.first_name, ' ', e.last_name) as 
     LEFT JOIN employees last_reviewer_emp ON last_reviewer_emp.employee_id = last_route.reviewer_employee_id
     WHERE (
         (ep.package_id IS NOT NULL AND ep.status = 'Approved and Applied')
-        OR (ep.package_id IS NULL AND ev.status IN ('Approved', 'Rejected', 'Returned'))
+        OR (ep.package_id IS NULL AND ev.status IN ('Approved', 'Imported', 'Rejected', 'Returned'))
     )
     AND ev.employee_id NOT IN (SELECT employee_id FROM users WHERE role = 'Admin' AND employee_id IS NOT NULL)
     ORDER BY ev.updated_at DESC");
 
 $total_c = 0;
 $approved_c = 0;
+$imported_c = 0;
 $rejected_c = 0;
 $returned_c = 0;
 
@@ -61,6 +62,7 @@ while ($row = $history->fetch_assoc()) {
     $total_c++;
     $history_status = $row['package_status'] === 'Approved and Applied' ? 'Approved' : ($row['package_status'] ?: $row['status']);
     if ($history_status === 'Approved' || $history_status === 'Approved and Applied') $approved_c++;
+    elseif ($history_status === 'Imported') $imported_c++;
     elseif ($history_status === 'Rejected') $rejected_c++;
     elseif ($history_status === 'Returned') $returned_c++;
     // Ongoing records are intentionally excluded by the query above.
@@ -189,6 +191,7 @@ ksort($existing_templates);
 .hist-status-pill:hover { background: #e8ede0; }
 .hist-status-pill.active-all    { background: var(--primary-blue); color: #fff; border-color: var(--primary-blue); }
 .hist-status-pill.active-approved { background: #d1fae5; color: #065f46; border-color: #6ee7b7; }
+.hist-status-pill.active-imported { background: #e8f1e5; color: #24592a; border-color: #a8c99e; }
 .hist-status-pill.active-rejected { background: #fee2e2; color: #991b1b; border-color: #fca5a5; }
 .hist-status-pill.active-returned { background: #fef3c7; color: #92400e; border-color: #fcd34d; }
 .hist-status-pill.active-pending { background: #dbeafe; color: #1d4ed8; border-color: #93c5fd; }
@@ -455,6 +458,7 @@ ksort($existing_templates);
 
 .hist-status-badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 12px; border-radius: 999px; font-size: .72rem; font-weight: 700; white-space: nowrap; }
 .hist-status-badge.approved { background: #d1fae5; color: #065f46; }
+.hist-status-badge.imported { background: #e8f1e5; color: #24592a; }
 .hist-status-badge.rejected { background: #fee2e2; color: #991b1b; }
 .hist-status-badge.returned { background: #fef3c7; color: #92400e; }
 
@@ -522,6 +526,9 @@ ksort($existing_templates);
         <button class="hist-status-pill" onclick="histFilter('Approved', this)">
             <i class="fas fa-check-circle me-1"></i>Approved <span class="ms-1 opacity-75" data-status-count="Approved">(<?php echo $approved_c; ?>)</span>
         </button>
+        <button class="hist-status-pill" onclick="histFilter('Imported', this)">
+            <i class="fas fa-file-import me-1"></i>Imported <span class="ms-1 opacity-75" data-status-count="Imported">(<?php echo $imported_c; ?>)</span>
+        </button>
         <button class="hist-status-pill" onclick="histFilter('Rejected', this)">
             <i class="fas fa-times-circle me-1"></i>Rejected <span class="ms-1 opacity-75" data-status-count="Rejected">(<?php echo $rejected_c; ?>)</span>
         </button>
@@ -588,11 +595,12 @@ ksort($existing_templates);
             $is_probationary_history = in_array($row['package_evaluation_type'] ?? '', ['Initial', 'Final'], true);
             $history_status = ($row['package_status'] ?? '') === 'Approved and Applied' ? 'Approved' : (($row['package_status'] ?? '') ?: $row['status']);
             $history_status_label = $history_status === 'Approved and Applied' ? 'Approved' : $history_status;
-            $status_filter_key = in_array($history_status_label, ['Approved', 'Rejected', 'Returned'], true) ? $history_status_label : 'Pending';
+            $status_filter_key = in_array($history_status_label, ['Approved', 'Imported', 'Rejected', 'Returned'], true) ? $history_status_label : 'Pending';
             $status_display = $status_filter_key === 'Pending' ? 'Pending' : $history_status_label;
             $status_lc  = strtolower($status_display);
             $status_icon = $history_status_label === 'Pending Self-Ratings' ? 'fa-hourglass-half' : match($history_status_label) {
                 'Approved' => 'fa-check-circle',
+                'Imported' => 'fa-file-import',
                 'Rejected' => 'fa-times-circle',
                 'Returned' => 'fa-rotate-left',
                 default    => 'fa-circle',
@@ -601,6 +609,7 @@ ksort($existing_templates);
             $reviewer_name = ($row['package_status'] ?? '') === 'Approved and Applied' ? (($row['last_reviewer_name'] ?? '') ?: 'Completed') : trim((string)($row['current_reviewer_name'] ?? ''));
             $reviewer_position = ($row['package_status'] ?? '') === 'Approved and Applied' ? (string)($row['last_reviewer_position'] ?? '') : (string)($row['current_reviewer_position'] ?? '');
             if ($reviewer_name === '') $reviewer_name = ($row['package_status'] ?? '') === 'Returned' ? (($row['last_reviewer_name'] ?? '') ?: 'Returned for revision') : (($row['current_step_label'] ?? '') ?: (($row['last_reviewer_name'] ?? '') ?: 'In review'));
+            if ($history_status_label === 'Imported') $reviewer_name = 'Historical import';
             $submitted_date = $row['submitted_at'] ?? $row['created_at'] ?? $row['updated_at'] ?? null;
             $initials_h = strtoupper(
                 substr($row['employee_name'], 0, 1) .
@@ -710,7 +719,7 @@ function histFilter(status, btn) {
     document.querySelectorAll('.hist-status-pill').forEach(p => {
         p.className = 'hist-status-pill';
     });
-    const classMap = { All: 'active-all', Pending: 'active-pending', Approved: 'active-approved', Rejected: 'active-rejected', Returned: 'active-returned' };
+    const classMap = { All: 'active-all', Pending: 'active-pending', Approved: 'active-approved', Imported: 'active-imported', Rejected: 'active-rejected', Returned: 'active-returned' };
     btn.classList.add(classMap[status] ?? 'active-all');
 
     applyHistFilters();
@@ -724,7 +733,7 @@ function applyHistFilters() {
     const rows = document.querySelectorAll('#histTableBody .history-row');
     let visible = 0;
     let typeCount = 0;
-    const typeStatusCounts = { All: 0, Pending: 0, Approved: 0, Rejected: 0, Returned: 0 };
+    const typeStatusCounts = { All: 0, Pending: 0, Approved: 0, Imported: 0, Rejected: 0, Returned: 0 };
     rows.forEach(row => {
         const typeMatch = row.dataset.type === histActiveType;
         if (typeMatch) {
@@ -785,13 +794,16 @@ foreach ($all_history as $row):
                         </div>
                     </div>
                     <span class="history-modal-status <?php echo e(strtolower($status)); ?>">
-                        <i class="fas <?php echo $status === 'Approved' ? 'fa-circle-check' : ($status === 'Rejected' ? 'fa-circle-xmark' : 'fa-rotate-left'); ?>"></i>
+                        <i class="fas <?php echo $status === 'Imported' ? 'fa-file-import' : ($status === 'Approved' ? 'fa-circle-check' : ($status === 'Rejected' ? 'fa-circle-xmark' : 'fa-rotate-left')); ?>"></i>
                         <?php echo e($status); ?>
                     </span>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close evaluation details"></button>
                 </div>
                 <div class="modal-body">
+                    <?php if ($status === 'Imported'): ?><div class="alert alert-info"><strong>Imported historical record.</strong> No new HRIS approval or employee consent was recorded.<?php if (!empty($row['legacy_reference'])): ?> Reference: <?php echo e($row['legacy_reference']); ?>.<?php endif; ?></div><?php endif; ?>
+                    <?php if ($status === 'Imported' && ($row['kra_subtotal'] === null || $row['behavior_average'] === null)): ?><div class="alert alert-secondary">Only the available summary scores were supplied for this historical record.</div><?php endif; ?>
                     <!-- Status Stepper -->
+                    <?php if ($status !== 'Imported'): ?>
                     <div class="status-stepper d-flex justify-content-between mb-4 py-3 border-bottom overflow-hidden">
                         <?php
                         $steps = [
@@ -820,6 +832,7 @@ foreach ($all_history as $row):
                             </div>
                         <?php endforeach; ?>
                     </div>
+                    <?php endif; ?>
 
                     <div class="eval-summary-header">
                         <div class="d-flex align-items-center gap-3">
@@ -846,10 +859,10 @@ foreach ($all_history as $row):
                                 <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3 fw-bold btn-cancel-ratings d-none" onclick="toggleEditRatings(<?php echo $row['evaluation_id']; ?>, true)">
                                     <i class="fas fa-times me-1"></i>Cancel
                                 </button>
-                                <a href="print-evaluation.php?id=<?php echo $row['evaluation_id']; ?>" target="_blank" class="btn btn-sm btn-primary rounded-pill px-3 py-2 fw-bold d-inline-flex align-items-center gap-2 shadow-sm">
+                                <?php if ($status !== 'Imported'): ?><a href="print-evaluation.php?id=<?php echo $row['evaluation_id']; ?>" target="_blank" class="btn btn-sm btn-primary rounded-pill px-3 py-2 fw-bold d-inline-flex align-items-center gap-2 shadow-sm">
                                     <i class="fas fa-print"></i>
                                     <span>Print Form</span>
-                                </a>
+                                </a><?php endif; ?>
                             </div>
                             <div class="d-flex align-items-center gap-2"><?php echo getEvaluationScoreCirclesHtml($conn, $row['evaluation_id'], $row['total_score']); ?></div>
                         </div>

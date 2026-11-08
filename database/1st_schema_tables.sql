@@ -473,7 +473,7 @@ CREATE TABLE evaluations (
     supervisor_altered_scores TINYINT(1) DEFAULT 0,
     sent_to_hr_date DATETIME NULL,
     sent_to_hr_by INT NULL,
-    status ENUM('Draft', 'Pending Self-Rating', 'Pending Reporting Review', 'Pending Dept Supervisor', 'Pending Dept Manager', 'Pending Supervisor', 'Pending HR Consolidation', 'Pending Team Consolidation', 'Pending Manager', 'Supervisor Confirmed', 'Approved', 'Rejected', 'Returned') DEFAULT 'Draft',
+    status ENUM('Draft', 'Pending Self-Rating', 'Pending Reporting Review', 'Pending Dept Supervisor', 'Pending Dept Manager', 'Pending Supervisor', 'Pending HR Consolidation', 'Pending Team Consolidation', 'Pending Manager', 'Supervisor Confirmed', 'Approved', 'Imported', 'Rejected', 'Returned') DEFAULT 'Draft',
     total_score DECIMAL(5,2) NULL,
     kra_subtotal DECIMAL(5,2) NULL,
     behavior_average DECIMAL(5,2) NULL,

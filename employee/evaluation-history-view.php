@@ -37,6 +37,7 @@ if (!$evaluation) {
 }
 
 $is_probationary_evaluation = in_array($evaluation['evaluation_type'] ?? '', ['Initial', 'Final'], true);
+$is_historical_import = ($evaluation['status'] ?? '') === 'Imported';
 $peerEvalType=($evaluation['evaluation_type'] ?? '') === 'Quarterly' ? 'quarterly' : 'annual';
 $is_annual_peer_evaluation = in_array($evaluation['evaluation_type'] ?? '', ['Annual','Quarterly'],true)
     && ($peerEvalType === 'quarterly' ? quarterlyUsesPeerWorkflow($conn,$evaluation_id) : annualUsesPeerWorkflow($conn,$evaluation_id));
@@ -64,7 +65,7 @@ $criteria_stmt->close();
 $kra_weight = (float)($evaluation['kra_weight'] ?? 80);
 $beh_weight = (float)($evaluation['behavior_weight'] ?? 20);
 
-$is_package_completed = ($evaluation['package_status'] === 'Approved and Applied' || $evaluation['status'] === 'Approved');
+$is_package_completed = ($evaluation['package_status'] === 'Approved and Applied' || in_array($evaluation['status'], ['Approved', 'Imported'], true));
 $show_reviewed_scores = $is_package_completed || ($is_probationary_evaluation
     && ($evaluation['probationary_head_step_status'] ?? '') === 'Approved'
     && !empty($evaluation['immediate_head_signature_data']));
@@ -129,16 +130,20 @@ require_once '../includes/header.php';
         </p>
     </section>
 
+    <?php if ($is_historical_import): ?>
+    <div class="alert alert-info mt-3" role="status"><strong><i class="fas fa-file-import me-1"></i>Imported historical record.</strong> This record preserves a past evaluation; no new employee consent or HRIS approval was recorded.<?php if (!empty($evaluation['legacy_reference'])): ?> Reference: <?php echo e($evaluation['legacy_reference']); ?>.<?php endif; ?> <?php echo $criteria ? 'Criterion ratings are included below.' : 'This is a summary record; criterion ratings were not supplied.'; ?></div>
+    <?php endif; ?>
+
     <!-- ── Original vs. Modified Score Comparison (Req 4) ──────────────────── -->
     <section class="package-card" aria-label="Original vs Modified Score Comparison">
         <header class="package-card__header">
             <div>
                 <h2 class="h5 mb-0 fw-bold">
                     <i class="fas fa-balance-scale me-2"></i>
-                    <?php echo $is_package_completed ? 'Original Self-Rating vs. Final / Reviewed Rating' : ($show_reviewed_scores ? 'Original Self-Rating vs. Immediate Head Review' : ($is_annual_peer_evaluation ? 'Submitted Self-Rating & Current 360 Results' : 'Submitted Self-Rating Summary')); ?>
+                    <?php echo $is_historical_import ? 'Historical Evaluation Details' : ($is_package_completed ? 'Original Self-Rating vs. Final / Reviewed Rating' : ($show_reviewed_scores ? 'Original Self-Rating vs. Immediate Head Review' : ($is_annual_peer_evaluation ? 'Submitted Self-Rating & Current 360 Results' : 'Submitted Self-Rating Summary'))); ?>
                 </h2>
                 <div class="small text-muted mt-1">
-                    <?php echo $is_package_completed ? 'Audit comparison between your submitted rating and officer adjustments.' : ($show_reviewed_scores ? 'Compare your original ratings with the immediate head’s reviewed ratings.' : ($is_annual_peer_evaluation ? 'Your self-ratings and received department 360 ratings are shown below while head approval is pending.' : 'Your submitted self-ratings are shown below while the evaluation review is in progress.')); ?>
+                    <?php echo $is_historical_import ? 'Past scores as recorded in the imported source.' : ($is_package_completed ? 'Audit comparison between your submitted rating and officer adjustments.' : ($show_reviewed_scores ? 'Compare your original ratings with the immediate head’s reviewed ratings.' : ($is_annual_peer_evaluation ? 'Your self-ratings and received department 360 ratings are shown below while head approval is pending.' : 'Your submitted self-ratings are shown below while the evaluation review is in progress.'))); ?>
                 </div>
             </div>
             <div>
@@ -187,14 +192,14 @@ require_once '../includes/header.php';
                 <div class="col-12 col-md-4">
                     <div class="package-stat h-100 d-flex flex-column gap-2" style="border:1px solid #d7e3d0;border-radius:10px;padding:18px;background:#f3f7ef;">
                         <span class="small text-uppercase fw-bold" style="color:#36572b;"><i class="fas fa-chart-pie me-1" aria-hidden="true"></i> KRA</span>
-                        <strong class="tabular-nums" style="font-size:1.8rem;color:#185425;"><?php echo number_format($show_reviewed_scores ? (float)$evaluation['kra_subtotal'] : $orig_kra_subtotal,2); ?></strong>
+                        <strong class="tabular-nums" style="font-size:1.8rem;color:#185425;"><?php echo $is_historical_import && $evaluation['kra_subtotal'] === null ? '—' : number_format($show_reviewed_scores ? (float)$evaluation['kra_subtotal'] : $orig_kra_subtotal,2); ?></strong>
                         <span class="small text-muted">Weight: 80%</span>
                     </div>
                 </div>
                 <div class="col-12 col-md-4">
                     <div class="package-stat h-100 d-flex flex-column gap-2" style="border:1px solid #e6ddbc;border-radius:10px;padding:18px;background:#fcf9ef;">
                         <span class="small text-uppercase fw-bold" style="color:#746018;"><i class="fas fa-users me-1" aria-hidden="true"></i> Core Behaviors &amp; Values</span>
-                        <strong class="tabular-nums" style="font-size:1.8rem;color:#846812;"><?php echo number_format($show_reviewed_scores ? (float)$evaluation['behavior_average'] : $orig_beh_average,2); ?></strong>
+                        <strong class="tabular-nums" style="font-size:1.8rem;color:#846812;"><?php echo $is_historical_import && $evaluation['behavior_average'] === null ? '—' : number_format($show_reviewed_scores ? (float)$evaluation['behavior_average'] : $orig_beh_average,2); ?></strong>
                         <span class="small text-muted">Weight: 20%</span>
                     </div>
                 </div>
@@ -241,9 +246,11 @@ require_once '../includes/header.php';
                     <div class="package-stat h-100 d-flex flex-column justify-content-between" style="border:2px solid var(--bs-border-color,#dee2e6);border-radius:10px;padding:14px 18px;">
                         <span class="text-muted small text-uppercase fw-bold"><?php echo $is_probationary_evaluation ? 'Individual Core Values' : 'Shared Team Behavior'; ?></span>
                         <strong class="tabular-nums mt-1" style="color:var(--rp-primary-gold-dark);font-size:1.8rem;">
-                            <?php echo $is_probationary_evaluation
-                                ? number_format($show_reviewed_scores ? (float)$evaluation['behavior_average'] : $orig_beh_average, 2)
-                                : (($is_package_completed && $evaluation['shared_behavior_score'] !== null) ? number_format((float)$evaluation['shared_behavior_score'], 2) : 'Pending'); ?>
+                            <?php echo $is_historical_import
+                                ? ($evaluation['behavior_average'] === null ? '—' : number_format((float)$evaluation['behavior_average'], 2))
+                                : ($is_probationary_evaluation
+                                    ? number_format($show_reviewed_scores ? (float)$evaluation['behavior_average'] : $orig_beh_average, 2)
+                                    : (($is_package_completed && $evaluation['shared_behavior_score'] !== null) ? number_format((float)$evaluation['shared_behavior_score'], 2) : 'Pending')); ?>
                         </strong>
                         <div class="small text-muted mt-1">
                             <?php echo $is_probationary_evaluation ? 'Individual score (20%)' : ($is_package_completed ? 'Finalized department shared score' : 'Calculated and applied at final Board approval'); ?>
@@ -439,9 +446,9 @@ require_once '../includes/header.php';
                             <th style="<?php echo $show_reviewed_scores ? 'width:40%;' : 'width:60%;'; ?>">Criterion</th>
                             <th class="text-end" style="<?php echo $show_reviewed_scores ? 'width:10%;' : 'width:20%;'; ?>">Weight</th>
                             <th class="text-end" style="<?php echo $show_reviewed_scores ? 'width:18%;' : 'width:20%;'; ?>">
-                                <?php echo $show_reviewed_scores ? 'Original Self-Rating' : 'Submitted Rating'; ?>
+                                <?php echo $is_historical_import ? 'Historical rating' : ($show_reviewed_scores ? 'Original Self-Rating' : 'Submitted Rating'); ?>
                             </th>
-                            <?php if ($show_reviewed_scores): ?>
+                            <?php if ($show_reviewed_scores && !$is_historical_import): ?>
                                 <th class="text-end" style="width:18%;">Reviewed / Adjusted</th>
                                 <th class="text-center" style="width:14%;">Variance</th>
                             <?php endif; ?>
@@ -463,8 +470,8 @@ require_once '../includes/header.php';
                                 <?php endif; ?>
                             </td>
                             <td data-label="Weight" class="text-end tabular-nums fw-bold text-muted"><?php echo number_format((float)$criterion['weight'], 2); ?>%</td>
-                            <td data-label="<?php echo $show_reviewed_scores ? 'Original Self-Rating' : 'Submitted Rating'; ?>" class="text-end tabular-nums fw-semibold" style="font-size:1.05rem;"><?php echo number_format($orig, 2); ?></td>
-                            <?php if ($show_reviewed_scores): ?>
+                            <td data-label="<?php echo $is_historical_import ? 'Historical rating' : ($show_reviewed_scores ? 'Original Self-Rating' : 'Submitted Rating'); ?>" class="text-end tabular-nums fw-semibold" style="font-size:1.05rem;"><?php echo number_format($orig, 2); ?></td>
+                            <?php if ($show_reviewed_scores && !$is_historical_import): ?>
                                 <td data-label="Reviewed / Adjusted" class="text-end tabular-nums fw-bold text-dark" style="font-size:1.1rem;"><?php echo number_format($rev, 2); ?></td>
                                 <td data-label="Variance" class="text-center">
                                     <?php if ($is_adj): ?>
@@ -505,12 +512,12 @@ require_once '../includes/header.php';
                         <tr>
                             <th style="<?php echo $annualPeerBreakdown ? '' : ($show_reviewed_scores ? 'width:40%;' : 'width:70%;'); ?>">Criterion</th>
                             <th class="text-end" style="<?php echo $annualPeerBreakdown ? '' : ($show_reviewed_scores ? 'width:20%;' : 'width:30%;'); ?>">
-                                <?php echo $annualPeerBreakdown ? 'Self-rating' : ($show_reviewed_scores ? 'Original Self-Rating' : 'Submitted Rating'); ?>
+                                <?php echo $is_historical_import ? 'Historical rating' : ($annualPeerBreakdown ? 'Self-rating' : ($show_reviewed_scores ? 'Original Self-Rating' : 'Submitted Rating')); ?>
                             </th>
                             <?php if ($annualPeerBreakdown): ?>
                                 <?php foreach ($annualReceivedPeers as $peerIndex=>$peer): ?><th class="text-end"><?php echo e($annualNamedPeers ? $peer['rater_name'] : 'Employee '.($peerIndex+1)); ?></th><?php endforeach; ?>
                                 <th class="text-end">Combined 360 average</th>
-                            <?php elseif ($show_reviewed_scores): ?>
+                            <?php elseif ($show_reviewed_scores && !$is_historical_import): ?>
                                 <th class="text-end" style="width:20%;">Reviewed / Adjusted</th>
                                 <th class="text-center" style="width:20%;">Variance</th>
                             <?php endif; ?>
@@ -531,11 +538,11 @@ require_once '../includes/header.php';
                                     <div class="small text-muted mt-1"><?php echo e($criterion['description']); ?></div>
                                 <?php endif; ?>
                             </td>
-                            <td data-label="<?php echo $annualPeerBreakdown ? 'Self-rating' : ($show_reviewed_scores ? 'Original Self-Rating' : 'Submitted Rating'); ?>" class="text-end tabular-nums fw-semibold" style="font-size:1.05rem;"><?php echo number_format($orig, 2); ?></td>
+                            <td data-label="<?php echo $is_historical_import ? 'Historical rating' : ($annualPeerBreakdown ? 'Self-rating' : ($show_reviewed_scores ? 'Original Self-Rating' : 'Submitted Rating')); ?>" class="text-end tabular-nums fw-semibold" style="font-size:1.05rem;"><?php echo number_format($orig, 2); ?></td>
                             <?php if ($annualPeerBreakdown): ?>
                                 <?php foreach ($annualReceivedPeers as $peerIndex=>$peer): $peerScores=json_decode($peer['scores_json'],true) ?: []; ?><td data-label="<?php echo e($annualNamedPeers ? $peer['rater_name'] : 'Employee '.($peerIndex+1)); ?>" class="text-end tabular-nums"><?php echo isset($peerScores[$itemIndex]) ? number_format((float)$peerScores[$itemIndex],2) : '—'; ?></td><?php endforeach; ?>
                                 <td data-label="Combined 360 average" class="text-end tabular-nums fw-bold text-dark" style="font-size:1.1rem;"><?php echo number_format((float)$annualPeerBreakdown['item_averages'][$itemIndex],2); ?></td>
-                            <?php elseif ($show_reviewed_scores): ?>
+                            <?php elseif ($show_reviewed_scores && !$is_historical_import): ?>
                                 <td data-label="Reviewed / Adjusted" class="text-end tabular-nums fw-bold text-dark" style="font-size:1.1rem;"><?php echo number_format($rev, 2); ?></td>
                                 <td data-label="Variance" class="text-center">
                                     <?php if ($is_adj): ?>
