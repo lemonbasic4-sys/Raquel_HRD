@@ -426,7 +426,7 @@ function movementIcon(string $type): string {
             $ls_color = $ls_level ? getPerformanceLevelColor($ls_level) : 'var(--text-dark)';
             $ls_badge = $ls_level ? getPerformanceLevelBadgeClass($ls_level) : 'bg-secondary';
         ?>
-        <div class="stat-card h-100">
+        <div class="stat-card h-100 employee-latest-score">
             <div class="stat-icon stat-icon-success" aria-hidden="true">
                 <i class="fas fa-chart-line"></i>
             </div>
@@ -857,6 +857,15 @@ function movementIcon(string $type): string {
 
 
 <style>
+.employee-latest-score .badge {
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    text-align: left;
+    line-height: 1.35;
+    margin-top: .25rem;
+    margin-bottom: .25rem;
+}
 /* ── Quick Actions Section Headings (Req 6.2, 17.2 — 1.5rem, 24px margin-top) */
 .quick-actions-section-heading {
     font-size: 1.5rem;

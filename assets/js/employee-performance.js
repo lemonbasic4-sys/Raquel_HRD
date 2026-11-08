@@ -3,154 +3,217 @@
     const BASE = document.currentScript.dataset.base;
     const byId = id => document.getElementById(id);
     const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[c]));
-    const num = (v, digits = 2) => v === null || v === undefined ? '—' : Number(v).toFixed(digits);
-    const signed = v => v === null ? 'No comparison' : `${v > 0 ? '+' : ''}${num(v)}`;
-    const date = v => v ? new Date(v.replace(' ', 'T')).toLocaleDateString('en-PH', {year:'numeric', month:'short', day:'numeric'}) : 'Not recorded';
-    const change = (a, b) => a == null || b == null ? null : Math.round((a - b) * 100) / 100;
-    const changeHtml = delta => `<span class="perf-change ${delta > 0 ? 'text-success' : delta < 0 ? 'text-danger' : 'text-muted'}">${signed(delta)}${delta === null ? '' : delta > 0 ? ' · Improved' : delta < 0 ? ' · Declined' : ' · Unchanged'}</span>`;
-    const level = s => s >= 3.6 ? 'Outstanding' : s >= 2.6 ? 'Exceeds Expectations' : s >= 2 ? 'Meets Expectations' : 'Needs Improvement';
-    const compatibleCycle = (a, b) => a.evaluation_type === b.evaluation_type ||
-        (['Initial','Final'].includes(a.evaluation_type) && ['Initial','Final'].includes(b.evaluation_type));
+    const num = (value, digits = 2) => value == null ? '\u2014' : Number(value).toFixed(digits);
+    const delta = (current, previous) => current == null || previous == null ? null : Math.round((current - previous) * 100) / 100;
+    const signed = value => value == null ? '\u2014' : `${value > 0 ? '+' : ''}${num(value)}`;
+    const direction = value => value == null ? 'No comparison yet' : value > 0 ? 'Improved' : value < 0 ? 'Declined' : 'Unchanged';
+    const changeClass = value => value > 0 ? 'mp-up' : value < 0 ? 'mp-down' : 'mp-same';
+    const level = score => score >= 3.6 ? 'Outstanding' : score >= 2.6 ? 'Exceeds Expectations' : score >= 2 ? 'Meets Expectations' : 'Needs Improvement';
+    const changeHtml = value => value == null ? '<span class="mp-muted">Not comparable</span>' : `<span class="mp-change ${changeClass(value)}">${signed(value)} ${value > 0 ? '&#8593;' : value < 0 ? '&#8595;' : '&#8212;'}</span>`;
     let evaluations = [];
+    let selectedId;
+    let comparisonId;
     let chart;
 
-    function baselineFor(ev) {
-        const index = evaluations.indexOf(ev);
-        return evaluations.slice(index + 1).find(previous => compatibleCycle(ev, previous)) ?? null;
+    function previousCycle(ev) {
+        return evaluations[evaluations.indexOf(ev) + 1] ?? null;
     }
 
     function criterionComparison(row, ev, previous) {
-        if (!previous) return {previous:null, delta:null, note:'No earlier comparable cycle'};
-        if (!ev.details_match || !previous.details_match) return {previous:null, delta:null, note:'Criterion details need HR verification'};
+        if (!previous) return {previous:null, change:null, note:'Select another cycle to compare.'};
+        if (!ev.details_match || !previous.details_match) return {previous:null, change:null, note:'Detailed ratings need HR verification.'};
         const matches = previous.criteria.filter(r => r.key === row.key && r.basis === row.basis);
-        const currentMatches = ev.criteria.filter(r => r.key === row.key && r.basis === row.basis);
-        if (matches.length !== 1 || currentMatches.length !== 1) {
-            return {previous:null, delta:null, note:'Criterion changed, missing, or duplicated'};
+        if (matches.length !== 1 || ev.criteria.filter(r => r.key === row.key && r.basis === row.basis).length !== 1) {
+            return {previous:null, change:null, note:'Criterion or rating basis changed, is missing, or is duplicated.'};
         }
         const match = matches[0];
-        return {previous:match.rating, delta:change(row.rating, match.rating),
+        return {previous:match.rating, change:delta(row.rating, match.rating),
             note: Math.abs(match.item_weight - row.item_weight) > .005 || match.section_weight !== row.section_weight
-                ? 'Weight changed; comparison uses the rating only' : ''};
+                ? 'Weight changed; this compares ratings only.' : ''};
     }
 
-    function renderBreakdown(ev, previous) {
-        const target = byId(`cycle-body-${ev.evaluation_id}`);
-        const delta = previous ? change(ev.total_score, previous.total_score) : null;
-        const components = `<div class="row g-2 mb-3">
-            <div class="col-sm-4"><div class="bg-light rounded p-3 small">KRA (${num(ev.kra_weight,0)}%)<strong class="d-block fs-5">${num(ev.kra_subtotal)} / 4</strong>Contribution: ${num(ev.kra_subtotal === null ? null : ev.kra_subtotal * ev.kra_weight / 100, 3)}</div></div>
-            <div class="col-sm-4"><div class="bg-light rounded p-3 small">${ev.behavior_basis === 'department_shared' ? 'Department Shared Behavior' : 'Core Behaviors & Values'} (${num(ev.behavior_weight,0)}%)<strong class="d-block fs-5">${num(ev.behavior_average)} / 4</strong>Contribution: ${num(ev.behavior_average === null ? null : ev.behavior_average * ev.behavior_weight / 100, 3)}</div></div>
-            <div class="col-sm-4"><div class="bg-light rounded p-3 small">Official overall score<strong class="d-block fs-5">${num(ev.total_score)} / 4</strong>${num(ev.score_percentage)}% of scale maximum</div></div>
-        </div>`;
-        const formula = ev.formula_matches
-            ? `<p class="small text-muted">Official formula: (${num(ev.kra_subtotal)} × ${num(ev.kra_weight,0)}%) + (${num(ev.behavior_average)} × ${num(ev.behavior_weight,0)}%) = <strong>${num(ev.total_score)}</strong>. Contributions are rounded for display; the overall score follows the official rounding rules.</p>`
-            : '<div class="alert alert-warning small">The saved official score is shown. Its component totals do not reconcile with the available weights, or component details are missing. Ask HR to verify this record; a replacement score has not been calculated.</div>';
-        const detailNotice = ev.details_match ? '' : '<div class="alert alert-warning small">The available criterion ratings do not fully reconcile with the saved component totals. The official overall score remains the saved approved result. Ask HR to check the missing or changed criterion details before using them for development comparisons.</div>';
-        const peer = ev.peer_summary ? `<div class="alert alert-success small">Finalized 360 result · ${ev.peer_summary.received}/${ev.peer_summary.expected} required peer submissions · official version ${ev.peer_summary.version}. Behavior uses the approved item averages from that version. Self and peer averages are shown separately; any approved behavior adjustments are already included in the final rating.</div>` : '';
-        const shared = ev.behavior_basis === 'department_shared' ? '<div class="alert alert-info small">This cycle applies a department shared behavior score. Individual behavior ratings below describe your review; they are not the department score and do not have individual contributions to the overall result.</div>' : '';
-        const options = evaluations.slice(evaluations.indexOf(ev) + 1).filter(p => compatibleCycle(ev,p));
-        const comparison = `<label class="small fw-semibold" for="baseline-${ev.evaluation_id}">Compare with an earlier cycle</label>
-            <select class="form-select form-select-sm mt-1 mb-2 perf-baseline" id="baseline-${ev.evaluation_id}" data-id="${ev.evaluation_id}">
-                <option value="">No comparison</option>${options.map(p => `<option value="${p.evaluation_id}" ${previous?.evaluation_id === p.evaluation_id ? 'selected' : ''}>${esc(p.cycle_label)}</option>`).join('')}
-            </select><p class="small">Overall change: ${changeHtml(delta)}${previous ? ` versus ${esc(previous.cycle_label)}. ${previous.evaluation_type !== ev.evaluation_type ? 'Initial and Final are different stages; interpret the overall change alongside the matching criteria.' : ''}` : '. Another comparable finalized cycle is needed.'}</p>`;
-        const rated = ev.criteria.filter(r => r.rating !== null);
+    function extremes(ev) {
+        const rated = ev.details_match ? ev.criteria.filter(r => r.rating != null) : [];
         const high = rated.length ? Math.max(...rated.map(r => r.rating)) : null;
         const low = rated.length ? Math.min(...rated.map(r => r.rating)) : null;
-        const sameRatings = high === low;
-        const comparisons = ev.criteria.map(row => ({row, comparison:criterionComparison(row,ev,previous)}));
-        const sectionTable = section => {
-            const items = comparisons.filter(({row}) => section === 'KRA' ? row.section === 'KRA' : row.section !== 'KRA');
-            if (!items.length) return `<p class="small text-muted">No ${section === 'KRA' ? 'KRA' : 'behavior'} criterion ratings were supplied for this record.</p>`;
-            return `<div class="table-responsive mb-3" tabindex="0" aria-label="${section} criterion ratings"><table class="table perf-criteria"><thead><tr><th>Criterion</th><th>Item weight</th><th>Self</th>${ev.peer_summary && section !== 'KRA' ? '<th>Peer average</th>' : ''}<th>Final rating / 4</th><th>Weighted score</th><th>Overall contribution</th><th>Previous / 4</th><th>Change</th></tr></thead><tbody>${items.map(({row:r,comparison:c}) => `<tr>
-                <td><strong>${esc(r.name)}</strong>${!sameRatings && r.rating === high ? ' <span class="badge bg-success perf-extreme">Highest rating</span>' : ''}${!sameRatings && r.rating === low ? ' <span class="badge bg-warning text-dark perf-extreme">Lowest rating</span>' : ''}<div class="small text-muted criterion-description">${esc(r.description)}</div></td>
-                <td>${num(r.item_weight)}%${r.section !== 'KRA' ? '<div class="text-muted small">Equal share</div>' : ''}</td><td>${num(r.self_rating)}</td>
-                ${ev.peer_summary && section !== 'KRA' ? `<td>${num(r.peer_average)}</td>` : ''}<td class="fw-bold">${num(r.rating)}</td>
-                <td>${num(r.weighted_score,3)}</td><td>${num(r.contribution,3)}</td><td>${num(c.previous)}</td><td>${changeHtml(c.delta)}${c.note ? `<div class="small text-muted">${esc(c.note)}</div>` : ''}</td></tr>`).join('')}</tbody></table></div>`;
-        };
-        const strengths = ev.details_match && !sameRatings ? rated.filter(r => r.rating === high) : [];
-        const focus = comparisons.filter(({row,comparison}) => ev.details_match && row.rating !== null &&
-            (row.rating < 2.6 || comparison.delta < 0 || (!sameRatings && row.rating === low)));
-        const insights = !ev.details_match ? '<p class="small text-muted">Criterion insights will be reliable once HR verifies the detailed scores for this record.</p>' : `<div class="insight-card p-3 mb-3"><h6 class="fw-bold">Performance insights</h6>
-            ${strengths.length ? `<p class="small mb-2"><strong>Highest rated:</strong> ${strengths.map(r => `${esc(r.name)} (${num(r.rating)})`).join(', ')}. Maintain these responsibilities and discuss how to build on them with your head.</p>` : `<p class="small mb-2">${rated.length ? 'All available criteria have the same rating; there is no distinct highest or lowest criterion.' : 'Criterion-level insights are unavailable because this record has no detailed ratings.'}</p>`}
-            ${focus.length ? `<ul class="small mb-0">${focus.map(({row:r,comparison:c}) => `<li><strong>${esc(r.name)}:</strong> ${num(r.rating)}/4${c.delta < 0 ? `, down ${num(-c.delta)} points` : ''}. ${r.rating < 2.6 ? 'Agree on a specific improvement action, support, and review date with your head.' : c.delta < 0 ? 'Review what changed since the previous cycle and agree on an action to recover performance.' : 'This is a relative low rating, not necessarily underperformance. Discuss a development goal for the next cycle.'}</li>`).join('')}</ul>` : rated.length ? '<p class="small mb-0">No lower or declining matching criteria were identified in this comparison. Continue the practices behind these ratings.</p>' : ''}
-        </div>`;
-        const plans = ev.development_plans.length ? `<h6 class="fw-bold">Approved development plan</h6><ul class="small">${ev.development_plans.map(p => `<li><strong>${esc(p.improvement_area)}</strong> · Action/support: ${esc(p.support_needed)} · Time frame: ${esc(p.time_frame)}</li>`).join('')}</ul>` : '';
-        target.innerHTML = `<p class="small text-muted">${esc(ev.template_name)}<br>Evaluation period: ${esc(ev.evaluation_period_start)} to ${esc(ev.evaluation_period_end)} · Approved ${esc(date(ev.approved_date))}</p>${components}${formula}${detailNotice}${peer}${shared}${comparison}${insights}<h6 class="fw-bold">Key Result Areas</h6>${sectionTable('KRA')}<h6 class="fw-bold">Behavioral competencies${ev.peer_summary ? ' & 360 ratings' : ''}</h6>${sectionTable('Behavior')}${plans}${ev.supervisor_comments ? `<p class="small"><strong>Head's comments:</strong> ${esc(ev.supervisor_comments)}</p>` : ''}<a class="btn btn-outline-primary btn-sm" href="${BASE}/employee/evaluation-history-view.php?evaluation_id=${ev.evaluation_id}">Open evaluation &amp; audit details</a>`;
+        return {rated, high, low, tied:high === low};
     }
 
-    function renderHistory() {
-        byId('evalHistoryContainer').innerHTML = evaluations.map((ev,i) => `<details class="perf-cycle" id="cycle-${ev.evaluation_id}" ${i === 0 ? 'open' : ''}><summary><span class="fw-bold">${esc(ev.cycle_label)}</span><span class="d-block small mt-1">${num(ev.total_score)} / 4 · ${esc(ev.performance_level || level(ev.total_score))} · ${num(ev.score_percentage)}% of scale maximum</span></summary><div class="perf-cycle-body" id="cycle-body-${ev.evaluation_id}"></div></details>`).join('');
-        evaluations.forEach(ev => renderBreakdown(ev,baselineFor(ev)));
-        byId('evalHistoryContainer').addEventListener('change', event => {
-            if (!event.target.matches('.perf-baseline')) return;
-            const ev = evaluations.find(r => r.evaluation_id === Number(event.target.dataset.id));
-            const previous = evaluations.find(r => r.evaluation_id === Number(event.target.value)) ?? null;
-            renderBreakdown(ev,previous);
-            byId(`baseline-${ev.evaluation_id}`).focus();
-        });
+    function renderSummary() {
+        const latest = evaluations[0];
+        const previous = evaluations[1] ?? null;
+        byId('latest-score').textContent = num(latest.total_score);
+        byId('latest-level').textContent = latest.performance_level || level(latest.total_score);
+        byId('latest-cycle').textContent = latest.cycle_label;
+        byId('previous-score').textContent = num(previous?.total_score);
+        byId('previous-scale').hidden = !previous;
+        byId('previous-level').textContent = previous ? (previous.performance_level || level(previous.total_score)) : 'No previous evaluation';
+        byId('previous-cycle').textContent = previous?.cycle_label ?? '';
+        const d = delta(latest.total_score, previous?.total_score);
+        byId('latest-change').textContent = signed(d);
+        byId('latest-change').className = `mp-score ${changeClass(d)}`;
+        byId('latest-direction').textContent = direction(d);
+        byId('finalized-count').textContent = `${evaluations.length} cycle${evaluations.length === 1 ? '' : 's'}`;
+        renderInsights(latest,previous);
     }
+
+    function renderInsights(ev, previous) {
+        const {rated,high,low,tied} = extremes(ev);
+        if (!rated.length) {
+            byId('latest-insights').innerHTML = '<p class="mp-muted">Detailed ratings are unavailable or need HR verification. Open the evaluation details or contact HR.</p>';
+            return;
+        }
+        if (tied) {
+            const below = low < 2.6;
+            byId('latest-insights').innerHTML = `<div class="mp-highlight"><div class="mp-highlight-label">Consistent ratings</div><p>All rated criteria are ${num(high)} / 4.</p><span class="mp-muted">There is no distinct highest or lowest criterion.</span></div><div class="mp-highlight"><div class="mp-highlight-label mp-focus-label">Next step</div><p>${below ? 'Agree on a development action and review date with your head.' : 'Keep your current strengths and agree on one development goal with your head.'}</p></div>`;
+            return;
+        }
+        const highest = rated.filter(r => r.rating === high);
+        const lowest = rated.filter(r => r.rating === low);
+        const names = rows => `${rows.slice(0,2).map(r => esc(r.name)).join(', ')}${rows.length > 2 ? ` +${rows.length - 2} more` : ''}`;
+        const declining = rated.map(row => ({row,comparison:criterionComparison(row,ev,previous)}))
+            .filter(r => r.comparison.change !== null && r.comparison.change < 0).sort((a,b) => a.comparison.change - b.comparison.change);
+        byId('latest-insights').innerHTML = `<div class="mp-highlight"><div class="mp-highlight-label">Highest rated</div><p><strong>${names(highest)}</strong> <span class="mp-muted">${num(high)} / 4</span></p></div><div class="mp-highlight"><div class="mp-highlight-label mp-focus-label">Lowest rated</div><p><strong>${names(lowest)}</strong> <span class="mp-muted">${num(low)} / 4</span></p><span class="mp-muted">${low < 2.6 ? 'Agree on a specific improvement action with your head.' : 'A development opportunity; a relative low rating does not mean poor performance.'}</span></div>${declining.length ? `<div class="mp-highlight"><p><strong>${esc(declining[0].row.name)}</strong> declined ${num(-declining[0].comparison.change)} points. Review what changed.</p></div>` : ''}`;
+    }
+
+    function updateSelectors() {
+        const option = (ev, selected) => `<option value="${ev.evaluation_id}" ${ev.evaluation_id === selected ? 'selected' : ''}>${esc(ev.cycle_label)}</option>`;
+        byId('review-cycle').innerHTML = evaluations.map(ev => option(ev,selectedId)).join('');
+        byId('compare-cycle').innerHTML = '<option value="">No comparison</option>' + evaluations.filter(ev => ev.evaluation_id !== selectedId).map(ev => option(ev,comparisonId)).join('');
+        byId('compare-cycle').value = comparisonId == null ? '' : String(comparisonId);
+        byId('compare-cycle').disabled = evaluations.length < 2;
+    }
+
+    function renderCriteria(ev, previous, section) {
+        const {high,low,tied} = extremes(ev);
+        const rows = ev.criteria.filter(r => section === 'KRA' ? r.section === 'KRA' : r.section !== 'KRA')
+            .map(row => ({row,comparison:criterionComparison(row,ev,previous)}))
+            .sort((a,b) => (a.row.rating ?? Infinity) - (b.row.rating ?? Infinity));
+        const prefix = section === 'KRA' ? 'kra' : 'behavior';
+        byId(`${prefix}-count`).textContent = `(${rows.length})`;
+        if (!rows.length) {
+            byId(`${prefix}-criteria`).innerHTML = '<p class="mp-muted mt-3">No criterion ratings were recorded.</p>';
+            return;
+        }
+        const rowHtml = ({row:r,comparison:c}) => `<div class="mp-criterion">
+            <div class="mp-criterion-name"><strong>${esc(r.name)}</strong>${!tied && r.rating === high ? '<br><span class="mp-tag mp-tag-high">Highest rated</span>' : ''}${!tied && r.rating === low ? '<br><span class="mp-tag mp-tag-low">Lowest rated</span>' : ''}</div>
+            <div class="mp-rating" aria-label="Rating ${num(r.rating)} out of 4">${num(r.rating)}</div>
+            <div class="mp-criterion-change" title="${esc(c.note || `Previous rating: ${num(c.previous)}. ${direction(c.change)}.`)}">${c.change == null ? `<span class="mp-muted">${previous ? 'Not comparable' : 'No comparison'}</span>` : changeHtml(c.change)}<span class="visually-hidden">${c.change == null ? esc(c.note) : direction(c.change)}</span></div>
+        </div>`;
+        byId(`${prefix}-criteria`).innerHTML = `<p class="mp-muted mt-2">Lowest ratings first${section !== 'KRA' && ev.peer_summary ? ' &middot; Approved 360 ratings' : ''}</p>${rows.slice(0,4).map(rowHtml).join('')}${rows.length > 4 ? `<details class="mp-more"><summary>Show ${rows.length - 4} more criteria</summary>${rows.slice(4).map(rowHtml).join('')}</details>` : ''}`;
+    }
+
+    function renderTechnical(ev, previous) {
+        const formula = ev.formula_matches
+            ? `(${num(ev.kra_subtotal)} &times; ${num(ev.kra_weight,0)}%) + (${num(ev.behavior_average)} &times; ${num(ev.behavior_weight,0)}%) = <strong>${num(ev.total_score)} / 4</strong>.`
+            : 'The saved official score is displayed. Available component totals or weights need HR verification.';
+        const peer = ev.peer_summary ? `<p>360 evaluation: ${ev.peer_summary.received}/${ev.peer_summary.expected} required peer submissions. Approved version ${ev.peer_summary.version}. Final behavior ratings include any approved adjustments.</p>` : '';
+        const shared = ev.behavior_basis === 'department_shared' ? '<p>The overall result uses a department shared behavior score. Individual behavior ratings below do not contribute separately to that shared score.</p>' : '';
+        const rows = ev.criteria.map(r => {
+            const c = criterionComparison(r,ev,previous);
+            return `<tr><td class="mp-details-name"><strong>${esc(r.name)}</strong><div>${esc(r.description)}</div></td><td>${r.section === 'KRA' ? 'KRA' : 'Behavior'}</td><td>${num(r.item_weight)}%</td><td>${num(r.section_weight,0)}%</td><td>${num(r.self_rating)}</td>${ev.peer_summary ? `<td>${num(r.peer_average)}</td>` : ''}<td>${num(r.rating)}</td><td>${num(r.weighted_score,3)}</td><td>${num(r.contribution,3)}</td><td>${num(c.previous)}</td><td>${c.change == null ? esc(c.note) : `${signed(c.change)}. ${esc(c.note)}`}</td></tr>`;
+        }).join('');
+        byId('technical-content').innerHTML = `<p><strong>${esc(ev.template_name)}</strong><br>Evaluation period: ${esc(ev.evaluation_period_start)} to ${esc(ev.evaluation_period_end)}<br>Approved: ${esc(ev.approved_date ?? 'Not recorded')}</p><p><strong>Official calculation:</strong> ${formula}</p><p>Section contributions: KRA ${num(ev.kra_subtotal == null ? null : ev.kra_subtotal * ev.kra_weight / 100,3)}; behavior ${num(ev.behavior_average == null ? null : ev.behavior_average * ev.behavior_weight / 100,3)}. Displayed contributions may differ slightly because of official rounding.</p>${peer}${shared}<div class="table-responsive" tabindex="0" aria-label="Detailed scoring"><table class="table table-sm"><thead><tr><th>Criterion</th><th>Section</th><th>Item weight</th><th>Section weight</th><th>Self</th>${ev.peer_summary ? '<th>Peer average</th>' : ''}<th>Final rating</th><th>Weighted score</th><th>Overall contribution</th><th>Comparison rating</th><th>Change / note</th></tr></thead><tbody>${rows}</tbody></table></div>${ev.supervisor_comments ? `<p><strong>Head's comments:</strong> ${esc(ev.supervisor_comments)}</p>` : ''}<div class="d-flex flex-wrap gap-2"><a class="btn btn-outline-primary btn-sm" href="${BASE}/employee/evaluation-history-view.php?evaluation_id=${ev.evaluation_id}">Review cycle audit</a>${previous ? `<a class="btn btn-outline-secondary btn-sm" href="${BASE}/employee/evaluation-history-view.php?evaluation_id=${previous.evaluation_id}">Comparison cycle audit</a>` : ''}</div>`;
+    }
+
+    function renderComparison() {
+        const ev = evaluations.find(r => r.evaluation_id === selectedId);
+        const previous = evaluations.find(r => r.evaluation_id === comparisonId) ?? null;
+        const d = delta(ev.total_score,previous?.total_score);
+        byId('comparison-summary').innerHTML = `<span>Reviewed cycle: <strong>${num(ev.total_score)} / 4</strong></span>${previous ? `<span>Comparison: <strong>${num(previous.total_score)} / 4</strong></span><span>${changeHtml(d)} <span class="mp-muted">${direction(d)}</span></span>` : '<span class="mp-muted">Choose another cycle to see changes.</span>'}`;
+        const notices = [];
+        if (!ev.formula_matches || !ev.details_match || (previous && !previous.details_match)) notices.push('Some detailed ratings need HR verification. Official overall scores are preserved.');
+        if (previous && ev.evaluation_type !== previous.evaluation_type) notices.push('Different cycle types: interpret the overall change alongside matching criteria.');
+        if (ev.behavior_basis === 'department_shared') notices.push('Behavior ratings below are individual; the overall score uses department shared behavior.');
+        if (previous && !ev.criteria.some(r => criterionComparison(r,ev,previous).change !== null)) notices.push('No equivalent criteria are available for this pair.');
+        byId('comparison-notice').textContent = notices.join(' ');
+        renderCriteria(ev,previous,'KRA');
+        renderCriteria(ev,previous,'Behavior');
+        renderTechnical(ev,previous);
+        byId('scoring-details').open = false;
+    }
+
+    function selectCycle(id) {
+        const ev = evaluations.find(r => r.evaluation_id === id);
+        if (!ev) return;
+        selectedId = id;
+        comparisonId = previousCycle(ev)?.evaluation_id ?? null;
+        updateSelectors(); renderComparison();
+    }
+
+    function activateTab(panelId, focus = false) {
+        document.querySelectorAll('.mp-tabs [role="tab"]').forEach(tab => {
+            const active = tab.dataset.panel === panelId;
+            tab.setAttribute('aria-selected',String(active));
+            tab.tabIndex = active ? 0 : -1;
+            byId(tab.dataset.panel).hidden = !active;
+            if (active && focus) tab.focus();
+        });
+        if (panelId === 'performance-panel' && chart) chart.resize();
+    }
+
+    document.querySelectorAll('.mp-tabs [role="tab"]').forEach((tab,index,tabs) => {
+        tab.addEventListener('click',() => activateTab(tab.dataset.panel));
+        tab.addEventListener('keydown',event => {
+            if (!['ArrowLeft','ArrowRight','Home','End'].includes(event.key)) return;
+            event.preventDefault();
+            const next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : (index + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
+            activateTab(tabs[next].dataset.panel,true);
+        });
+    });
+    byId('review-cycle').addEventListener('change',event => selectCycle(Number(event.target.value)));
+    byId('compare-cycle').addEventListener('change',event => {
+        comparisonId = event.target.value ? Number(event.target.value) : null;
+        renderComparison();
+    });
 
     function renderChart(data) {
+        const chronological = [...evaluations].reverse();
         chart = new Chart(byId('perfTrendChart'), {
-            type:'line', data:{labels:data.chart_labels, datasets:[{label:'Official finalized score',data:data.chart_scores,
-                borderColor:'#082E06',backgroundColor:'rgba(203,161,53,.12)',pointBackgroundColor:'#CBA135',pointBorderColor:'#082E06',
-                pointRadius:6,pointHoverRadius:8,tension:0,fill:true}]},
+            type:'line',data:{labels:data.chart_labels,datasets:[{label:'Finalized score',data:data.chart_scores,
+                borderColor:'#244b15',backgroundColor:'rgba(203,161,53,.1)',pointBackgroundColor:'#CBA135',pointBorderColor:'#244b15',pointRadius:5,pointHoverRadius:7,tension:0,fill:true}]},
             options:{responsive:true,maintainAspectRatio:false,
-                onClick:(_,elements) => { if (!elements.length) return; const ev = [...evaluations].reverse()[elements[0].index]; const detail = byId(`cycle-${ev.evaluation_id}`); detail.open = true; detail.scrollIntoView({behavior:'smooth',block:'start'}); },
-                plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx => `${num(ctx.raw)} / 4 · ${level(ctx.raw)}`}}},
-                scales:{y:{min:1,max:4,ticks:{stepSize:.5}},x:{offset:true,ticks:{maxRotation:45,autoSkip:true},grid:{display:false}}}}
+                onClick:(_,points) => {if (!points.length) return;selectCycle(chronological[points[0].index].evaluation_id);byId('comparison-heading').scrollIntoView({behavior:'smooth',block:'start'});},
+                plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx => `${num(ctx.raw)} / 4`}}},
+                scales:{y:{min:1,max:4,ticks:{stepSize:1},grid:{color:'#edf0e9'}},x:{offset:true,ticks:{autoSkip:true,maxTicksLimit:5,maxRotation:0,font:{size:10},
+                    callback:value => {const ev = chronological[Number(value)];return ev ? [ev.evaluation_type,(ev.approved_date || ev.evaluation_period_end).slice(0,10)] : '';}},grid:{display:false}}}}
         });
+        byId('perfTrendChart').setAttribute('aria-label',`Finalized evaluation scores: ${data.chart_labels.map((label,i) => `${label}: ${num(data.chart_scores[i])} out of 4`).join('; ')}`);
     }
 
-    function renderReadiness(data) {
+    function renderDevelopment(data) {
         const pct = data.readiness;
         byId('readinessPct').textContent = `${pct}%`;
         byId('readinessBar').style.width = `${pct}%`;
         byId('readinessLabel').textContent = pct >= 80 ? 'Ready for Advancement' : pct >= 55 ? 'Approaching Readiness' : pct >= 35 ? 'Progressing' : 'Developing';
         const b = data.readiness_breakdown;
-        byId('readinessBreakdown').innerHTML = `<div class="d-flex justify-content-between"><span>Evaluation Score (60%)</span><span>${num(b.evaluation)} / 60</span></div><div class="d-flex justify-content-between"><span>Years of Service (25%)</span><span>${num(b.service)} / 25</span></div><div class="d-flex justify-content-between"><span>Evaluation History (15%)</span><span>${num(b.history)} / 15</span></div><p class="mt-2 mb-0">A planning indicator, not an official promotion decision or evaluation percentage.</p>`;
-    }
-
-    function renderGoal(data) {
+        byId('readinessBreakdown').innerHTML = `<p>Evaluation score: ${num(b.evaluation)} / 60<br>Years of service: ${num(b.service)} / 25<br>Evaluation history: ${num(b.history)} / 15</p><p>A planning indicator, not an official promotion decision.</p>`;
         const s = data.latest_score;
-        const next = s < 2 ? 2 : s < 2.6 ? 2.6 : s < 3.6 ? 3.6 : null;
-        byId('goalTrackingContent').innerHTML = `<div class="d-flex justify-content-between small mb-2"><span>Latest finalized score</span><strong>${num(s)} / 4</strong></div><div class="progress goal-progress"><div class="progress-bar bg-success" style="width:${Math.max(0,Math.min(100,(s - 1)/3*100))}%"></div></div><p class="small mt-3 mb-0">${next ? `An increase of ${num(next - s)} points in a future cycle would reach ${esc(level(next))}.` : 'The latest finalized score is Outstanding. Maintain your strengths and review your development goals.'}</p>`;
+        const next = data.next_level;
+        byId('goalTrackingContent').innerHTML = `<div class="mp-goal"><div class="d-flex justify-content-between small mb-2"><span>Latest finalized score</span><strong>${num(s)} / 4</strong></div><div class="progress"><div class="progress-bar bg-success" style="width:${Math.max(0,Math.min(100,(s - 1)/3*100))}%"></div></div><p>${data.points_needed > 0 ? `${num(data.points_needed)} more points would reach ${esc(next)} in a future cycle.` : 'Your latest finalized score is Outstanding. Keep building on your strengths.'}</p></div>`;
+        const latest = evaluations[0];
+        byId('development-plan').innerHTML = latest.development_plans.length ? `<ul>${latest.development_plans.map(p => `<li><strong>${esc(p.improvement_area)}</strong><br>${esc(p.support_needed)} &middot; ${esc(p.time_frame)}</li>`).join('')}</ul>` : '<p class="mp-muted">No development plan was recorded for your latest evaluation. Agree on a specific action and review date with your head.</p>';
     }
 
     fetch(`${BASE}/employee/ajax/get-my-performance.php`)
-        .then(response => { if (!response.ok) throw new Error('Unable to load performance data'); return response.json(); })
+        .then(response => { if (!response.ok) throw new Error('Unable to load');return response.json(); })
         .then(data => {
-            if (!data.success) throw new Error(data.error || 'Unable to load performance data');
-            byId('perfLoadingState').style.display = 'none';
+            if (!data.success) throw new Error('Unable to load');
+            byId('perfLoadingState').hidden = true;
             if (data.pending_evaluations.length) {
-                const notice = byId('pendingPerformanceNotice');
-                notice.style.display = 'block';
-                notice.innerHTML = `<strong>${data.pending_evaluations.length} approved result(s) awaiting score completion</strong><p class="small mb-2">These are excluded from finalized averages, charts, and comparisons.</p><ul class="small mb-0">${data.pending_evaluations.map(p => `<li><a href="${BASE}/employee/evaluation-history-view.php?evaluation_id=${p.evaluation_id}">${esc(p.cycle_label)}</a>: ${esc(p.reason)}</li>`).join('')}</ul>`;
+                byId('pendingPerformanceNotice').hidden = false;
+                byId('pendingPerformanceNotice').innerHTML = `${data.pending_evaluations.length} approved result(s) are awaiting score completion and are excluded from this view.<details><summary>View pending results</summary><ul>${data.pending_evaluations.map(p => `<li><a href="${BASE}/employee/evaluation-history-view.php?evaluation_id=${p.evaluation_id}">${esc(p.cycle_label)}</a>: ${esc(p.reason)}</li>`).join('')}</ul></details>`;
             }
-            if (!data.total_count) {
-                byId('perfEmptyState').style.display = 'block';
-                byId('hero-trend-badge').textContent = 'No finalized data';
-                return;
-            }
+            if (!data.total_count) {byId('perfEmptyState').hidden = false;return;}
             evaluations = data.evaluations;
-            byId('perfContent').style.display = 'block';
-            byId('hero-avg-score').textContent = num(data.avg_score);
-            const labels = {improving:'Improving',declining:'Declining',stable:'Unchanged',insufficient_data:'One finalized cycle'};
-            const label = labels[data.trend];
-            ['hero-trend-badge','trendClassBadge'].forEach(id => {
-                const badge = byId(id); badge.textContent = label;
-                badge.style.cssText = `background:${data.trend === 'declining' ? '#fee2e2' : data.trend === 'improving' ? '#dcfce7' : '#e2e3e5'};color:#1c271b;padding:.3rem .75rem;border-radius:.5rem;`;
-            });
-            const note = document.createElement('p'); note.className = 'small text-muted mt-3 mb-0';
-            note.textContent = data.change.delta === null ? 'A second finalized cycle is needed to measure a change.' : `Latest versus preceding finalized cycle: ${signed(data.change.delta)} points. Click a chart point to open its breakdown. Cycle types and responsibilities can differ; use matching criteria below for development comparisons.`;
-            byId('perfTrendChart').parentElement.after(note);
-            renderChart(data); renderHistory(); renderReadiness(data); renderGoal(data);
+            byId('perfContent').hidden = false;
+            renderSummary();selectCycle(evaluations[0].evaluation_id);renderDevelopment(data);renderChart(data);
         })
         .catch(() => {
-            byId('perfLoadingState').style.display = 'none';
-            byId('perfContent').style.display = 'none';
-            byId('hero-trend-badge').textContent = 'Unavailable';
-            byId('perfEmptyState').style.display = 'block';
-            byId('perfEmptyState').querySelector('h5').textContent = 'Performance data could not be loaded';
+            byId('perfLoadingState').hidden = true;
+            byId('perfContent').hidden = true;
+            byId('perfEmptyState').hidden = false;
+            byId('perfEmptyState').querySelector('h2').textContent = 'Performance data could not be loaded';
             byId('perfEmptyState').querySelector('p').textContent = 'Reload the page to try again. If the problem continues, contact HR.';
         });
 })();
