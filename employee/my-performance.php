@@ -29,20 +29,11 @@ if (!empty($emp['hire_date'])) {
 }
 
 // ── Quick stats for PHP-rendered hero (latest approved) ─────────────────────
-$latest_stmt = $conn->prepare("
-    SELECT total_score, performance_level, approved_date,
-           YEAR(evaluation_period_end) AS eval_year
-    FROM evaluations
-    WHERE employee_id = ? AND status = 'Approved' AND deleted_at IS NULL
-    ORDER BY evaluation_period_end DESC, approved_date DESC
-    LIMIT 1
-");
-$latest_stmt->bind_param("i", $employee_id);
-$latest_stmt->execute();
-$latest_eval = $latest_stmt->get_result()->fetch_assoc();
-$latest_stmt->close();
-
-$total_evals_count = (int)($conn->query("SELECT COUNT(*) AS c FROM evaluations WHERE employee_id=$employee_id AND status='Approved' AND deleted_at IS NULL")->fetch_assoc()['c'] ?? 0);
+// Hero and JSON response use the same finalized records and chronology.
+require_once '../includes/employee-performance-analysis.php';
+$performance_history = employeePerformanceHistory($conn, $employee_id);
+$total_evals_count = count($performance_history['evaluations']);
+$latest_eval = $total_evals_count ? $performance_history['evaluations'][$total_evals_count - 1] : null;
 
 require_once '../includes/header.php';
 ?>
@@ -178,6 +169,16 @@ require_once '../includes/header.php';
         gap: .85rem;
     }
 }
+.perf-cycle { border:1px solid #e1e8dc; border-radius:.75rem; margin-bottom:1rem; overflow:hidden; }
+.perf-cycle summary { padding:1rem; cursor:pointer; background:#f7faf4; }
+.perf-cycle[open] summary { border-bottom:1px solid #e1e8dc; }
+.perf-cycle-body { padding:1rem; }
+.perf-criteria { font-size:.8rem; min-width:760px; }
+.perf-criteria th { white-space:nowrap; }
+.perf-criteria td { vertical-align:top; }
+.perf-criteria .criterion-description { max-width:280px; }
+.perf-extreme { font-size:.68rem; }
+.perf-change { font-variant-numeric:tabular-nums; white-space:nowrap; }
 </style>
 
 <?php
@@ -196,23 +197,13 @@ $score_label = $latest_eval['performance_level'] ?? 'N/A';
         <div class="col-auto">
             <?php
             $avatar_url = getEmployeeAvatar($emp['profile_picture'] ?? '');
-            $initials   = strtoupper(substr($emp['first_name'] ?? 'U', 0, 1) . substr($emp['last_name'] ?? '', 0, 1));
-            if ($avatar_url && strpos($avatar_url, '/logo/logo.png') === false):
+            $default_avatar_url = getEmployeeAvatar('');
             ?>
-                <img src="<?php echo $avatar_url; ?>" alt="Profile"
+                <img src="<?php echo e($avatar_url); ?>" alt="Employee profile picture"
                      class="rounded-circle shadow"
                      style="width:72px;height:72px;object-fit:cover;border:3px solid rgba(255,255,255,.35);"
-                     onerror="this.onerror=null;this.style.display='none';document.getElementById('hero-initials').style.display='flex';">
-                <div id="hero-initials" class="rounded-circle d-none align-items-center justify-content-center fw-bold fs-4"
-                     style="width:72px;height:72px;background:rgba(255,255,255,.2);border:3px solid rgba(255,255,255,.35);color:#fff;">
-                    <?php echo $initials; ?>
-                </div>
-            <?php else: ?>
-                <div class="rounded-circle d-flex align-items-center justify-content-center fw-bold fs-4"
-                     style="width:72px;height:72px;background:rgba(255,255,255,.2);border:3px solid rgba(255,255,255,.35);color:#fff;">
-                    <?php echo $initials; ?>
-                </div>
-            <?php endif; ?>
+                     data-default-avatar="<?php echo e($default_avatar_url); ?>"
+                     onerror="this.onerror=null;this.src=this.dataset.defaultAvatar;">
         </div>
 
         <div class="col">
@@ -243,7 +234,7 @@ $score_label = $latest_eval['performance_level'] ?? 'N/A';
         <div class="col-6 col-md-3">
             <div class="stat-pill">
                 <div class="fw-bold text-white" style="font-size:1.2rem;"><?php echo $total_evals_count; ?></div>
-                <div style="font-size:.7rem;color:rgba(255,255,255,.6);">Evaluations Done</div>
+                <div style="font-size:.7rem;color:rgba(255,255,255,.6);">Finalized Evaluations</div>
             </div>
         </div>
         <div class="col-6 col-md-3">
@@ -255,7 +246,7 @@ $score_label = $latest_eval['performance_level'] ?? 'N/A';
         <div class="col-6 col-md-3">
             <div class="stat-pill">
                 <div class="fw-bold text-white" style="font-size:1.2rem;" id="hero-avg-score">—</div>
-                <div style="font-size:.7rem;color:rgba(255,255,255,.6);">Avg Score (All Time)</div>
+                <div style="font-size:.7rem;color:rgba(255,255,255,.6);">Avg Finalized Score (All Time)</div>
             </div>
         </div>
         <div class="col-6 col-md-3">
@@ -274,6 +265,7 @@ $score_label = $latest_eval['performance_level'] ?? 'N/A';
 </div>
 
 <!-- Main Content (shown after load) -->
+<div id="pendingPerformanceNotice" class="alert alert-info" style="display:none;" role="status"></div>
 <div id="perfContent" style="display:none;">
     <div class="row g-4">
 
@@ -286,7 +278,7 @@ $score_label = $latest_eval['performance_level'] ?? 'N/A';
                     <div class="d-flex align-items-center justify-content-between mb-3">
                         <div>
                             <h6 class="fw-bold text-dark mb-0"><i class="fas fa-chart-line text-primary me-2"></i>Performance Trend</h6>
-                            <div class="text-muted" style="font-size:.75rem;">Last 5 evaluation years (average per year)</div>
+                            <div class="text-muted" style="font-size:.75rem;">Each finalized cycle ? ordered by approval date</div>
                         </div>
                         <span id="trendClassBadge" class="badge px-3 py-2" style="font-size:.75rem;"></span>
                     </div>
@@ -299,7 +291,11 @@ $score_label = $latest_eval['performance_level'] ?? 'N/A';
             <!-- Evaluation History -->
             <div class="card section-card mb-4">
                 <div class="card-body p-4">
-                    <h6 class="fw-bold text-dark mb-3"><i class="fas fa-history text-info me-2"></i>Evaluation History</h6>
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                        <h6 class="fw-bold text-dark mb-0"><i class="fas fa-history text-info me-2"></i>Evaluation Breakdown &amp; Progress</h6>
+                        <a href="<?php echo BASE_URL; ?>/employee/evaluation-history.php" class="btn btn-outline-primary btn-sm">All Evaluation History</a>
+                    </div>
+                    <p class="small text-muted">Expand a cycle to see approved ratings, component weights, strengths, and changes in matching criteria. Percentages mean score ? 4 ? 100; they are not percentile ranks.</p>
                     <div id="evalHistoryContainer">
                         <div class="text-center py-4 text-muted">Loading...</div>
                     </div>
@@ -315,7 +311,7 @@ $score_label = $latest_eval['performance_level'] ?? 'N/A';
             <div class="card section-card mb-4">
                 <div class="card-body p-4">
                     <h6 class="fw-bold text-dark mb-1"><i class="fas fa-rocket text-success me-2"></i>Career Readiness</h6>
-                    <div class="text-muted mb-3" style="font-size:.75rem;">Based on evaluation scores, tenure & history</div>
+                    <div class="text-muted mb-3" style="font-size:.75rem;">Illustrative indicator from finalized scores, tenure &amp; history</div>
                     <div class="d-flex align-items-center justify-content-between mb-2">
                         <span class="fw-bold" style="font-size:.85rem;" id="readinessLabel">Calculating...</span>
                         <span class="fw-bold text-primary" id="readinessPct">—</span>
@@ -354,303 +350,7 @@ $score_label = $latest_eval['performance_level'] ?? 'N/A';
 </div>
 
 <script src="<?php echo BASE_URL; ?>/assets/vendor/chartjs/chart.umd.min.js"></script>
-<script>
-(function () {
-    const BASE = '<?php echo BASE_URL; ?>';
-
-    // ── Helpers ────────────────────────────────────────────────────────────
-    function scoreClass(s) {
-        if (s >= 3.60) return 'outstanding';
-        if (s >= 2.60) return 'exceeds';
-        if (s >= 2.00) return 'meets';
-        return 'needs';
-    }
-    function scoreBadgeHtml(s, label) {
-        const cls = scoreClass(s);
-        const map = {
-            outstanding: 'history-badge-outstanding',
-            exceeds:     'history-badge-exceeds',
-            meets:       'history-badge-meets',
-            needs:       'history-badge-needs',
-        };
-        return `<span class="badge px-2 py-1 ${map[cls]}" style="font-size:.72rem;">${escHtml(label || s.toFixed(2))}</span>`;
-    }
-    function escHtml(s) {
-        if (!s) return '—';
-        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-    }
-    function fmtDate(d) {
-        if (!d) return '—';
-        try { return new Date(d).toLocaleDateString('en-PH', {year:'numeric',month:'short',day:'numeric'}); } catch(e){return d;}
-    }
-    function fmtPeriod(start, end) {
-        if (!start && !end) return '—';
-        if (!start) return fmtDate(end);
-        try {
-            const s = new Date(start).toLocaleDateString('en-PH', {month:'short', year:'numeric'});
-            const e = new Date(end).toLocaleDateString('en-PH', {month:'short', year:'numeric'});
-            return `${s} – ${e}`;
-        } catch(ex) { return end || start; }
-    }
-
-    // ── Fetch ──────────────────────────────────────────────────────────────
-    fetch(`${BASE}/employee/ajax/get-my-performance.php`)
-        .then(r => r.json())
-        .then(data => {
-            document.getElementById('perfLoadingState').style.display = 'none';
-
-            if (!data.success || data.total_count === 0) {
-                document.getElementById('perfEmptyState').style.display = 'block';
-                return;
-            }
-
-            document.getElementById('perfContent').style.display = 'block';
-
-            // ── Hero pills ───────────────────────────────────────────────
-            document.getElementById('hero-avg-score').textContent = data.avg_score
-                ? data.avg_score.toFixed(2) : '—';
-
-            const trendMap = {
-                consistently_outstanding: { label: '⭐ Consistently Outstanding', bg: 'linear-gradient(90deg,#CBA135,#a07a1a)', color: '#fff' },
-                improving:               { label: '←‘ Improving',  bg: '#dcfce7', color: '#14532d' },
-                stable:                  { label: '←’ Stable',     bg: '#e2e3e5', color: '#41464b' },
-                declining:               { label: '←“ Declining',  bg: '#fee2e2', color: '#7f1d1d' },
-            };
-            const tr = trendMap[data.trend] || trendMap['stable'];
-            const trendPill = document.getElementById('hero-trend-badge');
-            trendPill.textContent = tr.label;
-            trendPill.style.cssText = `background:${tr.bg};color:${tr.color};padding:.3rem .75rem;border-radius:.5rem;`;
-
-            // ── Trend chart ──────────────────────────────────────────────
-            renderChart(data.chart_labels, data.chart_scores);
-
-            // Trend class badge
-            const tcb = document.getElementById('trendClassBadge');
-            tcb.textContent = tr.label;
-            tcb.style.cssText = `background:${tr.bg};color:${tr.color};`;
-
-            // ── Evaluation history table ─────────────────────────────────
-            renderHistory(data.evaluations);
-
-            // ── Career readiness ─────────────────────────────────────────
-            renderReadiness(data.readiness);
-
-            // ── Goal tracking ─────────────────────────────────────────────
-            renderGoal(data.avg_score, data.next_level, data.points_needed);
-
-        })
-        .catch(() => {
-            document.getElementById('perfLoadingState').style.display = 'none';
-            document.getElementById('perfEmptyState').style.display = 'block';
-        });
-
-    // ── Chart ─────────────────────────────────────────────────────────────
-    function renderChart(labels, scores) {
-        if (!labels || labels.length === 0) return;
-        const ctx = document.getElementById('perfTrendChart').getContext('2d');
-
-        // Color gradient on the line
-        const gradient = ctx.createLinearGradient(0, 0, 0, 280);
-        gradient.addColorStop(0, 'rgba(8,46,6,0.35)');
-        gradient.addColorStop(1, 'rgba(203,161,53,0.05)');
-
-        new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels,
-                datasets: [{
-                    label: 'Avg Score',
-                    data: scores,
-                    borderColor: '#082E06',
-                    backgroundColor: gradient,
-                    borderWidth: 2.5,
-                    pointBackgroundColor: scores.map(s =>
-                        s >= 3.60 ? '#28a745' : s >= 2.60 ? '#17a2b8' : s >= 2.00 ? '#ffc107' : '#dc3545'
-                    ),
-                    pointRadius: 6,
-                    pointHoverRadius: 8,
-                    tension: 0.4,
-                    fill: true,
-                    clip: false,
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                layout: {
-                    padding: { top: 14, right: 16, bottom: 6, left: 6 }
-                },
-                plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                        callbacks: {
-                            label: ctx => {
-                                const s = ctx.raw;
-                                let lvl = s >= 3.60 ? 'Outstanding'
-                                    : s >= 2.60 ? 'Exceeds Expectations'
-                                    : s >= 2.00 ? 'Meets Expectations'
-                                    : 'Needs Improvement';
-                                return ` Score: ${s.toFixed(2)} (${lvl})`;
-                            }
-                        }
-                    }
-                },
-                scales: {
-                    y: {
-                        min: 1.0, max: 4.0,
-                        ticks: { stepSize: 0.5, font: { size: 11 } },
-                        grid: { color: '#f0f0f0' },
-                    },
-                    x: { offset: true, ticks: { font: { size: 11 } }, grid: { display: false } }
-                }
-            }
-        });
-    }
-
-    // ── History table ─────────────────────────────────────────────────────
-    function renderHistory(evals) {
-        if (!evals || evals.length === 0) {
-            document.getElementById('evalHistoryContainer').innerHTML =
-                '<div class="text-muted text-center py-3 small">No approved evaluations found.</div>';
-            return;
-        }
-
-        let rows = evals.map(ev => {
-            const s = parseFloat(ev.total_score) || 0;
-            const badgeHtml = scoreBadgeHtml(s, ev.performance_level || s.toFixed(2));
-            const shortComments = ev.supervisor_comments
-                ? escHtml(ev.supervisor_comments.substring(0, 60)) + (ev.supervisor_comments.length > 60 ? '...' : '')
-                : '<span class="opacity-50">—</span>';
-            return `
-                <tr>
-                    <td class="small">${escHtml(fmtPeriod(ev.evaluation_period_start, ev.evaluation_period_end))}</td>
-                    <td class="fw-bold text-center">${s.toFixed(2)}</td>
-                    <td class="text-center">${badgeHtml}</td>
-                    <td class="text-muted small" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escHtml(ev.supervisor_comments)}">${shortComments}</td>
-                </tr>`;
-        }).join('');
-
-        let cards = evals.map(ev => {
-            const s = parseFloat(ev.total_score) || 0;
-            const badgeHtml = scoreBadgeHtml(s, ev.performance_level || s.toFixed(2));
-            const period = escHtml(fmtPeriod(ev.evaluation_period_start, ev.evaluation_period_end));
-            const approvedDate = ev.approved_date ? `<div class="eval-history-date"><i class="fas fa-check-circle me-1"></i>Approved ${escHtml(fmtDate(ev.approved_date))}</div>` : '';
-            const comments = ev.supervisor_comments ? escHtml(ev.supervisor_comments) : '<span class="opacity-50">No supervisor notes recorded.</span>';
-            return `
-                <article class="eval-history-card">
-                    <div class="eval-history-card-head">
-                        <div class="min-width-0">
-                            <div class="eval-history-period">${period}</div>
-                            ${approvedDate}
-                        </div>
-                        <div class="eval-history-score">
-                            <div class="eval-history-score-value">${s.toFixed(2)}</div>
-                            <div class="eval-history-score-label">Score</div>
-                        </div>
-                    </div>
-                    <div>${badgeHtml}</div>
-                    <div class="eval-history-notes">
-                        <div class="eval-history-notes-title">Supervisor Notes</div>
-                        <div>${comments}</div>
-                    </div>
-                </article>`;
-        }).join('');
-
-        document.getElementById('evalHistoryContainer').innerHTML = `
-            <div class="eval-history-shell">
-            <div class="eval-history-table table-responsive">
-                <table class="table table-hover align-middle mb-0" style="font-size:.85rem;">
-                    <thead class="table-light">
-                        <tr>
-                            <th>Period</th>
-                            <th class="text-center">Score</th>
-                            <th class="text-center">Level</th>
-                            <th>Supervisor Notes</th>
-                        </tr>
-                    </thead>
-                    <tbody>${rows}</tbody>
-                </table>
-            </div>
-            <div class="eval-history-mobile">${cards}</div>
-            </div>`;
-    }
-
-    // ── Readiness ─────────────────────────────────────────────────────────
-    function renderReadiness(pct) {
-        const bar   = document.getElementById('readinessBar');
-        const label = document.getElementById('readinessLabel');
-        const pctEl = document.getElementById('readinessPct');
-        const bkEl  = document.getElementById('readinessBreakdown');
-
-        pctEl.textContent = pct + '%';
-        setTimeout(() => { bar.style.width = pct + '%'; }, 100);
-
-        let lbl = 'Developing';
-        let barColor = '#E1232A';
-        if (pct >= 80)      { lbl = 'Ready for Advancement'; barColor = '#082E06'; }
-        else if (pct >= 55) { lbl = 'Approaching Readiness'; barColor = '#CBA135'; }
-        else if (pct >= 35) { lbl = 'Progressing';           barColor = '#16a34a'; }
-        label.textContent = lbl;
-        bar.style.background = barColor;
-
-        bkEl.innerHTML = `
-            <div class="d-flex justify-content-between"><span>Evaluation Score (60%)</span><span id="r-eval">—</span></div>
-            <div class="d-flex justify-content-between"><span>Years of Service (25%)</span><span id="r-svc">—</span></div>
-            <div class="d-flex justify-content-between"><span>Evaluation History (15%)</span><span id="r-hist">—</span></div>`;
-    }
-
-    // ── Goal ──────────────────────────────────────────────────────────────
-    function renderGoal(avgScore, nextLevel, pointsNeeded) {
-        const el = document.getElementById('goalTrackingContent');
-        if (!avgScore) { el.innerHTML = '<div class="text-muted small text-center py-3">No data yet.</div>'; return; }
-
-        const levels = [
-            { label: 'Needs Improvement',  min: 1.00, max: 2.00, color: '#E1232A' },
-            { label: 'Meets Expectations', min: 2.00, max: 2.60, color: '#CBA135' },
-            { label: 'Exceeds Expectations', min: 2.60, max: 3.60, color: '#16a34a' },
-            { label: 'Outstanding',        min: 3.60, max: 4.00, color: '#082E06' },
-        ];
-
-        // Full 1–4 progress bar
-        const totalRange = 3.0;
-        const pct = Math.min(((avgScore - 1.0) / totalRange) * 100, 100);
-
-        let nextMsg = '';
-        if (pointsNeeded > 0) {
-            nextMsg = `<div class="alert alert-info py-2 px-3 small mt-3 mb-0"><i class="fas fa-info-circle me-1"></i>You need <strong>+${pointsNeeded.toFixed(2)}</strong> more points to reach <strong>${escHtml(nextLevel)}</strong>.</div>`;
-        } else {
-            nextMsg = `<div class="alert alert-success py-2 px-3 small mt-3 mb-0"><i class="fas fa-star me-1"></i>You've reached the <strong>Outstanding</strong> level! Keep it up!</div>`;
-        }
-
-        const levelDots = levels.map(l => {
-            const active = avgScore >= l.min;
-            return `<div class="text-center" style="flex:1;font-size:.65rem;">
-                        <div style="width:10px;height:10px;border-radius:50%;background:${active ? l.color : '#dee2e6'};margin:0 auto 3px;"></div>
-                        <span style="color:${active ? l.color : '#aaa'};font-weight:${active?'600':'400'};">${l.label.split(' ')[0]}</span>
-                    </div>`;
-        }).join('');
-
-        el.innerHTML = `
-            <div class="mb-2">
-                <div class="d-flex justify-content-between small mb-1">
-                    <span class="text-muted">Current Avg</span>
-                    <span class="fw-bold">${avgScore.toFixed(2)}</span>
-                </div>
-                <div class="bg-light rounded-pill" style="height:10px;overflow:hidden;">
-                    <div class="goal-progress" style="width:${pct}%;background:${avgScore>=3.60?'#082E06':avgScore>=2.60?'#16a34a':avgScore>=2.00?'#CBA135':'#E1232A'};transition:width 1s ease;"></div>
-                </div>
-                <div class="d-flex mt-1" style="gap:0;">${levelDots}</div>
-            </div>
-            ${nextMsg}`;
-        // Animate
-        setTimeout(() => {
-            const bar = el.querySelector('.goal-progress');
-            if (bar) bar.style.width = pct + '%';
-        }, 200);
-    }
-
-})();
-</script>
+<script src="<?php echo BASE_URL; ?>/assets/js/employee-performance.js?v=<?php echo filemtime(__DIR__.'/../assets/js/employee-performance.js'); ?>" data-base="<?php echo e(BASE_URL); ?>"></script>
 
 <?php require_once '../includes/footer.php'; ?>
 

@@ -767,54 +767,22 @@ $hero_name = trim($emp['first_name'] . ' ' . ($emp['middle_name'] ? $emp['middle
 ?>
 
         <?php
-        // Query approved evaluations for 5-Year performance trend
-        $perf_history_q = $conn->prepare("
-            SELECT evaluation_id, total_score, performance_level, approved_date,
-                   COALESCE(approved_date, evaluation_period_end) AS display_date,
-                   YEAR(COALESCE(approved_date, evaluation_period_end)) as eval_year,
-                   evaluation_type
-            FROM evaluations
-            WHERE employee_id = ? AND status = 'Approved'
-            ORDER BY COALESCE(approved_date, evaluation_period_end) ASC
-        ");
-        $perf_history_q->bind_param("i", $eid);
-        $perf_history_q->execute();
-        $perf_history_res = $perf_history_q->get_result();
-        $perf_history_data = [];
-        $chart_labels = [];
-        $chart_scores = [];
-        while ($ph = $perf_history_res->fetch_assoc()) {
-            $perf_history_data[] = $ph;
-            $chart_labels[] = date('M Y', strtotime($ph['display_date'])) . ' (' . ($ph['evaluation_type'] ?? 'Eval') . ')';
-            $chart_scores[] = (float)$ph['total_score'];
-        }
-        $perf_history_q->close();
-
-        $avg_5yr_score = 0;
-        $classification = 'No Evaluation Record';
+        // Use the same finalized official records, chronology and change as the Employee Portal.
+        require_once __DIR__ . '/../includes/employee-performance-analysis.php';
+        $performance_history = employeePerformanceHistory($conn, (int)$eid);
+        $perf_history_data = $performance_history['evaluations'];
+        $chart_labels = array_column($perf_history_data, 'cycle_label');
+        $chart_scores = array_column($perf_history_data, 'total_score');
+        $avg_5yr_score = $perf_history_data ? round(array_sum($chart_scores) / count($chart_scores), 2) : 0;
+        $n = count($chart_scores);
+        $change = employeePerformanceChange($n ? $chart_scores[$n - 1] : null, $n > 1 ? $chart_scores[$n - 2] : null);
+        $classification = 'No Finalized Evaluation';
         $class_badge = 'bg-secondary';
-        if (!empty($perf_history_data)) {
-            $sum_scores = array_sum(array_column($perf_history_data, 'total_score'));
-            $avg_5yr_score = round($sum_scores / count($perf_history_data), 2);
-            
-            $n = count($perf_history_data);
-            $first = (float)$perf_history_data[0]['total_score'];
-            $last = (float)$perf_history_data[$n - 1]['total_score'];
-            $diff = $last - $first;
-            
-            if ($avg_5yr_score >= 3.60) {
-                $classification = 'Consistently Outstanding';
-                $class_badge = 'bg-success';
-            } elseif ($diff >= 0.30) {
-                $classification = 'Improving Performance';
-                $class_badge = 'bg-info text-dark';
-            } elseif ($diff <= -0.30) {
-                $classification = 'Declining / Needing Intervention';
-                $class_badge = 'bg-danger';
-            } else {
-                $classification = 'Stable Performance';
-                $class_badge = 'bg-primary';
-            }
+        if ($n) {
+            $classification = ['improving'=>'Improving Performance', 'declining'=>'Declining Performance',
+                'stable'=>'Unchanged Performance', 'insufficient_data'=>'One Finalized Cycle'][$change['direction']];
+            $class_badge = ['improving'=>'bg-success', 'declining'=>'bg-danger',
+                'stable'=>'bg-primary', 'insufficient_data'=>'bg-secondary'][$change['direction']];
         }
 
         // Keep the existing approved career movement lookup, now rendered in its related tab.
@@ -2155,7 +2123,7 @@ foreach ($completionSections as $k => $done) {
                 <div class="employee-section-header">
                     <div>
                         <div class="employee-section-kicker"><i class="fas fa-chart-line text-warning"></i>Performance Analytics</div>
-                        <h5 class="mb-0">5-Year Historical Performance Trend</h5>
+                        <h5 class="mb-0">Finalized Evaluation Performance Trend</h5>
                     </div>
                     <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
                         <span class="badge <?php echo $class_badge; ?> px-3 py-2" style="font-size:0.82rem;">
@@ -2170,7 +2138,7 @@ foreach ($completionSections as $k => $done) {
                 <?php if (empty($perf_history_data)): ?>
                     <div class="empty-state py-4">
                         <i class="fas fa-chart-line"></i>
-                        <p>No approved performance evaluation history recorded for this employee yet.</p>
+                        <p>No finalized performance evaluation history recorded for this employee yet.</p>
                     </div>
                 <?php else: ?>
                     <div class="row align-items-center g-3 mb-3">

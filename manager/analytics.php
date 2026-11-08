@@ -3,6 +3,9 @@ $page_title = 'Analytics';
 require_once '../includes/session-check.php';
 checkRole(['HR Manager']);
 require_once '../includes/functions.php';
+require_once '../includes/employee-performance-analysis.php';
+$finalized_eval_filter = finalizedPerformanceSql('ev');
+$finalized_eval_filter_unaliased = finalizedPerformanceSql('evaluations');
 require_once '../includes/header.php';
 
 /* ── Filters ────────────────────────────────────────────────────────────── */
@@ -19,7 +22,7 @@ $evaluation_type_filter_unaliased = $cohort === 'probationary'
     ? "evaluation_type IN ('Initial','Final')"
     : "evaluation_type IN ('Annual','Quarterly')";
 
-$where  = "WHERE ev.status = 'Approved' AND $evaluation_type_filter";
+$where  = "WHERE ev.status = 'Approved' AND $finalized_eval_filter AND $evaluation_type_filter";
 $params = [];  $types = '';
 
 if (!empty($date_from))    { $where .= " AND ev.approved_date >= ?";              $params[] = $date_from;           $types .= 's'; }
@@ -65,7 +68,7 @@ $perf_q->close();
 
 /* ── Score Trend — per-year 12-month data (built-in year filter) ────────── */
 // Discover all years that have approved evaluations
-$yr_q = $conn->query("SELECT DISTINCT YEAR(approved_date) AS yr FROM evaluations WHERE status='Approved' AND $evaluation_type_filter_unaliased ORDER BY yr DESC");
+$yr_q = $conn->query("SELECT DISTINCT YEAR(approved_date) AS yr FROM evaluations WHERE status='Approved' AND $finalized_eval_filter_unaliased AND $evaluation_type_filter_unaliased ORDER BY yr DESC");
 $available_years = [];
 while ($row = $yr_q->fetch_assoc()) $available_years[] = (int)$row['yr'];
 if (empty($available_years)) $available_years = [(int)date('Y')];
@@ -78,7 +81,7 @@ $all_years_trend = [];
 foreach ($available_years as $yr) {
     $yr_months = [];
     for ($m = 1; $m <= 12; $m++) {
-        $t_where  = "WHERE status='Approved' AND $evaluation_type_filter_unaliased AND MONTH(approved_date)=$m AND YEAR(approved_date)=$yr AND employee_id NOT IN (SELECT employee_id FROM users WHERE role = 'Admin' AND employee_id IS NOT NULL)";
+        $t_where  = "WHERE status='Approved' AND $finalized_eval_filter_unaliased AND $evaluation_type_filter_unaliased AND MONTH(approved_date)=$m AND YEAR(approved_date)=$yr AND employee_id NOT IN (SELECT employee_id FROM users WHERE role = 'Admin' AND employee_id IS NOT NULL)";
         $t_params = []; $t_types = '';
         if (!empty($filter_branch)) { $t_where .= ' AND employee_id IN (SELECT employee_id FROM employees WHERE branch_id=?)';     $t_params[] = (int)$filter_branch; $t_types .= 'i'; }
         if (!empty($filter_dept))   { $t_where .= ' AND employee_id IN (SELECT employee_id FROM employees WHERE department_id=?)'; $t_params[] = (int)$filter_dept;   $t_types .= 'i'; }
@@ -96,7 +99,7 @@ $trend_label = 'By Year';
 /* ── Branch Comparison  ──────────────────────────────────────────────────
    Always shows ALL branches; date filter respected but branch/dept filters
    are intentionally excluded so users can compare branches side-by-side.   */
-$br_where = "WHERE ev.status = 'Approved' AND $evaluation_type_filter";
+$br_where = "WHERE ev.status = 'Approved' AND $finalized_eval_filter AND $evaluation_type_filter";
 $br_params = []; $br_types = '';
 if (!empty($date_from)) { $br_where .= " AND ev.approved_date >= ?"; $br_params[] = $date_from;            $br_types .= 's'; }
 if (!empty($date_to))   { $br_where .= " AND ev.approved_date <= ?"; $br_params[] = $date_to.' 23:59:59'; $br_types .= 's'; }
@@ -491,7 +494,7 @@ $yoy_branch_q = $conn->query("
     FROM evaluations ev
     INNER JOIN employees e ON ev.employee_id = e.employee_id
     INNER JOIN branches b ON e.branch_id = b.branch_id
-    WHERE ev.status = 'Approved'
+    WHERE ev.status = 'Approved' AND $finalized_eval_filter
       AND $evaluation_type_filter
       AND ev.total_score IS NOT NULL
       AND $yoy_date_expr IS NOT NULL
@@ -510,7 +513,7 @@ $yoy_dept_q = $conn->query("
     FROM evaluations ev
     INNER JOIN employees e ON ev.employee_id = e.employee_id
     INNER JOIN departments d ON e.department_id = d.department_id
-    WHERE ev.status = 'Approved'
+    WHERE ev.status = 'Approved' AND $finalized_eval_filter
       AND $evaluation_type_filter
       AND ev.total_score IS NOT NULL
       AND $yoy_date_expr IS NOT NULL
@@ -530,7 +533,7 @@ $yoy_emp_q = $conn->query("
            ROUND(AVG(ev.total_score), 2) as avg_score
     FROM evaluations ev
     INNER JOIN employees e ON ev.employee_id = e.employee_id
-    WHERE ev.status = 'Approved'
+    WHERE ev.status = 'Approved' AND $finalized_eval_filter
       AND $evaluation_type_filter
       AND ev.total_score IS NOT NULL
       AND $yoy_date_expr IS NOT NULL
