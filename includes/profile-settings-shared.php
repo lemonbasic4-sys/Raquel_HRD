@@ -10,6 +10,17 @@ require_once __DIR__ . '/functions.php';
 $user_id = $_SESSION['user_id'];
 $success_msg = '';
 $error_msg = '';
+$sidebar_preference_portals = [
+    'Admin' => 'admin',
+    'HR Manager' => 'manager',
+    'HR Supervisor' => 'supervisor',
+    'HR Staff' => 'staff',
+];
+$is_sidebar_visibility_preferences = (($sidebar_preference_portals[$_SESSION['role'] ?? ''] ?? null) === basename(dirname($_SERVER['PHP_SELF'])));
+
+if ($is_sidebar_visibility_preferences && !ensureSidebarCollapsePreferenceSchema($conn)) {
+    $error_msg = 'Sidebar preference settings are temporarily unavailable.';
+}
 
 // Fetch current user data
 $stmt = $conn->prepare("SELECT * FROM users WHERE user_id = ?");
@@ -134,6 +145,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'update_profile') {
     $new_name = trim($_POST['full_name'] ?? '');
     $new_email = trim($_POST['email'] ?? '');
+    $sidebar_collapse_mode = isset($_POST['sidebar_fully_hidden']) ? 'hidden' : 'compact';
     
     if (empty($new_name) || empty($new_email)) {
         $error_msg = 'Full name and email are required.';
@@ -147,8 +159,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         if ($chk->get_result()->num_rows > 0) {
             $error_msg = 'This email is already in use by another account.';
         } else {
-            $upd = $conn->prepare("UPDATE users SET full_name = ?, email = ? WHERE user_id = ?");
-            $upd->bind_param("ssi", $new_name, $new_email, $user_id);
+            if ($is_sidebar_visibility_preferences) {
+                $upd = $conn->prepare("UPDATE users SET full_name = ?, email = ?, sidebar_collapse_mode = ? WHERE user_id = ?");
+                $upd->bind_param("sssi", $new_name, $new_email, $sidebar_collapse_mode, $user_id);
+                $user['sidebar_collapse_mode'] = $sidebar_collapse_mode;
+            } else {
+                $upd = $conn->prepare("UPDATE users SET full_name = ?, email = ? WHERE user_id = ?");
+                $upd->bind_param("ssi", $new_name, $new_email, $user_id);
+            }
             $upd->execute();
             $upd->close();
             
@@ -157,7 +175,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             $user['full_name'] = $new_name;
             $user['email'] = $new_email;
             
-            logAudit($conn, $user_id, 'UPDATE', 'User Profile', $user_id, 'Updated profile information');
+            $profile_audit_note = 'Updated profile information';
+            if ($is_sidebar_visibility_preferences) {
+                $profile_audit_note .= '; sidebar collapses as ' . ($sidebar_collapse_mode === 'hidden' ? 'fully hidden' : 'compact icons');
+            }
+            logAudit($conn, $user_id, 'UPDATE', 'User Profile', $user_id, $profile_audit_note);
             $success_msg = 'Profile updated successfully!';
         }
         $chk->close();
@@ -361,6 +383,26 @@ require_once __DIR__ . '/header.php';
                                         value="<?php echo e($user['role']); ?>" disabled>
                                     <small class="text-muted">Role is assigned by administrator.</small>
                                 </div>
+                                <?php if ($is_sidebar_visibility_preferences): ?>
+                                    <div class="col-12">
+                                        <div class="sidebar-visibility-setting">
+                                            <div class="d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-3">
+                                                <div>
+                                                    <div class="fw-bold"><i class="fas fa-columns me-2 text-success"></i>Sidebar visibility when collapsed</div>
+                                                    <p class="small text-muted mb-0">Choose whether the desktop sidebar disappears completely or remains available as navigation icons.</p>
+                                                </div>
+                                                <div class="form-check form-switch mb-0">
+                                                    <input class="form-check-input" type="checkbox" role="switch" id="sidebarCollapseMode" name="sidebar_fully_hidden" value="1" <?php echo (($user['sidebar_collapse_mode'] ?? 'hidden') === 'hidden') ? 'checked' : ''; ?>>
+                                                    <label class="form-check-label fw-semibold" for="sidebarCollapseMode">Fully hidden</label>
+                                                </div>
+                                            </div>
+                                            <div class="sidebar-visibility-options mt-3">
+                                                <div class="sidebar-visibility-option" data-mode="hidden"><i class="fas fa-expand-arrows-alt"></i><span><strong>Fully hidden</strong><small>0% sidebar visibility and more workspace.</small></span></div>
+                                                <div class="sidebar-visibility-option" data-mode="compact"><i class="fas fa-grip-lines-vertical"></i><span><strong>Compact</strong><small>Keep navigation icons visible for quick access.</small></span></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                <?php endif; ?>
                             </div>
                             <div class="mt-4 pt-3 border-top">
                                 <button type="submit" class="btn btn-primary px-4">
@@ -490,6 +532,24 @@ require_once __DIR__ . '/header.php';
         </div>
     </div>
 </div>
+
+<?php if ($is_sidebar_visibility_preferences): ?>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var toggle = document.getElementById('sidebarCollapseMode');
+    if (!toggle) return;
+    var syncSidebarMode = function () {
+        var mode = toggle.checked ? 'hidden' : 'compact';
+        toggle.nextElementSibling.textContent = mode === 'hidden' ? 'Fully hidden' : 'Compact icons';
+        document.querySelectorAll('.sidebar-visibility-option').forEach(function (option) {
+            option.classList.toggle('is-selected', option.dataset.mode === mode);
+        });
+    };
+    toggle.addEventListener('change', syncSidebarMode);
+    syncSidebarMode();
+});
+</script>
+<?php endif; ?>
 
 <!-- Photo Upload Modal -->
 <div class="modal fade" id="photoModal" tabindex="-1">

@@ -16,6 +16,19 @@ require_once '../includes/functions.php';
 
 $user_id = (int)$_SESSION['user_id'];
 $success = '';
+$sidebar_success = '';
+
+if (!ensureSidebarCollapsePreferenceSchema($conn)) {
+    http_response_code(500);
+    exit('Sidebar preference settings are unavailable.');
+}
+
+$sidebar_mode_stmt = $conn->prepare('SELECT sidebar_collapse_mode FROM users WHERE user_id = ? LIMIT 1');
+$sidebar_mode_stmt->bind_param('i', $user_id);
+$sidebar_mode_stmt->execute();
+$sidebar_mode_row = $sidebar_mode_stmt->get_result()->fetch_assoc();
+$sidebar_mode_stmt->close();
+$sidebar_collapse_mode = (($sidebar_mode_row['sidebar_collapse_mode'] ?? '') === 'compact') ? 'compact' : 'hidden';
 
 // Per-field validation errors
 $field_errors = [
@@ -26,7 +39,21 @@ $field_errors = [
 // General (non-field-specific) error
 $general_error = '';
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'update_sidebar_visibility') {
+    verifyCsrfToken();
+    $sidebar_collapse_mode = isset($_POST['sidebar_fully_hidden']) ? 'hidden' : 'compact';
+    $sidebar_mode_update = $conn->prepare('UPDATE users SET sidebar_collapse_mode = ? WHERE user_id = ?');
+    $sidebar_mode_update->bind_param('si', $sidebar_collapse_mode, $user_id);
+    if ($sidebar_mode_update->execute()) {
+        logAudit($conn, $user_id, 'UPDATE', 'User Profile', $user_id, 'Employee set sidebar collapse to ' . ($sidebar_collapse_mode === 'hidden' ? 'fully hidden' : 'compact icons'));
+        $sidebar_success = 'Sidebar preference saved successfully!';
+    } else {
+        $general_error = 'Failed to save the sidebar preference. Please try again.';
+    }
+    $sidebar_mode_update->close();
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') !== 'update_sidebar_visibility') {
     $current  = $_POST['current_password']  ?? '';
     $new      = $_POST['new_password']      ?? '';
     $confirm  = $_POST['confirm_password']  ?? '';
@@ -243,6 +270,31 @@ require_once '../includes/header.php';
                     <small class="form-helper">Contact HR to update your username or account details.</small>
                 </div>
 
+                <div class="mt-4 pt-3 border-top">
+                    <form method="POST" aria-label="Sidebar visibility preference">
+                        <?php echo csrfField(); ?>
+                        <input type="hidden" name="action" value="update_sidebar_visibility">
+                        <div class="sidebar-visibility-setting">
+                            <div class="d-flex flex-column gap-2">
+                                <div class="fw-bold"><i class="fas fa-columns me-2 text-success"></i>Sidebar visibility when collapsed</div>
+                                <p class="small text-muted mb-1">On desktop, choose whether the sidebar fully hides or stays as quick-access icons.</p>
+                                <div class="form-check form-switch mb-1">
+                                    <input class="form-check-input" type="checkbox" role="switch" id="sidebarCollapseMode" name="sidebar_fully_hidden" value="1" <?php echo $sidebar_collapse_mode === 'hidden' ? 'checked' : ''; ?>>
+                                    <label class="form-check-label fw-semibold" for="sidebarCollapseMode">Fully hidden</label>
+                                </div>
+                                <div class="sidebar-visibility-options">
+                                    <div class="sidebar-visibility-option" data-mode="hidden"><i class="fas fa-expand-arrows-alt"></i><span><strong>Fully hidden</strong><small>Use the full workspace when collapsed.</small></span></div>
+                                    <div class="sidebar-visibility-option" data-mode="compact"><i class="fas fa-grip-lines-vertical"></i><span><strong>Compact</strong><small>Keep navigation icons available.</small></span></div>
+                                </div>
+                                <button type="submit" class="btn btn-outline-success btn-sm align-self-start mt-2"><i class="fas fa-save me-1"></i>Save sidebar preference</button>
+                            </div>
+                            <?php if ($sidebar_success): ?>
+                                <div class="alert alert-success border-0 py-2 px-3 small mb-0 mt-3"><i class="fas fa-check-circle me-1"></i><?php echo e($sidebar_success); ?></div>
+                            <?php endif; ?>
+                        </div>
+                    </form>
+                </div>
+
             </div>
         </div>
     </div>
@@ -381,5 +433,21 @@ require_once '../includes/header.php';
     </div>
 
 </div><!-- /.row -->
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var toggle = document.getElementById('sidebarCollapseMode');
+    if (!toggle) return;
+    var syncSidebarMode = function () {
+        var mode = toggle.checked ? 'hidden' : 'compact';
+        toggle.nextElementSibling.textContent = mode === 'hidden' ? 'Fully hidden' : 'Compact icons';
+        document.querySelectorAll('.sidebar-visibility-option').forEach(function (option) {
+            option.classList.toggle('is-selected', option.dataset.mode === mode);
+        });
+    };
+    toggle.addEventListener('change', syncSidebarMode);
+    syncSidebarMode();
+});
+</script>
 
 <?php require_once '../includes/footer.php'; ?>

@@ -30,6 +30,26 @@ if ($current_dir === 'employee' && $effective_role === 'President and CEO') {
     $effective_role = 'Employee';
 }
 
+// Sidebar collapse visibility is a saved preference for HRIS and Admin users.
+$sidebar_preference_portals = [
+    'Admin' => 'admin',
+    'HR Manager' => 'manager',
+    'HR Supervisor' => 'supervisor',
+    'HR Staff' => 'staff',
+    'Employee' => 'employee',
+];
+$sidebar_collapse_mode = 'hidden';
+if (($sidebar_preference_portals[$effective_role] ?? null) === $current_dir && ensureSidebarCollapsePreferenceSchema($conn)) {
+    $sidebar_pref_stmt = $conn->prepare('SELECT sidebar_collapse_mode FROM users WHERE user_id = ? LIMIT 1');
+    $sidebar_pref_stmt->bind_param('i', $_SESSION['user_id']);
+    $sidebar_pref_stmt->execute();
+    $sidebar_pref = $sidebar_pref_stmt->get_result()->fetch_assoc();
+    $sidebar_pref_stmt->close();
+    if (($sidebar_pref['sidebar_collapse_mode'] ?? '') === 'compact') {
+        $sidebar_collapse_mode = 'compact';
+    }
+}
+
 // Notifications are strictly account-based but now isolated by portal context.
 $notif_context = ($current_dir === 'employee') ? 'employee' : 'hr';
 if ($effective_role === 'HR Supervisor' && $current_dir === 'supervisor') {
@@ -591,7 +611,7 @@ if ($annual_nav_actor && $annual_nav_actor['employment_status'] === 'Regular'
     </script>
 </head>
 
-<body class="<?php echo ($current_dir === 'admin' ? 'admin-area' : '') . ($effective_role === 'Employee' ? ' role-employee' : '') . (in_array($effective_role, ['HR Manager', 'HR Supervisor', 'HR Staff'], true) ? ' hris-area' : ''); ?>">
+<body class="<?php echo ($current_dir === 'admin' ? 'admin-area' : '') . ($effective_role === 'Employee' ? ' role-employee' : '') . (in_array($effective_role, ['HR Manager', 'HR Supervisor', 'HR Staff'], true) ? ' hris-area' : '') . ((($sidebar_preference_portals[$effective_role] ?? null) === $current_dir) ? ' sidebar-mode-' . $sidebar_collapse_mode : ''); ?>">
 
         <!-- __ Connection Status Toast ______________________________________________
          Modern toast-style offline/reconnect indicator (bottom-right).

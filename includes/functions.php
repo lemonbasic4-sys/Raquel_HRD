@@ -831,6 +831,34 @@ function ensureUserAccountSecuritySchema($conn): bool
     return true;
 }
 
+/**
+ * Store each HRIS user's preferred desktop sidebar collapse presentation.
+ */
+function ensureSidebarCollapsePreferenceSchema($conn): bool
+{
+    static $ensured = false;
+    if ($ensured) {
+        return true;
+    }
+
+    $result = $conn->query("SHOW COLUMNS FROM users LIKE 'sidebar_collapse_mode'");
+    if (!$result) {
+        error_log('Unable to inspect sidebar preference column: ' . $conn->error);
+        return false;
+    }
+
+    if ($result->num_rows === 0) {
+        $sql = "ALTER TABLE users ADD COLUMN sidebar_collapse_mode ENUM('hidden', 'compact') NOT NULL DEFAULT 'hidden' AFTER must_change_password";
+        if (!$conn->query($sql)) {
+            error_log('Unable to add users.sidebar_collapse_mode: ' . $conn->error);
+            return false;
+        }
+    }
+
+    $ensured = true;
+    return true;
+}
+
 
 
 /**

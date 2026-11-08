@@ -6973,6 +6973,98 @@ body.has-wizard-footer {
         margin-left: 0 !important;
         width: 100% !important;
     }
+
+    /* Fully hidden is also available to Admin; HRIS already uses these values. */
+    html.sidebar-collapsed body.sidebar-mode-hidden .sidebar {
+        width: var(--sidebar-width) !important;
+        transform: translateX(-100%);
+        visibility: hidden;
+        pointer-events: none;
+    }
+
+    html.sidebar-collapsed body.sidebar-mode-hidden .top-navbar {
+        left: 0 !important;
+        width: 100% !important;
+    }
+
+    html.sidebar-collapsed body.sidebar-mode-hidden .main-content {
+        margin-left: 0 !important;
+        width: 100% !important;
+    }
+
+    /* Saved preference: keep compact navigation icons instead of fully hiding the sidebar. */
+    body.sidebar-mode-compact .sidebar {
+        transition: width .45s ease, transform .45s ease, visibility 0s;
+    }
+
+    body.sidebar-mode-compact .top-navbar {
+        transition: left .45s ease, width .45s ease;
+    }
+
+    body.sidebar-mode-compact .main-content {
+        transition: margin-left .45s ease, width .45s ease;
+    }
+
+    html.sidebar-collapsed body.sidebar-mode-compact .sidebar {
+        width: var(--sidebar-collapsed-width) !important;
+        transform: translateX(0);
+        visibility: visible;
+        pointer-events: auto;
+        transition: width .45s ease, transform .45s ease, visibility 0s;
+    }
+
+    html.sidebar-collapsed body.sidebar-mode-compact .top-navbar {
+        left: var(--sidebar-collapsed-width) !important;
+        width: calc(100% - var(--sidebar-collapsed-width)) !important;
+    }
+
+    html.sidebar-collapsed body.sidebar-mode-compact .main-content {
+        margin-left: var(--sidebar-collapsed-width) !important;
+        width: calc(100% - var(--sidebar-collapsed-width)) !important;
+    }
+}
+
+/* Profile Settings: desktop sidebar preference */
+.sidebar-visibility-setting {
+    border: 1px solid #dbe6d8;
+    border-radius: 14px;
+    background: #f8fbf7;
+    padding: 1rem;
+}
+
+.sidebar-visibility-setting .form-switch .form-check-input {
+    cursor: pointer;
+    height: 1.35rem;
+    width: 2.55rem;
+}
+
+.sidebar-visibility-options {
+    display: grid;
+    gap: .65rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.sidebar-visibility-option {
+    align-items: center;
+    background: #fff;
+    border: 1px solid #dfe8dc;
+    border-radius: 10px;
+    color: #536153;
+    display: flex;
+    gap: .7rem;
+    padding: .75rem;
+    transition: border-color .2s ease, box-shadow .2s ease, background .2s ease;
+}
+
+.sidebar-visibility-option i { color: #6d7f6a; font-size: 1.05rem; }
+.sidebar-visibility-option strong,
+.sidebar-visibility-option small { display: block; }
+.sidebar-visibility-option small { color: #748074; font-size: .76rem; line-height: 1.35; margin-top: .12rem; }
+.sidebar-visibility-option.is-selected { background: #edf8ef; border-color: #1a8f53; box-shadow: 0 0 0 2px rgba(26, 143, 83, .1); color: #154e2c; }
+.sidebar-visibility-option.is-selected i { color: #198754; }
+
+@media (max-width: 575.98px) {
+    .sidebar-visibility-options { grid-template-columns: 1fr; }
 }
 
 /* ── 8. LAPTOPS & SMALL MONITORS (992px – 1366.98px) ───────────────── */
