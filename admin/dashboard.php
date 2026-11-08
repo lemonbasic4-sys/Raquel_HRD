@@ -147,16 +147,23 @@ $held_accounts = $conn->query("
 $auto_backup_enabled = (int) getSetting($conn, 'auto_backup_enabled', '0');
 $auto_backup_last_run = getSetting($conn, 'auto_backup_last_run', '');
 $auto_backup_next_run = getSetting($conn, 'auto_backup_next_run', '');
+$auto_backup_next_run_at = $auto_backup_next_run ? strtotime($auto_backup_next_run) : false;
+$auto_backup_has_future_run = $auto_backup_next_run_at && $auto_backup_next_run_at >= time();
 $backup_attention = !$auto_backup_enabled
-    || empty($auto_backup_last_run)
-    || (!empty($auto_backup_next_run) && strtotime($auto_backup_next_run) < time());
+    || !$auto_backup_next_run_at
+    || $auto_backup_next_run_at < time();
 if (!$auto_backup_enabled) {
     $backup_status_title = 'Automatic backup disabled';
     $backup_status_detail = 'Enable a schedule to protect system records.';
 } elseif (empty($auto_backup_last_run)) {
-    $backup_status_title = 'No automatic backup yet';
-    $backup_status_detail = 'Review the schedule or create a backup now.';
-} elseif (!empty($auto_backup_next_run) && strtotime($auto_backup_next_run) < time()) {
+    if ($auto_backup_has_future_run) {
+        $backup_status_title = 'Automatic backup scheduled';
+        $backup_status_detail = 'First run ' . date('M j, Y g:i A', $auto_backup_next_run_at) . '.';
+    } else {
+        $backup_status_title = 'Automatic backup needs a schedule';
+        $backup_status_detail = 'Choose a future backup time in Backup & Recovery.';
+    }
+} elseif ($auto_backup_next_run_at < time()) {
     $backup_status_title = 'Scheduled backup overdue';
     $backup_status_detail = 'The scheduled run time has passed.';
 } else {
