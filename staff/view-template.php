@@ -44,7 +44,8 @@ if (!$template) {
 }
 $hris_template_role = (string)($viewer_context['role'] ?? '');
 if ((!empty($viewer_context['is_ceo']) || in_array($hris_template_role, ['HR Manager', 'HR Supervisor'], true))
-    && (int)($template['created_by'] ?? 0) !== (int)($_SESSION['user_id'] ?? 0)) {
+    && (int)($template['created_by'] ?? 0) !== (int)($_SESSION['user_id'] ?? 0)
+    && !canManageEvaluationTemplate($conn, $tid, (int)($_SESSION['user_id'] ?? 0))) {
     $library_url = !empty($viewer_context['is_ceo'])
         ? BASE_URL . '/employee/evaluation-templates.php'
         : ((($viewer_context['role'] ?? '') === 'HR Supervisor')

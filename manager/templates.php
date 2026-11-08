@@ -541,6 +541,16 @@ $used_template_count = (int) $conn->query("SELECT COUNT(DISTINCT ev.template_id)
                     </div>
                     <div class="card-footer bg-transparent border-top p-3">
                         <div class="d-flex gap-2 flex-wrap template-list-card-actions">
+                            <?php
+                            $view_template_path = (!empty($creator_context['is_ceo']) || $is_employee_template_portal)
+                                ? '/employee/view-evaluation-template.php?id='
+                                : (($creator_context['role'] ?? '') === 'HR Staff'
+                                    ? '/staff/view-template.php?id='
+                                    : '/manager/view-template.php?id=');
+                            ?>
+                            <a href="<?php echo BASE_URL . $view_template_path . (int)$t['template_id']; ?>" class="btn btn-sm btn-outline-primary flex-fill" title="View template (read only)">
+                                <i class="fas fa-eye me-1"></i>View
+                            </a>
                             <?php if ($is_template_manager): ?>
                             <a href="<?php echo ((!empty($creator_context['is_ceo']) || $is_employee_template_portal) ? BASE_URL . '/employee/edit-evaluation-template.php?id=' : BASE_URL . '/manager/edit-template.php?id=') . (int)$t['template_id']; ?>" class="btn btn-sm btn-outline-primary flex-fill">
                                 <i class="fas fa-edit me-1"></i>Edit
@@ -557,16 +567,6 @@ $used_template_count = (int) $conn->query("SELECT COUNT(DISTINCT ev.template_id)
                                 <i class="fas fa-trash-alt"></i>
                             </button>
                             <?php else: ?>
-                            <?php
-                            $view_template_path = (!empty($creator_context['is_ceo']) || $is_employee_template_portal)
-                                ? '/employee/view-evaluation-template.php?id='
-                                : (($creator_context['role'] ?? '') === 'HR Staff'
-                                    ? '/staff/view-template.php?id='
-                                    : '/manager/view-template.php?id=');
-                            ?>
-                            <a href="<?php echo BASE_URL . $view_template_path . (int)$t['template_id']; ?>" class="btn btn-sm btn-outline-primary flex-fill">
-                                <i class="fas fa-eye me-1"></i>View
-                            </a>
                             <span class="badge bg-light text-muted border align-self-center"><i class="fas fa-lock me-1"></i>Read only</span>
                             <?php endif; ?>
                         </div>
