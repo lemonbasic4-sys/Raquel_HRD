@@ -48,6 +48,16 @@ if ($employee_id > 0) {
 $history_ongoing = count(array_filter($evaluations, static function (array $evaluation): bool {
     return !in_array($evaluation['status'] ?? '', ['Approved', 'Imported', 'Rejected'], true);
 }));
+$evaluation_types = ['Initial', 'Final', 'Quarterly', 'Annual'];
+$selected_type = (string) ($_GET['type'] ?? 'All');
+if ($selected_type !== 'All' && !in_array($selected_type, $evaluation_types, true)) {
+    $selected_type = 'All';
+}
+$filtered_evaluations = $selected_type === 'All'
+    ? $evaluations
+    : array_values(array_filter($evaluations, static function (array $evaluation) use ($selected_type): bool {
+        return ($evaluation['evaluation_type'] ?? '') === $selected_type;
+    }));
 
 require_once '../includes/header.php';
 ?>
@@ -237,24 +247,35 @@ require_once '../includes/header.php';
         </a>
     </div>
 
-    <?php if (!$evaluations): ?>
+    <form method="get" action="evaluation-history.php" class="d-flex flex-wrap align-items-center gap-2 mt-3 mb-3">
+        <label for="evaluation-type-filter" class="fw-semibold mb-0">Evaluation type</label>
+        <select id="evaluation-type-filter" name="type" class="form-select form-select-sm" style="width: auto; min-width: 170px;" onchange="this.form.submit()">
+            <option value="All" <?php echo $selected_type === 'All' ? 'selected' : ''; ?>>All types</option>
+            <?php foreach ($evaluation_types as $type): ?>
+                <option value="<?php echo e($type); ?>" <?php echo $selected_type === $type ? 'selected' : ''; ?>><?php echo e($type); ?></option>
+            <?php endforeach; ?>
+        </select>
+        <button type="submit" class="btn btn-primary btn-sm">Apply filter</button>
+    </form>
+
+    <?php if (!$filtered_evaluations): ?>
         <section class="package-empty">
             <i class="fas fa-history fa-3x text-muted mb-3" style="opacity:0.4;"></i>
             <h2 class="h5 fw-bold">No evaluation history found</h2>
-            <p class="mb-0 text-muted">Your submitted evaluations and audit logs will appear here.</p>
+            <p class="mb-0 text-muted"><?php echo $evaluations ? 'No ' . e($selected_type) . ' evaluations found. Choose another type or All types.' : 'Your submitted evaluations and audit logs will appear here.'; ?></p>
         </section>
     <?php else: ?>
         <section class="package-card" role="region" aria-label="Evaluation History Audit List">
             <header class="package-card__header">
                 <h2 class="h5 mb-0 fw-bold">
                     <i class="fas fa-list-alt me-2"></i>Submitted Evaluation Cycles
-                    <span class="badge bg-secondary ms-2" style="font-size:.75rem;"><?php echo count($evaluations); ?></span>
+                    <span class="badge bg-secondary ms-2" style="font-size:.75rem;"><?php echo count($filtered_evaluations); ?></span>
                 </h2>
                 <div class="small text-muted">Original self-ratings and officer adjustments are tracked for every cycle.</div>
             </header>
             <div class="package-card__body">
                 <div class="eh-list">
-                    <?php foreach ($evaluations as $ev): ?>
+                    <?php foreach ($filtered_evaluations as $ev): ?>
                     <?php
                         $annualHistoryMember=$ev['evaluation_type']==='Annual' && annualUsesPeerWorkflow($conn,(int)$ev['evaluation_id']) ? annualMember($conn,(int)$ev['evaluation_id']) : null;
                         $annualHistoryComplete=$annualHistoryMember && count(annualPeers($conn,$annualHistoryMember))>=annualExpectedPeers($conn,(int)$annualHistoryMember['cycle_id'],$employee_id);
