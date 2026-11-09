@@ -513,7 +513,7 @@ ksort($existing_templates);
 <!-- Evaluation type tabs -->
 <div class="history-review-tabs fadeup fadeup-1" role="tablist" aria-label="Evaluation type">
     <button class="history-review-tab probationary active" type="button" role="tab" aria-selected="true" onclick="histSetType('probationary', this)"><i class="fas fa-users"></i><span><strong>Probationary Evaluation</strong><small class="d-block text-muted fw-normal">Initial and Final evaluations</small></span><span class="tab-count" id="histProbationaryCount">0</span></button>
-    <button class="history-review-tab regular" type="button" role="tab" aria-selected="false" onclick="histSetType('regular', this)"><i class="fas fa-user"></i><span><strong>Regular Employee</strong><small class="d-block text-muted fw-normal">Annual team evaluations</small></span><span class="tab-count" id="histRegularCount">0</span></button>
+    <button class="history-review-tab regular" type="button" role="tab" aria-selected="false" onclick="histSetType('regular', this)"><i class="fas fa-user"></i><span><strong>Regular Employee</strong><small class="d-block text-muted fw-normal">Quarterly and Annual team evaluations</small></span><span class="tab-count" id="histRegularCount">0</span></button>
 </div>
 <section class="history-section-heading"><h5 class="fw-bold mb-1" id="historyTypeHeading">Probationary Evaluation</h5><div class="history-period" id="historyTypePeriod">Initial and Final employee evaluations</div></section>
 
@@ -688,7 +688,7 @@ function histSetType(type, btn) {
         tab.setAttribute('aria-selected', active ? 'true' : 'false');
     });
     document.getElementById('historyTypeHeading').textContent = type === 'probationary' ? 'Probationary Evaluation' : 'Regular Employee';
-    document.getElementById('historyTypePeriod').textContent = type === 'probationary' ? 'Initial and Final employee evaluations' : 'Annual team evaluations';
+    document.getElementById('historyTypePeriod').textContent = type === 'probationary' ? 'Initial and Final employee evaluations' : 'Quarterly and Annual team evaluations';
     histActiveStatus = 'All';
     document.querySelectorAll('.hist-status-pill').forEach(p => p.className = 'hist-status-pill');
     document.querySelector('.hist-status-pill')?.classList.add('active-all');
