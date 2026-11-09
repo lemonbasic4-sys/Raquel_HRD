@@ -160,7 +160,7 @@ if ($cycle && !empty($cycle['completed_at']) && $view==='rate') {
     header('Location: '.quarterlyUrl($actor,'?view='.($canFinalize ? 'head-review' : 'review').'&evaluation_id='.$evaluationId)); exit;
 }
 $memberReviewerSql = hrEvaluationReviewerSql('m', (string)(int)($cycle['department_id'] ?? 0));
-$members=$cycle ? quarterlyQuery($conn,"SELECT m.*, $memberReviewerSql AS reviewer_position_id, e.first_name,e.last_name,ev.total_score,
+$members=$cycle ? quarterlyQuery($conn,"SELECT m.*, $memberReviewerSql AS reviewer_position_id, e.first_name,e.last_name,ev.total_score,ev.status AS evaluation_status,
         (SELECT COUNT(*) FROM quarterly_peer_submissions s JOIN employees rater ON rater.employee_id=s.rater_employee_id WHERE s.cycle_id=m.cycle_id AND s.target_employee_id=m.employee_id AND rater.department_id=e.department_id) AS received,
         (SELECT COUNT(*) FROM quarterly_peer_submissions s WHERE s.cycle_id=m.cycle_id AND s.target_employee_id=m.employee_id AND s.rater_employee_id=?) AS rated
     FROM quarterly_evaluation_members m JOIN employees e ON e.employee_id=m.employee_id
@@ -169,6 +169,15 @@ $members=$cycle ? quarterlyQuery($conn,"SELECT m.*, $memberReviewerSql AS review
     ORDER BY COALESCE(jt.rank_category_id,999),m.position_id,e.last_name,e.first_name",
     [(int)$actor['employee_id'],$cycleId]) : [];
 $own=array_values(array_filter($members,static fn($m)=>(int)$m['employee_id']===(int)$actor['employee_id']));
+$departmentCompletedScores=[];
+foreach ($members as $scoreMember) {
+    if ((int)$scoreMember['current_version']<1 || !empty($scoreMember['revision_pending'])
+        || ($scoreMember['evaluation_status'] ?? '')!=='Approved' || $scoreMember['total_score']===null) continue;
+    if ((int)$scoreMember['received']<quarterlyExpectedPeers($conn,$cycleId,(int)$scoreMember['employee_id'])) continue;
+    $departmentCompletedScores[]=(float)$scoreMember['total_score'];
+}
+$departmentOverallScore=$departmentCompletedScores
+    ? round(array_sum($departmentCompletedScores)/count($departmentCompletedScores),2) : null;
 if ($cycle && (int)$actor['department_id']!==(int)$cycle['department_id']) {
     foreach ($members as &$executiveMember) {
         $executiveMember['rated']=(bool)quarterlyQuery($conn,'SELECT 1 FROM quarterly_kra_approvals WHERE member_id=? AND approved_by=? LIMIT 1',[(int)$executiveMember['member_id'],(int)$actor['user_id']]);
@@ -278,6 +287,10 @@ require_once __DIR__ . '/header.php';
             <header class="quarterly-section-heading <?php echo $view==='peers' ? 'quarterly-peer-heading' : ''; ?>"><div><h2 class="h5 mb-1"><?php echo $historyView ? 'Quarterly Evaluation History' : ($view==='peers' ? '360 Rating — Department Peers' : 'Quarterly Evaluation Progress'); ?><?php if ($view==='peers' && !$historyView): ?> <button type="button" class="quarterly-peer-help" data-bs-toggle="tooltip" data-bs-placement="bottom" data-bs-container="body" title="Rate coworkers on Core Behaviors &amp; Values. For your direct reports, review KRA and submit your Core Values rating on the same screen. Your self-rating is included once. Confirmed peer ratings are locked." aria-label="Department peer rating instructions"><i class="fas fa-info-circle" aria-hidden="true"></i></button><?php endif; ?></h2><p class="text-muted small mb-0"><?php echo $historyView ? 'Completed department evaluations and their approved results. View only.' : ($view==='peers' ? 'Rate your coworkers on the eight Core Behaviors & Values items.' : 'Review submitted self-ratings, department 360 participation, and quarterly results.'); ?></p></div>
                 <?php if ($view==='peers'): ?>
                 <div class="quarterly-peer-size">
+                    <div class="package-stat" aria-label="Department overall score: <?php echo $departmentOverallScore===null ? 'not available' : number_format($departmentOverallScore,2).' out of 4'; ?>, based on <?php echo count($departmentCompletedScores); ?> of <?php echo count($members); ?> complete employee scores">
+                        <div class="package-stat-icon" style="background:rgba(8,46,6,.08);color:var(--rp-forest-green,#082e06);"><i class="fas fa-chart-line" aria-hidden="true"></i></div>
+                        <div class="package-stat-content"><strong><?php echo $departmentOverallScore===null ? '—' : number_format($departmentOverallScore,2).' / 4.00'; ?></strong><span>Department overall score</span><small><?php echo count($departmentCompletedScores); ?> of <?php echo count($members); ?> complete</small></div>
+                    </div>
                     <div class="package-stat" aria-label="Department size: <?php echo count($members); ?> employees in this Quarterly cycle">
                         <div class="package-stat-icon" style="background:rgba(8,46,6,.08);color:var(--rp-forest-green,#082e06);"><i class="fas fa-users" aria-hidden="true"></i></div>
                         <div class="package-stat-content"><strong><?php echo count($members); ?> <?php echo count($members)===1 ? 'Employee' : 'Employees'; ?></strong><span>Department size</span></div>
