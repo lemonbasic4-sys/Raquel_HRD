@@ -115,6 +115,11 @@ if ($_SERVER['REQUEST_METHOD']==='GET' && $member && $canFinalize && $view==='re
     }
 }
 $executiveKraOnly=$member && $canFinalize && (int)$actor['department_id']!==(int)$member['department_id'];
+if ($_SERVER['REQUEST_METHOD']==='GET' && $member && $executiveKraOnly && $view==='review'
+    && (!(int)$member['current_version'] || !empty($member['revision_pending']))) {
+    header('Location: '.quarterlyUrl($actor,'?view=rate&evaluation_id='.$evaluationId));
+    exit;
+}
 $headReviewSubmission=null;
 $headReviewKra=[];
 if ($view==='head-review') {
@@ -299,10 +304,6 @@ require_once __DIR__ . '/header.php';
                 <?php endif; ?>
             </header>
             <?php if ($view==='peers' && !$historyView && $cycle && quarterlyCanOwnCycle($conn,$actor,(int)$cycle['department_id']) && empty($cycle['completed_at']) && !empty($cycle['ready_for_approval_at'])): ?>
-                <div class="alert alert-success d-flex flex-wrap align-items-center justify-content-between gap-3 mt-3" role="status" data-persistent-alert>
-                    <div><strong>Ready for <?php echo e(quarterlyCycleOwnerName($conn,(int)$cycle['department_id'])); ?> approval</strong><div>All quarterly requirements are complete. The cycle will move to history after approval.</div></div>
-                    <div class="d-flex flex-wrap gap-2"><button class="btn btn-success" type="button" data-bs-toggle="modal" data-bs-target="#quarterlyApproveCycleModal"><i class="fas fa-check-circle me-2" aria-hidden="true"></i>Approve cycle</button><button class="btn btn-danger quarterly-cycle-reject" type="button" data-bs-toggle="modal" data-bs-target="#quarterlyRejectCycleModal"><i class="fas fa-rotate-left me-2" aria-hidden="true"></i>Reject &amp; restart</button></div>
-                </div>
             <?php endif; ?>
             <div class="row g-2 mb-3"><div class="col-md-7"><label for="quarterlySearch" class="form-label">Find employee</label><input id="quarterlySearch" class="form-control" type="search" placeholder="Employee name or position"></div>
                 <div class="col-md-5"><label for="quarterlyStatus" class="form-label">Status</label><select id="quarterlyStatus" class="form-select"><option value="">All</option><option value="submitted">Self-rating submitted</option><option value="pending">For consolidation</option><option value="finalized">Finalized</option><option value="revision">Revision pending</option></select></div></div>
@@ -359,7 +360,7 @@ require_once __DIR__ . '/header.php';
                             <button class="btn btn-sm btn-outline-secondary" type="button" disabled aria-disabled="true" title="Submit your Quarterly self-rating first to unlock peer ratings.">Self-rating required</button>
                         <?php elseif (quarterlyCanFinalize($conn,$actor,$target) && $m['rated']): ?>
                             <?php if (!empty($m['revision_pending'])): ?>
-                                <a class="btn btn-sm btn-outline-success" href="<?php echo quarterlyUrl($actor,'?view=review&evaluation_id='.(int)$m['evaluation_id']); ?>">Review revised result</a>
+                                <a class="btn btn-sm btn-outline-success" href="<?php echo quarterlyUrl($actor,'?view='.( (int)$actor['department_id']!==(int)$cycle['department_id'] ? 'rate' : 'review').'&evaluation_id='.(int)$m['evaluation_id']); ?>"><?php echo (int)$actor['department_id']!==(int)$cycle['department_id'] ? 'Review revised KRA' : 'Review revised result'; ?></a>
                             <?php else: ?>
                                 <a class="btn btn-sm btn-outline-success" href="<?php echo quarterlyUrl($actor,'?view=head-review&evaluation_id='.(int)$m['evaluation_id']); ?>">View submitted review</a>
                             <?php endif; ?>
@@ -378,7 +379,13 @@ require_once __DIR__ . '/header.php';
                     <?php endif; ?></div></td>
                 </tr>
             <?php endforeach; ?></tbody>
-        </table></div></div>
+        </table></div>
+        <?php if ($view==='peers' && !$historyView && $cycle && quarterlyCanOwnCycle($conn,$actor,(int)$cycle['department_id']) && empty($cycle['completed_at']) && !empty($cycle['ready_for_approval_at'])): ?>
+            <div class="alert alert-success d-flex flex-wrap align-items-center justify-content-between gap-3 mt-3 mb-0" role="status" data-persistent-alert>
+                <div><strong>Ready for <?php echo e(quarterlyCycleOwnerName($conn,(int)$cycle['department_id'])); ?> approval</strong><div>All quarterly requirements are complete. The cycle will move to history after approval.</div></div>
+                <div class="d-flex flex-wrap gap-2"><button class="btn btn-success" type="button" data-bs-toggle="modal" data-bs-target="#quarterlyApproveCycleModal"><i class="fas fa-check-circle me-2" aria-hidden="true"></i>Approve cycle</button><button class="btn btn-danger quarterly-cycle-reject" type="button" data-bs-toggle="modal" data-bs-target="#quarterlyRejectCycleModal"><i class="fas fa-rotate-left me-2" aria-hidden="true"></i>Reject &amp; restart</button></div>
+            </div>
+        <?php endif; ?></div>
     <?php elseif ($view==='head-review'): $headReviewScores=json_decode($headReviewSubmission['scores_json'],true) ?: []; $headReviewSelf=json_decode($member['self_values_json'] ?? '[]',true) ?: []; $headReviewScore=quarterlyCalculate($headReviewKra,$headReviewScores,[]); ?>
         <section class="content-card p-4 quarterly-head-review-view">
             <div class="quarterly-submission-heading">
@@ -645,7 +652,7 @@ require_once __DIR__ . '/header.php';
             <p><?php echo e($member['position_name'].' · '.$member['template_name'].' · '.$member['period_start'].' to '.$member['period_end']); ?></p>
             <p class="small">Finalized by the immediate-head position: <strong><?php echo e($member['reviewer_position_name'] ?? 'Not configured'); ?></strong></p>
             <?php if (!$member['reviewer_position_id']): ?><div class="alert alert-warning">Configure this position's Reports To relationship in Position Management before finalizing this evaluation.</div><?php endif; ?>
-            <?php if ($member['revision_pending']): ?><div class="alert alert-warning">Late 360 · Revision pending. The official score remains <?php echo number_format((float)$member['official_score'],2); ?> until the immediate head re-finalizes.</div><?php endif; ?>
+            <?php if ($member['revision_pending']): ?><div class="alert alert-warning">Revision pending. The official score remains <?php echo number_format((float)$member['official_score'],2); ?> until the immediate head re-finalizes.</div><?php endif; ?>
             <div class="row g-3 quarterly-summary">
                 <div class="col-sm-4"><div class="stat-card page-hero fadeup"><span>Reviewed KRA · 80%</span><strong><?php echo number_format($candidate['kra'],2); ?></strong></div></div>
                 <div class="col-sm-4"><div class="stat-card page-hero fadeup"><span>Self + peer Core Values · 20%</span><strong><?php echo number_format($candidate['core'],2); ?></strong><small><?php echo count($peers); ?> of <?php echo $expected; ?> peer ratings received</small></div></div>

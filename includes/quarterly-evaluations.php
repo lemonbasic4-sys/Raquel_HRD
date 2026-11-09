@@ -724,6 +724,7 @@ function quarterlyRegisterSubmission($conn, int $evaluationId): void
     // the original roster or its submitted evaluations.
     $member = quarterlyQuery($conn, 'SELECT * FROM quarterly_evaluation_members WHERE cycle_id=? AND employee_id=?',
         [$cycleId,(int)$ev['employee_id']])[0] ?? null;
+    $newCycleMember=false;
     if (!$member) {
         if (quarterlyUsesDepartmentCycle(['department_name'=>$departmentName])) {
             $personDate=quarterlyQuery($conn,'SELECT COALESCE(regularization_effective_date,DATE(probationary_eligible_at),hire_date) AS effective_date FROM employees WHERE employee_id=?',[(int)$ev['employee_id']])[0]['effective_date'] ?? null;
@@ -739,6 +740,7 @@ function quarterlyRegisterSubmission($conn, int $evaluationId): void
         $r=$roster[0];
         quarterlyQuery($conn, "INSERT INTO quarterly_evaluation_members (cycle_id,employee_id,position_id,reviewer_position_id,position_name)
             VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE member_id=member_id", [$cycleId,(int)$r['employee_id'],(int)$r['job_title_id'], $r['reports_to'], $r['job_title']]);
+        $newCycleMember=true;
     }
     $member = quarterlyQuery($conn, 'SELECT * FROM quarterly_evaluation_members WHERE cycle_id=? AND employee_id=?', [$cycleId,(int)$ev['employee_id']])[0] ?? null;
     if (!$member) throw new DomainException('No eligible department Quarterly template is assigned to this position.');
@@ -754,7 +756,8 @@ function quarterlyRegisterSubmission($conn, int $evaluationId): void
             if ($raterActor && quarterlyCanRate($raterActor)) createNotification($conn,(int)$user['user_id'],'Quarterly evaluation resubmitted: rate again','Earlier 360 ratings for this employee were cleared. Submit a new rating.',quarterlyUrl($raterActor,'?view=rate&evaluation_id='.$evaluationId),'evaluations',true);
         }
     }
-    $isLateParticipant=!empty($cycle['first_completed_at']) || !empty($member['is_late_participant']);
+    $isLateParticipant=empty($member['revision_pending'])
+        && (!empty($member['is_late_participant']) || ($newCycleMember && !empty($cycle['first_completed_at'])));
     quarterlyQuery($conn, 'UPDATE quarterly_evaluation_members SET evaluation_id=?,self_values_json=?,is_late_participant=? WHERE member_id=?', [$evaluationId,$values,$isLateParticipant ? 1 : 0,(int)$member['member_id']]);
     quarterlyCandidate($conn,quarterlyMember($conn,$evaluationId));
     $submittedMember=quarterlyMember($conn,$evaluationId);
@@ -778,7 +781,7 @@ function quarterlyReturnEvaluation($conn, array $actor, int $evaluationId, strin
         $member=quarterlyMember($conn,$evaluationId);
         if (!$member['self_values_json']) throw new DomainException('This evaluation is already awaiting resubmission.');
         quarterlyQuery($conn,"UPDATE evaluations SET status='Returned',supervisor_comments=? WHERE evaluation_id=?",[$reason,$evaluationId]);
-        quarterlyQuery($conn,'UPDATE quarterly_evaluation_members SET self_values_json=NULL,revision_pending=1 WHERE member_id=?',[(int)$member['member_id']]);
+        quarterlyQuery($conn,'UPDATE quarterly_evaluation_members SET self_values_json=NULL,revision_pending=1,is_late_participant=0 WHERE member_id=?',[(int)$member['member_id']]);
         quarterlyQuery($conn,'UPDATE quarterly_evaluation_cycles SET completed_at=NULL WHERE cycle_id=?',[(int)$member['cycle_id']]);
         logAudit($conn,(int)$actor['user_id'],'UPDATE','Quarterly Evaluation',$evaluationId,'Returned for self-rating revision: '.$reason);
         foreach (quarterlyQuery($conn,'SELECT user_id FROM users WHERE employee_id=? AND is_active=1',[(int)$member['employee_id']]) as $user) {
@@ -850,7 +853,7 @@ function quarterlySubmitPeers($conn, array $actor, int $evaluationId, array $sco
         $member=quarterlyMember($conn,$evaluationId);
         quarterlyAssertSnapshotActive($member);
         if (!$member['self_values_json']) throw new DomainException('Wait for the employee to resubmit their self-rating.');
-        $rater=quarterlyQuery($conn,'SELECT evaluation_id,is_late_participant FROM quarterly_evaluation_members WHERE cycle_id=? AND employee_id=?',[(int)$member['cycle_id'],(int)$actor['employee_id']])[0] ?? null;
+        $rater=quarterlyQuery($conn,'SELECT evaluation_id,is_late_participant,revision_pending FROM quarterly_evaluation_members WHERE cycle_id=? AND employee_id=?',[(int)$member['cycle_id'],(int)$actor['employee_id']])[0] ?? null;
         if (!$rater && !quarterlyCanFinalize($conn,$actor,$member)) throw new DomainException('Only assigned department participants and the immediate head may rate this employee.');
         if ((!$rater || !$rater['evaluation_id']) && !quarterlyCanRateBeforeSelf($conn,$actor,$member)) throw new DomainException('Submit your Quarterly self-rating for this department period first.');
         if (!empty($rater['evaluation_id'])) {
@@ -867,7 +870,8 @@ function quarterlySubmitPeers($conn, array $actor, int $evaluationId, array $sco
         // Resolve omitted peer ratings from the employee submission, never from browser defaults.
         $scores=quarterlyValidateScores(quarterlyResolveReviewOverrides(
             quarterlyValidateScores(json_decode($member['self_values_json'] ?? '[]',true) ?: []),$scores));
-        $late=!empty($member['is_late_participant']) || !empty($rater['is_late_participant']) ? 1 : 0;
+        $late=(!empty($member['is_late_participant']) && empty($member['revision_pending']))
+            || (!empty($rater['is_late_participant']) && empty($rater['revision_pending'])) ? 1 : 0;
         quarterlyQuery($conn,'INSERT INTO quarterly_peer_submissions (cycle_id,rater_employee_id,target_employee_id,submitted_by,scores_json,rater_signature_data,rater_signed_at,is_late) VALUES (?,?,?,?,?,?,?,?)',
             [(int)$member['cycle_id'],(int)$actor['employee_id'],(int)$member['employee_id'],(int)$actor['user_id'],json_encode($scores),$signature !== '' ? $signature : null,$signature !== '' ? date('Y-m-d H:i:s') : null,$late]);
         quarterlyQuery($conn,'UPDATE notifications SET needs_action=0 WHERE user_id=? AND link=?',
@@ -1000,7 +1004,7 @@ function quarterlyRefreshApprovedResult($conn, array $member, int $actorUserId, 
     $previousSnapshot=json_decode($previous['snapshot_json'] ?? '{}',true) ?: [];
     $scoreChanged=$member['official_score']===null || abs((float)$member['official_score']-$candidate['total'])>.00001;
     $completeChanged=($previousSnapshot['score_complete'] ?? false)!==$complete;
-    $version=(int)$member['current_version']+1;
+    $version=(int)(quarterlyQuery($conn,'SELECT COALESCE(MAX(version_number),0)+1 AS next_version FROM quarterly_evaluation_versions WHERE member_id=?',[(int)$member['member_id']])[0]['next_version'] ?? 1);
     $snapshot=$candidate+['score_complete'=>$complete,'expected_peers'=>$expected,
         'previous_score'=>$member['official_score'],'kra_rows'=>quarterlyKraRows($conn,(int)$member['evaluation_id']),
         'self_values'=>json_decode($member['self_values_json'],true),'peers'=>quarterlyPeers($conn,$member),
@@ -1009,7 +1013,9 @@ function quarterlyRefreshApprovedResult($conn, array $member, int $actorUserId, 
     quarterlyQuery($conn,'INSERT INTO quarterly_evaluation_versions (member_id,version_number,finalized_by,remarks,snapshot_json) VALUES (?,?,?,?,?)',
         [(int)$member['member_id'],$version,$approve ? $actorUserId : (int)$approval['approved_by'],
             $approve ? 'Approved by immediate head.' : 'Score updated automatically after a department peer submission.',json_encode($snapshot)]);
-    quarterlyQuery($conn,'UPDATE quarterly_evaluation_members SET current_version=?,revision_pending=0,finalized_at=COALESCE(finalized_at,NOW()) WHERE member_id=?',[$version,(int)$member['member_id']]);
+    quarterlyQuery($conn,'UPDATE quarterly_evaluation_members SET current_version=?,
+        is_late_participant=IF(revision_pending=1,0,is_late_participant),revision_pending=0,
+        finalized_at=COALESCE(finalized_at,NOW()) WHERE member_id=?',[$version,(int)$member['member_id']]);
     quarterlyQuery($conn,"UPDATE evaluations SET kra_subtotal=?,behavior_average=?,total_score=?,performance_level=?,status='Approved',approved_by=COALESCE(approved_by,?),approved_date=COALESCE(approved_date,NOW()) WHERE evaluation_id=?",
         [$candidate['kra'],$candidate['core'],$candidate['total'],getPerformanceLevel($candidate['total']),$actorUserId,(int)$member['evaluation_id']]);
     quarterlyQuery($conn,'UPDATE quarterly_evaluation_cycles SET first_finalized_at=COALESCE(first_finalized_at,NOW()) WHERE cycle_id=?',[(int)$member['cycle_id']]);
@@ -1185,12 +1191,14 @@ function quarterlyFinalize($conn, array $actor, int $evaluationId, array $rating
             throw new DomainException('Explain KRA or Core Values adjustments, or late-score revisions, in the review remarks.');
         }
         if ($expected>0 && $candidate['peer_count']===0) throw new DomainException('At least one submitted peer rating is needed before finalization.');
-        $version=(int)$member['current_version']+1;
+        $version=(int)(quarterlyQuery($conn,'SELECT COALESCE(MAX(version_number),0)+1 AS next_version FROM quarterly_evaluation_versions WHERE member_id=?',[(int)$member['member_id']])[0]['next_version'] ?? 1);
         $snapshot=$candidate+['core_adjustments'=>$coreAdjustments ? array_map(static fn($score)=>round((float)$score,2),$coreAdjustments) : null,'kra_rows'=>quarterlyKraRows($conn,$evaluationId),'self_values'=>json_decode($member['self_values_json'],true),
             'peers'=>quarterlyPeers($conn,$member), 'expected_peers'=>$expected,'previous_score'=>$member['official_score']];
         quarterlyQuery($conn,'INSERT INTO quarterly_evaluation_versions (member_id,version_number,finalized_by,remarks,snapshot_json) VALUES (?,?,?,?,?)',
             [(int)$member['member_id'],$version,(int)$actor['user_id'],$remarks,json_encode($snapshot)]);
-        quarterlyQuery($conn,'UPDATE quarterly_evaluation_members SET current_version=?,revision_pending=0,finalized_at=NOW() WHERE member_id=?',[$version,(int)$member['member_id']]);
+        quarterlyQuery($conn,'UPDATE quarterly_evaluation_members SET current_version=?,
+            is_late_participant=IF(revision_pending=1,0,is_late_participant),revision_pending=0,
+            finalized_at=NOW() WHERE member_id=?',[$version,(int)$member['member_id']]);
         quarterlyQuery($conn,'UPDATE quarterly_evaluation_cycles SET first_finalized_at=COALESCE(first_finalized_at,NOW()) WHERE cycle_id=?',[(int)$member['cycle_id']]);
         quarterlyQuery($conn,"UPDATE evaluations SET kra_subtotal=?,behavior_average=?,total_score=?,performance_level=?,status='Approved',approved_by=?,approved_date=NOW() WHERE evaluation_id=?",
             [$candidate['kra'],$candidate['core'],$candidate['total'],getPerformanceLevel($candidate['total']),(int)$actor['user_id'],$evaluationId]);

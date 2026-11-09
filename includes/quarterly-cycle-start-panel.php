@@ -22,7 +22,7 @@ $hrdReady=$hrdRoster && !array_filter($hrdRoster,static fn($row)=>!empty($row['i
 $positionRoster=quarterlyCyclePositionReadinessRows($hrdRoster);
 ?>
 <section class="content-card p-3 p-md-4 mb-4" id="quarterly-cycle-start" aria-labelledby="hrdCycleStartTitle">
-    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap <?php echo $cycleSetupReadOnly ? 'mb-0' : 'mb-3'; ?>">
+    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-0">
         <div>
             <h2 class="h5 fw-bold mb-1" id="hrdCycleStartTitle"><i class="fas fa-calendar-check me-2" aria-hidden="true"></i><?php echo e($cycleDepartmentName); ?> Quarterly cycle</h2>
             <p class="small text-muted mb-0"><?php echo $cycleSetupReadOnly ? ($hrdOpenCycle ? formatDate($hrdOpenCycle['period_start']).' to '.formatDate($hrdOpenCycle['period_end']).' · View cycle details below.' : 'Read-only form readiness. The '.e($cycleOwnerName).' starts the cycle.') : 'Start this department cycle after each immediate head has created the Quarterly form for their direct reports.'; ?></p>
@@ -32,10 +32,10 @@ $positionRoster=quarterlyCyclePositionReadinessRows($hrdRoster);
             <span class="badge <?php echo $hrdOpenCycle ? 'bg-info text-dark' : ($hrdReady && !$hrdOverlap ? 'bg-success' : 'bg-warning text-dark'); ?>">
                 <?php echo $hrdOpenCycle ? 'Cycle open' : ($hrdOverlap ? 'Period already exists' : ($hrdReady ? 'Forms ready' : 'Forms or accounts needed')); ?>
             </span>
-            <?php if ($cycleSetupReadOnly): ?><button class="btn btn-outline-success btn-sm collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#quarterlyCycleReadOnlyDetails" aria-expanded="false" aria-controls="quarterlyCycleReadOnlyDetails"><i class="fas fa-chevron-down me-1" aria-hidden="true"></i>Details</button><?php endif; ?>
+            <button class="btn btn-outline-success btn-sm collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#quarterlyCycleSetupDetails" aria-expanded="false" aria-controls="quarterlyCycleSetupDetails"><i class="fas fa-chevron-down me-1" aria-hidden="true"></i>Details</button>
         </div>
     </div>
-    <div<?php if ($cycleSetupReadOnly): ?> class="collapse pt-3" id="quarterlyCycleReadOnlyDetails"<?php endif; ?>>
+    <div class="collapse pt-3" id="quarterlyCycleSetupDetails">
     <?php if ($hrdOpenCycle): ?>
         <p class="mb-0">The <?php echo e(formatDate($hrdOpenCycle['period_start'])); ?> to <?php echo e(formatDate($hrdOpenCycle['period_end'])); ?> cycle is open. <?php echo $cycleSetupReadOnly ? 'The '.e($cycleOwnerName).' will approve it after all required ratings are complete.' : 'Complete and approve it before starting another period.'; ?></p>
     <?php elseif (!$cycleSetupReadOnly): ?>
