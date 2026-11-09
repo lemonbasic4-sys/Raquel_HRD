@@ -573,9 +573,9 @@ ksort($existing_templates);
 </div>
 
 <!-- Evaluation table -->
-<div class="history-table-wrap hr-history-table-container fadeup fadeup-2"><table class="table history-table hr-history-table" id="histTable"><thead><tr><th>Employee Name</th><th>Department</th><th>Position</th><th>Form Code</th><th>Overall Rating</th><th>Status</th><th>Current Reviewer</th><th>Date Submitted</th><th>Actions</th></tr></thead><tbody id="histTableBody">
+<div class="history-table-wrap hr-history-table-container fadeup fadeup-2"><table class="table history-table hr-history-table" id="histTable"><thead><tr><th>Employee Name</th><th>Department</th><th>Position</th><th>Overall Rating</th><th>Status</th><th>Date Submitted</th><th>Actions</th></tr></thead><tbody id="histTableBody">
     <?php if (empty($all_history)): ?>
-        <tr><td colspan="9" class="history-empty-row">No evaluation records yet.</td></tr>
+        <tr><td colspan="7" class="history-empty-row">No evaluation records yet.</td></tr>
     <?php else: ?>
         <?php foreach ($all_history as $row):
             $h_score = (float)($row['total_score'] ?? 0);
@@ -626,7 +626,7 @@ ksort($existing_templates);
                 <img src="<?php echo e($avatar_h); ?>?v=<?php echo time(); ?>" alt="<?php echo e($row['employee_name']); ?>">
             </div><div class="employee-copy"><strong><?php echo e($row['employee_name']); ?></strong><small><?php echo e($row['employee_code'] ?? ('ID ' . $row['employee_id'])); ?></small></div></div></td>
             <!-- Dept + Template -->
-            <td><?php echo e($row['department_name'] ?? 'N/A'); ?></td><td><?php echo e($row['job_title'] ?? 'N/A'); ?></td><td class="history-form-code"><?php echo e($row['form_code'] ?: 'N/A'); ?></td>
+            <td><?php echo e($row['department_name'] ?? 'N/A'); ?></td><td><?php echo e($row['job_title'] ?? 'N/A'); ?></td>
             <!-- Score -->
             <td class="text-center"><strong class="d-block"><?php echo $h_score > 0 ? number_format($h_score, 2) : '—'; ?></strong><?php if ($h_perf): $rating_class = str_contains($h_badge_class, 'success') ? 'rating-excellent' : (str_contains($h_badge_class, 'info') ? 'rating-exceeds' : (str_contains($h_badge_class, 'warning') ? 'rating-meets' : (str_contains($h_badge_class, 'danger') ? 'rating-needs' : ''))); ?><span class="rating-pill <?php echo $rating_class; ?>"><?php echo e($h_perf); ?></span><?php endif; ?></td>
             <!--
@@ -657,7 +657,7 @@ ksort($existing_templates);
                         <i class="fas fa-history me-1"></i>Historical Import
                     </span>
                 <?php endif; ?>
-            </td><td><div class="current-reviewer"><?php echo e($reviewer_name); ?></div></td><td><?php echo $submitted_date ? formatDate($submitted_date) : '—'; ?></td><td>
+            </td><td><?php echo $submitted_date ? formatDate($submitted_date) : '—'; ?></td><td>
                 <button class="btn btn-sm btn-primary rounded-pill px-3 fw-semibold shadow-sm"
                         data-bs-toggle="modal" data-bs-target="#reviewModal<?php echo $row['evaluation_id']; ?>">
                     <i class="fas fa-eye me-1"></i>View
@@ -667,7 +667,7 @@ ksort($existing_templates);
         <?php endforeach; ?>
 
         <!-- No results (search) -->
-    <tr class="d-none" id="histNoResults"><td colspan="9" class="history-empty-row">No evaluations match these filters.</td></tr>
+    <tr class="d-none" id="histNoResults"><td colspan="7" class="history-empty-row">No evaluations match these filters.</td></tr>
     <?php endif; ?>
 </tbody></table></div>
 
