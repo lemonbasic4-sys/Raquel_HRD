@@ -54,7 +54,9 @@ $positionRoster=quarterlyCyclePositionReadinessRows($hrdRoster);
                 <tr><td class="fw-semibold"><?php echo e($position['job_title']); ?></td>
                     <td><?php echo (int)$position['employee_count']; ?></td>
                     <td><?php echo e($position['reviewer_position_name'] ?: 'Immediate head missing'); ?></td>
-                    <td><?php if ($position['issues']): ?><span class="text-danger"><?php echo (int)$position['blocked_count']; ?> of <?php echo (int)$position['employee_count']; ?> need attention: <?php echo e(implode('; ',$position['issues'])); ?></span><?php else: ?><span class="text-success fw-semibold"><i class="fas fa-check-circle me-1" aria-hidden="true"></i>Ready</span><?php endif; ?></td></tr>
+                    <td><?php if ($position['issues']): ?>
+                        <details class="cycle-readiness-issue"><summary class="text-danger fw-semibold"><?php echo (int)$position['blocked_count']; ?> need attention</summary><small class="d-block text-muted mt-1"><?php echo e(implode('; ',$position['issues'])); ?></small></details>
+                    <?php else: ?><span class="text-success fw-semibold"><i class="fas fa-check-circle me-1" aria-hidden="true"></i>Ready</span><?php endif; ?></td></tr>
                 <?php endforeach; ?>
                 <?php if (!$positionRoster): ?><tr><td colspan="4" class="text-muted text-center py-3">No active regular employees found.</td></tr><?php endif; ?>
             </tbody>
@@ -75,7 +77,9 @@ $positionRoster=quarterlyCyclePositionReadinessRows($hrdRoster);
                 <tr><td class="fw-semibold"><?php echo e($position['job_title']); ?></td>
                     <td><?php echo (int)$position['employee_count']; ?></td>
                     <td><?php echo e($position['reviewer_position_name'] ?: 'Immediate head missing'); ?></td>
-                    <td><?php if ($position['issues']): ?><span class="text-danger"><?php echo (int)$position['blocked_count']; ?> of <?php echo (int)$position['employee_count']; ?> need attention: <?php echo e(implode('; ',$position['issues'])); ?></span><?php else: ?><span class="text-success fw-semibold"><i class="fas fa-check-circle me-1" aria-hidden="true"></i>Ready</span><?php endif; ?></td></tr>
+                    <td><?php if ($position['issues']): ?>
+                        <details class="cycle-readiness-issue"><summary class="text-danger fw-semibold"><?php echo (int)$position['blocked_count']; ?> need attention</summary><small class="d-block text-muted mt-1"><?php echo e(implode('; ',$position['issues'])); ?></small></details>
+                    <?php else: ?><span class="text-success fw-semibold"><i class="fas fa-check-circle me-1" aria-hidden="true"></i>Ready</span><?php endif; ?></td></tr>
                 <?php endforeach; ?>
                 <?php if (!$positionRoster): ?><tr><td colspan="4" class="text-muted text-center py-3">No active regular employees found.</td></tr><?php endif; ?>
             </tbody>
