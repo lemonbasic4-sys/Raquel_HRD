@@ -2,6 +2,18 @@
 
 Use this folder to test **probationary Initial and Final evaluations** and **regular Quarterly and Annual evaluations** in Human Resources. Two probationary employees let you test them separately. All people and personal details are mock data.
 
+## Temporary HR Supervisor coverage
+
+HR Supervisor II temporarily receives Supervisor I's direct reports when Supervisor I has no active regular holder with an enabled HR Supervisor account. The configured reporting positions stay unchanged. An eligible replacement Supervisor I automatically resumes those reports. Acting coverage also applies to form targets and unfinished Annual/Quarterly reviews; completed approvals and scores retain their recorded reviewer.
+
+After loading the HR fixture, run the regression check from the project root:
+
+```powershell
+& 'C:\xampp\php\php.exe' Evaluation_test/hr_evaluation/verify_supervisor_succession.php
+```
+
+The check creates temporary records and simulates promotion/replacement inside a transaction, then rolls back. Use a test database; `HRIS_TEST_DATABASE`, `HRIS_TEST_HOST`, `HRIS_TEST_USER`, and `HRIS_TEST_PASSWORD` can override the local connection defaults. This check does not verify the browser workflow.
+
 ## Before you start
 
 Start Apache and MySQL in XAMPP. Open PowerShell in `C:\xampp\htdocs\Raquel_HRD`.

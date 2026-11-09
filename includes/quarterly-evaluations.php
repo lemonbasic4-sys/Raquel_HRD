@@ -265,7 +265,9 @@ function quarterlyCanRate(array $actor): bool
 
 function quarterlyMember($conn, int $evaluationId): ?array
 {
-    return quarterlyQuery($conn, "SELECT m.*, c.department_id, c.period_start, c.period_end, c.first_finalized_at,
+    $reviewerSql = hrEvaluationReviewerSql('m', 'c.department_id');
+    return quarterlyQuery($conn, "SELECT m.*, m.reviewer_position_id AS original_reviewer_position_id,
+            $reviewerSql AS reviewer_position_id, c.department_id, c.period_start, c.period_end, c.first_finalized_at,
             e.first_name, e.last_name, e.department_id AS current_department_id, e.job_title_id AS current_position_id,
             e.is_active AS employee_active, e.employment_status, e.deleted_at AS employee_deleted_at,
             ev.status AS evaluation_status, ev.total_score AS official_score, et.template_name,
@@ -276,7 +278,7 @@ function quarterlyMember($conn, int $evaluationId): ?array
         FROM quarterly_evaluation_members m JOIN quarterly_evaluation_cycles c ON c.cycle_id=m.cycle_id
         JOIN employees e ON e.employee_id=m.employee_id JOIN evaluations ev ON ev.evaluation_id=m.evaluation_id
         JOIN evaluation_templates et ON et.template_id=ev.template_id
-        LEFT JOIN job_titles reviewer_position ON reviewer_position.job_title_id=m.reviewer_position_id
+        LEFT JOIN job_titles reviewer_position ON reviewer_position.job_title_id=($reviewerSql)
         WHERE m.evaluation_id=? AND ev.deleted_at IS NULL", [$evaluationId])[0] ?? null;
 }
 
@@ -310,6 +312,10 @@ function quarterlyCycleRosterPreview($conn, int $departmentId): array
     foreach ($employees as &$employee) {
         $issues = [];
         $positionId = (int)$employee['job_title_id'];
+        $effectiveHead = effectiveHRSupervisorPosition($conn, (int)$employee['reports_to'], $departmentId);
+        if ($effectiveHead !== (int)$employee['reports_to']) {
+            $employee['reviewer_position_name'] = quarterlyQuery($conn,'SELECT job_title FROM job_titles WHERE job_title_id=?',[$effectiveHead])[0]['job_title'] ?? $employee['reviewer_position_name'];
+        }
         $hrSupervisorTarget = strcasecmp((string)$employee['department_name'], 'Human Resources') === 0
             && preg_match('/^HR Supervisor\b/i', (string)$employee['job_title'])
             && preg_match('/^HR Manager\b/i', (string)$employee['reviewer_position_name']);
@@ -320,7 +326,7 @@ function quarterlyCycleRosterPreview($conn, int $departmentId): array
                 JOIN users u ON u.employee_id=h.employee_id
                 WHERE h.job_title_id=? AND h.employee_id<>? AND h.is_active=1 AND h.deleted_at IS NULL
                   AND u.is_active=1 AND u.deleted_at IS NULL AND COALESCE(u.account_hold,0)=0 LIMIT 1",
-                [(int)$employee['reports_to'],(int)$employee['employee_id']])) $issues[] = 'Immediate head account missing';
+                [$effectiveHead,(int)$employee['employee_id']])) $issues[] = 'Immediate head account missing';
         if (!quarterlyQuery($conn, "SELECT 1 FROM users WHERE employee_id=? AND role='Employee'
                 AND is_active=1 AND deleted_at IS NULL AND COALESCE(account_hold,0)=0 LIMIT 1",
                 [(int)$employee['employee_id']])) $issues[] = 'Employee Portal account missing';
@@ -336,7 +342,7 @@ function quarterlyCycleRosterPreview($conn, int $departmentId): array
               AND creator.is_active=1 AND creator.deleted_at IS NULL
               AND creator_account.is_active=1 AND creator_account.deleted_at IS NULL
               AND COALESCE(creator_account.account_hold,0)=0",
-            [$departmentId,$positionId,(int)$employee['reports_to'],$hrSupervisorTarget ? 1 : 0,$departmentId]);
+            [$departmentId,$positionId,$effectiveHead,$hrSupervisorTarget ? 1 : 0,$departmentId]);
         $validTemplate = false;
         foreach ($templates as $template) {
             $criteria = quarterlyQuery($conn, "SELECT section,criterion_name,weight FROM evaluation_criteria
@@ -570,8 +576,9 @@ function quarterlyCanSeeOwnPeerNames($conn, array $actor, array $member): bool
     if ((int)$actor['employee_id'] !== (int)$member['employee_id']) return false;
     if (quarterlyIsHrDepartment($actor) && $actor['role'] === 'HR Manager') return true;
     // A head is identified by the review assignments saved in this department cycle.
-    return (bool)quarterlyQuery($conn, 'SELECT 1 FROM quarterly_evaluation_members
-        WHERE cycle_id=? AND reviewer_position_id=? AND employee_id<>? LIMIT 1',
+    $reviewerSql = hrEvaluationReviewerSql('m', (string)(int)$member['department_id']);
+    return (bool)quarterlyQuery($conn, "SELECT 1 FROM quarterly_evaluation_members m
+        WHERE m.cycle_id=? AND ($reviewerSql)=? AND m.employee_id<>? LIMIT 1",
         [(int)$member['cycle_id'], (int)$member['position_id'], (int)$member['employee_id']]);
 }
 
@@ -1078,7 +1085,8 @@ function quarterlyUpdateCycleCompletion($conn, int $cycleId, int $approvalUserId
                 BASE_URL.'/'.$historyPortal.'/evaluation-history.php','evaluations',false);
         }
     }
-    $recipients=quarterlyQuery($conn,'SELECT DISTINCT u.user_id FROM users u JOIN employees e ON e.employee_id=u.employee_id WHERE u.is_active=1 AND u.deleted_at IS NULL AND e.is_active=1 AND e.deleted_at IS NULL AND (EXISTS(SELECT 1 FROM quarterly_evaluation_members m WHERE m.cycle_id=? AND m.employee_id=e.employee_id) OR EXISTS(SELECT 1 FROM quarterly_evaluation_members m WHERE m.cycle_id=? AND m.reviewer_position_id=e.job_title_id))',[$cycleId,$cycleId]);
+    $reviewerSql = hrEvaluationReviewerSql('m', (string)(int)$cycle['department_id']);
+    $recipients=quarterlyQuery($conn,"SELECT DISTINCT u.user_id FROM users u JOIN employees e ON e.employee_id=u.employee_id WHERE u.is_active=1 AND u.deleted_at IS NULL AND e.is_active=1 AND e.deleted_at IS NULL AND (EXISTS(SELECT 1 FROM quarterly_evaluation_members m WHERE m.cycle_id=? AND m.employee_id=e.employee_id) OR EXISTS(SELECT 1 FROM quarterly_evaluation_members m WHERE m.cycle_id=? AND ($reviewerSql)=e.job_title_id))",[$cycleId,$cycleId]);
     foreach ($recipients as $recipient) {
         $actor=quarterlyActor($conn,(int)$recipient['user_id']);
         if (!$actor) continue;
@@ -1149,8 +1157,10 @@ function quarterlyFinalize($conn, array $actor, int $evaluationId, array $rating
 function quarterlyPendingReviewCount($conn, array $actor): int
 {
     if (!$conn->query("SHOW TABLES LIKE 'quarterly_evaluation_members'")->num_rows) return 0;
+    $reviewerSql = hrEvaluationReviewerSql('m', 'c.department_id');
     $reviews=quarterlyQuery($conn,"SELECT m.evaluation_id FROM quarterly_evaluation_members m
-        WHERE m.reviewer_position_id=? AND m.employee_id<>? AND m.evaluation_id IS NOT NULL
+        JOIN quarterly_evaluation_cycles c ON c.cycle_id=m.cycle_id
+        WHERE ($reviewerSql)=? AND m.employee_id<>? AND m.evaluation_id IS NOT NULL
           AND (m.current_version=0 OR m.revision_pending=1)",[(int)$actor['job_title_id'],(int)$actor['employee_id']]);
     $count=0;
     foreach ($reviews as $review) {

@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/annual-evaluations.php';
 require_once __DIR__ . '/quarterly-evaluations.php';
+require_once __DIR__ . '/hr-supervisor-succession.php';
 
 // ============================================
 
@@ -3744,6 +3745,16 @@ function getEvaluationTemplateCreatorPositionIds($conn, $context): array
 {
     $position_id = (int)($context['job_title_id'] ?? 0);
     if ($position_id <= 0) return [];
+    if (($context['role'] ?? '') === 'HR Supervisor'
+        && strcasecmp((string)($context['department_name'] ?? ''), 'Human Resources') === 0
+        && ($context['position_title'] ?? '') === 'HR Supervisor II') {
+        $primary = annualQuery($conn, "SELECT job_title_id FROM job_titles
+            WHERE department_id=? AND job_title='HR Supervisor I' AND rank_category_id=4 AND is_active=1 LIMIT 1",
+            [(int)$context['department_id']])[0]['job_title_id'] ?? 0;
+        if ($primary && effectiveHRSupervisorPosition($conn, (int)$primary, (int)$context['department_id']) === $position_id) {
+            return [$position_id, (int)$primary];
+        }
+    }
     if (($context['role'] ?? '') !== 'HR Manager'
         || strcasecmp((string)($context['department_name'] ?? ''), 'Human Resources') !== 0
         || !preg_match('/^HR Manager\b/i', (string)($context['position_title'] ?? ''))) {
@@ -7268,7 +7279,7 @@ function getHRDirectReportByPosition($conn, $employee_id)
     }
 
     $position_stmt = $conn->prepare("
-        SELECT parent.job_title_id, parent.department_id, parent.rank_category_id
+        SELECT parent.job_title_id, parent.department_id, parent.rank_category_id, parent.job_title
         FROM job_titles child
         JOIN job_titles parent ON parent.job_title_id = child.reports_to
         WHERE child.job_title_id = ?
@@ -7291,6 +7302,18 @@ function getHRDirectReportByPosition($conn, $employee_id)
     $reporting_department_id = (int)$reporting_position['department_id'];
     $reporting_rank_id = (int)$reporting_position['rank_category_id'];
     $employee_department_id = (int)$employee['department_id'];
+
+    if ($reporting_position['job_title'] === 'HR Supervisor I' && $reporting_rank_id === 4) {
+        $actingPosition = effectiveHRSupervisorPosition($conn, $reporting_position_id, $reporting_department_id);
+        $supervisor = annualQuery($conn, "SELECT e.employee_id AS supervisor_employee_id, e.employee_id AS reports_to,
+                e.first_name,e.last_name,e.job_title,e.rank_category_id,u.user_id,u.full_name,u.email
+            FROM employees e JOIN users u ON u.employee_id=e.employee_id
+            WHERE e.job_title_id=? AND e.department_id=? AND e.employee_id<>?
+              AND e.rank_category_id=4 AND e.employment_status='Regular' AND e.is_active=1 AND e.deleted_at IS NULL
+              AND u.role='HR Supervisor' AND u.is_active=1 AND u.deleted_at IS NULL AND COALESCE(u.account_hold,0)=0
+            ORDER BY e.employee_id,u.user_id LIMIT 1", [$actingPosition,$reporting_department_id,$employee_id])[0] ?? null;
+        return ['is_hr_employee'=>true, 'supervisor'=>$supervisor];
+    }
 
     // Keep the configured parent position primary; use Position I first if that position has no active holder.
     $supervisor_stmt = $conn->prepare("

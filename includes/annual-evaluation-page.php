@@ -72,9 +72,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } catch (DomainException $e) { $error=$e->getMessage(); }
       catch (Throwable $e) { error_log('Annual workflow: '.$e->getMessage()); $error='The request could not be completed. Your previous finalized result has been preserved. Please try again.'; }
 }
+$reviewerSql = hrEvaluationReviewerSql('m', 'c.department_id');
 $cycles = annualQuery($conn,"SELECT DISTINCT c.*,d.department_name FROM annual_evaluation_cycles c
     JOIN departments d ON d.department_id=c.department_id JOIN annual_evaluation_members m ON m.cycle_id=c.cycle_id
-    WHERE m.employee_id=? OR m.reviewer_position_id=?
+    WHERE m.employee_id=? OR ($reviewerSql)=?
     ORDER BY c.period_end DESC,c.cycle_id DESC",[(int)$actor['employee_id'],(int)$actor['job_title_id']]);
 $cycleOptions=array_values(array_filter($cycles,static fn($c)=>!empty($c['completed_at'])===$historyView));
 if (!$cycleId && $cycleOptions) $cycleId=(int)$cycleOptions[0]['cycle_id'];
@@ -150,7 +151,8 @@ if ($historyView && $cycle && empty($cycle['completed_at']) && !$evaluationId) {
 if ($cycle && !empty($cycle['completed_at']) && $view==='rate') {
     header('Location: '.annualUrl($actor,'?view='.($canFinalize ? 'head-review' : 'review').'&evaluation_id='.$evaluationId)); exit;
 }
-$members=$cycle ? annualQuery($conn,"SELECT m.*,e.first_name,e.last_name,ev.total_score,
+$memberReviewerSql = hrEvaluationReviewerSql('m', (string)(int)($cycle['department_id'] ?? 0));
+$members=$cycle ? annualQuery($conn,"SELECT m.*, $memberReviewerSql AS reviewer_position_id, e.first_name,e.last_name,ev.total_score,
         (SELECT COUNT(*) FROM annual_peer_submissions s JOIN employees rater ON rater.employee_id=s.rater_employee_id WHERE s.cycle_id=m.cycle_id AND s.target_employee_id=m.employee_id AND rater.department_id=e.department_id) AS received,
         (SELECT COUNT(*) FROM annual_peer_submissions s WHERE s.cycle_id=m.cycle_id AND s.target_employee_id=m.employee_id AND s.rater_employee_id=?) AS rated
     FROM annual_evaluation_members m JOIN employees e ON e.employee_id=m.employee_id

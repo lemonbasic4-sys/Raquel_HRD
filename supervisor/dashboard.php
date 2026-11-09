@@ -127,11 +127,12 @@ if ($user_id_pkg > 0) {
 require_once '../includes/annual-evaluations.php';
 $annual_dashboard_actor = annualActor($conn, $user_id_pkg);
 if ($annual_dashboard_actor && $conn->query("SHOW TABLES LIKE 'annual_evaluation_members'")->num_rows) {
+    $annual_reviewer_sql = hrEvaluationReviewerSql('m', 'c.department_id');
     $annual_dashboard_rows = annualQuery($conn, "SELECT m.evaluation_id,d.department_name
         FROM annual_evaluation_members m
         JOIN annual_evaluation_cycles c ON c.cycle_id=m.cycle_id
         JOIN departments d ON d.department_id=c.department_id
-        WHERE m.reviewer_position_id=? AND m.employee_id<>? AND m.evaluation_id IS NOT NULL
+        WHERE ($annual_reviewer_sql)=? AND m.employee_id<>? AND m.evaluation_id IS NOT NULL
           AND (m.current_version=0 OR m.revision_pending=1)
         ORDER BY m.evaluation_id DESC", [(int)$annual_dashboard_actor['job_title_id'], (int)$annual_dashboard_actor['employee_id']]);
     foreach ($annual_dashboard_rows as $annual_dashboard_row) {
