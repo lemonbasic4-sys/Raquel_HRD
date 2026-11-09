@@ -1003,7 +1003,7 @@ function annualRefreshApprovedResult($conn, array $member, int $actorUserId, boo
     $previousSnapshot=json_decode($previous['snapshot_json'] ?? '{}',true) ?: [];
     $scoreChanged=$member['official_score']===null || abs((float)$member['official_score']-$candidate['total'])>.00001;
     $completeChanged=($previousSnapshot['score_complete'] ?? false)!==$complete;
-    $version=(int)$member['current_version']+1;
+    $version=(int)(annualQuery($conn,'SELECT COALESCE(MAX(version_number),0)+1 AS next_version FROM annual_evaluation_versions WHERE member_id=?',[(int)$member['member_id']])[0]['next_version'] ?? 1);
     $snapshot=$candidate+['score_complete'=>$complete,'expected_peers'=>$expected,
         'previous_score'=>$member['official_score'],'kra_rows'=>annualKraRows($conn,(int)$member['evaluation_id']),
         'self_values'=>json_decode($member['self_values_json'],true),'peers'=>annualPeers($conn,$member),
@@ -1029,6 +1029,57 @@ function annualRefreshApprovedResult($conn, array $member, int $actorUserId, boo
 }
 
 /** Caller holds the cycle lock; archive only fully approved and fully rated cycles. */
+/** Reject a completed-but-unapproved Annual cycle and reopen members at self-rating. */
+function annualRejectCycle($conn, array $actor, int $cycleId): int
+{
+    $conn->begin_transaction();
+    try {
+        $cycle=annualQuery($conn,'SELECT c.*,d.department_name FROM annual_evaluation_cycles c
+            JOIN departments d ON d.department_id=c.department_id WHERE c.cycle_id=? FOR UPDATE',[$cycleId])[0] ?? null;
+        if (!$cycle || !annualCanOwnCycle($conn,$actor,(int)$cycle['department_id'])) {
+            throw new DomainException('Only the assigned department cycle owner can reject this Annual cycle.');
+        }
+        if (!empty($cycle['completed_at']) || empty($cycle['ready_for_approval_at'])) {
+            throw new DomainException('Only a cycle ready for approval can be rejected and restarted.');
+        }
+        $members=annualQuery($conn,'SELECT member_id,employee_id,evaluation_id FROM annual_evaluation_members
+            WHERE cycle_id=? ORDER BY member_id FOR UPDATE',[$cycleId]);
+        if (!$members) throw new DomainException('This Annual cycle has no evaluations to restart.');
+        $rejected=0;
+        foreach ($members as $member) {
+            if ($member['evaluation_id']) {
+                annualQuery($conn,"UPDATE evaluations SET status='Rejected' WHERE evaluation_id=?",[(int)$member['evaluation_id']]);
+                logAudit($conn,(int)$actor['user_id'],'REJECT','Annual Evaluation',(int)$member['evaluation_id'],
+                    'Rejected when the department cycle was rejected and restarted. Prior score snapshots are retained for audit.');
+                $rejected++;
+            }
+        }
+        annualQuery($conn,'DELETE FROM annual_peer_submissions WHERE cycle_id=?',[$cycleId]);
+        foreach ($members as $member) annualQuery($conn,'DELETE FROM annual_kra_approvals WHERE member_id=?',[(int)$member['member_id']]);
+        annualQuery($conn,'UPDATE annual_evaluation_members SET evaluation_id=NULL,self_values_json=NULL,
+            current_version=0,revision_pending=0,finalized_at=NULL,is_late_participant=0 WHERE cycle_id=?',[$cycleId]);
+        annualQuery($conn,'UPDATE annual_evaluation_cycles SET ready_for_approval_at=NULL,cycle_approved_by=NULL,
+            completed_at=NULL WHERE cycle_id=?',[$cycleId]);
+        logAudit($conn,(int)$actor['user_id'],'REJECT','Annual Cycle',$cycleId,
+            'Rejected and restarted cycle for '.$cycle['department_name'].' from '.$cycle['period_start'].' to '.$cycle['period_end'].'. '.$rejected.' linked evaluations were rejected; prior score snapshots were retained.');
+        foreach (annualQuery($conn,"SELECT DISTINCT u.user_id FROM annual_evaluation_members m
+                JOIN users u ON u.employee_id=m.employee_id
+                WHERE m.cycle_id=? AND u.is_active=1 AND u.deleted_at IS NULL
+                  AND COALESCE(u.account_hold,0)=0",[$cycleId]) as $user) {
+            $recipientActor=annualActor($conn,(int)$user['user_id']);
+            if (!$recipientActor) continue;
+            createNotification($conn,(int)$user['user_id'],'Annual cycle restarted',
+                'The '.$cycle['department_name'].' Annual cycle was rejected and restarted. Submit a new self-rating and complete the cycle ratings again.',
+                annualUrl($recipientActor,'?view=peers&cycle_id='.$cycleId),'evaluations',true);
+        }
+        $conn->commit();
+        return $rejected;
+    } catch (Throwable $error) {
+        $conn->rollback();
+        throw $error;
+    }
+}
+
 function annualUpdateCycleCompletion($conn, int $cycleId, int $approvalUserId = 0): bool
 {
     $cycle=annualQuery($conn,'SELECT c.*,d.department_name FROM annual_evaluation_cycles c JOIN departments d ON d.department_id=c.department_id WHERE c.cycle_id=?',[$cycleId])[0] ?? null;
@@ -1140,7 +1191,7 @@ function annualFinalize($conn, array $actor, int $evaluationId, array $ratings, 
             throw new DomainException('Explain KRA or Core Values adjustments, or late-score revisions, in the review remarks.');
         }
         if ($expected>0 && $candidate['peer_count']===0) throw new DomainException('At least one submitted peer rating is needed before finalization.');
-        $version=(int)$member['current_version']+1;
+        $version=(int)(annualQuery($conn,'SELECT COALESCE(MAX(version_number),0)+1 AS next_version FROM annual_evaluation_versions WHERE member_id=?',[(int)$member['member_id']])[0]['next_version'] ?? 1);
         $snapshot=$candidate+['core_adjustments'=>$coreAdjustments ? array_map(static fn($score)=>round((float)$score,2),$coreAdjustments) : null,'kra_rows'=>annualKraRows($conn,$evaluationId),'self_values'=>json_decode($member['self_values_json'],true),
             'peers'=>annualPeers($conn,$member), 'expected_peers'=>$expected,'previous_score'=>$member['official_score']];
         annualQuery($conn,'INSERT INTO annual_evaluation_versions (member_id,version_number,finalized_by,remarks,snapshot_json) VALUES (?,?,?,?,?)',
