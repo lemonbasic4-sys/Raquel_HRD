@@ -405,8 +405,8 @@ function annualCyclePositionReadinessRows(array $employees): array
 
 function annualApCycleReadyToStart($conn, array $actor): bool
 {
-    if (!annualUsesDepartmentCycle($actor) || !annualCanOwnCycle($conn,$actor,(int)$actor['department_id'])) return false;
     ensureAnnualEvaluationSchema($conn);
+    if (!annualCanOwnCycle($conn,$actor,(int)$actor['department_id'])) return false;
     $year=date('Y');
     $from=$year.'-01-01';
     $to=$year.'-12-31';
@@ -417,13 +417,14 @@ function annualApCycleReadyToStart($conn, array $actor): bool
     return (bool)$roster && !array_filter($roster,static fn($person)=>!empty($person['issues']));
 }
 
-/** Keep one actionable notification while the AP Manager can start this year's cycle. */
+/** Keep one actionable notification while the assigned owner can start this year's cycle. */
 function annualSyncApCycleReadinessNotification($conn, array $actor): bool
 {
-    if (!annualUsesDepartmentCycle($actor) || !annualCanOwnCycle($conn,$actor,(int)$actor['department_id'])) return false;
+    ensureAnnualEvaluationSchema($conn);
+    if (!annualCanOwnCycle($conn,$actor,(int)$actor['department_id'])) return false;
     $ready=annualApCycleReadyToStart($conn,$actor);
     $title=(annualIsApDepartment($actor) ? 'AP' : $actor['department_name']).' Annual cycle ready to start ('.date('Y').')';
-    $existing=annualQuery($conn,'SELECT notification_id FROM notifications WHERE user_id=? AND title=? LIMIT 1',
+    $existing=annualQuery($conn,'SELECT notification_id FROM notifications WHERE user_id=? AND title=? AND needs_action=1 LIMIT 1',
         [(int)$actor['user_id'],$title]);
     if ($ready && !$existing) {
         createNotification($conn,(int)$actor['user_id'],$title,
@@ -480,7 +481,7 @@ function annualStartCycle($conn, array $actor, int $departmentId, string $from, 
         }
         logAudit($conn,(int)$actor['user_id'],'CREATE','Annual Cycle',$cycleId,
             $department['department_name'].' '.$from.' to '.$to.'; self-rating deadline '.$deadline.'; '.count($roster).' members.');
-        if (annualUsesDepartmentCycle($department)) {
+        if (annualCanOwnCycle($conn,$actor,$departmentId)) {
             annualQuery($conn,'UPDATE notifications SET needs_action=0 WHERE user_id=? AND title=? AND needs_action=1',
                 [(int)$actor['user_id'],(annualIsApDepartment($department) ? 'AP' : $department['department_name']).' Annual cycle ready to start ('.date('Y').')']);
         }

@@ -61,11 +61,10 @@ if ($effective_role === 'HR Staff' && $current_dir === 'staff') {
 if ($current_dir === 'employee' && in_array($effective_role, ['Employee', 'HR Manager', 'HR Supervisor', 'HR Staff'], true)) {
     sendEmployeeProbationReminder($conn, (int) $_SESSION['user_id']);
 }
-if ($current_dir === 'employee' && $effective_role === 'Employee') {
-    $ap_readiness_actor = annualActor($conn,(int)($_SESSION['user_id'] ?? 0));
-    if ($ap_readiness_actor && annualUsesDepartmentCycle($ap_readiness_actor)) {
-        annualSyncApCycleReadinessNotification($conn,$ap_readiness_actor);
-    }
+if (in_array($current_dir,['employee','manager'],true)
+    && in_array($effective_role,['Employee','HR Manager','President and CEO'],true)) {
+    $annual_readiness_actor = annualActor($conn,(int)($_SESSION['user_id'] ?? 0));
+    if ($annual_readiness_actor) annualSyncApCycleReadinessNotification($conn,$annual_readiness_actor);
 }
 $notif_count = getUnreadNotificationCount($conn, (int) $_SESSION['user_id'], $notif_context);
 $notifications = getRecentNotifications($conn, (int) $_SESSION['user_id'], 5, $notif_context);
@@ -120,7 +119,10 @@ switch ($effective_role) {
         } catch (Exception $e) {}
         $_mgr_pkg_pending = countPendingOrganizationPackagesForUser($conn, (int)($_SESSION['user_id'] ?? 0));
         $_annual_manager_actor=annualActor($conn,(int)($_SESSION['user_id'] ?? 0));
-        if ($_annual_manager_actor) $_mgr_pkg_pending+=annualPendingReviewCount($conn,$_annual_manager_actor);
+        if ($_annual_manager_actor) {
+            $_mgr_pkg_pending+=annualPendingReviewCount($conn,$_annual_manager_actor);
+            if (annualApCycleReadyToStart($conn,$_annual_manager_actor)) $_mgr_pkg_pending++;
+        }
         if ($_annual_manager_actor) $_mgr_pkg_pending+=quarterlyPendingCount($conn,$_annual_manager_actor);
         $_mgr_approvals_pending = countManagerPendingApprovals($conn);
 
