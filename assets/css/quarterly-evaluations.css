@@ -28,6 +28,10 @@
 .quarterly-page .quarterly-cycle-reject { background:linear-gradient(135deg,#bd2929,#9e1b22); border-color:#9e1b22; color:#fff; box-shadow:0 3px 8px rgba(158,27,34,.15); }
 .quarterly-page .quarterly-cycle-reject:hover { background:#7f181e; border-color:#7f181e; color:#fff; }
 .quarterly-page .btn:focus-visible { outline:3px solid var(--quarterly-gold); outline-offset:3px; }
+#quarterlyApproveCycleModal .modal-header,#quarterlyRejectCycleModal .modal-header { background:linear-gradient(135deg,var(--hero-from,#294306) 0%,var(--hero-mid,#294306) 50%,var(--hero-to,#183a03) 100%); border:0; color:#fff; }
+#quarterlyApproveCycleModal .modal-header h2,#quarterlyRejectCycleModal .modal-header h2 { color:#fff; }
+#quarterlyApproveCycleModal .modal-header .btn-close,#quarterlyRejectCycleModal .modal-header .btn-close { filter:invert(1) grayscale(100%) brightness(200%); opacity:.9; }
+#quarterlyApproveCycleModal .modal-header i,#quarterlyRejectCycleModal .modal-header i { color:#e4c45a !important; }
 .quarterly-workflow-nav { background:#eef2e9; border:1px solid var(--quarterly-border); border-radius:14px; padding:7px; }
 .quarterly-workflow-nav .btn { border-color:transparent; background:transparent; }
 .quarterly-page .form-label,.quarterly-cycle-filter label { font-weight:600; color:#283629; }
