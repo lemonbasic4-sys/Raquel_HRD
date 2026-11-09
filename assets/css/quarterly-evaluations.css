@@ -25,6 +25,8 @@
 .quarterly-page .btn-success,.quarterly-page .btn-outline-success.active { background:linear-gradient(135deg,#294306,#082e06); border-color:#294306; color:#fff; box-shadow:0 3px 8px rgba(8,46,6,.15); }
 .quarterly-page .btn-outline-success { color:#294306; border-color:#a9b99a; background:#fff; }
 .quarterly-page .btn-success:hover,.quarterly-page .btn-outline-success:hover { background:#183a03; border-color:#183a03; color:#fff; }
+.quarterly-page .quarterly-cycle-reject { background:linear-gradient(135deg,#bd2929,#9e1b22); border-color:#9e1b22; color:#fff; box-shadow:0 3px 8px rgba(158,27,34,.15); }
+.quarterly-page .quarterly-cycle-reject:hover { background:#7f181e; border-color:#7f181e; color:#fff; }
 .quarterly-page .btn:focus-visible { outline:3px solid var(--quarterly-gold); outline-offset:3px; }
 .quarterly-workflow-nav { background:#eef2e9; border:1px solid var(--quarterly-border); border-radius:14px; padding:7px; }
 .quarterly-workflow-nav .btn { border-color:transparent; background:transparent; }

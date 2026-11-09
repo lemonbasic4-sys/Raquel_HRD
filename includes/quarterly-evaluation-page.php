@@ -63,6 +63,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $conn->commit();
             } catch (Throwable $approvalError) { $conn->rollback(); throw $approvalError; }
             redirectWith(quarterlyUrl($actor,'?view=history&cycle_id='.$approveCycleId),'success','Quarterly cycle approved and moved to history.');
+        } elseif (($_POST['action'] ?? '') === 'reject_cycle') {
+            $rejectCycleId=(int)($_POST['cycle_id'] ?? 0);
+            $rejectedCount=quarterlyRejectCycle($conn,$actor,$rejectCycleId);
+            redirectWith(quarterlyUrl($actor,'?view=peers&cycle_id='.$rejectCycleId),'success',
+                'Quarterly cycle rejected and restarted. '.$rejectedCount.' previous evaluation(s) were rejected; employees can submit new self-ratings.');
         } elseif (($_POST['action'] ?? '') === 'return') {
             quarterlyReturnEvaluation($conn,$actor,(int)($_POST['return_evaluation_id'] ?? 0),(string)($_POST['return_reason'] ?? ''));
             redirectWith(quarterlyUrl($actor,'?view=peers'),'success','Evaluation returned. Earlier 360 ratings will be cleared when the employee resubmits.');
@@ -227,7 +232,7 @@ require_once __DIR__ . '/header.php';
     <?php if ($evaluationId && $cycle && quarterlyCanOwnCycle($conn,$actor,(int)$cycle['department_id']) && empty($cycle['completed_at']) && !empty($cycle['ready_for_approval_at'])): ?>
         <div class="alert alert-success d-flex flex-wrap align-items-center justify-content-between gap-3" role="status" data-persistent-alert>
             <div><strong>Ready for <?php echo e(quarterlyCycleOwnerName($conn,(int)$cycle['department_id'])); ?> approval</strong><div>All quarterly requirements are complete. The cycle will move to history after approval.</div></div>
-            <form method="post"><?php echo csrfField(); ?><input type="hidden" name="action" value="approve_cycle"><input type="hidden" name="cycle_id" value="<?php echo (int)$cycleId; ?>"><button class="btn btn-success" type="submit"><i class="fas fa-check-circle me-2" aria-hidden="true"></i>Approve cycle</button></form>
+            <form method="post" class="d-flex flex-wrap gap-2"><?php echo csrfField(); ?><input type="hidden" name="cycle_id" value="<?php echo (int)$cycleId; ?>"><button class="btn btn-success" type="submit" name="action" value="approve_cycle"><i class="fas fa-check-circle me-2" aria-hidden="true"></i>Approve cycle</button><button class="btn btn-danger quarterly-cycle-reject" type="submit" name="action" value="reject_cycle" onclick="return confirm('Reject this Quarterly cycle? All linked evaluations will be marked Rejected, previous 360 ratings will be cleared, and employees must submit new self-ratings. Saved scores and approval snapshots will remain in audit history.');"><i class="fas fa-rotate-left me-2" aria-hidden="true"></i>Reject &amp; restart</button></form>
         </div>
     <?php endif; ?>
     <?php if (!$cycles || (!$evaluationId && !$cycleOptions)): ?>
@@ -267,7 +272,7 @@ require_once __DIR__ . '/header.php';
             <?php if ($view==='peers' && !$historyView && $cycle && quarterlyCanOwnCycle($conn,$actor,(int)$cycle['department_id']) && empty($cycle['completed_at']) && !empty($cycle['ready_for_approval_at'])): ?>
                 <div class="alert alert-success d-flex flex-wrap align-items-center justify-content-between gap-3 mt-3" role="status" data-persistent-alert>
                     <div><strong>Ready for <?php echo e(quarterlyCycleOwnerName($conn,(int)$cycle['department_id'])); ?> approval</strong><div>All quarterly requirements are complete. The cycle will move to history after approval.</div></div>
-                    <form method="post"><?php echo csrfField(); ?><input type="hidden" name="action" value="approve_cycle"><input type="hidden" name="cycle_id" value="<?php echo (int)$cycleId; ?>"><button class="btn btn-success" type="submit"><i class="fas fa-check-circle me-2" aria-hidden="true"></i>Approve cycle</button></form>
+                    <form method="post" class="d-flex flex-wrap gap-2"><?php echo csrfField(); ?><input type="hidden" name="cycle_id" value="<?php echo (int)$cycleId; ?>"><button class="btn btn-success" type="submit" name="action" value="approve_cycle"><i class="fas fa-check-circle me-2" aria-hidden="true"></i>Approve cycle</button><button class="btn btn-danger quarterly-cycle-reject" type="submit" name="action" value="reject_cycle" onclick="return confirm('Reject this Quarterly cycle? All linked evaluations will be marked Rejected, previous 360 ratings will be cleared, and employees must submit new self-ratings. Saved scores and approval snapshots will remain in audit history.');"><i class="fas fa-rotate-left me-2" aria-hidden="true"></i>Reject &amp; restart</button></form>
                 </div>
             <?php endif; ?>
             <div class="row g-2 mb-3"><div class="col-md-7"><label for="quarterlySearch" class="form-label">Find employee</label><input id="quarterlySearch" class="form-control" type="search" placeholder="Employee name or position"></div>

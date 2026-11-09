@@ -1097,6 +1097,54 @@ function quarterlyUpdateCycleCompletion($conn, int $cycleId, int $approvalUserId
     return $complete;
 }
 
+/** Reject a completed-but-unapproved cycle and reopen every employee at self-rating. */
+function quarterlyRejectCycle($conn, array $actor, int $cycleId): int
+{
+    $conn->begin_transaction();
+    try {
+        $cycle=quarterlyQuery($conn,'SELECT c.*,d.department_name FROM quarterly_evaluation_cycles c
+            JOIN departments d ON d.department_id=c.department_id WHERE c.cycle_id=? FOR UPDATE',[$cycleId])[0] ?? null;
+        if (!$cycle || !quarterlyCanOwnCycle($conn,$actor,(int)$cycle['department_id'])) {
+            throw new DomainException('Only the assigned department cycle owner can reject this Quarterly cycle.');
+        }
+        if (!empty($cycle['completed_at']) || empty($cycle['ready_for_approval_at'])) {
+            throw new DomainException('Only a cycle ready for approval can be rejected and restarted.');
+        }
+        $members=quarterlyQuery($conn,'SELECT member_id,employee_id,evaluation_id FROM quarterly_evaluation_members
+            WHERE cycle_id=? ORDER BY member_id FOR UPDATE',[$cycleId]);
+        if (!$members) throw new DomainException('This Quarterly cycle has no evaluations to restart.');
+        $rejected=0;
+        foreach ($members as $member) {
+            if ($member['evaluation_id']) {
+                quarterlyQuery($conn,"UPDATE evaluations SET status='Rejected' WHERE evaluation_id=?",[(int)$member['evaluation_id']]);
+                logAudit($conn,(int)$actor['user_id'],'REJECT','Quarterly Evaluation',(int)$member['evaluation_id'],
+                    'Rejected when the department cycle was rejected and restarted. Prior scores and approval snapshots are retained for audit.');
+                $rejected++;
+            }
+        }
+        quarterlyQuery($conn,'DELETE FROM quarterly_peer_submissions WHERE cycle_id=?',[$cycleId]);
+        quarterlyQuery($conn,'UPDATE quarterly_evaluation_members SET evaluation_id=NULL,self_values_json=NULL,
+            current_version=0,revision_pending=0,finalized_at=NULL,is_late_participant=0 WHERE cycle_id=?',[$cycleId]);
+        quarterlyQuery($conn,'UPDATE quarterly_evaluation_cycles SET ready_for_approval_at=NULL,cycle_approved_by=NULL,
+            completed_at=NULL WHERE cycle_id=?',[$cycleId]);
+        logAudit($conn,(int)$actor['user_id'],'REJECT','Quarterly Cycle',$cycleId,
+            'Rejected and restarted cycle for '.$cycle['department_name'].' from '.$cycle['period_start'].' to '.$cycle['period_end'].'. '.$rejected.' linked evaluations were rejected; prior score and approval records were retained.');
+        foreach (quarterlyQuery($conn,"SELECT DISTINCT u.user_id FROM quarterly_evaluation_members m
+                JOIN users u ON u.employee_id=m.employee_id
+                WHERE m.cycle_id=? AND u.is_active=1 AND u.deleted_at IS NULL
+                  AND COALESCE(u.account_hold,0)=0",[$cycleId]) as $user) {
+            createNotification($conn,(int)$user['user_id'],'Quarterly cycle restarted',
+                'The '.$cycle['department_name'].' Quarterly cycle was rejected and restarted. Submit a new self-rating and complete the cycle ratings again.',
+                quarterlyUrl($actor,'?view=peers&cycle_id='.$cycleId),'evaluations',true);
+        }
+        $conn->commit();
+        return $rejected;
+    } catch (Throwable $error) {
+        $conn->rollback();
+        throw $error;
+    }
+}
+
 function quarterlyApplyKraRatings($conn, array $actor, int $evaluationId, array $ratings): array
 {
     $rows=quarterlyKraRows($conn,$evaluationId);
