@@ -1104,3 +1104,15 @@ if (headReviewTabs) {
 }
 </script>
 <?php require_once __DIR__ . '/footer.php'; ?>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('table.quarterly-core-score-table').forEach(function (table) {
+        const labels = Array.from(table.querySelectorAll('thead th')).map(function (th) { return th.textContent.trim(); });
+        table.classList.add('mobile-peer-detail-table');
+        table.querySelectorAll('tbody tr').forEach(function (row) {
+            Array.from(row.cells).forEach(function (cell, i) { cell.setAttribute('data-label', labels[i] || 'Rating'); });
+        });
+    });
+});
+</script>

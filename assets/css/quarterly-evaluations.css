@@ -345,3 +345,19 @@
     .peer-history-short-heading { display:inline; }
 }
 @media(min-width:651px) { .peer-history-short-heading { display:none; } }
+
+/* Read-only peer breakdown: one criterion per mobile card, all ratings retained. */
+@media(max-width:650px) {
+    table.mobile-peer-detail-table { display:block!important; min-width:0!important; width:100%!important; }
+    table.mobile-peer-detail-table thead { display:none; }
+    table.mobile-peer-detail-table tbody { display:block; width:100%; }
+    table.mobile-peer-detail-table tbody tr { display:block; margin-bottom:12px; border:1px solid #dce5d7; border-radius:10px; overflow:hidden; background:#fff; }
+    table.mobile-peer-detail-table tbody td { display:flex!important; width:100%!important; min-width:0!important; align-items:center; justify-content:space-between; gap:12px; padding:9px 12px!important; font-size:12px!important; line-height:1.45; white-space:normal!important; word-break:normal!important; overflow-wrap:break-word; text-align:right; }
+    table.mobile-peer-detail-table tbody td::before { content:attr(data-label); text-align:left; color:#536153; font-size:11px; flex:1; }
+    table.mobile-peer-detail-table tbody td:first-child { display:block!important; background:#edf4e8; color:#173f13; text-align:left; }
+    table.mobile-peer-detail-table tbody td:first-child::before { display:none; }
+    table.mobile-peer-detail-table tbody td:first-child small { display:block; margin-top:4px; font-size:11px; }
+    table.mobile-peer-detail-table tbody td:last-child { background:#f3f7ef; font-weight:700; color:#244b15; }
+    table.mobile-peer-detail-table tfoot { display:table; width:100%; }
+    table.mobile-peer-detail-table tfoot th, table.mobile-peer-detail-table tfoot td { padding:10px!important; font-size:12px!important; white-space:normal!important; }
+}
