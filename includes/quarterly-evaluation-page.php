@@ -17,6 +17,7 @@ if ($ownCycleSetupVisible) $cycleSetupChoices[(int)$actor['department_id']]=$act
 foreach ($externalCyclePreviews as $externalPreview) {
     $cycleSetupChoices[(int)$externalPreview['department_id']]=$externalPreview['department_name'];
 }
+$cycleSetupChoices=[]; // New forms are published per employee; no department cycle setup.
 $requestedPreviewId=(int)($_GET['preview_department'] ?? 0);
 $cycleSetupDepartmentId=isset($cycleSetupChoices[$requestedPreviewId]) ? $requestedPreviewId
     : ($externalCyclePreviews ? (int)$externalCyclePreviews[0]['department_id'] : (int)$actor['department_id']);
@@ -36,13 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verifyCsrfToken();
     try {
         if (($_POST['action'] ?? '') === 'start_quarterly_cycle') {
-            if (!quarterlyCanOwnCycle($conn,$actor,(int)$actor['department_id'])) {
-                throw new DomainException('Only the assigned department cycle owner can start this cycle.');
-            }
-            $newCycleId=quarterlyStartCycle($conn,$actor,(int)$actor['department_id'],
-                (string)($_POST['period_start'] ?? ''),(string)($_POST['period_end'] ?? ''),
-                (string)($_POST['self_rating_deadline'] ?? ''));
-            redirectWith(quarterlyUrl($actor,'?view=peers&cycle_id='.$newCycleId),'success','Department Quarterly cycle started. Employee self-rating notifications were sent.');
+            throw new DomainException('Publish an employee evaluation form with its period instead of starting a department cycle.');
         } elseif (($_POST['action'] ?? '') === 'rate' && ($_POST['confirmed'] ?? '') === '1') {
             $ratingTarget=quarterlyMember($conn,$evaluationId);
             $withKra=$ratingTarget && quarterlyCanFinalize($conn,$actor,$ratingTarget);
@@ -53,7 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (!empty($_POST['kra'])) throw new DomainException('Only the immediate head may adjust KRA ratings.');
                 quarterlySubmitPeers($conn,$actor,$evaluationId,(array)($_POST['scores'] ?? []));
             }
-            redirectWith(quarterlyUrl($actor,'?view=peers&cycle_id='.(int)$_POST['cycle_id']),'success',$withKra ? 'KRA review approved and your 360 ratings submitted. Peer ratings are locked.' : 'Your 360 ratings were submitted and locked.');
+            redirectWith(quarterlyUrl($actor,'?view=peers&cycle_id='.(int)$_POST['cycle_id']),'success',$withKra ? 'Your KRA review and 360 rating were saved. Individual final approval waits for all required peer ratings.' : 'Your 360 ratings were submitted and locked.');
         } elseif (($_POST['action'] ?? '') === 'cancel_cycle') {
             $cancelCycleId=(int)($_POST['cycle_id'] ?? 0);
             $conn->begin_transaction();
@@ -90,9 +85,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       catch (Throwable $e) { error_log('Quarterly workflow: '.$e->getMessage()); $error='The request could not be completed. Your previous finalized result has been preserved. Please try again.'; }
 }
 $reviewerSql = hrEvaluationReviewerSql('m', 'c.department_id');
-$cycles = quarterlyQuery($conn,"SELECT DISTINCT c.*,d.department_name FROM quarterly_evaluation_cycles c
+$cycles = quarterlyQuery($conn,"SELECT DISTINCT c.*,d.department_name,(SELECT CONCAT(e.first_name,' ',e.last_name) FROM quarterly_evaluation_members im JOIN employees e ON e.employee_id=im.employee_id WHERE im.cycle_id=c.cycle_id LIMIT 1) AS individual_name FROM quarterly_evaluation_cycles c
     JOIN departments d ON d.department_id=c.department_id JOIN quarterly_evaluation_members m ON m.cycle_id=c.cycle_id
-    WHERE m.employee_id=? OR ($reviewerSql)=?
+    WHERE m.employee_id=? OR ($reviewerSql)=? OR (c.individual_evaluation_id>0 AND c.department_id=".(int)$actor['department_id']." AND EXISTS(SELECT 1 FROM quarterly_required_raters rr WHERE rr.cycle_id=c.cycle_id AND rr.rater_employee_id=".(int)$actor['employee_id']."))
     ORDER BY c.period_end DESC,c.cycle_id DESC",[(int)$actor['employee_id'],(int)$actor['job_title_id']]);
 $cycleOptions=array_values(array_filter($cycles,static fn($c)=>$historyView ? (!empty($c['completed_at']) || !empty($c['cancelled_at'])) : (empty($c['completed_at']) && empty($c['cancelled_at']))));
 if (!$cycleId && $cycleOptions) $cycleId=(int)$cycleOptions[0]['cycle_id'];
@@ -115,7 +110,7 @@ if ($evaluationId) {
     $canFinalize=quarterlyCanFinalize($conn,$actor,$member);
 }
 // Existing inbox links may still target the retired consolidation review.
-if ($_SERVER['REQUEST_METHOD']==='GET' && $member && $canFinalize && $view==='review'
+if ($_SERVER['REQUEST_METHOD']==='GET' && $member && empty($member['individual_evaluation_id']) && $canFinalize && $view==='review'
     && in_array($actor['role'],['HR Manager','HR Supervisor'],true)) {
     $hasHeadReview=(bool)quarterlyQuery($conn,'SELECT 1 FROM quarterly_peer_submissions WHERE cycle_id=? AND target_employee_id=? AND rater_employee_id=? LIMIT 1',
         [(int)$member['cycle_id'],(int)$member['employee_id'],(int)$actor['employee_id']]);
@@ -205,7 +200,7 @@ if ($cycle) {
     }
 }
 $directReportCycle=(bool)array_filter($members,static fn($m)=>(int)$m['employee_id']!==(int)$actor['employee_id'] && (int)$m['reviewer_position_id']>0 && (int)$m['reviewer_position_id']===(int)$actor['job_title_id']);
-$isDepartmentPeer=$own && (int)$cycle['department_id']===(int)$actor['department_id'];
+$isDepartmentPeer=($own || !empty($cycle['individual_evaluation_id'])) && (int)($cycle['department_id'] ?? 0)===(int)$actor['department_id'];
 if (($view==='rate' && !$isDepartmentPeer && !$canFinalize) || ($view==='peers' && !$isDepartmentPeer && !$directReportCycle && $cycle)) {
     http_response_code(403); exit('360 ratings are available only within your own department cycle.');
 }
@@ -252,19 +247,19 @@ require_once __DIR__ . '/header.php';
         <a class="btn btn-outline-success <?php echo $historyView ? 'active' : ''; ?>" <?php echo $historyView ? 'aria-current="page"' : ''; ?> href="<?php echo quarterlyUrl($actor,'?view=history'); ?>"><i class="fas fa-history me-2" aria-hidden="true"></i>Quarterly Evaluation History</a>
     </nav>
     <?php endif; ?>
-    <?php if ($cycle && quarterlyCanOwnCycle($conn,$actor,(int)$cycle['department_id']) && empty($cycle['cancelled_at'])): ?>
+    <?php if ($cycle && empty($cycle['individual_evaluation_id']) && quarterlyCanOwnCycle($conn,$actor,(int)$cycle['department_id']) && empty($cycle['cancelled_at'])): ?>
         <div class="modal fade" id="quarterlyCancelCycleModal" tabindex="-1" aria-labelledby="quarterlyCancelCycleTitle" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content">
             <div class="modal-header"><h2 class="modal-title h5 mb-0" id="quarterlyCancelCycleTitle"><i class="fas fa-ban text-danger me-2" aria-hidden="true"></i>Cancel Quarterly cycle?</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
             <form method="post"><div class="modal-body"><p>Cancel this department cycle? Submitted ratings will remain in history. This can also cancel an already approved cycle.</p><?php echo csrfField(); ?><input type="hidden" name="action" value="cancel_cycle"><input type="hidden" name="cycle_id" value="<?php echo (int)$cycleId; ?>"><label class="form-label fw-semibold" for="quarterlyCancellationReason">Reason for cancellation</label><textarea class="form-control" id="quarterlyCancellationReason" name="cancellation_reason" rows="3" maxlength="2000" required></textarea></div><div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Keep cycle</button><button class="btn btn-danger" type="submit"><i class="fas fa-ban me-2"></i>Cancel cycle</button></div></form>
         </div></div></div>
     <?php endif; ?>
-    <?php if ($evaluationId && $cycle && quarterlyCanOwnCycle($conn,$actor,(int)$cycle['department_id']) && empty($cycle['completed_at']) && empty($cycle['cancelled_at']) && !empty($cycle['ready_for_approval_at'])): ?>
+    <?php if ($evaluationId && $cycle && empty($cycle['individual_evaluation_id']) && quarterlyCanOwnCycle($conn,$actor,(int)$cycle['department_id']) && empty($cycle['completed_at']) && empty($cycle['cancelled_at']) && !empty($cycle['ready_for_approval_at'])): ?>
         <div class="alert alert-success d-flex flex-wrap align-items-center justify-content-between gap-3" role="status" data-persistent-alert>
             <div><strong>Ready for <?php echo e(quarterlyCycleOwnerName($conn,(int)$cycle['department_id'])); ?> approval</strong><div>All quarterly requirements are complete. The cycle will move to history after approval.</div></div>
             <div class="d-flex flex-wrap gap-2"><button class="btn btn-outline-danger" type="button" data-bs-toggle="modal" data-bs-target="#quarterlyCancelCycleModal"><i class="fas fa-ban me-2" aria-hidden="true"></i>Cancel cycle</button><button class="btn btn-success" type="button" data-bs-toggle="modal" data-bs-target="#quarterlyApproveCycleModal"><i class="fas fa-check-circle me-2" aria-hidden="true"></i>Approve cycle</button><button class="btn btn-danger quarterly-cycle-reject" type="button" data-bs-toggle="modal" data-bs-target="#quarterlyRejectCycleModal"><i class="fas fa-rotate-left me-2" aria-hidden="true"></i>Reject &amp; restart</button></div>
         </div>
     <?php endif; ?>
-    <?php if ($cycle && quarterlyCanOwnCycle($conn,$actor,(int)$cycle['department_id']) && empty($cycle['completed_at']) && !empty($cycle['ready_for_approval_at'])): ?>
+    <?php if ($cycle && empty($cycle['individual_evaluation_id']) && quarterlyCanOwnCycle($conn,$actor,(int)$cycle['department_id']) && empty($cycle['completed_at']) && !empty($cycle['ready_for_approval_at'])): ?>
         <div class="modal fade" id="quarterlyApproveCycleModal" tabindex="-1" aria-labelledby="quarterlyApproveCycleTitle" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
                 <div class="modal-header"><h2 class="modal-title h5 mb-0" id="quarterlyApproveCycleTitle"><i class="fas fa-check-circle text-success me-2" aria-hidden="true"></i>Approve Quarterly cycle?</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
@@ -293,12 +288,12 @@ require_once __DIR__ . '/header.php';
             <label for="quarterlyCycle" class="align-self-center">Department / period</label>
             <select id="quarterlyCycle" name="cycle_id" class="form-select quarterly-cycle">
             <?php foreach ($cycleOptions as $c): ?>
-                <option value="<?php echo (int)$c['cycle_id']; ?>" <?php echo (int)$c['cycle_id']===$cycleId ? 'selected' : ''; ?>><?php echo e($c['department_name'].' · '.$c['period_start'].' to '.$c['period_end']); ?></option>
+                <option value="<?php echo (int)$c['cycle_id']; ?>" <?php echo (int)$c['cycle_id']===$cycleId ? 'selected' : ''; ?>><?php echo e($c['department_name'].(!empty($c['individual_evaluation_id']) ? ' - '.$c['individual_name'] : '').' - '.$c['period_start'].' to '.$c['period_end']); ?></option>
             <?php endforeach; ?>
             </select><button class="btn btn-success">Show cycle</button>
         </form>
         <?php if ($historyView): ?>
-            <?php if (!empty($cycle['cancelled_at'])): ?><div class="alert alert-warning" role="status"><i class="fas fa-ban me-2" aria-hidden="true"></i><strong>Cycle cancelled.</strong> Ratings are retained. Reason: <?php echo e($cycle['cancellation_reason'] ?? ''); ?></div><?php else: ?><div class="alert alert-success d-flex flex-wrap align-items-center justify-content-between gap-2" role="status"><span><i class="fas fa-check-circle me-2" aria-hidden="true"></i>All required Quarterly approvals and 360 ratings are complete. This cycle is archived for viewing. Completed <?php echo e($cycle['completed_at']); ?>.</span><?php if (quarterlyCanOwnCycle($conn,$actor,(int)$cycle['department_id'])): ?><button class="btn btn-outline-danger" type="button" data-bs-toggle="modal" data-bs-target="#quarterlyCancelCycleModal"><i class="fas fa-ban me-2"></i>Cancel cycle</button><?php endif; ?></div><?php endif; ?>
+            <?php if (!empty($cycle['cancelled_at'])): ?><div class="alert alert-warning" role="status"><i class="fas fa-ban me-2" aria-hidden="true"></i><strong>Cycle cancelled.</strong> Ratings are retained. Reason: <?php echo e($cycle['cancellation_reason'] ?? ''); ?></div><?php else: ?><div class="alert alert-success d-flex flex-wrap align-items-center justify-content-between gap-2" role="status"><span><i class="fas fa-check-circle me-2" aria-hidden="true"></i>All required Quarterly approvals and 360 ratings are complete. This record is archived for viewing. Completed <?php echo e($cycle['completed_at']); ?>.</span><?php if (empty($cycle['individual_evaluation_id']) && quarterlyCanOwnCycle($conn,$actor,(int)$cycle['department_id'])): ?><button class="btn btn-outline-danger" type="button" data-bs-toggle="modal" data-bs-target="#quarterlyCancelCycleModal"><i class="fas fa-ban me-2"></i>Cancel cycle</button><?php endif; ?></div><?php endif; ?>
         <?php elseif ($view==='peers'): ?>
             <?php if (!quarterlyCanRate($actor)): ?><div class="alert alert-warning">HR department peer ratings are completed through your HRIS account. Your Employee Portal remains available for self-rating and your results.</div><?php endif; ?>
             <?php if ($own && !$own[0]['evaluation_id']): ?><div class="alert alert-warning"><?php echo $actor['role']==='HR Manager' ? 'Your own Quarterly self-rating is pending. You may rate submitted department evaluations now and complete your self-rating separately.' : 'Your own Quarterly self-rating is pending. Direct-report Rate & Review remains available; submit your self-rating before rating other coworkers.'; ?></div><?php endif; ?>
@@ -318,7 +313,7 @@ require_once __DIR__ . '/header.php';
                 </div>
                 <?php endif; ?>
             </header>
-            <?php if ($view==='peers' && !$historyView && $cycle && quarterlyCanOwnCycle($conn,$actor,(int)$cycle['department_id']) && empty($cycle['completed_at']) && !empty($cycle['ready_for_approval_at'])): ?>
+            <?php if ($view==='peers' && !$historyView && $cycle && empty($cycle['individual_evaluation_id']) && quarterlyCanOwnCycle($conn,$actor,(int)$cycle['department_id']) && empty($cycle['completed_at']) && !empty($cycle['ready_for_approval_at'])): ?>
             <?php endif; ?>
             <div class="row g-2 mb-3"><div class="col-md-7"><label for="quarterlySearch" class="form-label">Find employee</label><input id="quarterlySearch" class="form-control" type="search" placeholder="Employee name or position"></div>
                 <div class="col-md-5"><label for="quarterlyStatus" class="form-label">Status</label><select id="quarterlyStatus" class="form-select"><option value="">All</option><option value="submitted">Self-rating submitted</option><option value="pending">For consolidation</option><option value="finalized">Finalized</option><option value="revision">Revision pending</option></select></div></div>
@@ -362,6 +357,8 @@ require_once __DIR__ . '/header.php';
                         <?php elseif (quarterlyCanFinalize($conn,$actor,$target) && $m['rated']): ?>
                             <?php if (!empty($m['revision_pending'])): ?>
                                 <a class="btn btn-sm btn-outline-success" href="<?php echo quarterlyUrl($actor,'?view='.( (int)$actor['department_id']!==(int)$cycle['department_id'] ? 'rate' : 'review').'&evaluation_id='.(int)$m['evaluation_id']); ?>"><?php echo (int)$actor['department_id']!==(int)$cycle['department_id'] ? 'Review revised KRA' : 'Review revised result'; ?></a>
+                            <?php elseif (!empty($cycle['individual_evaluation_id']) && $m['evaluation_status']!=='Approved'): ?>
+                                <a class="btn btn-sm btn-outline-success" href="<?php echo quarterlyUrl($actor,'?view=review&evaluation_id='.(int)$m['evaluation_id']); ?>" aria-label="Review and approve"><i class="fas fa-clipboard-check peer-mobile-eye" aria-hidden="true"></i><span class="peer-desktop-action">Review &amp; approve</span></a>
                             <?php else: ?>
                                 <a class="btn btn-sm btn-outline-success" href="<?php echo quarterlyUrl($actor,'?view=head-review&evaluation_id='.(int)$m['evaluation_id']); ?>" aria-label="View submitted review"><i class="fas fa-eye peer-mobile-eye" aria-hidden="true"></i><span class="peer-desktop-action">View submitted review</span></a>
                             <?php endif; ?>
@@ -381,7 +378,7 @@ require_once __DIR__ . '/header.php';
                 </tr>
             <?php endforeach; ?></tbody>
         </table></div>
-        <?php if ($view==='peers' && !$historyView && $cycle && quarterlyCanOwnCycle($conn,$actor,(int)$cycle['department_id']) && empty($cycle['completed_at']) && !empty($cycle['ready_for_approval_at'])): ?>
+        <?php if ($view==='peers' && !$historyView && $cycle && empty($cycle['individual_evaluation_id']) && quarterlyCanOwnCycle($conn,$actor,(int)$cycle['department_id']) && empty($cycle['completed_at']) && !empty($cycle['ready_for_approval_at'])): ?>
             <div class="alert alert-success d-flex flex-wrap align-items-center justify-content-between gap-3 mt-3 mb-0" role="status" data-persistent-alert>
                 <div><strong>Ready for <?php echo e(quarterlyCycleOwnerName($conn,(int)$cycle['department_id'])); ?> approval</strong><div>All quarterly requirements are complete. The cycle will move to history after approval.</div></div>
                 <div class="d-flex flex-wrap gap-2"><button class="btn btn-success" type="button" data-bs-toggle="modal" data-bs-target="#quarterlyApproveCycleModal"><i class="fas fa-check-circle me-2" aria-hidden="true"></i>Approve cycle</button><button class="btn btn-danger quarterly-cycle-reject" type="button" data-bs-toggle="modal" data-bs-target="#quarterlyRejectCycleModal"><i class="fas fa-rotate-left me-2" aria-hidden="true"></i>Reject &amp; restart</button></div>
@@ -509,6 +506,9 @@ require_once __DIR__ . '/header.php';
                     <?php require __DIR__.'/quarterly-result-cards.php'; ?>
                 </section>
             <?php endif; ?>
+            <?php if (!empty($member['individual_evaluation_id']) && $canFinalize): ?>
+            <div class="alert alert-info" data-persistent-alert><strong>Individual evaluation.</strong> Save your KRA review and rating below. Final approval occurs only after all assigned department peers have rated this employee.<?php if (!individualApprovalReady($conn,'quarterly',$member,(int)$actor['employee_id'])): ?> Other peer ratings are still pending; saving now will not finalize the result.<?php endif; ?></div>
+            <?php endif; ?>
             <p id="quarterlyRatingProgress" class="small fw-bold" aria-live="polite"></p>
             <?php if ($submitted): ?><div class="alert alert-success">Submitted and locked. These ratings cannot be edited.</div><?php endif; ?>
             <form method="post" id="quarterlyRatingForm" data-draft-key="quarterly-rating-overrides-v3-<?php echo (int)$actor['user_id']; ?>-<?php echo $evaluationId; ?>-<?php echo substr(hash('sha256',json_encode([$member['employee_id'],$member['evaluation_created_at'],$member['evaluation_submitted_at'],$member['period_start'],$member['period_end']])),0,24); ?>" data-resume-tab="<?php echo $_SERVER['REQUEST_METHOD']==='POST' ? '1' : '0'; ?>" data-submitted="<?php echo $submitted ? '1' : '0'; ?>" data-override-only="<?php echo !$submitted ? '1' : '0'; ?>">
@@ -568,7 +568,7 @@ require_once __DIR__ . '/header.php';
                     </div>
                     <div class="tab-pane" id="quarterlyRateReviewPanel" role="tabpanel" aria-labelledby="quarterlyRateReviewTab" tabindex="0">
                         <h3 class="h5 quarterly-review-section"><span><i class="fas fa-clipboard-check me-2" aria-hidden="true"></i>Review &amp; Submit Ratings</span></h3>
-                        <p>Check the effective KRA and behavior ratings before approving. Blank overrides retain the employee's submitted ratings. Confirmation approves the employee's evaluation and locks your ratings. The overall score updates automatically as remaining department members submit their 360 ratings.</p>
+                        <p><?php echo !empty($member['individual_evaluation_id']) ? 'Check the effective KRA and behavior ratings. Blank overrides retain the submitted ratings. Your peer rating is locked on confirmation. If other required peer ratings are still pending, this saves the review without final approval. Once all required ratings are complete, the immediate head can finalize the individual result.' : "Check the effective KRA and behavior ratings before approving. Blank overrides retain the employee's submitted ratings. Confirmation approves the employee's evaluation and locks your ratings. The overall score updates automatically as remaining department members submit their 360 ratings."; ?></p>
                         <section class="quarterly-review-summary-group" aria-labelledby="quarterlyReviewKraHeading">
                             <h4 class="h6" id="quarterlyReviewKraHeading">Key Result Areas · Immediate-head review <span>80% of final score</span></h4>
                             <div class="table-responsive quarterly-score-table-wrap"><table class="table table-sm quarterly-score-table"><thead><tr><th>KRA item</th><th class="text-end">Weight</th><th class="text-end">Submitted</th><th class="text-end">Reviewed</th></tr></thead><tbody id="quarterlyRatingPreviewKraRows"><tr><td colspan="4" class="text-muted">No KRA ratings available.</td></tr></tbody><tfoot><tr><th colspan="3">Weighted KRA subtotal</th><td class="text-end"><strong id="quarterlyRatingPreviewKraTotal">—</strong></td></tr></tfoot></table></div>

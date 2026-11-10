@@ -69,7 +69,7 @@ if (isset($_GET['discard']) && is_numeric($_GET['discard'])) {
 
 $employee_stmt = $conn->prepare("
     SELECT e.employee_id, e.employee_code, e.first_name, e.last_name, e.job_title, e.job_title_id, e.department_id, e.branch_id,
-           e.rank_category_id, e.hire_date, e.employment_status, e.contract_start_date, e.contract_end_date,
+           e.rank_category_id, e.hire_date, e.employment_status, e.contract_start_date, e.contract_end_date, e.regularization_effective_date,
            e.probationary_next_evaluation_type,
            d.department_name, b.branch_name
     FROM employees e
@@ -104,6 +104,8 @@ if (!$employee) {
     redirectWith(BASE_URL . '/employee/dashboard.php', 'danger', 'No employee record found for self-rating.');
 }
 $allowed_eval_types = getAllowedEvaluationTypesForEmploymentStatus($employee['employment_status'] ?? 'Regular');
+$individualAvailableEt=individualTemplateEligibilitySql('et',$employee_id);
+$individualAvailableFull=individualTemplateEligibilitySql('evaluation_templates',$employee_id);
 $in_clause = "'" . implode("','", $allowed_eval_types) . "'";
 $legacy_probationary_rank_et = probationaryTemplateLegacyRankSql('et', $employee['job_title_id'] ?? 0);
 $legacy_probationary_rank_full = probationaryTemplateLegacyRankSql('evaluation_templates', $employee['job_title_id'] ?? 0);
@@ -126,6 +128,7 @@ $view_eval = null;
 $edit_scores = [];
 $view_scores = [];
 $view_dev_plans = [];
+$individualExistingFlag=0;
 $selected_template_id = isset($_GET['template']) ? (int) $_GET['template'] : 0;
 $view_mode = false;
 $assigned_evaluations = null;
@@ -258,9 +261,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ? '1 = 1'
         : "(target_department IS NULL OR target_department = '' OR target_department = 'All Departments' OR target_department = '" . $conn->real_escape_string((string)$employee['department_name']) . "')";
     $active_template_eligibility = $is_valid_existing_edit ? '1 = 1' : "status = 'Active'";
+    $individualExistingFlag=$is_valid_existing_edit ? 1 : 0;
     $template_access = $conn->prepare("SELECT template_id FROM evaluation_templates
         WHERE template_id = ? AND $active_template_eligibility AND deleted_at IS NULL
           AND evaluation_type IN ($in_clause)
+          AND ($individualAvailableFull OR $individualExistingFlag = 1)
           AND $department_eligibility
           AND $department_name_eligibility
           AND $position_eligibility LIMIT 1");
@@ -366,6 +371,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $errors[] = 'Please select an evaluation template.';
     }
 
+    $individualTemplate=annualQuery($conn,'SELECT * FROM evaluation_templates WHERE template_id=?',[$template_id])[0]??[];
+    $individualPeriodError=false;
+    if(!empty($individualTemplate['individual_workflow'])) {
+        try {
+            $savedPeriod=$editing_id>0 && $is_valid_existing_edit ? annualQuery($conn,'SELECT evaluation_period_start,evaluation_period_end FROM evaluations WHERE evaluation_id=? AND employee_id=?',[$editing_id,$employee_id])[0]??null : null;
+            [$period_start,$period_end]=$savedPeriod ? [$savedPeriod['evaluation_period_start'],$savedPeriod['evaluation_period_end']] : individualAssessmentDates($employee,$individualTemplate);
+        } catch(DomainException $error) { $errors[]=$error->getMessage(); $individualPeriodError=true; }
+    }
     if ($template_id > 0) {
         $annual_check_start = $period_start ?: date('Y') . '-01-01';
         $annual_check_end = $period_end ?: date('Y') . '-12-31';
@@ -409,10 +422,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     $evaluation_type = trim($template['evaluation_type'] ?? 'Annual');
-    if ($evaluation_type === 'Annual' && $ap_annual_waiting) {
+    if ($evaluation_type === 'Annual' && $ap_annual_waiting && empty($individualTemplate['individual_workflow'])) {
         $errors[] = 'The department cycle owner has not started an available Annual cycle. Please wait before opening this self-rating form.';
     }
-    if ($evaluation_type === 'Quarterly' && !$available_quarterly_cycle) {
+    if ($evaluation_type === 'Quarterly' && !$available_quarterly_cycle && empty($individualTemplate['individual_workflow'])) {
         $errors[] = 'The department cycle owner has not started an available Quarterly cycle. Please wait before opening this self-rating form.';
     }
     if (($employee['employment_status'] ?? '') === 'Probationary'
@@ -446,7 +459,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     // Automatically calculate period_start and period_end if they are empty
-    if (empty($period_start) || empty($period_end)) {
+    if (!$individualPeriodError && (empty($period_start) || empty($period_end))) {
         if ($editing_id > 0) {
             $db_eval_stmt = $conn->prepare("SELECT evaluation_period_start, evaluation_period_end FROM evaluations WHERE evaluation_id = ? LIMIT 1");
             $db_eval_stmt->bind_param("i", $editing_id);
@@ -731,8 +744,9 @@ $templates_stmt = $conn->prepare("
             AND (et.target_job_title_id IS NULL OR et.target_job_title_id = ?)
             AND $legacy_probationary_rank_et))
       AND et.evaluation_type IN ($in_clause)
-      AND (et.evaluation_type <> 'Annual' OR ? = 0)
-      AND (et.evaluation_type <> 'Quarterly' OR $quarterly_waiting_flag = 0)
+      AND $individualAvailableEt
+      AND (et.individual_workflow=1 OR et.evaluation_type <> 'Annual' OR ? = 0)
+      AND (et.individual_workflow=1 OR et.evaluation_type <> 'Quarterly' OR $quarterly_waiting_flag = 0)
       $probationary_phase_filter_et
       AND (et.evaluation_type <> 'Final' OR $initial_gate = 1)
       AND NOT EXISTS (
@@ -740,8 +754,8 @@ $templates_stmt = $conn->prepare("
           FROM evaluations ev
           WHERE ev.employee_id = ?
             AND ev.template_id = et.template_id
-            AND (et.evaluation_type <> 'Annual' OR YEAR(ev.evaluation_period_start) = YEAR(CURDATE()))
-            AND (et.evaluation_type <> 'Quarterly' OR (ev.evaluation_period_start = '$quarterly_cycle_start_sql' AND ev.evaluation_period_end = '$quarterly_cycle_end_sql'))
+            AND (et.individual_workflow=1 OR et.evaluation_type <> 'Annual' OR YEAR(ev.evaluation_period_start) = YEAR(CURDATE()))
+            AND (et.individual_workflow=1 OR et.evaluation_type <> 'Quarterly' OR (ev.evaluation_period_start = '$quarterly_cycle_start_sql' AND ev.evaluation_period_end = '$quarterly_cycle_end_sql'))
             AND ev.deleted_at IS NULL
             AND ev.status NOT IN ('Draft', 'Returned', 'Rejected', 'Pending Self-Rating')
             AND NOT (
@@ -769,7 +783,7 @@ $selected_template = null;
 if ($selected_template_id > 0) {
     if ($is_assigned_edit) {
         $sel_template_stmt = $conn->prepare("
-            SELECT template_id, template_name, evaluation_type, target_department, form_code, revision_date, effective_date_form
+            SELECT template_id, template_name, evaluation_type, target_department, form_code, revision_date, effective_date_form, individual_workflow, assessment_from, assessment_to
             FROM evaluation_templates
             WHERE template_id = ?
             LIMIT 1
@@ -777,7 +791,7 @@ if ($selected_template_id > 0) {
         $sel_template_stmt->bind_param("i", $selected_template_id);
     } else {
         $sel_template_stmt = $conn->prepare("
-            SELECT template_id, template_name, evaluation_type, target_department, form_code, revision_date, effective_date_form
+            SELECT template_id, template_name, evaluation_type, target_department, form_code, revision_date, effective_date_form, individual_workflow, assessment_from, assessment_to
             FROM evaluation_templates 
             WHERE template_id = ? 
               AND (target_department IS NULL OR target_department = '' OR target_department = 'All Departments' OR target_department = ?)
@@ -787,8 +801,9 @@ if ($selected_template_id > 0) {
                       AND (target_job_title_id IS NULL OR target_job_title_id = ?)
                       AND $legacy_probationary_rank_full))
               AND evaluation_type IN ($in_clause)
-              AND (evaluation_type <> 'Annual' OR ? = 0)
-              AND (evaluation_type <> 'Quarterly' OR $quarterly_waiting_flag = 0)
+          AND ($individualAvailableFull OR $individualExistingFlag = 1)
+              AND (individual_workflow=1 OR evaluation_type <> 'Annual' OR ? = 0)
+              AND (individual_workflow=1 OR evaluation_type <> 'Quarterly' OR $quarterly_waiting_flag = 0)
               $probationary_phase_filter_full
               AND (evaluation_type <> 'Final' OR $initial_gate = 1)
             LIMIT 1
@@ -832,7 +847,7 @@ if ($selected_template_id > 0) {
               AND template_id = ? 
               AND status NOT IN ('Draft', 'Returned', 'Rejected', 'Pending Self-Rating')
               AND (evaluation_type <> 'Annual' OR YEAR(evaluation_period_start) = YEAR(CURDATE()))
-              AND (evaluation_type <> 'Quarterly' OR (evaluation_period_start = '$quarterly_cycle_start_sql' AND evaluation_period_end = '$quarterly_cycle_end_sql'))
+              AND (EXISTS(SELECT 1 FROM evaluation_templates ip WHERE ip.template_id=evaluations.template_id AND ip.individual_workflow=1) OR evaluation_type <> 'Quarterly' OR (evaluation_period_start = '$quarterly_cycle_start_sql' AND evaluation_period_end = '$quarterly_cycle_end_sql'))
               AND NOT (
                   (evaluation_type='Annual' AND EXISTS (
                       SELECT 1 FROM annual_evaluation_members aem JOIN annual_evaluation_cycles aec ON aec.cycle_id=aem.cycle_id
@@ -2298,12 +2313,6 @@ require_once '../includes/header.php';
                         <?php endif; ?>
 
                         <!-- 1. Primary Action: Template Selection at TOP -->
-                        <?php if ($ap_annual_waiting && !$edit_eval): ?>
-                            <div class="alert alert-info mb-3" role="status"><i class="fas fa-clock me-2" aria-hidden="true"></i>The Annual self-rating form will appear here after the department cycle owner starts the evaluation cycle.</div>
-                        <?php endif; ?>
-                        <?php if ($quarterly_waiting_flag && !$edit_eval && ($employee['employment_status'] ?? '') === 'Regular'): ?>
-                            <div class="alert alert-info mb-3" role="status"><i class="fas fa-clock me-2" aria-hidden="true"></i>The Quarterly self-rating form will appear here after the department cycle owner starts a Quarterly cycle.</div>
-                        <?php endif; ?>
                         <div class="row g-3 mb-4">
                             <div class="col-12">
                                 <label class="form-label fw-bold text-primary" style="font-size: 0.95rem;">
@@ -2415,18 +2424,22 @@ require_once '../includes/header.php';
                         $display_start = $edit_eval['evaluation_period_start'] ?? '';
                         $display_end = $edit_eval['evaluation_period_end'] ?? '';
                         $eval_type = $edit_eval['evaluation_type'] ?? ($selected_template['evaluation_type'] ?? 'Annual');
-                        if ($eval_type === 'Annual' && $available_annual_cycle
+                        if (empty($selected_template['individual_workflow']) && $eval_type === 'Annual' && $available_annual_cycle
                             && (!$edit_eval || in_array($edit_eval['status'] ?? '', ['Draft','Pending Self-Rating'], true))) {
                             $display_start = $available_annual_cycle['period_start'];
                             $display_end = $available_annual_cycle['period_end'];
                         }
-                        if ($eval_type === 'Quarterly' && $available_quarterly_cycle
+                        if (empty($selected_template['individual_workflow']) && $eval_type === 'Quarterly' && $available_quarterly_cycle
                             && (!$edit_eval || in_array($edit_eval['status'] ?? '', ['Draft','Pending Self-Rating'], true))) {
                             $display_start = $available_quarterly_cycle['period_start'];
                             $display_end = $available_quarterly_cycle['period_end'];
                         }
                         
-                        if (empty($display_start) || empty($display_end)) {
+                        if (!empty($selected_template['individual_workflow']) && !$edit_eval) {
+                            try { [$display_start,$display_end]=individualAssessmentDates($employee,$selected_template); }
+                            catch(DomainException $error) { echo '<div class="alert alert-warning">'.e($error->getMessage()).'</div>'; }
+                        }
+                        if (empty($selected_template['individual_workflow']) && (empty($display_start) || empty($display_end))) {
                             $hire_date = $employee['hire_date'] ?? date('Y-m-d');
                             
                             if ($eval_type === 'Annual') {
@@ -2457,7 +2470,7 @@ require_once '../includes/header.php';
                         </div>
                         <input type="hidden" name="period_start" value="<?php echo e($display_start); ?>">
                         <input type="hidden" name="period_end" value="<?php echo e($display_end); ?>">
-                        <?php if (($eval_type ?? '') === 'Annual' && $is_managed_annual_employee): ?>
+                        <?php if (empty($selected_template['individual_workflow']) && ($eval_type ?? '') === 'Annual' && $is_managed_annual_employee): ?>
                         <div class="alert <?php echo $available_annual_cycle ? 'alert-info' : 'alert-warning'; ?> mt-3 mb-3" role="status">
                             <?php if ($available_annual_cycle): ?>
                                 <strong>Annual cycle:</strong> <?php echo e(formatDate($display_start)); ?> to <?php echo e(formatDate($display_end)); ?>.
@@ -2467,7 +2480,7 @@ require_once '../includes/header.php';
                             <?php endif; ?>
                         </div>
                         <?php endif; ?>
-                        <?php if (($eval_type ?? '') === 'Quarterly' && $available_quarterly_cycle): ?>
+                        <?php if (empty($selected_template['individual_workflow']) && ($eval_type ?? '') === 'Quarterly' && $available_quarterly_cycle): ?>
                         <div class="alert alert-info mt-3 mb-3" role="status">
                             <strong>Quarterly cycle:</strong> <?php echo e(formatDate($display_start)); ?> to <?php echo e(formatDate($display_end)); ?>.
                             Self-rating deadline: <?php echo e(formatDate($available_quarterly_cycle['self_rating_deadline'])); ?>.

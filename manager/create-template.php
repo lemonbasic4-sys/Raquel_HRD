@@ -6,6 +6,8 @@ if (!ensureHierarchicalEvaluationSchema($conn)) {
     http_response_code(500);
     exit('Evaluation template schema is unavailable.');
 }
+ensureAnnualEvaluationSchema($conn);
+ensureQuarterlyEvaluationSchema($conn);
 checkRole(['HR Manager', 'HR Supervisor', 'Employee', 'President and CEO']);
 $creator_context = getEvaluationTemplateCreatorContext($conn, (int)($_SESSION['user_id'] ?? 0));
 $is_employee_template_portal = basename(dirname($_SERVER['SCRIPT_NAME'])) === 'employee';
@@ -109,6 +111,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $behavior_framework_version = '';
     }
 
+    try { [$assessmentFrom,$assessmentTo]=individualTemplateDates($_POST,$evaluation_type); }
+    catch (DomainException $error) { redirectWith($template_list_url,'danger',$error->getMessage()); }
     // Validate created_by exists in users
     $creator_id = (int)($_SESSION['user_id'] ?? 0);
     $creator_id_nullable = null;
@@ -135,6 +139,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $stmt->execute();
     $template_id = $stmt->insert_id;
     $stmt->close();
+    annualQuery($conn,'UPDATE evaluation_templates SET individual_workflow=?,assessment_from=?,assessment_to=? WHERE template_id=?',
+        [in_array($evaluation_type,['Annual','Quarterly'],true) ? 1 : 0,$assessmentFrom,$assessmentTo,(int)$template_id]);
     if (!saveEvaluationTemplateTargetPositionIds($conn, $template_id, $target_position_ids)) {
         throw new RuntimeException('Failed to assign target positions to the evaluation template.');
     }
@@ -169,6 +175,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $creator_position = trim((string)($creator_context['position_title'] ?? ''));
     $creator_label = $creator_position !== '' ? " by {$creator_position}" : '';
     logAudit($conn, $_SESSION['user_id'], 'CREATE', 'Template', $template_id, "Created evaluation template: $template_name$creator_label");
+    if(in_array($evaluation_type,['Annual','Quarterly'],true)) individualNotifyTemplateAvailability($conn,(int)$template_id);
     notifyHrStaffOfTemplateChange($conn, $template_id, 'Published');
     redirectWith($template_list_url, 'success', "Template '$template_name' created successfully.");
 }
@@ -588,6 +595,7 @@ require_once '../includes/header.php';
                     </select>
                 </div>
             </div>
+            <?php require __DIR__.'/../includes/individual-template-period-fields.php'; ?>
             <div class="form-check form-switch mb-3">
                 <input class="form-check-input" type="checkbox" role="switch" id="probationaryTemplateToggle" name="probationary_template" value="1">
                 <label class="form-check-label fw-semibold" for="probationaryTemplateToggle">This template is exclusively for OJT / Trainee / Probationary / Project Based employees</label>
@@ -1701,6 +1709,9 @@ function collectDraft() {
         target_department: document.querySelector('[name="target_department"]')?.value || '',
         evaluation_type: document.querySelector('[name="evaluation_type"]')?.value || '',
         probationary_template: document.getElementById('probationaryTemplateToggle')?.checked || false,
+        assessment_year: document.getElementById('assessmentYear')?.value || '',
+        assessment_from: document.getElementById('assessmentFrom')?.value || '',
+        assessment_to: document.getElementById('assessmentTo')?.value || '',
         kra_weight: document.getElementById('kraWeight')?.value || '80',
         behavior_weight: document.getElementById('behaviorWeight')?.value || '20',
         form_code: document.querySelector('[name="form_code"]')?.value || '',
@@ -1737,6 +1748,7 @@ function restoreDraft(draft) {
     setVal('[name="target_department"]', draft.target_department);
     setVal('[name="evaluation_type"]', draft.evaluation_type);
     const probationToggle = document.getElementById('probationaryTemplateToggle');
+    for(const [key,id] of Object.entries({assessment_year:'assessmentYear',assessment_from:'assessmentFrom',assessment_to:'assessmentTo'})) { if(draft[key]!==undefined && document.getElementById(id)) document.getElementById(id).value=draft[key]; }
     if (probationToggle) probationToggle.checked = draft.probationary_template !== undefined
         ? !!draft.probationary_template
         : ['Initial', 'Final'].includes(draft.evaluation_type);

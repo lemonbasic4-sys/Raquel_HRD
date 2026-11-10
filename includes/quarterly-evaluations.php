@@ -113,6 +113,7 @@ function ensureQuarterlyEvaluationSchema($conn): void
             OR (d.department_name='Office of the President' AND j.job_title='President and CEO')
             OR (d.department_name='Operations' AND j.job_title='VP for Operations')
             OR (d.department_name='Purchasing' AND j.job_title='Procurement Supervisor I')) AND j.is_active=1");
+    ensureIndividualEvaluationSchema($conn,'quarterly');
     $ready[$key] = true;
     // Cycles created before the explicit-start workflow are already in progress.
     $conn->query('UPDATE quarterly_evaluation_cycles c SET c.started_at=c.created_at
@@ -273,7 +274,7 @@ function quarterlyMember($conn, int $evaluationId): ?array
 {
     $reviewerSql = hrEvaluationReviewerSql('m', 'c.department_id');
     return quarterlyQuery($conn, "SELECT m.*, m.reviewer_position_id AS original_reviewer_position_id,
-            $reviewerSql AS reviewer_position_id, c.department_id, c.period_start, c.period_end, c.first_finalized_at, c.cancelled_at, c.cancellation_reason,
+            $reviewerSql AS reviewer_position_id, c.department_id, c.individual_evaluation_id, CASE WHEN c.individual_evaluation_id>0 THEN ev.evaluation_period_start ELSE c.period_start END AS period_start, CASE WHEN c.individual_evaluation_id>0 THEN ev.evaluation_period_end ELSE c.period_end END AS period_end, c.first_finalized_at, c.cancelled_at, c.cancellation_reason,
             e.first_name, e.last_name, e.department_id AS current_department_id, e.job_title_id AS current_position_id,
             e.is_active AS employee_active, e.employment_status, e.deleted_at AS employee_deleted_at,
             ev.status AS evaluation_status, ev.total_score AS official_score, et.template_name,
@@ -297,6 +298,7 @@ function quarterlyRosterEligibilitySql(string $memberAlias = 'm', string $employ
 
 function quarterlyExpectedPeers($conn, int $cycleId, int $employeeId): int
 {
+    if(individualIsCycle($conn,'quarterly',$cycleId)) return (int)quarterlyQuery($conn,'SELECT COUNT(*) n FROM quarterly_required_raters WHERE cycle_id=? AND target_employee_id=?',[$cycleId,$employeeId])[0]['n'];
     $count=(int)quarterlyQuery($conn,'SELECT COUNT(*) AS n FROM quarterly_evaluation_members m
         JOIN employees e ON e.employee_id=m.employee_id WHERE m.cycle_id=? AND m.employee_id<>? AND '
         .quarterlyRosterEligibilitySql(),[$cycleId,$employeeId])[0]['n'];
@@ -495,6 +497,7 @@ function quarterlyStartCycle($conn, array $actor, int $departmentId, string $fro
 
 function quarterlyCancelCycle($conn, array $actor, int $cycleId, string $reason): void
 {
+    if(individualIsCycle($conn,'quarterly',$cycleId)) throw new DomainException('Individual evaluations use immediate-head review, not department cycle controls.');
     $reason=trim($reason);
     if ($reason==='') throw new DomainException('Enter a reason for cancelling this Quarterly cycle.');
     if (mb_strlen($reason)>2000) throw new DomainException('The cancellation reason must not exceed 2,000 characters.');
@@ -518,7 +521,7 @@ function quarterlyCycleForSelfRating($conn, int $departmentId, int $employeeId):
         FROM quarterly_evaluation_cycles c
         JOIN employees e ON e.employee_id=?
         LEFT JOIN quarterly_evaluation_members m ON m.cycle_id=c.cycle_id AND m.employee_id=?
-        WHERE c.department_id=? AND c.started_at IS NOT NULL AND c.cancelled_at IS NULL
+        WHERE c.department_id=? AND c.individual_evaluation_id=0 AND c.started_at IS NOT NULL AND c.cancelled_at IS NULL
           AND (m.member_id IS NULL OR m.evaluation_id IS NULL OR m.revision_pending=1)
         ORDER BY c.period_end DESC,c.cycle_id DESC',[$employeeId,$employeeId,$departmentId]);
     $department=quarterlyQuery($conn,'SELECT department_name FROM departments WHERE department_id=?',[$departmentId])[0] ?? [];
@@ -535,6 +538,7 @@ function quarterlyCycleForSelfRating($conn, int $departmentId, int $employeeId):
 /** Caller holds the cycle lock. Enroll new pilot-department employees within the cycle period. */
 function quarterlySyncApCycleRoster($conn, array $cycle): int
 {
+    if(!empty($cycle['individual_evaluation_id'])) return 0;
     if (!quarterlyUsesDepartmentCycle($cycle) || empty($cycle['started_at'])) return 0;
     $newMembers=quarterlyQuery($conn,"SELECT e.employee_id,e.job_title_id,j.job_title,j.reports_to
         FROM employees e JOIN job_titles j ON j.job_title_id=e.job_title_id
@@ -586,6 +590,7 @@ function quarterlyCanFinalize($conn, array $actor, array $member): bool
 
 function quarterlyCanRateBeforeSelf($conn, array $actor, array $member): bool
 {
+    if(!empty($member['individual_evaluation_id'])) return quarterlyCanRate($actor) && (individualRequiredRater($conn,'quarterly',$member,(int)$actor['employee_id']) || quarterlyCanFinalize($conn,$actor,$member));
     return quarterlyCanRate($actor) && ($actor['role']==='HR Manager' || quarterlyCanFinalize($conn,$actor,$member));
 }
 
@@ -698,7 +703,7 @@ function quarterlyReviewToken($conn, array $member): string
 /** Snapshot a department roster using active regular employees with applicable Quarterly forms. */
 function quarterlyRegisterSubmission($conn, int $evaluationId): void
 {
-    $ev = quarterlyQuery($conn, "SELECT ev.*, e.department_id, e.job_title_id, e.employment_status, e.job_title, jt.reports_to
+    $ev = quarterlyQuery($conn, "SELECT ev.*, e.department_id, e.job_title_id, e.employment_status, e.regularization_effective_date, e.job_title, jt.reports_to
         FROM evaluations ev JOIN employees e ON e.employee_id=ev.employee_id
         LEFT JOIN job_titles jt ON jt.job_title_id=e.job_title_id
         WHERE ev.evaluation_id=? AND ev.deleted_at IS NULL AND ev.evaluation_type='Quarterly'", [$evaluationId])[0] ?? null;
@@ -716,6 +721,14 @@ function quarterlyRegisterSubmission($conn, int $evaluationId): void
         throw new DomainException('This Quarterly template must use the eight standard Core Behaviors & Values. Ask its creator to publish an updated template.');
     }
     $values = json_encode(quarterlyValidateScores(array_column($criteria, 'score_value')));
+    $individualTemplate=quarterlyQuery($conn,'SELECT * FROM evaluation_templates WHERE template_id=? AND individual_workflow=1',[(int)$ev['template_id']])[0]??null;
+    if ($individualTemplate) {
+        if(!quarterlyQuery($conn,'SELECT 1 FROM quarterly_evaluation_members WHERE evaluation_id=?',[$evaluationId])) {
+            [$expectedStart,$expectedEnd]=individualAssessmentDates($ev,$individualTemplate);
+            if($start!==$expectedStart || $end!==$expectedEnd) throw new DomainException('The evaluation period does not match the authoritative employee/form period.');
+        }
+        individualRegisterSubmission($conn,'quarterly',$ev,$values); return;
+    }
     $departmentName = quarterlyQuery($conn,'SELECT department_name FROM departments WHERE department_id=?',[(int)$ev['department_id']])[0]['department_name'] ?? '';
     if ($departmentName==='Office of the President' && !$ev['reports_to']) {
         throw new DomainException('The President/CEO is excluded from this department Quarterly cycle.');
@@ -817,6 +830,13 @@ function quarterlyReturnEvaluation($conn, array $actor, int $evaluationId, strin
 
 function quarterlyNotifyCycleRaters($conn, int $cycleId, int $evaluationId, int $joiningEmployeeId, bool $late): void
 {
+    if(individualIsCycle($conn,'quarterly',$cycleId)) {
+        foreach(quarterlyQuery($conn,"SELECT DISTINCT u.user_id FROM quarterly_required_raters rr JOIN users u ON u.employee_id=rr.rater_employee_id WHERE rr.cycle_id=? AND u.is_active=1 AND u.deleted_at IS NULL AND COALESCE(u.account_hold,0)=0",[$cycleId]) as $user) {
+            $rater=quarterlyActor($conn,(int)$user['user_id']);
+            if($rater && quarterlyCanRate($rater)) createNotification($conn,(int)$user['user_id'],'Quarterly rating required after resubmission','The employee resubmitted; provide your 360 rating again.',quarterlyUrl($rater,'?view=rate&evaluation_id='.$evaluationId),'evaluations',true);
+        }
+        return;
+    }
     $members=quarterlyQuery($conn,'SELECT employee_id FROM quarterly_evaluation_members WHERE cycle_id=? AND evaluation_id IS NOT NULL',[$cycleId]);
     if (count($members)<2) return;
     foreach ($members as $member) {
@@ -877,6 +897,10 @@ function quarterlySubmitPeers($conn, array $actor, int $evaluationId, array $sco
         $member=quarterlyMember($conn,$evaluationId);
         quarterlyAssertSnapshotActive($member);
         if (!$member['self_values_json']) throw new DomainException('Wait for the employee to resubmit their self-rating.');
+        if(!empty($member['individual_evaluation_id'])) {
+            if(!individualRequiredRater($conn,'quarterly',$member,(int)$actor['employee_id'])) throw new DomainException('You are not an assigned peer for this individual evaluation.');
+            $rater=[];
+        } else {
         $rater=quarterlyQuery($conn,'SELECT evaluation_id,is_late_participant,revision_pending FROM quarterly_evaluation_members WHERE cycle_id=? AND employee_id=?',[(int)$member['cycle_id'],(int)$actor['employee_id']])[0] ?? null;
         if (!$rater && !quarterlyCanFinalize($conn,$actor,$member)) throw new DomainException('Only assigned department participants and the immediate head may rate this employee.');
         if ((!$rater || !$rater['evaluation_id']) && !quarterlyCanRateBeforeSelf($conn,$actor,$member)) throw new DomainException('Submit your Quarterly self-rating for this department period first.');
@@ -884,6 +908,7 @@ function quarterlySubmitPeers($conn, array $actor, int $evaluationId, array $sco
             $raterMember=quarterlyMember($conn,(int)$rater['evaluation_id']);
             if (!$raterMember) throw new DomainException('Your Quarterly evaluation record is unavailable. Contact HR.');
             quarterlyAssertSnapshotActive($raterMember);
+        }
         }
         if ((int)$actor['employee_id']===(int)$member['employee_id'] || (int)$actor['department_id']!==(int)$member['department_id']) {
             throw new DomainException('Only coworkers in this department cycle can rate this employee.');
@@ -969,6 +994,7 @@ function quarterlyReviewAndRate($conn, array $actor, int $evaluationId, array $r
     try {
         $member=quarterlyMember($conn,$evaluationId);
         if (!$member || !quarterlyCanFinalize($conn,$actor,$member)) throw new DomainException('Only this employee\'s immediate head can review these ratings.');
+
         quarterlyQuery($conn,'SELECT cycle_id FROM quarterly_evaluation_cycles WHERE cycle_id=? FOR UPDATE',[(int)$member['cycle_id']]);
         $member=quarterlyMember($conn,$evaluationId);
         $kraDefaults=[];
@@ -978,7 +1004,10 @@ function quarterlyReviewAndRate($conn, array $actor, int $evaluationId, array $r
         if (!$departmentHead && $scores) throw new DomainException('360 ratings are restricted to the employee department.');
         if ($departmentHead) $scores=quarterlyResolveReviewOverrides(json_decode($member['self_values_json'],true),$scores);
         quarterlyApproveKra($conn,$actor,$evaluationId,$ratings,'',$token,false,false);
-        if ($departmentHead) quarterlySubmitPeers($conn,$actor,$evaluationId,$scores,false,$signature);
+        if ($departmentHead) {
+            $headAlreadyRated=quarterlyQuery($conn,'SELECT 1 FROM quarterly_peer_submissions WHERE cycle_id=? AND target_employee_id=? AND rater_employee_id=?',[(int)$member['cycle_id'],(int)$member['employee_id'],(int)$actor['employee_id']]);
+            if (!$headAlreadyRated) quarterlySubmitPeers($conn,$actor,$evaluationId,$scores,false,$signature);
+        }
         else {
             $bytes=base64_decode(substr($signature,strpos($signature,',')+1),true);
             $info=$bytes===false ? false : @getimagesizefromstring($bytes);
@@ -993,7 +1022,7 @@ function quarterlyReviewAndRate($conn, array $actor, int $evaluationId, array $r
             foreach ($plans as $index=>$plan) quarterlyQuery($conn,'INSERT INTO evaluation_dev_plans (evaluation_id,improvement_area,support_needed,time_frame,sort_order) VALUES (?,?,?,?,?)',
                 [$evaluationId,$plan['improvement_area'],$plan['support_needed'],$plan['time_frame'],$index]);
         }
-        quarterlyRefreshApprovedResult($conn,quarterlyMember($conn,$evaluationId),(int)$actor['user_id'],true);
+        if(empty($member['individual_evaluation_id']) || individualApprovalReady($conn,'quarterly',$member)) quarterlyRefreshApprovedResult($conn,quarterlyMember($conn,$evaluationId),(int)$actor['user_id'],true);
         $conn->commit();
     } catch (Throwable $e) { $conn->rollback(); throw $e; }
 }
@@ -1020,6 +1049,7 @@ function quarterlyValidateDevelopmentPlans(array $plans): array
 /** Caller holds the cycle lock. Approval stays locked; peer arrivals revise the score. */
 function quarterlyRefreshApprovedResult($conn, array $member, int $actorUserId, bool $approve = false): void
 {
+    if(!empty($member['individual_evaluation_id']) && !individualApprovalReady($conn,'quarterly',$member)) throw new DomainException('Final approval requires all assigned department 360 ratings.');
     $candidate=quarterlyCandidate($conn,$member);
     $expected=quarterlyExpectedPeers($conn,(int)$member['cycle_id'],(int)$member['employee_id']);
     $complete=$candidate['peer_count']>=$expected;
@@ -1058,6 +1088,11 @@ function quarterlyRefreshApprovedResult($conn, array $member, int $actorUserId, 
 /** Caller holds the cycle lock; archive only fully approved and fully rated cycles. */
 function quarterlyUpdateCycleCompletion($conn, int $cycleId, int $approvalUserId = 0): bool
 {
+    if(individualIsCycle($conn,'quarterly',$cycleId)) {
+        $done=(bool)quarterlyQuery($conn,"SELECT 1 FROM quarterly_evaluation_members m JOIN evaluations ev ON ev.evaluation_id=m.evaluation_id WHERE m.cycle_id=? AND m.current_version>0 AND m.revision_pending=0 AND ev.status='Approved'",[$cycleId]);
+        if($done) quarterlyQuery($conn,'UPDATE quarterly_evaluation_cycles SET completed_at=COALESCE(completed_at,NOW()),first_completed_at=COALESCE(first_completed_at,NOW()),cycle_approved_by=COALESCE(cycle_approved_by,?) WHERE cycle_id=?',[$approvalUserId ?: null,$cycleId]);
+        return $done;
+    }
     $cycle=quarterlyQuery($conn,'SELECT c.*,d.department_name FROM quarterly_evaluation_cycles c JOIN departments d ON d.department_id=c.department_id WHERE c.cycle_id=?',[$cycleId])[0] ?? null;
     if (!$cycle) {
         if ($approvalUserId) throw new DomainException('This quarterly cycle is unavailable.');
@@ -1134,6 +1169,7 @@ function quarterlyUpdateCycleCompletion($conn, int $cycleId, int $approvalUserId
 /** Reject a completed-but-unapproved cycle and reopen every employee at self-rating. */
 function quarterlyRejectCycle($conn, array $actor, int $cycleId): int
 {
+    if(individualIsCycle($conn,'quarterly',$cycleId)) throw new DomainException('Individual evaluations use immediate-head review, not department cycle controls.');
     $conn->begin_transaction();
     try {
         $cycle=quarterlyQuery($conn,'SELECT c.*,d.department_name FROM quarterly_evaluation_cycles c
@@ -1233,6 +1269,7 @@ function quarterlyFinalize($conn, array $actor, int $evaluationId, array $rating
         quarterlyQuery($conn,'UPDATE notifications SET needs_action=0 WHERE link LIKE ?', ['%/quarterly-evaluations.php?view=review&evaluation_id='.$evaluationId]);
         logAudit($conn,(int)$actor['user_id'],'APPROVE','Quarterly Evaluation',$evaluationId,'Finalized version '.$version.'. Score: '.$candidate['total'].'. '.$remarks);
         quarterlyNotifyEmployee($conn,(int)$member['employee_id'],'Quarterly evaluation finalized','Your immediate head finalized Quarterly result version '.$version.'. Final score: '.number_format($candidate['total'],2).'.', $evaluationId);
+        if(!empty($member['individual_evaluation_id'])) quarterlyUpdateCycleCompletion($conn,(int)$member['cycle_id'],(int)$actor['user_id']);
         $conn->commit();
     } catch (Throwable $e) { $conn->rollback(); throw $e; }
 }
@@ -1258,7 +1295,7 @@ function quarterlyPendingCount($conn, array $actor): int
 {
     if (!$conn->query("SHOW TABLES LIKE 'quarterly_evaluation_members'")->num_rows) return 0;
     $count=quarterlyPendingReviewCount($conn,$actor);
-    if (quarterlyApCycleReadyToStart($conn,$actor)) $count++;
+    if (quarterlyCanRate($actor)) $count+=(int)quarterlyQuery($conn,"SELECT COUNT(*) n FROM quarterly_required_raters rr JOIN quarterly_evaluation_cycles c ON c.cycle_id=rr.cycle_id WHERE rr.rater_employee_id=? AND c.completed_at IS NULL AND c.cancelled_at IS NULL AND c.department_id=? AND NOT EXISTS(SELECT 1 FROM quarterly_peer_submissions ps WHERE ps.cycle_id=rr.cycle_id AND ps.target_employee_id=rr.target_employee_id AND ps.rater_employee_id=rr.rater_employee_id)",[(int)$actor['employee_id'],(int)$actor['department_id']])[0]['n'];
     if (quarterlyCanOwnCycle($conn,$actor,(int)$actor['department_id'])) {
         $ready=quarterlyQuery($conn,'SELECT COUNT(*) AS n FROM quarterly_evaluation_cycles
             WHERE department_id=? AND ready_for_approval_at IS NOT NULL AND completed_at IS NULL AND cancelled_at IS NULL',

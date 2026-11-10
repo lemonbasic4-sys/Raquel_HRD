@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__.'/individual-evaluation-workflow.php';
 /** Annual ratings are isolated from the probationary/package approval pipeline. */
 function annualCoreValues(): array
 {
@@ -113,6 +114,7 @@ function ensureAnnualEvaluationSchema($conn): void
             OR (d.department_name='Office of the President' AND j.job_title='President and CEO')
             OR (d.department_name='Operations' AND j.job_title='VP for Operations')
             OR (d.department_name='Purchasing' AND j.job_title='Procurement Supervisor I')) AND j.is_active=1");
+    ensureIndividualEvaluationSchema($conn,'annual');
     $ready[$key] = true;
     // Cycles created before the explicit-start workflow are already in progress.
     $conn->query('UPDATE annual_evaluation_cycles c SET c.started_at=c.created_at
@@ -273,7 +275,7 @@ function annualMember($conn, int $evaluationId): ?array
 {
     $reviewerSql = hrEvaluationReviewerSql('m', 'c.department_id');
     return annualQuery($conn, "SELECT m.*, m.reviewer_position_id AS original_reviewer_position_id,
-            $reviewerSql AS reviewer_position_id, c.department_id, c.period_start, c.period_end, c.first_finalized_at, c.cancelled_at, c.cancellation_reason,
+            $reviewerSql AS reviewer_position_id, c.department_id, c.individual_evaluation_id, CASE WHEN c.individual_evaluation_id>0 THEN ev.evaluation_period_start ELSE c.period_start END AS period_start, CASE WHEN c.individual_evaluation_id>0 THEN ev.evaluation_period_end ELSE c.period_end END AS period_end, c.first_finalized_at, c.cancelled_at, c.cancellation_reason,
             e.first_name, e.last_name, e.department_id AS current_department_id, e.job_title_id AS current_position_id,
             e.is_active AS employee_active, e.employment_status, e.deleted_at AS employee_deleted_at,
             ev.status AS evaluation_status, ev.total_score AS official_score, et.template_name,
@@ -297,6 +299,7 @@ function annualRosterEligibilitySql(string $memberAlias = 'm', string $employeeA
 
 function annualExpectedPeers($conn, int $cycleId, int $employeeId): int
 {
+    if(individualIsCycle($conn,'annual',$cycleId)) return (int)annualQuery($conn,'SELECT COUNT(*) n FROM annual_required_raters WHERE cycle_id=? AND target_employee_id=?',[$cycleId,$employeeId])[0]['n'];
     $count=(int)annualQuery($conn,'SELECT COUNT(*) AS n FROM annual_evaluation_members m
         JOIN employees e ON e.employee_id=m.employee_id WHERE m.cycle_id=? AND m.employee_id<>? AND '
         .annualRosterEligibilitySql(),[$cycleId,$employeeId])[0]['n'];
@@ -498,6 +501,7 @@ function annualStartCycle($conn, array $actor, int $departmentId, string $from, 
 
 function annualCancelCycle($conn, array $actor, int $cycleId, string $reason): void
 {
+    if(individualIsCycle($conn,'annual',$cycleId)) throw new DomainException('Individual evaluations use immediate-head review, not department cycle controls.');
     $reason=trim($reason);
     if ($reason==='') throw new DomainException('Enter a reason for cancelling this Annual cycle.');
     if (mb_strlen($reason)>2000) throw new DomainException('The cancellation reason must not exceed 2,000 characters.');
@@ -521,7 +525,7 @@ function annualCycleForSelfRating($conn, int $departmentId, int $employeeId): ?a
         FROM annual_evaluation_cycles c
         JOIN employees e ON e.employee_id=?
         LEFT JOIN annual_evaluation_members m ON m.cycle_id=c.cycle_id AND m.employee_id=?
-        WHERE c.department_id=? AND c.started_at IS NOT NULL AND c.cancelled_at IS NULL
+        WHERE c.department_id=? AND c.individual_evaluation_id=0 AND c.started_at IS NOT NULL AND c.cancelled_at IS NULL
           AND (m.member_id IS NULL OR m.evaluation_id IS NULL OR m.revision_pending=1)
         ORDER BY c.period_end DESC,c.cycle_id DESC',[$employeeId,$employeeId,$departmentId]);
     $department=annualQuery($conn,'SELECT department_name FROM departments WHERE department_id=?',[$departmentId])[0] ?? [];
@@ -538,6 +542,7 @@ function annualCycleForSelfRating($conn, int $departmentId, int $employeeId): ?a
 /** Caller holds the cycle lock. Enroll new pilot-department employees within the cycle period. */
 function annualSyncApCycleRoster($conn, array $cycle): int
 {
+    if(!empty($cycle['individual_evaluation_id'])) return 0;
     if (!annualUsesDepartmentCycle($cycle) || empty($cycle['started_at'])) return 0;
     $newMembers=annualQuery($conn,"SELECT e.employee_id,e.job_title_id,j.job_title,j.reports_to
         FROM employees e JOIN job_titles j ON j.job_title_id=e.job_title_id
@@ -589,6 +594,7 @@ function annualCanFinalize($conn, array $actor, array $member): bool
 
 function annualCanRateBeforeSelf($conn, array $actor, array $member): bool
 {
+    if(!empty($member['individual_evaluation_id'])) return annualCanRate($actor) && (individualRequiredRater($conn,'annual',$member,(int)$actor['employee_id']) || annualCanFinalize($conn,$actor,$member));
     return annualCanRate($actor) && ($actor['role']==='HR Manager' || annualCanFinalize($conn,$actor,$member));
 }
 
@@ -701,7 +707,7 @@ function annualReviewToken($conn, array $member): string
 /** Snapshot a department roster using active regular employees with applicable Annual forms. */
 function annualRegisterSubmission($conn, int $evaluationId): void
 {
-    $ev = annualQuery($conn, "SELECT ev.*, e.department_id, e.job_title_id, e.employment_status, e.job_title, jt.reports_to
+    $ev = annualQuery($conn, "SELECT ev.*, e.department_id, e.job_title_id, e.employment_status, e.regularization_effective_date, e.job_title, jt.reports_to
         FROM evaluations ev JOIN employees e ON e.employee_id=ev.employee_id
         LEFT JOIN job_titles jt ON jt.job_title_id=e.job_title_id
         WHERE ev.evaluation_id=? AND ev.deleted_at IS NULL AND ev.evaluation_type='Annual'", [$evaluationId])[0] ?? null;
@@ -719,6 +725,14 @@ function annualRegisterSubmission($conn, int $evaluationId): void
         throw new DomainException('This Annual template must use the eight standard Core Behaviors & Values. Ask its creator to publish an updated template.');
     }
     $values = json_encode(annualValidateScores(array_column($criteria, 'score_value')));
+    $individualTemplate=annualQuery($conn,'SELECT * FROM evaluation_templates WHERE template_id=? AND individual_workflow=1',[(int)$ev['template_id']])[0]??null;
+    if ($individualTemplate) {
+        if(!annualQuery($conn,'SELECT 1 FROM annual_evaluation_members WHERE evaluation_id=?',[$evaluationId])) {
+            [$expectedStart,$expectedEnd]=individualAssessmentDates($ev,$individualTemplate);
+            if($start!==$expectedStart || $end!==$expectedEnd) throw new DomainException('The evaluation period does not match the authoritative employee/form period.');
+        }
+        individualRegisterSubmission($conn,'annual',$ev,$values); return;
+    }
     $departmentName = annualQuery($conn,'SELECT department_name FROM departments WHERE department_id=?',[(int)$ev['department_id']])[0]['department_name'] ?? '';
     if ($departmentName==='Office of the President' && !$ev['reports_to']) {
         throw new DomainException('The President/CEO is excluded from this department Annual cycle.');
@@ -817,6 +831,13 @@ function annualReturnEvaluation($conn, array $actor, int $evaluationId, string $
 
 function annualNotifyCycleRaters($conn, int $cycleId, int $evaluationId, int $joiningEmployeeId, bool $late): void
 {
+    if(individualIsCycle($conn,'annual',$cycleId)) {
+        foreach(annualQuery($conn,"SELECT DISTINCT u.user_id FROM annual_required_raters rr JOIN users u ON u.employee_id=rr.rater_employee_id WHERE rr.cycle_id=? AND u.is_active=1 AND u.deleted_at IS NULL AND COALESCE(u.account_hold,0)=0",[$cycleId]) as $user) {
+            $rater=annualActor($conn,(int)$user['user_id']);
+            if($rater && annualCanRate($rater)) createNotification($conn,(int)$user['user_id'],'Annual rating required after resubmission','The employee resubmitted; provide your 360 rating again.',annualUrl($rater,'?view=rate&evaluation_id='.$evaluationId),'evaluations',true);
+        }
+        return;
+    }
     $members=annualQuery($conn,'SELECT employee_id FROM annual_evaluation_members WHERE cycle_id=? AND evaluation_id IS NOT NULL',[$cycleId]);
     if (count($members)<2) return;
     foreach ($members as $member) {
@@ -877,6 +898,10 @@ function annualSubmitPeers($conn, array $actor, int $evaluationId, array $scores
         $member=annualMember($conn,$evaluationId);
         annualAssertSnapshotActive($member);
         if (!$member['self_values_json']) throw new DomainException('Wait for the employee to resubmit their self-rating.');
+        if(!empty($member['individual_evaluation_id'])) {
+            if(!individualRequiredRater($conn,'annual',$member,(int)$actor['employee_id'])) throw new DomainException('You are not an assigned peer for this individual evaluation.');
+            $rater=[];
+        } else {
         $rater=annualQuery($conn,'SELECT evaluation_id,is_late_participant FROM annual_evaluation_members WHERE cycle_id=? AND employee_id=?',[(int)$member['cycle_id'],(int)$actor['employee_id']])[0] ?? null;
         if (!$rater && !annualCanFinalize($conn,$actor,$member)) throw new DomainException('Only assigned department participants and the immediate head may rate this employee.');
         if ((!$rater || !$rater['evaluation_id']) && !annualCanRateBeforeSelf($conn,$actor,$member)) throw new DomainException('Submit your Annual self-rating for this department period first.');
@@ -884,6 +909,7 @@ function annualSubmitPeers($conn, array $actor, int $evaluationId, array $scores
             $raterMember=annualMember($conn,(int)$rater['evaluation_id']);
             if (!$raterMember) throw new DomainException('Your Annual evaluation record is unavailable. Contact HR.');
             annualAssertSnapshotActive($raterMember);
+        }
         }
         if ((int)$actor['employee_id']===(int)$member['employee_id'] || (int)$actor['department_id']!==(int)$member['department_id']) {
             throw new DomainException('Only coworkers in this department cycle can rate this employee.');
@@ -968,6 +994,7 @@ function annualReviewAndRate($conn, array $actor, int $evaluationId, array $rati
     try {
         $member=annualMember($conn,$evaluationId);
         if (!$member || !annualCanFinalize($conn,$actor,$member)) throw new DomainException('Only this employee\'s immediate head can review these ratings.');
+
         annualQuery($conn,'SELECT cycle_id FROM annual_evaluation_cycles WHERE cycle_id=? FOR UPDATE',[(int)$member['cycle_id']]);
         $member=annualMember($conn,$evaluationId);
         $kraDefaults=[];
@@ -977,7 +1004,10 @@ function annualReviewAndRate($conn, array $actor, int $evaluationId, array $rati
         if (!$departmentHead && $scores) throw new DomainException('360 ratings are restricted to the employee department.');
         if ($departmentHead) $scores=annualResolveReviewOverrides(json_decode($member['self_values_json'],true),$scores);
         annualApproveKra($conn,$actor,$evaluationId,$ratings,'',$token,false,false);
-        if ($departmentHead) annualSubmitPeers($conn,$actor,$evaluationId,$scores,false,$signature);
+        if ($departmentHead) {
+            $headAlreadyRated=annualQuery($conn,'SELECT 1 FROM annual_peer_submissions WHERE cycle_id=? AND target_employee_id=? AND rater_employee_id=?',[(int)$member['cycle_id'],(int)$member['employee_id'],(int)$actor['employee_id']]);
+            if (!$headAlreadyRated) annualSubmitPeers($conn,$actor,$evaluationId,$scores,false,$signature);
+        }
         else {
             $bytes=base64_decode(substr($signature,strpos($signature,',')+1),true);
             $info=$bytes===false ? false : @getimagesizefromstring($bytes);
@@ -992,7 +1022,7 @@ function annualReviewAndRate($conn, array $actor, int $evaluationId, array $rati
             foreach ($plans as $index=>$plan) annualQuery($conn,'INSERT INTO evaluation_dev_plans (evaluation_id,improvement_area,support_needed,time_frame,sort_order) VALUES (?,?,?,?,?)',
                 [$evaluationId,$plan['improvement_area'],$plan['support_needed'],$plan['time_frame'],$index]);
         }
-        annualRefreshApprovedResult($conn,annualMember($conn,$evaluationId),(int)$actor['user_id'],true);
+        if(empty($member['individual_evaluation_id']) || individualApprovalReady($conn,'annual',$member)) annualRefreshApprovedResult($conn,annualMember($conn,$evaluationId),(int)$actor['user_id'],true);
         $conn->commit();
     } catch (Throwable $e) { $conn->rollback(); throw $e; }
 }
@@ -1019,6 +1049,7 @@ function annualValidateDevelopmentPlans(array $plans): array
 /** Caller holds the cycle lock. Approval stays locked; peer arrivals revise the score. */
 function annualRefreshApprovedResult($conn, array $member, int $actorUserId, bool $approve = false): void
 {
+    if(!empty($member['individual_evaluation_id']) && !individualApprovalReady($conn,'annual',$member)) throw new DomainException('Final approval requires all assigned department 360 ratings.');
     $candidate=annualCandidate($conn,$member);
     $expected=annualExpectedPeers($conn,(int)$member['cycle_id'],(int)$member['employee_id']);
     $complete=$candidate['peer_count']>=$expected;
@@ -1056,6 +1087,7 @@ function annualRefreshApprovedResult($conn, array $member, int $actorUserId, boo
 /** Reject a completed-but-unapproved Annual cycle and reopen members at self-rating. */
 function annualRejectCycle($conn, array $actor, int $cycleId): int
 {
+    if(individualIsCycle($conn,'annual',$cycleId)) throw new DomainException('Individual evaluations use immediate-head review, not department cycle controls.');
     $conn->begin_transaction();
     try {
         $cycle=annualQuery($conn,'SELECT c.*,d.department_name FROM annual_evaluation_cycles c
@@ -1106,6 +1138,11 @@ function annualRejectCycle($conn, array $actor, int $cycleId): int
 
 function annualUpdateCycleCompletion($conn, int $cycleId, int $approvalUserId = 0): bool
 {
+    if(individualIsCycle($conn,'annual',$cycleId)) {
+        $done=(bool)annualQuery($conn,"SELECT 1 FROM annual_evaluation_members m JOIN evaluations ev ON ev.evaluation_id=m.evaluation_id WHERE m.cycle_id=? AND m.current_version>0 AND m.revision_pending=0 AND ev.status='Approved'",[$cycleId]);
+        if($done) annualQuery($conn,'UPDATE annual_evaluation_cycles SET completed_at=COALESCE(completed_at,NOW()),first_completed_at=COALESCE(first_completed_at,NOW()),cycle_approved_by=COALESCE(cycle_approved_by,?) WHERE cycle_id=?',[$approvalUserId ?: null,$cycleId]);
+        return $done;
+    }
     $cycle=annualQuery($conn,'SELECT c.*,d.department_name FROM annual_evaluation_cycles c JOIN departments d ON d.department_id=c.department_id WHERE c.cycle_id=?',[$cycleId])[0] ?? null;
     if (!$cycle) {
         if ($approvalUserId) throw new DomainException('This annual cycle is unavailable.');
@@ -1231,6 +1268,7 @@ function annualFinalize($conn, array $actor, int $evaluationId, array $ratings, 
         annualQuery($conn,'UPDATE notifications SET needs_action=0 WHERE link LIKE ?', ['%/annual-evaluations.php?view=review&evaluation_id='.$evaluationId]);
         logAudit($conn,(int)$actor['user_id'],'APPROVE','Annual Evaluation',$evaluationId,'Finalized version '.$version.'. Score: '.$candidate['total'].'. '.$remarks);
         annualNotifyEmployee($conn,(int)$member['employee_id'],'Annual evaluation finalized','Your immediate head finalized Annual result version '.$version.'. Final score: '.number_format($candidate['total'],2).'.', $evaluationId);
+        if(!empty($member['individual_evaluation_id'])) annualUpdateCycleCompletion($conn,(int)$member['cycle_id'],(int)$actor['user_id']);
         $conn->commit();
     } catch (Throwable $e) { $conn->rollback(); throw $e; }
 }
@@ -1256,7 +1294,7 @@ function annualPendingCount($conn, array $actor): int
 {
     if (!$conn->query("SHOW TABLES LIKE 'annual_evaluation_members'")->num_rows) return 0;
     $count=annualPendingReviewCount($conn,$actor);
-    if (annualApCycleReadyToStart($conn,$actor)) $count++;
+    if (annualCanRate($actor)) $count+=(int)annualQuery($conn,"SELECT COUNT(*) n FROM annual_required_raters rr JOIN annual_evaluation_cycles c ON c.cycle_id=rr.cycle_id WHERE rr.rater_employee_id=? AND c.completed_at IS NULL AND c.cancelled_at IS NULL AND c.department_id=? AND NOT EXISTS(SELECT 1 FROM annual_peer_submissions ps WHERE ps.cycle_id=rr.cycle_id AND ps.target_employee_id=rr.target_employee_id AND ps.rater_employee_id=rr.rater_employee_id)",[(int)$actor['employee_id'],(int)$actor['department_id']])[0]['n'];
     if (annualCanOwnCycle($conn,$actor,(int)$actor['department_id'])) {
         $ready=annualQuery($conn,'SELECT COUNT(*) AS n FROM annual_evaluation_cycles
             WHERE department_id=? AND ready_for_approval_at IS NOT NULL AND completed_at IS NULL AND cancelled_at IS NULL',

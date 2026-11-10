@@ -147,6 +147,11 @@ require_once '../includes/header.php';
                     <div class="detail-item"><span>Created by</span><strong><?php echo e($template['created_by_name'] ?: 'Not specified'); ?><?php if (!empty($template['created_by_role'])): ?><small><?php echo e($template['created_by_role']); ?></small><?php endif; ?></strong></div>
                     <div class="detail-item"><span>Target department</span><strong><?php echo e($template['target_department'] ?: 'All Departments'); ?></strong></div>
                     <div class="detail-item"><span>Evaluation type</span><strong><?php echo e($template['evaluation_type'] ?? 'Annual'); ?></strong></div>
+                    <?php if (!empty($template['individual_workflow'])): ?>
+                    <div class="detail-item"><span>Period From</span><strong><?php echo e(formatDate($template['assessment_from'])); ?><?php if ($template['evaluation_type']==='Annual'): ?><small>Or employee regularization date, whichever is later</small><?php endif; ?></strong></div>
+                    <div class="detail-item"><span>Period To</span><strong><?php echo e(formatDate($template['assessment_to'])); ?></strong></div>
+                    <div class="detail-item"><span>Workflow</span><strong>Individual submission and immediate-head approval</strong></div>
+                    <?php endif; ?>
                     <div class="detail-item"><span>Form code</span><strong><?php echo e($template['form_code'] ?: 'Not specified'); ?></strong></div>
                     <div class="detail-item"><span>Revision date</span><strong><?php echo !empty($template['revision_date']) ? formatDate($template['revision_date']) : 'Not specified'; ?></strong></div>
                     <div class="detail-item"><span>Effective date</span><strong><?php echo !empty($template['effective_date_form']) ? formatDate($template['effective_date_form']) : 'Not specified'; ?></strong></div>

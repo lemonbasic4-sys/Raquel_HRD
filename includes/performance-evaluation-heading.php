@@ -5,10 +5,7 @@ $quarterly_category = !empty($quarterly_in_performance_page);
 $performance_user_id = (int)($_SESSION['user_id'] ?? 0);
 $performance_actor = annualActor($conn, $performance_user_id);
 $probationary_pending = countPendingOrganizationPackagesForUser($conn, $performance_user_id, true);
-$regular_pending = $performance_actor
-    ? (in_array($performance_actor['role'], ['HR Manager', 'HR Supervisor'], true)
-        ? annualPendingReviewCount($conn, $performance_actor)
-        : annualPendingCount($conn, $performance_actor)) : 0;
+$regular_pending = $performance_actor ? annualPendingCount($conn, $performance_actor) : 0;
 $quarterly_pending = $performance_actor ? quarterlyPendingCount($conn, $performance_actor) : 0;
 ?>
 <section class="package-hero">

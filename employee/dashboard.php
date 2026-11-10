@@ -8,6 +8,8 @@ if (!ensureHierarchicalEvaluationSchema($conn)) {
     exit('Evaluation template schema is unavailable.');
 }
 
+ensureAnnualEvaluationSchema($conn);
+ensureQuarterlyEvaluationSchema($conn);
 $employee_id = (int)($_SESSION['employee_id'] ?? 0);
 $user_id     = (int)($_SESSION['user_id']     ?? 0);
 
@@ -99,6 +101,7 @@ if (($emp['employment_status'] ?? '') === 'Regular' && annualUsesDepartmentCycle
 $allowed_eval_types = getAllowedEvaluationTypesForEmploymentStatus($emp['employment_status'] ?? 'Regular');
 $allowed_eval_type_sql = "'" . implode("','", $allowed_eval_types) . "'";
 $legacy_probationary_rank_et = probationaryTemplateLegacyRankSql('et', $emp['job_title_id'] ?? 0);
+$dashboardIndividualAvailable=individualTemplateEligibilitySql('et',$employee_id);
 $pending_templates_stmt = $conn->prepare("
     SELECT COUNT(*) AS total
     FROM evaluation_templates et
@@ -111,7 +114,8 @@ $pending_templates_stmt = $conn->prepare("
             AND (et.target_job_title_id IS NULL OR et.target_job_title_id = ?)
             AND $legacy_probationary_rank_et))
       AND et.evaluation_type IN ($allowed_eval_type_sql)
-      AND (et.evaluation_type <> 'Annual' OR ? = 0)
+      AND $dashboardIndividualAvailable
+      AND (et.individual_workflow=1 OR et.evaluation_type <> 'Annual' OR ? = 0)
       AND NOT EXISTS (
           SELECT 1
           FROM evaluations ev

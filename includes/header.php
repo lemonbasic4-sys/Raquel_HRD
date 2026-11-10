@@ -12,6 +12,8 @@ if (!ensureHierarchicalEvaluationSchema($conn)) {
     exit('Evaluation template schema is unavailable.');
 }
 
+ensureAnnualEvaluationSchema($conn);
+ensureQuarterlyEvaluationSchema($conn);
 // Auto-backup scheduler: silently check & trigger if Admin session
 if (isset($_SESSION['role']) && $_SESSION['role'] === 'Admin') {
     require_once __DIR__ . '/auto-backup-check.php';
@@ -60,11 +62,6 @@ if ($effective_role === 'HR Staff' && $current_dir === 'staff') {
 }
 if ($current_dir === 'employee' && in_array($effective_role, ['Employee', 'HR Manager', 'HR Supervisor', 'HR Staff'], true)) {
     sendEmployeeProbationReminder($conn, (int) $_SESSION['user_id']);
-}
-if (in_array($current_dir,['employee','manager'],true)
-    && in_array($effective_role,['Employee','HR Manager','President and CEO'],true)) {
-    $annual_readiness_actor = annualActor($conn,(int)($_SESSION['user_id'] ?? 0));
-    if ($annual_readiness_actor) annualSyncApCycleReadinessNotification($conn,$annual_readiness_actor);
 }
 $notif_count = getUnreadNotificationCount($conn, (int) $_SESSION['user_id'], $notif_context);
 $notifications = getRecentNotifications($conn, (int) $_SESSION['user_id'], 5, $notif_context);
@@ -120,7 +117,7 @@ switch ($effective_role) {
         $_mgr_pkg_pending = countPendingOrganizationPackagesForUser($conn, (int)($_SESSION['user_id'] ?? 0));
         $_annual_manager_actor=annualActor($conn,(int)($_SESSION['user_id'] ?? 0));
         if ($_annual_manager_actor) {
-            $_mgr_pkg_pending+=annualPendingReviewCount($conn,$_annual_manager_actor);
+            $_mgr_pkg_pending+=annualPendingCount($conn,$_annual_manager_actor);
             if (annualApCycleReadyToStart($conn,$_annual_manager_actor)) $_mgr_pkg_pending++;
         }
         if ($_annual_manager_actor) $_mgr_pkg_pending+=quarterlyPendingCount($conn,$_annual_manager_actor);
@@ -172,7 +169,7 @@ switch ($effective_role) {
         } catch (Exception $e) {}
         $_sup_pkg_pending = countPendingOrganizationPackagesForUser($conn, (int)($_SESSION['user_id'] ?? 0));
         $_annual_supervisor_actor=annualActor($conn,(int)($_SESSION['user_id'] ?? 0));
-        if ($_annual_supervisor_actor) $_sup_pkg_pending+=annualPendingReviewCount($conn,$_annual_supervisor_actor);
+        if ($_annual_supervisor_actor) $_sup_pkg_pending+=annualPendingCount($conn,$_annual_supervisor_actor);
         if ($_annual_supervisor_actor) $_sup_pkg_pending+=quarterlyPendingCount($conn,$_annual_supervisor_actor);
 
         $sidebar_menus = [
@@ -295,6 +292,7 @@ switch ($effective_role) {
             $_hdr_final_gate = (!$is_probationary_employee
                 || hasApprovedInitialProbationaryEvaluation($conn, $_hdr_emp_id)) ? 1 : 0;
 
+            $_hdrIndividualAvailable=individualTemplateEligibilitySql('et',$_hdr_emp_id);
             $_hdr_pt_stmt = $conn->prepare("
                 SELECT COUNT(*) AS total
                 FROM evaluation_templates et
@@ -307,16 +305,17 @@ switch ($effective_role) {
                         AND (et.target_job_title_id IS NULL OR et.target_job_title_id = ?)
                         AND $_hdr_legacy_rank_sql))
                   AND et.evaluation_type IN ($_hdr_in_clause)
-                  AND (et.evaluation_type <> 'Annual' OR ? = 0)
-                  AND (et.evaluation_type <> 'Quarterly' OR $_hdr_quarterly_waiting = 0)
+                  AND $_hdrIndividualAvailable
+                  AND (et.individual_workflow=1 OR et.evaluation_type <> 'Annual' OR ? = 0)
+                  AND (et.individual_workflow=1 OR et.evaluation_type <> 'Quarterly' OR $_hdr_quarterly_waiting = 0)
                   AND (et.evaluation_type <> 'Final' OR $_hdr_final_gate = 1)
                   AND NOT EXISTS (
                       SELECT 1
                       FROM evaluations ev
                       WHERE ev.employee_id = ?
                         AND ev.template_id = et.template_id
-                        AND (et.evaluation_type <> 'Annual' OR YEAR(ev.evaluation_period_start) = YEAR(CURDATE()))
-                        AND (et.evaluation_type <> 'Quarterly' OR (ev.evaluation_period_start = '$_hdr_quarterly_start' AND ev.evaluation_period_end = '$_hdr_quarterly_end'))
+                        AND (et.individual_workflow=1 OR et.evaluation_type <> 'Annual' OR YEAR(ev.evaluation_period_start) = YEAR(CURDATE()))
+                        AND (et.individual_workflow=1 OR et.evaluation_type <> 'Quarterly' OR (ev.evaluation_period_start = '$_hdr_quarterly_start' AND ev.evaluation_period_end = '$_hdr_quarterly_end'))
                         AND ev.deleted_at IS NULL
                         AND ev.status NOT IN ('Draft', 'Returned', 'Rejected', 'Pending Self-Rating')
                   )
@@ -325,6 +324,7 @@ switch ($effective_role) {
             $_hdr_pt_stmt->execute();
             $m_pending_template_count = (int) ($_hdr_pt_stmt->get_result()->fetch_assoc()['total'] ?? 0);
             $_hdr_pt_stmt->close();
+            individualNotifyTemplateAvailability($conn,0,$_hdr_emp_id);
 
             $_hdr_history_stmt = $conn->prepare("SELECT COUNT(*) AS total FROM evaluations ev
                 WHERE ev.employee_id = ? AND ev.deleted_at IS NULL

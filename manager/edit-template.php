@@ -6,6 +6,8 @@ if (!ensureHierarchicalEvaluationSchema($conn)) {
     http_response_code(500);
     exit('Evaluation template schema is unavailable.');
 }
+ensureAnnualEvaluationSchema($conn);
+ensureQuarterlyEvaluationSchema($conn);
 checkRole(['HR Manager', 'HR Supervisor', 'HR Staff', 'Employee', 'President and CEO']);
 $creator_context = getEvaluationTemplateCreatorContext($conn, (int)($_SESSION['user_id'] ?? 0));
 $is_employee_template_portal = basename(dirname($_SERVER['SCRIPT_NAME'])) === 'employee';
@@ -129,6 +131,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $behavior_framework_version = '';
     }
 
+    try { [$assessmentFrom,$assessmentTo]=individualTemplateDates($_POST,$evaluation_type); }
+    catch (DomainException $error) { redirectWith($template_list_url,'danger',$error->getMessage()); }
     // Update template
     $stmt = $conn->prepare("UPDATE evaluation_templates
         SET template_name=?, description=?, target_department=?, target_department_id=?, target_job_title_id=NULLIF(?, 0),
@@ -140,6 +144,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $kra_weight, $behavior_weight, $form_code, $revision_date, $effective_date_form, $template_id);
     $stmt->execute();
     $stmt->close();
+    annualQuery($conn,'UPDATE evaluation_templates SET individual_workflow=?,assessment_from=?,assessment_to=? WHERE template_id=?',
+        [in_array($evaluation_type,['Annual','Quarterly'],true) ? 1 : 0,$assessmentFrom,$assessmentTo,(int)$template_id]);
     if (!saveEvaluationTemplateTargetPositionIds($conn, $template_id, $target_position_ids)) {
         throw new RuntimeException('Failed to update target positions for the evaluation template.');
     }
@@ -173,6 +179,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $beh_stmt->close();
 
     logAudit($conn, $_SESSION['user_id'], 'UPDATE', 'Template', $template_id, "Updated template: $template_name");
+    if(in_array($evaluation_type,['Annual','Quarterly'],true)) individualNotifyTemplateAvailability($conn,(int)$template_id);
     notifyHrStaffOfTemplateChange($conn, $template_id, 'Updated');
     redirectWith($template_list_url, 'success', "Template '$template_name' updated successfully.");
 }
@@ -629,6 +636,7 @@ require_once '../includes/header.php';
                     </select>
                 </div>
             </div>
+            <?php require __DIR__.'/../includes/individual-template-period-fields.php'; ?>
             <div class="form-check form-switch mb-3">
                 <input class="form-check-input" type="checkbox" role="switch" id="probationaryTemplateToggle" name="probationary_template" value="1" <?php echo in_array($tmpl['evaluation_type'] ?? '', ['Initial', 'Final'], true) ? 'checked' : ''; ?>>
                 <label class="form-check-label fw-semibold" for="probationaryTemplateToggle">This template is exclusively for probationary employees</label>
