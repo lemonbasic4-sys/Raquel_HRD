@@ -297,7 +297,8 @@
         alert.style.transition = 'opacity 0.4s ease-out';
         alert.style.opacity = '0';
         setTimeout(function () {
-          if (alert.parentNode) alert.style.display = 'none';
+          // Remove the layout box too; Bootstrap d-flex overrides inline display:none.
+          if (alert.parentNode) alert.parentNode.removeChild(alert);
         }, 420);
       }, 3500);
     });

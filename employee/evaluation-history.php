@@ -255,7 +255,6 @@ require_once '../includes/header.php';
                 <option value="<?php echo e($type); ?>" <?php echo $selected_type === $type ? 'selected' : ''; ?>><?php echo e($type); ?></option>
             <?php endforeach; ?>
         </select>
-        <button type="submit" class="btn btn-primary btn-sm">Apply filter</button>
     </form>
 
     <?php if (!$filtered_evaluations): ?>

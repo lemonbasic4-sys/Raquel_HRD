@@ -312,8 +312,8 @@ require_once __DIR__ . '/header.php';
             </header>
             <div class="row g-2 mb-3"><div class="col-md-7"><label for="annualSearch" class="form-label">Find employee</label><input id="annualSearch" class="form-control" type="search" placeholder="Employee name or position"></div>
                 <div class="col-md-5"><label for="annualStatus" class="form-label">Status</label><select id="annualStatus" class="form-select"><option value="">All</option><option value="submitted">Self-rating submitted</option><option value="pending">For consolidation</option><option value="finalized">Finalized</option><option value="revision">Revision pending</option></select></div></div>
-            <div class="table-responsive"><table class="table align-middle" id="annualRoster">
-            <thead><tr><th>Employee</th><th>Position</th><th>Self-rating</th><th><?php echo $view==='peers' ? 'Your 360 rating' : '360 received'; ?></th><?php if ($view==='peers'): ?><th class="text-center">360 received</th><?php endif; ?><th>Annual result</th><th class="text-center">Final score</th><th>Action</th></tr></thead>
+            <div class="table-responsive"><table class="table align-middle <?php echo $historyView ? 'peer-mobile-history' : ''; ?>" id="annualRoster" data-peer-columns="<?php echo $view==='peers' ? 'yes' : 'no'; ?>">
+            <thead><tr><th>Employee</th><th>Position</th><th>Self-rating</th><th><?php echo $view==='peers' ? 'Your 360 rating' : '360 received'; ?></th><?php if ($view==='peers'): ?><th class="text-center">360 received</th><?php endif; ?><th><?php if ($historyView): ?><span class="peer-history-full-heading">Annual result</span><span class="peer-history-short-heading">Result</span><?php else: ?>Annual result<?php endif; ?></th><th class="text-center">Final score</th><th>Action</th></tr></thead>
             <tbody><?php foreach ($members as $m):
                 $isOwnRow=(int)$m['employee_id']===(int)$actor['employee_id'];
                 $target=$m['evaluation_id'] ? annualMember($conn,(int)$m['evaluation_id']) : null;
@@ -329,7 +329,7 @@ require_once __DIR__ . '/header.php';
                     <?php if ($view==='peers'): $receivedCount=(int)$m['received']; $expectedCount=annualExpectedPeers($conn,$cycleId,(int)$m['employee_id']); ?>
                     <td class="text-center"><span class="annual-status-pill <?php echo $receivedCount>=$expectedCount && $m['evaluation_id'] ? 'is-complete' : 'is-pending'; ?>" title="<?php echo $receivedCount; ?> of <?php echo $expectedCount; ?> expected coworker ratings submitted; excludes self-rating"><i class="fas fa-users me-1" aria-hidden="true"></i><?php echo $receivedCount.' / '.$expectedCount; ?></span></td>
                     <?php endif; ?>
-                    <td><span class="annual-status-pill <?php echo $m['revision_pending'] ? 'is-revision' : ($m['current_version'] ? 'is-complete' : 'is-pending'); ?>"><?php echo e($state); ?></span>
+                    <td><span class="annual-status-pill <?php echo $m['revision_pending'] ? 'is-revision' : ($m['current_version'] ? 'is-complete' : 'is-pending'); ?>"><?php echo e($state); ?></span><?php if ($historyView && $m['current_version']): ?><small class="peer-mobile-score"><?php echo number_format((float)$m['total_score'],2); ?> / 4.00</small><?php endif; ?>
                     </td>
                     <td class="text-center text-nowrap">
                         <?php if ($m['current_version']): ?><strong style="font-size:1.15rem;color:#24452b"><?php echo number_format((float)$m['total_score'],2); ?></strong><small class="d-block text-muted">/ 4.00</small><?php else: ?><span class="text-muted">—</span><?php endif; ?>
@@ -337,7 +337,7 @@ require_once __DIR__ . '/header.php';
                     <td><div class="d-flex align-items-start gap-2" style="position:relative"><?php if ($target && !$target['self_values_json']): ?>
                         <span class="annual-status-pill is-revision">Returned · Awaiting resubmission</span>
                     <?php elseif ($historyView && $target): ?>
-                        <a class="btn btn-sm btn-outline-success" href="<?php echo $isOwnRow && $actor['role']==='Employee' ? BASE_URL.'/employee/evaluation-history-view.php?evaluation_id='.(int)$m['evaluation_id'] : annualUrl($actor,'?view='.(annualCanFinalize($conn,$actor,$target) && $m['rated'] ? 'head-review' : 'review').'&evaluation_id='.(int)$m['evaluation_id']); ?>">View completed evaluation</a>
+                        <a class="btn btn-sm btn-outline-success" href="<?php echo $isOwnRow && $actor['role']==='Employee' ? BASE_URL.'/employee/evaluation-history-view.php?evaluation_id='.(int)$m['evaluation_id'] : annualUrl($actor,'?view='.(annualCanFinalize($conn,$actor,$target) && $m['rated'] ? 'head-review' : 'review').'&evaluation_id='.(int)$m['evaluation_id']); ?>" aria-label="View completed evaluation"><i class="fas fa-eye peer-mobile-eye" aria-hidden="true"></i><span class="peer-desktop-action">View completed evaluation</span></a>
                     <?php elseif ($view==='peers' && $isOwnRow): ?>
                         <?php if ($m['evaluation_id']): ?>
                             <a class="btn btn-sm btn-outline-success" href="<?php echo $actor['role']==='Employee' ? BASE_URL.'/employee/evaluation-history-view.php?evaluation_id='.(int)$m['evaluation_id'] : annualUrl($actor,'?view=review&evaluation_id='.(int)$m['evaluation_id']); ?>">View my score</a>

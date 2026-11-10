@@ -78,10 +78,11 @@
 
     function updateSelectors() {
         const option = (ev, selected) => `<option value="${ev.evaluation_id}" ${ev.evaluation_id === selected ? 'selected' : ''}>${esc(ev.cycle_label)}</option>`;
-        byId('review-cycle').innerHTML = evaluations.map(ev => option(ev,selectedId)).join('');
-        byId('compare-cycle').innerHTML = '<option value="">No comparison</option>' + evaluations.filter(ev => ev.evaluation_id !== selectedId).map(ev => option(ev,comparisonId)).join('');
+        byId('review-cycle').innerHTML = '<option value="">Choose a cycle</option>' + evaluations.map(ev => option(ev,selectedId)).join('');
+        byId('review-cycle').value = selectedId == null ? '' : String(selectedId);
+        byId('compare-cycle').innerHTML = '<option value="">Choose a comparison cycle</option>' + evaluations.filter(ev => ev.evaluation_id !== selectedId).map(ev => option(ev,comparisonId)).join('');
         byId('compare-cycle').value = comparisonId == null ? '' : String(comparisonId);
-        byId('compare-cycle').disabled = evaluations.length < 2;
+        byId('compare-cycle').disabled = selectedId == null || evaluations.length < 2;
     }
 
     function renderCriteria(ev, comparison) {
@@ -137,9 +138,38 @@
     }).observe(byId('paired-criteria'));
     document.fonts.ready.then(alignComparisonRows);
 
+    let mobileSection = 'KRA';
+    function renderMobileComparison(ev, previous) {
+        const d = previous ? delta(ev.total_score, previous.total_score) : null;
+        const status = value => value == null ? 'Not comparable' : value > 0 ? 'Improved' : value < 0 ? 'Declined' : 'No change';
+        const rows = ev.criteria.filter(row => mobileSection === 'KRA' ? row.section === 'KRA' : row.section !== 'KRA');
+        byId('mobile-comparison').innerHTML = `
+            <div class="mp-mobile-scores"><div><span>Current score</span><strong>${num(ev.total_score)}<small> / 4</small></strong></div><div><span>Previous score</span><strong>${num(previous?.total_score)}<small> / 4</small></strong></div><div class="${changeClass(d)}"><span>Difference</span><strong>${signed(d)} ${d == null ? '' : d > 0 ? '&#8593;' : d < 0 ? '&#8595;' : '&#8212;'}</strong></div></div>
+            <div class="mp-mobile-sections" role="group" aria-label="Criteria section"><button type="button" data-mobile-section="KRA" aria-pressed="${mobileSection === 'KRA'}">Key Result Areas</button><button type="button" data-mobile-section="Behavior" aria-pressed="${mobileSection === 'Behavior'}">Core Behaviors &amp; Values</button></div>
+            <div class="mp-mobile-section-title"><strong>${mobileSection === 'KRA' ? 'Key Result Areas' : 'Core Behaviors &amp; Values'}</strong><span>${rows.length} items</span></div>
+            ${!rows.length ? '<p class="mp-muted">No criterion ratings recorded.</p>' : rows.map((row,index) => {
+                const c = criterionComparison(row,ev,previous);
+                const insight = c.change == null ? c.note : c.change < 0
+                    ? `Your finalized rating decreased from ${num(c.previous)} to ${num(row.rating)} (${num(-c.change)} points lower). This area needs more attention in your future performance.`
+                    : c.change > 0 ? `Your finalized rating improved from ${num(c.previous)} to ${num(row.rating)} (${num(c.change)} points higher). This shows progress in this area.`
+                    : `Your finalized rating remained at ${num(row.rating)}. Your result in this area is unchanged between the two evaluations.`;
+                return `<details class="mp-mobile-item ${c.change < 0 ? 'mp-mobile-declined' : ''}"><summary><span class="mp-mobile-item-name"><small>${mobileSection === 'KRA' ? 'KRA' : 'Behavior'} ${index+1}</small><strong>${esc(row.name)}</strong></span><span class="mp-mobile-status ${changeClass(c.change)}">${status(c.change)}${c.change == null ? '' : ` (${signed(c.change)})`}</span><span class="mp-mobile-chevron" aria-hidden="true">&#8964;</span></summary><div class="mp-mobile-detail"><div class="mp-mobile-values"><div><span>Previous</span><strong>${num(c.previous)}</strong></div><div><span>Current</span><strong>${num(row.rating)}</strong></div><div class="${changeClass(c.change)}"><span>Change</span><strong>${signed(c.change)}</strong></div></div><div class="mp-mobile-insight"><strong><i class="fas fa-info-circle" aria-hidden="true"></i> Insight</strong><p>${esc(insight)}${c.note && c.change != null ? ` ${esc(c.note)}` : ''}</p></div></div></details>`;
+            }).join('')}`;
+    }
+    byId('mobile-comparison').addEventListener('click', event => {
+        const button = event.target.closest('[data-mobile-section]');
+        if (!button) return;
+        mobileSection = button.dataset.mobileSection;
+        renderMobileComparison(evaluations.find(r => r.evaluation_id === selectedId), evaluations.find(r => r.evaluation_id === comparisonId) ?? null);
+    });
+
     function renderComparison() {
         const ev = evaluations.find(r => r.evaluation_id === selectedId);
         const previous = evaluations.find(r => r.evaluation_id === comparisonId) ?? null;
+        for (const id of ['comparison-summary', 'comparison-notice', 'paired-criteria', 'mobile-comparison']) byId(id).hidden = !ev;
+        const help = document.querySelector('.mp-desktop-comparison-help');
+        if (help) help.hidden = !ev;
+        if (!ev) return;
         const d = previous ? delta(previous.total_score,ev.total_score) : null;
         byId('comparison-summary').innerHTML = `<span>Reviewed cycle: <strong>${num(ev.total_score)} / 4</strong></span>${previous ? `<span>Comparison: <strong>${num(previous.total_score)} / 4</strong></span><span>${changeHtml(d)} <span class="mp-muted">${direction(d)}</span></span>` : '<span class="mp-muted">Choose another cycle to see changes.</span>'}`;
         const notices = [];
@@ -149,13 +179,13 @@
         if (previous && !ev.criteria.some(r => criterionComparison(r,ev,previous).change !== null)) notices.push('No equivalent criteria are available for this pair.');
         byId('comparison-notice').textContent = notices.join(' ');
         renderCriteria(ev,previous);
+        renderMobileComparison(ev,previous);
     }
 
     function selectCycle(id) {
         const ev = evaluations.find(r => r.evaluation_id === id);
-        if (!ev) return;
-        selectedId = id;
-        comparisonId = previousCycle(ev)?.evaluation_id ?? null;
+        selectedId = ev ? id : null;
+        comparisonId = null;
         updateSelectors(); renderComparison();
     }
 
@@ -191,7 +221,8 @@
             type:'line',data:{labels:data.chart_labels,datasets:[{label:'Finalized score',data:data.chart_scores,
                 borderColor:'#244b15',backgroundColor:'rgba(203,161,53,.1)',pointBackgroundColor:'#CBA135',pointBorderColor:'#244b15',pointRadius:5,pointHoverRadius:7,tension:0,fill:true}]},
             options:{responsive:true,maintainAspectRatio:false,
-                onClick:(_,points) => {if (!points.length) return;selectCycle(chronological[points[0].index].evaluation_id);byId('comparison-heading').scrollIntoView({behavior:'smooth',block:'start'});},
+                interaction:{mode:'nearest',intersect:true},
+                events:['mousemove','mouseout','click','touchstart','touchmove'],
                 plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx => `${num(ctx.raw)} / 4`}}},
                 scales:{y:{min:1,max:4,ticks:{stepSize:1},grid:{color:'#edf0e9'}},x:{offset:true,ticks:{autoSkip:true,maxTicksLimit:5,maxRotation:0,font:{size:10},
                     callback:value => {const ev = chronological[Number(value)];return ev ? [ev.evaluation_type,(ev.approved_date || ev.evaluation_period_end).slice(0,10)] : '';}},grid:{display:false}}}}
@@ -225,7 +256,7 @@
             if (!data.total_count) {byId('perfEmptyState').hidden = false;return;}
             evaluations = data.evaluations;
             byId('perfContent').hidden = false;
-            renderSummary();selectCycle(evaluations[0].evaluation_id);renderDevelopment(data);renderChart(data);
+            renderSummary();selectCycle(null);renderDevelopment(data);renderChart(data);
         })
         .catch(() => {
             byId('perfLoadingState').hidden = true;

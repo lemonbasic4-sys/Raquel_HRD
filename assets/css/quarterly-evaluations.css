@@ -298,3 +298,50 @@
 .quarterly-page #quarterly-cycle-start [data-bs-target="#quarterlyCycleReadOnlyDetails"][aria-expanded="true"] .fa-chevron-down{transform:rotate(180deg)}
 .quarterly-page .quarterly-you-indicator{display:inline-flex;align-items:center;gap:5px;margin:4px 0 0;padding:4px 9px;border:1px solid #bb941f;border-radius:999px;background:#f9e9ad;color:#193c12;font-size:.76rem;font-weight:800;line-height:1.2;white-space:nowrap;box-shadow:0 2px 6px rgba(8,46,6,.16)}
 .quarterly-page .quarterly-you-indicator i{font-size:.72rem;color:#1c631e}
+
+/* Compact history roster only; desktop and active rating tables stay unchanged. */
+.peer-mobile-eye,.peer-mobile-score { display:none; }
+@media(max-width:650px) {
+    table.peer-mobile-history { table-layout:fixed; width:100%; min-width:0!important; font-size:.7rem; }
+    table.peer-mobile-history th,table.peer-mobile-history td { padding:.65rem .3rem; white-space:normal!important; overflow-wrap:anywhere; vertical-align:middle; }
+    table.peer-mobile-history th:nth-child(3),table.peer-mobile-history td:nth-child(3),
+    table.peer-mobile-history th:nth-child(4),table.peer-mobile-history td:nth-child(4),
+    table.peer-mobile-history[data-peer-columns="yes"] th:nth-child(5),table.peer-mobile-history[data-peer-columns="yes"] td:nth-child(5),
+    table.peer-mobile-history[data-peer-columns="yes"] th:nth-child(7),table.peer-mobile-history[data-peer-columns="yes"] td:nth-child(7),
+    table.peer-mobile-history[data-peer-columns="no"] th:nth-child(6),table.peer-mobile-history[data-peer-columns="no"] td:nth-child(6) { display:none; }
+    table.peer-mobile-history th:first-child { width:30%; }
+    table.peer-mobile-history th:nth-child(2) { width:26%; }
+    table.peer-mobile-history th:last-child { width:14%; }
+    table.peer-mobile-history th { background:#e8f2e3; color:#173f13; font-size:.65rem; }
+    table.peer-mobile-history td:first-child { font-weight:650; }
+    table.peer-mobile-history [class$="status-pill"] { font-size:.6rem; padding:.25rem .35rem; line-height:1.4; white-space:normal; }
+    table.peer-mobile-history .peer-desktop-action { display:none; }
+    table.peer-mobile-history .peer-mobile-eye { display:inline; }
+    table.peer-mobile-history .peer-mobile-score { display:block; margin-top:.3rem; color:#244b15; font-weight:700; font-size:.65rem; }
+    table.peer-mobile-history td:last-child .btn { display:inline-flex; align-items:center; justify-content:center; min-width:34px; min-height:34px; padding:.4rem; border:0; background:#eef5eb; color:#244b15; box-shadow:none; }
+}
+
+/* Override the shared roster rules at phone widths without splitting words. */
+@media(max-width:650px) {
+    #quarterlyRoster.peer-mobile-history { width:100%!important; table-layout:fixed; min-width:0!important; }
+    #quarterlyRoster.peer-mobile-history th, #quarterlyRoster.peer-mobile-history td {
+        font-size:11px!important; padding:10px 4px!important; line-height:1.45;
+        word-break:normal!important; overflow-wrap:normal!important; white-space:normal!important;
+    }
+    #quarterlyRoster.peer-mobile-history th { font-size:10px!important; letter-spacing:0!important; white-space:nowrap!important; text-transform:none; }
+    #quarterlyRoster.peer-mobile-history th:first-child { width:32%!important; }
+    #quarterlyRoster.peer-mobile-history th:nth-child(2) { width:27%!important; }
+    #quarterlyRoster.peer-mobile-history th:last-child { width:40px!important; }
+    #quarterlyRoster.peer-mobile-history .quarterly-status-pill {
+        display:inline-block; width:auto; max-width:100%; min-width:0; border-radius:6px;
+        padding:4px 5px!important; font-size:10px!important; line-height:1.35;
+        word-break:normal; overflow-wrap:normal; white-space:normal!important;
+    }
+    #quarterlyRoster.peer-mobile-history .peer-mobile-score { font-size:10px!important; white-space:nowrap; }
+    #quarterlyRoster.peer-mobile-history td:last-child>div { justify-content:center; gap:0!important; }
+    #quarterlyRoster.peer-mobile-history td:last-child .btn { min-width:30px; min-height:34px; padding:4px!important; font-size:13px!important; }
+    #quarterlyRoster.peer-mobile-history .quarterly-you-indicator { font-size:9px!important; padding:3px 5px!important; margin-top:4px; }
+    .peer-history-full-heading { display:none; }
+    .peer-history-short-heading { display:inline; }
+}
+@media(min-width:651px) { .peer-history-short-heading { display:none; } }

@@ -72,7 +72,7 @@ $default_avatar_url = getEmployeeAvatar('');
                 <section class="mp-card">
                     <div class="mp-card-heading"><div><h2>Performance trend</h2><p>Approved, finalized cycles</p></div><span id="finalized-count" class="mp-muted"></span></div>
                     <div class="mp-chart"><canvas id="perfTrendChart" role="img" aria-label="Scores for finalized evaluation cycles"></canvas></div>
-                    <p class="mp-muted mp-chart-hint">Select a point to review that cycle.</p>
+                    <p class="mp-muted mp-chart-hint">Hover over or tap a point to see its evaluation date and score.</p>
                 </section>
                 <section class="mp-card" aria-label="Latest evaluation highlights">
                     <div class="mp-card-heading"><div><h2>What to focus on</h2><p>From your latest evaluation</p></div></div>
@@ -88,7 +88,8 @@ $default_avatar_url = getEmployeeAvatar('');
                 </div>
                 <div id="comparison-summary" class="mp-comparison-summary" aria-live="polite"></div>
                 <div id="comparison-notice" class="mp-muted"></div>
-                <p class="mp-muted mt-3">Read each evaluation from KRA 1 down to Behavior 8. Self is the original rating; Reviewed is the effective rating after review. Improved, No change, and Declined on the right compare reviewed ratings against the matching item on the left. Review adjustments show the difference from self-rating. Highlighted rows have a reviewed rating below 2.60.</p>
+                <p class="mp-muted mt-3 mp-desktop-comparison-help">Read each evaluation from KRA 1 down to Behavior 8. Self is the original rating; Reviewed is the effective rating after review. Improved, No change, and Declined on the right compare reviewed ratings against the matching item on the left. Review adjustments show the difference from self-rating. Highlighted rows have a reviewed rating below 2.60.</p>
+                <div id="mobile-comparison" class="mp-mobile-comparison"></div>
                 <div id="paired-criteria" class="mp-paired-criteria"></div>
             </section>
         </section>
