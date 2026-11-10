@@ -16,7 +16,7 @@ $date_from     = $_GET['date_from']  ?? '';
 $date_to       = $_GET['date_to']    ?? '';
 $filter_branch = $_GET['branch']     ?? '';
 $filter_dept   = $_GET['department'] ?? '';
-$hiringTabActive = ($_GET['tab'] ?? '') === 'hiring';
+$hiringTabActive = ($_GET['tab'] ?? 'hiring') === 'hiring';
 $cohort        = (($_GET['cohort'] ?? 'regular') === 'probationary') ? 'probationary' : 'regular';
 $evaluation_type_filter = $cohort === 'probationary'
     ? "ev.evaluation_type IN ('Initial','Final')"
