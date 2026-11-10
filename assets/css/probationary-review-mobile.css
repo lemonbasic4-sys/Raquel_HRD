@@ -1,0 +1,28 @@
+/* Probationary immediate-head review only; desktop is unchanged. */
+@media(max-width:650px) {
+ .probationary-review-page #reviewForm .package-card__body { padding:12px!important; }
+ .probationary-review-page #reviewForm .eval-tabs-header { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px; padding:8px; overflow:visible; }
+ .probationary-review-page #reviewForm .eval-tab-btn { display:flex; align-items:center; min-width:0; width:100%; min-height:54px; padding:9px 7px; font-size:11px; line-height:1.4; white-space:normal; text-align:left; }
+ .probationary-review-page #reviewForm .eval-tab-badge { flex-shrink:0; }
+ .probationary-review-page #reviewForm .table-responsive { overflow:visible; }
+ .probationary-review-page #reviewForm table { display:block; width:100%!important; min-width:0!important; border:0; }
+ .probationary-review-page #reviewForm table thead { display:none; }
+ .probationary-review-page #reviewForm table tbody { display:block; width:100%; }
+ .probationary-review-page #reviewForm table tbody tr { display:block; margin-bottom:12px; border:1px solid #dce5d7; border-radius:10px; overflow:hidden; background:#fff; }
+ .probationary-review-page #reviewForm table tbody td { display:flex; justify-content:space-between; align-items:center; gap:10px; width:100%!important; padding:10px 12px!important; border:0; font-size:12px!important; white-space:normal!important; word-break:normal; }
+ .probationary-review-page #reviewForm table tbody td::before { content:attr(data-label); flex:1; color:#536153; font-size:11px; text-align:left; }
+ .probationary-review-page #reviewForm .package-table tbody td:first-child { display:block; background:#edf4e8; }
+ .probationary-review-page #reviewForm .package-table tbody td:first-child::before { display:none; }
+ .probationary-review-page #reviewForm .package-table tbody td:first-child .fw-bold { font-size:13px!important; }
+ .probationary-review-page #reviewForm .package-table td>div.d-flex { flex:0 1 55%; min-width:0; }
+ .probationary-review-page #reviewForm .eval-score-input { min-width:0!important; width:100px!important; max-width:100%; font-size:16px!important; }
+ .probationary-review-page #reviewForm table tfoot { display:table; width:100%; }
+ .probationary-review-page #reviewForm table tfoot th,.probationary-review-page #reviewForm table tfoot td { padding:10px; font-size:12px!important; white-space:normal; }
+ .probationary-review-page #devPlanTable tbody td { display:block; text-align:left!important; }
+ .probationary-review-page #devPlanTable td::before { display:block; margin-bottom:5px; font-weight:600; }
+ .probationary-review-page #devPlanTable input,.probationary-review-page #devPlanTable textarea { width:100%; min-width:0; font-size:16px!important; }
+ .probationary-review-page #devPlanTable td:last-child { text-align:right!important; }
+ .probationary-review-page .probationary-review-actions { flex-direction:column; align-items:stretch!important; }
+ .probationary-review-page .probationary-review-actions>.btn { width:100%; min-width:0; height:auto; min-height:44px; white-space:normal!important; font-size:13px; line-height:1.45; padding:11px; }
+ .probationary-review-page #tab-decision .btn { max-width:100%; white-space:normal; }
+}

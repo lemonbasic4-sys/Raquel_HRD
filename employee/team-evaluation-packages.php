@@ -827,6 +827,26 @@ $active_package_tab = 'probationary';
             .package-card.package-card--probationary{border-color:#3730a3!important}
             .package-card.package-card--probationary .package-card__header{border-left:4px solid #3730a3}
             @media(max-width:575.98px){.package-category-tabs{gap:.4rem}.package-category-tab{flex:1;min-width:0;padding:.65rem .5rem;gap:.45rem}.package-category-tab__icon{width:30px;height:30px}.package-category-tab__copy strong{font-size:.76rem}.package-category-tab__copy small{font-size:.65rem}}
+
+@media(max-width:650px) {
+ .evaluation-packages table.probationary-mobile-roster { display:block!important; min-width:0!important; width:100%!important; table-layout:auto; }
+ .evaluation-packages table.probationary-mobile-roster thead { display:none; }
+ .evaluation-packages table.probationary-mobile-roster tbody { display:block; width:100%; }
+ .evaluation-packages table.probationary-mobile-roster tbody tr { display:block; width:100%; margin-bottom:10px; border:1px solid #dce5d7; border-radius:9px; overflow:hidden; }
+ .evaluation-packages table.probationary-mobile-roster tbody td { display:flex!important; justify-content:space-between; align-items:center; gap:10px; width:100%!important; min-width:0!important; max-width:none; padding:9px 10px!important; font-size:12px!important; line-height:1.4; white-space:normal!important; word-break:normal; text-align:right; border:0; }
+ .evaluation-packages table.probationary-mobile-roster tbody td::before { flex:1; text-align:left; font-weight:600; color:#536153; font-size:11px; }
+ .evaluation-packages table.probationary-mobile-roster td:nth-child(1)::before { content:'Employee'; }
+ .evaluation-packages table.probationary-mobile-roster td:nth-child(2)::before { content:'Position'; }
+ .evaluation-packages table.probationary-mobile-roster td:nth-child(3)::before { content:'KRA score'; }
+ .evaluation-packages table.probationary-mobile-roster td:nth-child(4)::before { content:'Core Values score'; }
+ .evaluation-packages table.probationary-mobile-roster td:nth-child(5)::before { content:'Weighted score'; }
+ .evaluation-packages table.probationary-mobile-roster td:nth-child(6)::before { content:'Final score'; }
+ .evaluation-packages table.probationary-mobile-roster td:nth-child(7)::before { content:'Status'; }
+ .evaluation-packages table.probationary-mobile-roster td:nth-child(8)::before { content:'Action'; }
+ .evaluation-packages table.probationary-mobile-roster td:first-child { background:#edf4e8; }
+ .evaluation-packages table.probationary-mobile-roster td.col-action { flex-wrap:wrap; }
+ .evaluation-packages table.probationary-mobile-roster .btn { max-width:100%; min-height:40px; white-space:normal!important; font-size:12px; }
+}
         </style>
         <?php if (in_array($_SESSION['role'] ?? '', ['HR Manager', 'HR Supervisor'], true)): ?>
         <nav class="d-flex flex-wrap gap-2 mb-3" aria-label="Probationary evaluation history">
@@ -1069,7 +1089,7 @@ $active_package_tab = 'probationary';
                     <!-- Tab 1: Evaluations -->
                     <div class="tab-pane fade show active" id="tab-members-<?php echo (int)$package['package_id']; ?>" role="tabpanel" aria-labelledby="tab-members-btn-<?php echo (int)$package['package_id']; ?>">
                         <div class="table-responsive mb-3">
-                            <table class="package-table table align-middle mb-0">
+                            <table class="package-table table align-middle mb-0 probationary-mobile-roster">
                                 <thead>
                                     <tr>
                                         <th class="col-employee">Employee</th>

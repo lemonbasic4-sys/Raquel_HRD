@@ -304,7 +304,8 @@ $kra_count = count($kra_criteria);
 $beh_count = count($beh_criteria);
 $devplan_count = count($existing_dev_plans);
 ?>
-<main class="evaluation-packages container-fluid py-4">
+<link rel="stylesheet" href="<?php echo BASE_URL; ?>/assets/css/probationary-review-mobile.css?v=<?php echo filemtime(__DIR__.'/../assets/css/probationary-review-mobile.css'); ?>">
+<main class="evaluation-packages container-fluid py-4 probationary-review-page">
     <section class="package-hero">
         <a class="history-back-link" href="<?php echo e($package_back_url); ?>">
             <i class="fas fa-arrow-left"></i> Back to evaluation review
@@ -723,7 +724,7 @@ $devplan_count = count($existing_dev_plans);
             <?php endif; ?>
 
             <!-- Form Action Buttons -->
-            <div class="d-flex flex-wrap gap-3 mt-4 pt-3 border-top align-items-center">
+            <div class="d-flex flex-wrap gap-3 mt-4 pt-3 border-top align-items-center probationary-review-actions">
                 <button class="btn-action-primary btn" type="submit">
                     <i class="fas fa-save me-1"></i>Save Adjustments &amp; Developmental Plan
                 </button>
@@ -939,3 +940,15 @@ document.addEventListener('DOMContentLoaded', function () {
 </script>
 
 <?php require_once '../includes/footer.php'; ?>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('#reviewForm table').forEach(function (table) {
+        const labels=Array.from(table.querySelectorAll('thead th')).map(function(th){return th.textContent.trim();});
+        const labelRows=function(){table.querySelectorAll('tbody tr').forEach(function(row){Array.from(row.cells).forEach(function(cell,i){cell.setAttribute('data-label',labels[i]||'');});});};
+        labelRows();
+        const body=table.querySelector('tbody');
+        if(body)new MutationObserver(labelRows).observe(body,{childList:true,subtree:true});
+    });
+});
+</script>
