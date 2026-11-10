@@ -84,42 +84,63 @@
         byId('compare-cycle').disabled = evaluations.length < 2;
     }
 
-    function renderCriteria(ev, previous, section) {
-        const {high,low,tied} = extremes(ev);
-        const rows = ev.criteria.filter(r => section === 'KRA' ? r.section === 'KRA' : r.section !== 'KRA')
-            .map(row => ({row,comparison:criterionComparison(row,ev,previous)}))
-            .sort((a,b) => (a.row.rating ?? Infinity) - (b.row.rating ?? Infinity));
-        const prefix = section === 'KRA' ? 'kra' : 'behavior';
-        byId(`${prefix}-count`).textContent = `(${rows.length})`;
-        if (!rows.length) {
-            byId(`${prefix}-criteria`).innerHTML = '<p class="mp-muted mt-3">No criterion ratings were recorded.</p>';
-            return;
-        }
-        const rowHtml = ({row:r,comparison:c}) => `<div class="mp-criterion">
-            <div class="mp-criterion-name"><strong>${esc(r.name)}</strong>${!tied && r.rating === high ? '<br><span class="mp-tag mp-tag-high">Highest rated</span>' : ''}${!tied && r.rating === low ? '<br><span class="mp-tag mp-tag-low">Lowest rated</span>' : ''}</div>
-            <div class="mp-rating" aria-label="Rating ${num(r.rating)} out of 4">${num(r.rating)}</div>
-            <div class="mp-criterion-change" title="${esc(c.note || `Previous rating: ${num(c.previous)}. ${direction(c.change)}.`)}">${c.change == null ? `<span class="mp-muted">${previous ? 'Not comparable' : 'No comparison'}</span>` : changeHtml(c.change)}<span class="visually-hidden">${c.change == null ? esc(c.note) : direction(c.change)}</span></div>
-        </div>`;
-        byId(`${prefix}-criteria`).innerHTML = `<p class="mp-muted mt-2">Lowest ratings first${section !== 'KRA' && ev.peer_summary ? ' &middot; Approved 360 ratings' : ''}</p>${rows.slice(0,4).map(rowHtml).join('')}${rows.length > 4 ? `<details class="mp-more"><summary>Show ${rows.length - 4} more criteria</summary>${rows.slice(4).map(rowHtml).join('')}</details>` : ''}`;
+    function renderCriteria(ev, comparison) {
+        const column = (cycle, baseline = null) => {
+            if (!cycle) return '<section class="mp-evaluation-column"><p>Choose another evaluation on the right.</p></section>';
+            let html = `<section class="mp-evaluation-column"><div class="mp-cycle-title"><strong>${esc(cycle.evaluation_type)} evaluation</strong><span>${esc(cycle.cycle_label)}</span><b>Total score: ${num(cycle.total_score)} / 4</b></div>`;
+            for (const section of ['KRA', 'Behavior']) {
+                const rows = cycle.criteria.filter(row => section === 'KRA' ? row.section === 'KRA' : row.section !== 'KRA');
+                html += `<h3 class="mt-4">${section === 'KRA' ? 'Key Result Areas' : 'Core Behaviors & Values'}</h3><table class="mp-simple-ratings"><thead><tr><th>Item</th><th>Self</th><th>${cycle.peer_summary && section !== 'KRA' ? '360 final' : 'Reviewed'}</th></tr></thead><tbody>`;
+                html += rows.map((row,index) => {
+                    const altered = row.rating != null && row.self_rating != null && Math.abs(row.rating - row.self_rating) > .005;
+                    const compared = baseline ? criterionComparison(row, cycle, baseline) : null;
+                    const progress = !baseline ? '' : compared.change == null
+                        ? '<span class="mp-item-progress mp-same">Not comparable</span>'
+                        : `<span class="mp-item-progress ${changeClass(compared.change)}">${compared.change > 0 ? '&#8593; Improved' : compared.change < 0 ? '&#8595; Declined' : '&#8212; No change'} (${signed(compared.change)})</span>`;
+                    return `<tr class="${row.rating != null && row.rating < 2.6 ? 'mp-needs-focus' : ''}"><td><span class="mp-item-number">${section} ${index + 1}</span><strong>${esc(row.name)}</strong>${progress}</td><td>${num(row.self_rating)}</td><td><strong>${num(row.rating)}</strong>${altered ? `<small class="${row.rating < row.self_rating ? 'mp-down' : 'mp-up'}">${signed(delta(row.rating,row.self_rating))} adjusted</small>` : (row.rating == null || row.self_rating == null ? '' : '<small class="mp-muted">No review adjustment</small>')}</td></tr>`;
+                }).join('');
+                html += '</tbody></table>';
+            }
+            return html + '</section>';
+        };
+        byId('paired-criteria').innerHTML = column(ev) + column(comparison, ev);
+        requestAnimationFrame(alignComparisonRows);
     }
 
-    function renderTechnical(ev, previous) {
-        const formula = ev.formula_matches
-            ? `(${num(ev.kra_subtotal)} &times; ${num(ev.kra_weight,0)}%) + (${num(ev.behavior_average)} &times; ${num(ev.behavior_weight,0)}%) = <strong>${num(ev.total_score)} / 4</strong>.`
-            : 'The saved official score is displayed. Available component totals or weights need HR verification.';
-        const peer = ev.peer_summary ? `<p>360 evaluation: ${ev.peer_summary.received}/${ev.peer_summary.expected} required peer submissions. Approved version ${ev.peer_summary.version}. Final behavior ratings include any approved adjustments.</p>` : '';
-        const shared = ev.behavior_basis === 'department_shared' ? '<p>The overall result uses a department shared behavior score. Individual behavior ratings below do not contribute separately to that shared score.</p>' : '';
-        const rows = ev.criteria.map(r => {
-            const c = criterionComparison(r,ev,previous);
-            return `<tr><td class="mp-details-name"><strong>${esc(r.name)}</strong><div>${esc(r.description)}</div></td><td>${r.section === 'KRA' ? 'KRA' : 'Behavior'}</td><td>${num(r.item_weight)}%</td><td>${num(r.section_weight,0)}%</td><td>${num(r.self_rating)}</td>${ev.peer_summary ? `<td>${num(r.peer_average)}</td>` : ''}<td>${num(r.rating)}</td><td>${num(r.weighted_score,3)}</td><td>${num(r.contribution,3)}</td><td>${num(c.previous)}</td><td>${c.change == null ? esc(c.note) : `${signed(c.change)}. ${esc(c.note)}`}</td></tr>`;
-        }).join('');
-        byId('technical-content').innerHTML = `<p><strong>${esc(ev.template_name)}</strong><br>Evaluation period: ${esc(ev.evaluation_period_start)} to ${esc(ev.evaluation_period_end)}<br>Approved: ${esc(ev.approved_date ?? 'Not recorded')}</p><p><strong>Official calculation:</strong> ${formula}</p><p>Section contributions: KRA ${num(ev.kra_subtotal == null ? null : ev.kra_subtotal * ev.kra_weight / 100,3)}; behavior ${num(ev.behavior_average == null ? null : ev.behavior_average * ev.behavior_weight / 100,3)}. Displayed contributions may differ slightly because of official rounding.</p>${peer}${shared}<div class="table-responsive" tabindex="0" aria-label="Detailed scoring"><table class="table table-sm"><thead><tr><th>Criterion</th><th>Section</th><th>Item weight</th><th>Section weight</th><th>Self</th>${ev.peer_summary ? '<th>Peer average</th>' : ''}<th>Final rating</th><th>Weighted score</th><th>Overall contribution</th><th>Comparison rating</th><th>Change / note</th></tr></thead><tbody>${rows}</tbody></table></div>${ev.supervisor_comments ? `<p><strong>Head's comments:</strong> ${esc(ev.supervisor_comments)}</p>` : ''}<div class="d-flex flex-wrap gap-2"><a class="btn btn-outline-primary btn-sm" href="${BASE}/employee/evaluation-history-view.php?evaluation_id=${ev.evaluation_id}">Review cycle audit</a>${previous ? `<a class="btn btn-outline-secondary btn-sm" href="${BASE}/employee/evaluation-history-view.php?evaluation_id=${previous.evaluation_id}">Comparison cycle audit</a>` : ''}</div>`;
+    function alignComparisonRows() {
+        const columns = byId('paired-criteria').querySelectorAll('.mp-evaluation-column');
+        if (columns.length !== 2) return;
+        const pairs = [];
+        for (const selector of ['.mp-cycle-title', 'h3', '.mp-simple-ratings']) {
+            const left = columns[0].querySelectorAll(selector);
+            const right = columns[1].querySelectorAll(selector);
+            left.forEach((element, index) => {
+                if (!right[index]) return;
+                if (selector === '.mp-simple-ratings') {
+                    const leftRows = element.querySelectorAll('tr');
+                    const rightRows = right[index].querySelectorAll('tr');
+                    leftRows.forEach((row, i) => { if (rightRows[i]) pairs.push([row, rightRows[i]]); });
+                } else pairs.push([element, right[index]]);
+            });
+        }
+        pairs.forEach(pair => pair.forEach(element => { element.style.height = ''; }));
+        const heights = pairs.map(pair => Math.ceil(Math.max(...pair.map(element => element.getBoundingClientRect().height))));
+        pairs.forEach((pair, i) => pair.forEach(element => { element.style.height = `${heights[i]}px`; }));
     }
+    let comparisonWidth = 0;
+    new ResizeObserver(entries => {
+        const width = entries[0].contentRect.width;
+        if (width !== comparisonWidth) {
+            comparisonWidth = width;
+            requestAnimationFrame(alignComparisonRows);
+        }
+    }).observe(byId('paired-criteria'));
+    document.fonts.ready.then(alignComparisonRows);
 
     function renderComparison() {
         const ev = evaluations.find(r => r.evaluation_id === selectedId);
         const previous = evaluations.find(r => r.evaluation_id === comparisonId) ?? null;
-        const d = delta(ev.total_score,previous?.total_score);
+        const d = previous ? delta(previous.total_score,ev.total_score) : null;
         byId('comparison-summary').innerHTML = `<span>Reviewed cycle: <strong>${num(ev.total_score)} / 4</strong></span>${previous ? `<span>Comparison: <strong>${num(previous.total_score)} / 4</strong></span><span>${changeHtml(d)} <span class="mp-muted">${direction(d)}</span></span>` : '<span class="mp-muted">Choose another cycle to see changes.</span>'}`;
         const notices = [];
         if (!ev.formula_matches || !ev.details_match || (previous && !previous.details_match)) notices.push('Some detailed ratings need HR verification. Official overall scores are preserved.');
@@ -127,10 +148,7 @@
         if (ev.behavior_basis === 'department_shared') notices.push('Behavior ratings below are individual; the overall score uses department shared behavior.');
         if (previous && !ev.criteria.some(r => criterionComparison(r,ev,previous).change !== null)) notices.push('No equivalent criteria are available for this pair.');
         byId('comparison-notice').textContent = notices.join(' ');
-        renderCriteria(ev,previous,'KRA');
-        renderCriteria(ev,previous,'Behavior');
-        renderTechnical(ev,previous);
-        byId('scoring-details').open = false;
+        renderCriteria(ev,previous);
     }
 
     function selectCycle(id) {

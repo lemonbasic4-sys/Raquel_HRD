@@ -99,3 +99,30 @@
     .mp-score { font-size:1.45rem; }
     .mp-score small { display:block; margin-left:0; font-size:.65rem; }
 }
+.mp-paired-criteria { margin-top:1rem; overflow-x:auto; }
+.mp-paired-row { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1rem; }
+.mp-cycle-title { display:flex; flex-direction:column; gap:.4rem; padding:1rem; background:#123b12; color:#fff; border-radius:12px; }
+.mp-cycle-title span { font-size:.78rem; }
+.mp-paired-heading { margin-top:1.4rem; }
+.mp-paired-cell { display:flex; justify-content:space-between; gap:.75rem; padding:1rem .65rem; border-bottom:1px solid #e3e8de; font-size:.82rem; overflow-wrap:anywhere; }
+.mp-paired-cell p { margin:.35rem 0; font-size:.75rem; }
+.mp-paired-score { flex-shrink:0; text-align:right; }
+.mp-needs-focus { background:#fff7e5; border-left:3px solid #bd9414; }
+@media (max-width:600px) { .mp-paired-row { min-width:640px; } }
+
+/* Two complete forms, each in its original criterion order. */
+.mp-paired-criteria { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1.25rem; }
+.mp-evaluation-column { min-width:0; }
+.mp-simple-ratings { width:100%; border-collapse:collapse; font-size:.8rem; }
+.mp-simple-ratings th { background:#edf3e9; color:#244b15; padding:.65rem .4rem; }
+.mp-simple-ratings td { padding:.8rem .4rem; border-bottom:1px solid #e3e8de; vertical-align:top; }
+.mp-simple-ratings th:not(:first-child), .mp-simple-ratings td:not(:first-child) { text-align:right; width:24%; white-space:nowrap; }
+.mp-simple-ratings td:first-child strong { display:block; line-height:1.4; }
+.mp-simple-ratings small { display:block; font-size:.65rem; margin-top:.25rem; }
+.mp-item-number { display:block; color:#687565; font-size:.68rem; margin-bottom:.2rem; }
+@media(max-width:650px) { .mp-evaluation-column { min-width:290px; } .mp-paired-criteria { grid-template-columns:repeat(2,minmax(290px,1fr)); } }
+
+.mp-item-progress { display:inline-block; margin-top:.45rem; padding:.25rem .45rem; border-radius:6px; font-size:.72rem; font-weight:600; background:#f0f2ef; }
+.mp-item-progress.mp-up { color:#146c43; background:#e5f4ea; }
+.mp-item-progress.mp-down { color:#b02a37; background:#fbe9eb; }
+.mp-item-progress.mp-same { color:#526054; background:#edf0ed; }

@@ -88,14 +88,8 @@ $default_avatar_url = getEmployeeAvatar('');
                 </div>
                 <div id="comparison-summary" class="mp-comparison-summary" aria-live="polite"></div>
                 <div id="comparison-notice" class="mp-muted"></div>
-                <div class="mp-criteria-grid">
-                    <section aria-labelledby="kra-heading"><h3 id="kra-heading">Key Result Areas <span id="kra-count"></span></h3><div id="kra-criteria"></div></section>
-                    <section aria-labelledby="behavior-heading"><h3 id="behavior-heading">Behavioral Competencies <span id="behavior-count"></span></h3><div id="behavior-criteria"></div></section>
-                </div>
-                <details class="mp-technical" id="scoring-details">
-                    <summary>Scoring details &amp; audit information</summary>
-                    <div id="technical-content"></div>
-                </details>
+                <p class="mp-muted mt-3">Read each evaluation from KRA 1 down to Behavior 8. Self is the original rating; Reviewed is the effective rating after review. Improved, No change, and Declined on the right compare reviewed ratings against the matching item on the left. Review adjustments show the difference from self-rating. Highlighted rows have a reviewed rating below 2.60.</p>
+                <div id="paired-criteria" class="mp-paired-criteria"></div>
             </section>
         </section>
 
