@@ -1,6 +1,6 @@
 # Initial Evaluation Period Proposal
 
-**Status:** For discussion. Documentation only; no application changes are included.
+**Status:** Initial date calculation and read-only self-rating fields implemented. Live portal testing remains pending. Final timing is unchanged.
 
 ## Agreed requirements
 
@@ -8,10 +8,10 @@ Evaluation forms exclusively for the following employment statuses must show bot
 
 | Employment status | Period From | Period To | Initial duration |
 | --- | --- | --- | --- |
-| OJT | Required | Required | To be decided |
-| Trainee | Required | Required | To be decided |
+| OJT | Required | Required | Recorded contract start to end |
+| Trainee | Required | Required | Recorded contract start to end |
 | Probationary | Required | Required | Three calendar months |
-| Project Based | Required | Required | To be decided |
+| Project Based | Required | Required | Recorded contract start to end |
 
 **Period From** identifies the start of the period being assessed. **Period To** identifies its end. Neither field, by itself, sets a submission deadline or changes the employee's employment status.
 
@@ -49,7 +49,7 @@ Period From: February 1, 2026
 Period To:   May 1, 2026
 ```
 
-The proposed approach is to make calculated dates read-only and enforce the calculation on the server. This is a recommendation, not an implemented feature.
+Calculated dates are read-only and enforced on the server. Existing saved evaluation periods are preserved. Probationary uses `hire_date`; HR must ensure it represents the probationary appointment start. A separate appointment-date field is not included in this change.
 
 ## Recommended date safeguards
 
@@ -60,14 +60,14 @@ The proposed approach is to make calculated dates read-only and enforce the calc
 - Reject a period whose From date is later than its To date.
 - Preserve saved periods in completed evaluations. Any correction to a pending evaluation's dates should be deliberate and recorded in the audit trail.
 
-## Decisions still needed
+## Decisions and remaining questions
 
 | Decision | What needs confirmation |
 | --- | --- |
-| OJT dates | Which start date and duration define the evaluation period? |
-| Trainee dates | Which start date and duration define the evaluation period? |
-| Project Based dates | Should the period follow the project, contract, or another agreed range? |
-| Date entry | Can the head choose dates for those three statuses, or should they be calculated? |
+| OJT dates | Confirmed: employee contract start and end dates. |
+| Trainee dates | Confirmed: employee contract start and end dates. |
+| Project Based dates | Confirmed: employee contract start and end dates. |
+| Date entry | Read-only employee-specific dates, enforced server-side for new Initial evaluations. |
 | Probationary start source | Is the existing hire date sufficient, or must a separate appointment effective date be recorded? |
 | Availability | When can an employee begin and submit the Initial form? |
 | Deadline | Is there a separate self-rating submission deadline? |

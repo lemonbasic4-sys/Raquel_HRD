@@ -4,6 +4,7 @@ require_once '../includes/session-check.php';
 checkRole(['Employee']);
 require_once '../includes/functions.php';
 require_once '../includes/quarterly-evaluations.php';
+require_once '../includes/initial-evaluation-period.php';
 
 ensureEvaluationWorkflowSchema($conn);
 ensureProbationaryEvaluationSchema($conn);
@@ -68,7 +69,7 @@ if (isset($_GET['discard']) && is_numeric($_GET['discard'])) {
 
 $employee_stmt = $conn->prepare("
     SELECT e.employee_id, e.employee_code, e.first_name, e.last_name, e.job_title, e.job_title_id, e.department_id, e.branch_id,
-           e.rank_category_id, e.hire_date, e.employment_status,
+           e.rank_category_id, e.hire_date, e.employment_status, e.contract_start_date, e.contract_end_date,
            e.probationary_next_evaluation_type,
            d.department_name, b.branch_name
     FROM employees e
@@ -424,6 +425,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $errors[] = 'Your Initial probationary evaluation must be fully approved before you can submit the Final self-rating.';
     }
 
+    // Initial periods are authoritative employee dates, not browser input.
+    if ($evaluation_type === 'Initial') {
+        $savedInitial = null;
+        if ($editing_id > 0 && $is_valid_existing_edit) {
+            $periodStmt = $conn->prepare('SELECT evaluation_period_start, evaluation_period_end FROM evaluations WHERE evaluation_id=? AND employee_id=?');
+            $periodStmt->bind_param('ii', $editing_id, $employee_id);
+            $periodStmt->execute();
+            $savedInitial = $periodStmt->get_result()->fetch_assoc();
+            $periodStmt->close();
+        }
+        try {
+            [$period_start, $period_end] = $savedInitial && !empty($savedInitial['evaluation_period_start']) && !empty($savedInitial['evaluation_period_end'])
+                ? [$savedInitial['evaluation_period_start'], $savedInitial['evaluation_period_end']]
+                : initialEvaluationPeriod($employee);
+        } catch (DomainException $error) {
+            $errors[] = $error->getMessage();
+            $period_start = $period_end = '';
+        }
+    }
+
     // Automatically calculate period_start and period_end if they are empty
     if (empty($period_start) || empty($period_end)) {
         if ($editing_id > 0) {
@@ -449,8 +470,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $period_start = $available_quarterly_cycle['period_start'] ?? null;
                 $period_end = $available_quarterly_cycle['period_end'] ?? null;
             } elseif ($evaluation_type === 'Initial') {
-                $period_start = $hire_date;
-                $period_end = date('Y-m-d', strtotime('+3 months', strtotime($hire_date)));
+                // Initial dates were resolved and validated above.
             } elseif ($evaluation_type === 'Final') {
                 $period_start = $hire_date;
                 $period_end = date('Y-m-d', strtotime('+5 months', strtotime($hire_date)));
@@ -2416,8 +2436,12 @@ require_once '../includes/header.php';
                                 $display_start = $available_quarterly_cycle['period_start'] ?? '';
                                 $display_end = $available_quarterly_cycle['period_end'] ?? '';
                             } elseif ($eval_type === 'Initial') {
-                                $display_start = $hire_date;
-                                $display_end = date('Y-m-d', strtotime('+3 months', strtotime($hire_date)));
+                                try {
+                                    [$display_start, $display_end] = initialEvaluationPeriod($employee);
+                                } catch (DomainException $error) {
+                                    $display_start = $display_end = '';
+                                    echo '<div class="alert alert-warning" role="status">' . e($error->getMessage()) . '</div>';
+                                }
                             } elseif ($eval_type === 'Final') {
                                 $display_start = $hire_date;
                                 $display_end = date('Y-m-d', strtotime('+5 months', strtotime($hire_date)));
@@ -2427,6 +2451,10 @@ require_once '../includes/header.php';
                             }
                         }
                         ?>
+                        <div class="row g-3 my-2">
+                            <div class="col-sm-6"><label class="form-label" for="evaluationPeriodFrom">Period From</label><input id="evaluationPeriodFrom" type="date" class="form-control" value="<?php echo e($display_start); ?>" readonly></div>
+                            <div class="col-sm-6"><label class="form-label" for="evaluationPeriodTo">Period To</label><input id="evaluationPeriodTo" type="date" class="form-control" value="<?php echo e($display_end); ?>" readonly></div>
+                        </div>
                         <input type="hidden" name="period_start" value="<?php echo e($display_start); ?>">
                         <input type="hidden" name="period_end" value="<?php echo e($display_end); ?>">
                         <?php if (($eval_type ?? '') === 'Annual' && $is_managed_annual_employee): ?>

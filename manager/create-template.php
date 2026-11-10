@@ -590,8 +590,8 @@ require_once '../includes/header.php';
             </div>
             <div class="form-check form-switch mb-3">
                 <input class="form-check-input" type="checkbox" role="switch" id="probationaryTemplateToggle" name="probationary_template" value="1">
-                <label class="form-check-label fw-semibold" for="probationaryTemplateToggle">This template is exclusively for probationary employees</label>
-                <div class="form-text">Uses 80% KRA and 20% individual Core Values for Initial or Final reviews. Core Values questions are still added in Stage 4.</div>
+                <label class="form-check-label fw-semibold" for="probationaryTemplateToggle">This template is exclusively for OJT / Trainee / Probationary / Project Based employees</label>
+                <div class="form-text">Uses 80% KRA and 20% individual Core Values for Initial or Final reviews. Core Values questions are still added in Stage 4. Every employee has a separate Period From and Period To. For Initial evaluations: Probationary uses the hire date plus three calendar months; OJT, Trainee, and Project Based use recorded contract dates. Dates are filled in on the employee form, not shared across the template.</div>
             </div>
             <div id="probationaryTargetFields">
             <div class="row mb-3">
