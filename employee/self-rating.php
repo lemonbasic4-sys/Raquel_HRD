@@ -11,6 +11,8 @@ if (!ensureHierarchicalEvaluationSchema($conn)) {
     http_response_code(500);
     exit('Evaluation reporting schema is unavailable.');
 }
+ensureAnnualEvaluationSchema($conn);
+ensureQuarterlyEvaluationSchema($conn);
 
 $employee_id = (int) ($_SESSION['employee_id'] ?? 0);
 $user_id = (int) ($_SESSION['user_id'] ?? 0);
@@ -722,6 +724,16 @@ $templates_stmt = $conn->prepare("
             AND (et.evaluation_type <> 'Quarterly' OR (ev.evaluation_period_start = '$quarterly_cycle_start_sql' AND ev.evaluation_period_end = '$quarterly_cycle_end_sql'))
             AND ev.deleted_at IS NULL
             AND ev.status NOT IN ('Draft', 'Returned', 'Rejected', 'Pending Self-Rating')
+            AND NOT (
+                (ev.evaluation_type='Annual' AND EXISTS (
+                    SELECT 1 FROM annual_evaluation_members aem JOIN annual_evaluation_cycles aec ON aec.cycle_id=aem.cycle_id
+                    WHERE aem.evaluation_id=ev.evaluation_id AND aec.cancelled_at IS NOT NULL
+                )) OR
+                (ev.evaluation_type='Quarterly' AND EXISTS (
+                    SELECT 1 FROM quarterly_evaluation_members qem JOIN quarterly_evaluation_cycles qec ON qec.cycle_id=qem.cycle_id
+                    WHERE qem.evaluation_id=ev.evaluation_id AND qec.cancelled_at IS NOT NULL
+                ))
+            )
             AND NOT ($initial_required_flag = 1 AND ev.status = 'Approved' AND ev.evaluation_type IN ('Initial', 'Final'))
       )
     ORDER BY template_name
@@ -801,6 +813,16 @@ if ($selected_template_id > 0) {
               AND status NOT IN ('Draft', 'Returned', 'Rejected', 'Pending Self-Rating')
               AND (evaluation_type <> 'Annual' OR YEAR(evaluation_period_start) = YEAR(CURDATE()))
               AND (evaluation_type <> 'Quarterly' OR (evaluation_period_start = '$quarterly_cycle_start_sql' AND evaluation_period_end = '$quarterly_cycle_end_sql'))
+              AND NOT (
+                  (evaluation_type='Annual' AND EXISTS (
+                      SELECT 1 FROM annual_evaluation_members aem JOIN annual_evaluation_cycles aec ON aec.cycle_id=aem.cycle_id
+                      WHERE aem.evaluation_id=evaluations.evaluation_id AND aec.cancelled_at IS NOT NULL
+                  )) OR
+                  (evaluation_type='Quarterly' AND EXISTS (
+                      SELECT 1 FROM quarterly_evaluation_members qem JOIN quarterly_evaluation_cycles qec ON qec.cycle_id=qem.cycle_id
+                      WHERE qem.evaluation_id=evaluations.evaluation_id AND qec.cancelled_at IS NOT NULL
+                  ))
+              )
               AND NOT ($initial_required_flag = 1 AND status = 'Approved' AND evaluation_type IN ('Initial', 'Final'))
               AND deleted_at IS NULL 
             LIMIT 1

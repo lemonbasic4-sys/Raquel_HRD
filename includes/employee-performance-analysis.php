@@ -2,11 +2,6 @@
 /** Read-only analysis of official results. Never recalculate or write approved scores. */
 require_once __DIR__ . '/functions.php';
 
-// The shared score filter references annual and quarterly cycle tables even
-// when analytics is opened before either evaluation module has been visited.
-ensureAnnualEvaluationSchema($conn);
-ensureQuarterlyEvaluationSchema($conn);
-
 /** Shared eligibility for employee, manager and aggregate analytics queries. */
 function finalizedPerformanceSql(string $alias = 'ev'): string
 {
@@ -19,6 +14,10 @@ function finalizedPerformanceSql(string $alias = 'ev'): string
               AND (perf_m.revision_pending=1 OR perf_v.version_id IS NULL OR
                 COALESCE(JSON_UNQUOTE(JSON_EXTRACT(perf_v.snapshot_json,'$.score_complete')),
                     IF(COALESCE(JSON_EXTRACT(perf_v.snapshot_json,'$.peer_count'),0)>=COALESCE(JSON_EXTRACT(perf_v.snapshot_json,'$.expected_peers'),2147483647),'true','false'))<>'true'))";
+        $conditions[] = "NOT EXISTS(SELECT 1 FROM {$prefix}_evaluation_members cancelled_member
+            JOIN {$prefix}_evaluation_cycles cancelled_cycle ON cancelled_cycle.cycle_id=cancelled_member.cycle_id
+            WHERE cancelled_member.evaluation_id=$alias.evaluation_id AND $alias.evaluation_type='$type'
+              AND cancelled_cycle.cancelled_at IS NOT NULL)";
     }
     $conditions[] = "NOT EXISTS(SELECT 1 FROM evaluation_package_members perf_pm
         JOIN evaluation_packages perf_p ON perf_p.package_id=perf_pm.package_id
@@ -53,6 +52,8 @@ function employeePerformanceCriterionKey(array $row): string
 
 function employeePerformanceHistory($conn, int $employeeId): array
 {
+    ensureAnnualEvaluationSchema($conn);
+    ensureQuarterlyEvaluationSchema($conn);
     $finalizedSql = finalizedPerformanceSql('ev');
     $rows = annualQuery($conn, "SELECT ev.evaluation_id, ev.evaluation_type, ev.template_id,
             ev.evaluation_period_start, ev.evaluation_period_end, ev.total_score, ev.kra_subtotal,

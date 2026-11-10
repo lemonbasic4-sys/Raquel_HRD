@@ -281,8 +281,7 @@ require_once '../includes/header.php';
                         if ($ev['evaluation_type']==='Annual' && annualUsesPeerWorkflow($conn,(int)$ev['evaluation_id'])) $historyCycleMember=annualMember($conn,(int)$ev['evaluation_id']);
                         elseif ($ev['evaluation_type']==='Quarterly' && quarterlyUsesPeerWorkflow($conn,(int)$ev['evaluation_id'])) $historyCycleMember=quarterlyMember($conn,(int)$ev['evaluation_id']);
                         $cycleCancelled=$historyCycleMember && !empty($historyCycleMember['cancelled_at']);
-                        $annualHistoryMember=$historyCycleMember && !$cycleCancelled ? $historyCycleMember : null;
-                        if ($cycleCancelled) { $ev['status']='Cycle Cancelled'; $ev['package_id']=null; }
+                        $annualHistoryMember=$historyCycleMember;
                         $annualHistoryComplete=$annualHistoryMember && count($ev['evaluation_type']==='Quarterly' ? quarterlyPeers($conn,$annualHistoryMember) : annualPeers($conn,$annualHistoryMember))>=($ev['evaluation_type']==='Quarterly' ? quarterlyExpectedPeers($conn,(int)$annualHistoryMember['cycle_id'],$employee_id) : annualExpectedPeers($conn,(int)$annualHistoryMember['cycle_id'],$employee_id));
                         $is_completed = ($ev['package_status'] === 'Approved and Applied' || in_array($ev['status'], ['Approved', 'Imported'], true));
                         $has_total    = $is_completed && ($ev['total_score'] !== null);
@@ -312,9 +311,11 @@ require_once '../includes/header.php';
                                     <span><i class="fas fa-paper-plane me-1"></i>Submitted <?php echo $submitted; ?></span>
                                 <?php endif; ?>
                             </div>
-                            <?php if ($annualHistoryMember && $ev['status']==='Approved'): ?><p class="small mt-2 mb-0 <?php echo $annualHistoryComplete ? 'text-success' : 'text-muted'; ?>"><strong>Approved · <?php echo $annualHistoryComplete ? 'Score complete' : 'Score provisional'; ?></strong><br><?php echo $annualHistoryComplete ? 'All required department ratings have been received.' : 'Your immediate head has approved your evaluation. Your overall score may change as remaining department members submit their 360 ratings. You will be notified when your score changes.'; ?></p><?php endif; ?>
+                            <?php if ($annualHistoryMember && !$cycleCancelled && $ev['status']==='Approved'): ?><p class="small mt-2 mb-0 <?php echo $annualHistoryComplete ? 'text-success' : 'text-muted'; ?>"><strong>Approved · <?php echo $annualHistoryComplete ? 'Score complete' : 'Score provisional'; ?></strong><br><?php echo $annualHistoryComplete ? 'All required department ratings have been received.' : 'Your immediate head has approved your evaluation. Your overall score may change as remaining department members submit their 360 ratings. You will be notified when your score changes.'; ?></p><?php endif; ?>
                             <div class="eh-card__badges">
-                                <?php if (!empty($ev['package_id'])): ?>
+                                <?php if ($cycleCancelled): ?>
+                                    <span class="badge bg-warning text-dark" title="<?php echo e($historyCycleMember['cancellation_reason'] ?? ''); ?>">Cycle Cancelled</span>
+                                <?php elseif (!empty($ev['package_id'])): ?>
                                     <?php echo renderOrganizationPipelineBadge($conn, (int)$ev['package_id'], '', (int)($ev['evaluation_id'] ?? 0)); ?>
                                 <?php else: ?>
                                     <span class="badge <?php echo $ev['status'] === 'Approved' ? 'bg-success' : 'bg-secondary'; ?>"><?php echo e($ev['status']); ?></span>

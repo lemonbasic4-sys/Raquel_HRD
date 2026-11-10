@@ -1243,7 +1243,7 @@ function quarterlyPendingReviewCount($conn, array $actor): int
     if (!$conn->query("SHOW TABLES LIKE 'quarterly_evaluation_members'")->num_rows) return 0;
     $reviewerSql = hrEvaluationReviewerSql('m', 'c.department_id');
     $reviews=quarterlyQuery($conn,"SELECT m.evaluation_id FROM quarterly_evaluation_members m
-        JOIN quarterly_evaluation_cycles c ON c.cycle_id=m.cycle_id
+        JOIN quarterly_evaluation_cycles c ON c.cycle_id=m.cycle_id AND c.cancelled_at IS NULL
         WHERE ($reviewerSql)=? AND m.employee_id<>? AND m.evaluation_id IS NOT NULL
           AND (m.current_version=0 OR m.revision_pending=1)",[(int)$actor['job_title_id'],(int)$actor['employee_id']]);
     $count=0;
@@ -1261,14 +1261,14 @@ function quarterlyPendingCount($conn, array $actor): int
     if (quarterlyApCycleReadyToStart($conn,$actor)) $count++;
     if (quarterlyCanOwnCycle($conn,$actor,(int)$actor['department_id'])) {
         $ready=quarterlyQuery($conn,'SELECT COUNT(*) AS n FROM quarterly_evaluation_cycles
-            WHERE department_id=? AND ready_for_approval_at IS NOT NULL AND completed_at IS NULL',
+            WHERE department_id=? AND ready_for_approval_at IS NOT NULL AND completed_at IS NULL AND cancelled_at IS NULL',
             [(int)$actor['department_id']])[0];
         $count+=(int)$ready['n'];
     }
     if (quarterlyCanRate($actor)) {
         $row=quarterlyQuery($conn,"SELECT COUNT(*) AS n FROM quarterly_evaluation_members target
             JOIN quarterly_evaluation_members own ON own.cycle_id=target.cycle_id AND own.employee_id=? AND own.evaluation_id IS NOT NULL
-            JOIN quarterly_evaluation_cycles c ON c.cycle_id=target.cycle_id AND c.department_id=?
+            JOIN quarterly_evaluation_cycles c ON c.cycle_id=target.cycle_id AND c.department_id=? AND c.cancelled_at IS NULL
             WHERE target.employee_id<>own.employee_id AND target.evaluation_id IS NOT NULL
               AND NOT EXISTS(SELECT 1 FROM quarterly_peer_submissions s WHERE s.cycle_id=target.cycle_id
                   AND s.target_employee_id=target.employee_id AND s.rater_employee_id=own.employee_id)",[(int)$actor['employee_id'],(int)$actor['department_id']])[0];

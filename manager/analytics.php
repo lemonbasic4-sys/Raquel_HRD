@@ -4,6 +4,9 @@ require_once '../includes/session-check.php';
 checkRole(['HR Manager']);
 require_once '../includes/functions.php';
 require_once '../includes/employee-performance-analysis.php';
+// finalizedPerformanceSql references both cycle tables, including on a fresh database.
+ensureAnnualEvaluationSchema($conn);
+ensureQuarterlyEvaluationSchema($conn);
 $finalized_eval_filter = finalizedPerformanceSql('ev');
 $finalized_eval_filter_unaliased = finalizedPerformanceSql('evaluations');
 require_once '../includes/header.php';
