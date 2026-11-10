@@ -51,6 +51,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 annualSubmitPeers($conn,$actor,$evaluationId,(array)($_POST['scores'] ?? []));
             }
             redirectWith(annualUrl($actor,'?view=peers&cycle_id='.(int)$_POST['cycle_id']),'success',$withKra ? 'KRA review approved and your 360 ratings submitted. Peer ratings are locked.' : 'Your 360 ratings were submitted and locked.');
+        } elseif (($_POST['action'] ?? '') === 'cancel_cycle') {
+            $cancelCycleId=(int)($_POST['cycle_id'] ?? 0);
+            $conn->begin_transaction();
+            try {
+                annualQuery($conn,'SELECT cycle_id FROM annual_evaluation_cycles WHERE cycle_id=? FOR UPDATE',[$cancelCycleId]);
+                annualCancelCycle($conn,$actor,$cancelCycleId,(string)($_POST['cancellation_reason'] ?? ''));
+                $conn->commit();
+            } catch (Throwable $cancelError) { $conn->rollback(); throw $cancelError; }
+            redirectWith(annualUrl($actor,'?view=history&cycle_id='.$cancelCycleId),'success','Annual cycle cancelled. Submitted ratings remain in history.');
         } elseif (($_POST['action'] ?? '') === 'approve_cycle') {
             $approveCycleId=(int)($_POST['cycle_id'] ?? 0);
             $conn->begin_transaction();
@@ -82,7 +91,7 @@ $cycles = annualQuery($conn,"SELECT DISTINCT c.*,d.department_name FROM annual_e
     JOIN departments d ON d.department_id=c.department_id JOIN annual_evaluation_members m ON m.cycle_id=c.cycle_id
     WHERE m.employee_id=? OR ($reviewerSql)=?
     ORDER BY c.period_end DESC,c.cycle_id DESC",[(int)$actor['employee_id'],(int)$actor['job_title_id']]);
-$cycleOptions=array_values(array_filter($cycles,static fn($c)=>!empty($c['completed_at'])===$historyView));
+$cycleOptions=array_values(array_filter($cycles,static fn($c)=>$historyView ? (!empty($c['completed_at']) || !empty($c['cancelled_at'])) : (empty($c['completed_at']) && empty($c['cancelled_at']))));
 if (!$cycleId && $cycleOptions) $cycleId=(int)$cycleOptions[0]['cycle_id'];
 $member=null; $named=false; $canFinalize=false;
 if ($evaluationId) {
@@ -132,25 +141,25 @@ if ($view==='head-review') {
 $cycle=null;
 foreach ($cycles as $c) if ((int)$c['cycle_id']===$cycleId) $cycle=$c;
 if ($cycleId && !$cycle) { http_response_code(403); exit('This department cycle is unavailable.'); }
-if ($cycle && (empty($cycle['completed_at']) || annualUsesDepartmentCycle($cycle))) {
+if ($cycle && empty($cycle['cancelled_at']) && (empty($cycle['completed_at']) || annualUsesDepartmentCycle($cycle))) {
     $conn->begin_transaction();
     try {
         annualQuery($conn,'SELECT cycle_id FROM annual_evaluation_cycles WHERE cycle_id=? FOR UPDATE',[$cycleId]);
         annualUpdateCycleCompletion($conn,$cycleId);
-        $cycle=array_merge($cycle,annualQuery($conn,'SELECT ready_for_approval_at,completed_at FROM annual_evaluation_cycles WHERE cycle_id=?',[$cycleId])[0]);
+        $cycle=array_merge($cycle,annualQuery($conn,'SELECT ready_for_approval_at,completed_at,cancelled_at,cancellation_reason FROM annual_evaluation_cycles WHERE cycle_id=?',[$cycleId])[0]);
         foreach ($cycles as &$cycleOption) {
             if ((int)$cycleOption['cycle_id']===$cycleId) $cycleOption=array_merge($cycleOption,$cycle);
         }
         unset($cycleOption);
-        $cycleOptions=array_values(array_filter($cycles,static fn($c)=>!empty($c['completed_at'])===$historyView));
+        $cycleOptions=array_values(array_filter($cycles,static fn($c)=>$historyView ? (!empty($c['completed_at']) || !empty($c['cancelled_at'])) : (empty($c['completed_at']) && empty($c['cancelled_at']))));
         $conn->commit();
     } catch (Throwable $cycleError) { $conn->rollback(); throw $cycleError; }
 }
-if ($cycle && !empty($cycle['completed_at'])) {
+if ($cycle && (!empty($cycle['completed_at']) || !empty($cycle['cancelled_at']))) {
     $historyView=true;
-    $cycleOptions=array_values(array_filter($cycles,static fn($c)=>!empty($c['completed_at'])));
+    $cycleOptions=array_values(array_filter($cycles,static fn($c)=>!empty($c['completed_at']) || !empty($c['cancelled_at'])));
 }
-if ($historyView && $cycle && empty($cycle['completed_at']) && !$evaluationId) {
+if ($historyView && $cycle && empty($cycle['completed_at']) && empty($cycle['cancelled_at']) && !$evaluationId) {
     header('Location: '.annualUrl($actor,'?view=peers&cycle_id='.$cycleId)); exit;
 }
 if ($cycle && !empty($cycle['completed_at']) && $view==='rate') {

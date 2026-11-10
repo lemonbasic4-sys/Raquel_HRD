@@ -19,8 +19,12 @@ CREATE TABLE IF NOT EXISTS quarterly_evaluation_cycles (
     first_completed_at DATETIME NULL,
     ready_for_approval_at DATETIME NULL,
     cycle_approved_by INT NULL,
+    cancelled_at DATETIME NULL,
+    cancelled_by INT NULL,
+    cancellation_reason TEXT NULL,
+    active_period_key TINYINT GENERATED ALWAYS AS (IF(cancelled_at IS NULL, 1, NULL)) STORED,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE KEY quarterly_department_period (department_id, period_start, period_end)
+    UNIQUE KEY quarterly_department_active_period (department_id, period_start, period_end, active_period_key)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS quarterly_kra_approvals (

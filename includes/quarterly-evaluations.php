@@ -84,6 +84,12 @@ function ensureQuarterlyEvaluationSchema($conn): void
     foreach (['started_at'=>'DATETIME NULL','started_by'=>'INT NULL','self_rating_deadline'=>'DATE NULL'] as $column=>$definition) {
         if (!$conn->query("SHOW COLUMNS FROM quarterly_evaluation_cycles LIKE '{$column}'")->num_rows) $conn->query("ALTER TABLE quarterly_evaluation_cycles ADD COLUMN {$column} {$definition}");
     }
+    foreach (['cancelled_at'=>'DATETIME NULL','cancelled_by'=>'INT NULL','cancellation_reason'=>'TEXT NULL'] as $column=>$definition) {
+        if (!$conn->query("SHOW COLUMNS FROM quarterly_evaluation_cycles LIKE '{$column}'")->num_rows) $conn->query("ALTER TABLE quarterly_evaluation_cycles ADD COLUMN {$column} {$definition}");
+    }
+    if (!$conn->query("SHOW COLUMNS FROM quarterly_evaluation_cycles LIKE 'active_period_key'")->num_rows) $conn->query('ALTER TABLE quarterly_evaluation_cycles ADD COLUMN active_period_key TINYINT GENERATED ALWAYS AS (IF(cancelled_at IS NULL, 1, NULL)) STORED');
+    if ($conn->query("SHOW INDEX FROM quarterly_evaluation_cycles WHERE Key_name='quarterly_department_period'")->num_rows) $conn->query('ALTER TABLE quarterly_evaluation_cycles DROP INDEX quarterly_department_period');
+    if (!$conn->query("SHOW INDEX FROM quarterly_evaluation_cycles WHERE Key_name='quarterly_department_active_period'")->num_rows) $conn->query('ALTER TABLE quarterly_evaluation_cycles ADD UNIQUE KEY quarterly_department_active_period (department_id,period_start,period_end,active_period_key)');
     if (!$conn->query("SHOW COLUMNS FROM employees LIKE 'regularization_effective_date'")->num_rows) {
         $conn->query('ALTER TABLE employees ADD COLUMN regularization_effective_date DATE NULL');
     }
@@ -267,7 +273,7 @@ function quarterlyMember($conn, int $evaluationId): ?array
 {
     $reviewerSql = hrEvaluationReviewerSql('m', 'c.department_id');
     return quarterlyQuery($conn, "SELECT m.*, m.reviewer_position_id AS original_reviewer_position_id,
-            $reviewerSql AS reviewer_position_id, c.department_id, c.period_start, c.period_end, c.first_finalized_at,
+            $reviewerSql AS reviewer_position_id, c.department_id, c.period_start, c.period_end, c.first_finalized_at, c.cancelled_at, c.cancellation_reason,
             e.first_name, e.last_name, e.department_id AS current_department_id, e.job_title_id AS current_position_id,
             e.is_active AS employee_active, e.employment_status, e.deleted_at AS employee_deleted_at,
             ev.status AS evaluation_status, ev.total_score AS official_score, et.template_name,
@@ -409,7 +415,7 @@ function quarterlyApCycleReadyToStart($conn, array $actor): bool
     ensureQuarterlyEvaluationSchema($conn);
     // Show a one-time setup task for the first cycle. Future periods are owner-chosen;
     // approving one cycle must not immediately advertise another as due.
-    if (quarterlyQuery($conn,'SELECT 1 FROM quarterly_evaluation_cycles WHERE department_id=? LIMIT 1',
+    if (quarterlyQuery($conn,'SELECT 1 FROM quarterly_evaluation_cycles WHERE department_id=? AND cancelled_at IS NULL LIMIT 1',
             [(int)$actor['department_id']])) return false;
     $roster=quarterlyCycleRosterPreview($conn,(int)$actor['department_id']);
     return (bool)$roster && !array_filter($roster,static fn($person)=>!empty($person['issues']));
@@ -455,10 +461,10 @@ function quarterlyStartCycle($conn, array $actor, int $departmentId, string $fro
     $conn->begin_transaction();
     try {
         $existing = quarterlyQuery($conn,'SELECT cycle_id FROM quarterly_evaluation_cycles
-            WHERE department_id=? AND period_start<=? AND period_end>=? LIMIT 1 FOR UPDATE',[$departmentId,$to,$from]);
+            WHERE department_id=? AND cancelled_at IS NULL AND period_start<=? AND period_end>=? LIMIT 1 FOR UPDATE',[$departmentId,$to,$from]);
         if ($existing) throw new DomainException('An Quarterly cycle already covers some or all of this period for the department.');
         if (quarterlyQuery($conn,'SELECT cycle_id FROM quarterly_evaluation_cycles
-                WHERE department_id=? AND started_at IS NOT NULL AND completed_at IS NULL LIMIT 1 FOR UPDATE',[$departmentId])) {
+                WHERE department_id=? AND started_at IS NOT NULL AND completed_at IS NULL AND cancelled_at IS NULL LIMIT 1 FOR UPDATE',[$departmentId])) {
             throw new DomainException('Complete the department’s current Quarterly cycle before starting a new period.');
         }
         quarterlyQuery($conn,'INSERT INTO quarterly_evaluation_cycles
@@ -487,6 +493,23 @@ function quarterlyStartCycle($conn, array $actor, int $departmentId, string $fro
     } catch (Throwable $error) { $conn->rollback(); throw $error; }
 }
 
+function quarterlyCancelCycle($conn, array $actor, int $cycleId, string $reason): void
+{
+    $reason=trim($reason);
+    if ($reason==='') throw new DomainException('Enter a reason for cancelling this Quarterly cycle.');
+    if (mb_strlen($reason)>2000) throw new DomainException('The cancellation reason must not exceed 2,000 characters.');
+    $cycle=quarterlyQuery($conn,'SELECT c.*,d.department_name FROM quarterly_evaluation_cycles c JOIN departments d ON d.department_id=c.department_id WHERE c.cycle_id=? FOR UPDATE',[$cycleId])[0] ?? null;
+    if (!$cycle || !quarterlyCanOwnCycle($conn,$actor,(int)$cycle['department_id'])) throw new DomainException('Only the assigned department cycle owner can cancel this Quarterly cycle.');
+    if (!empty($cycle['cancelled_at'])) throw new DomainException('This Quarterly cycle is already cancelled.');
+    quarterlyQuery($conn,'UPDATE quarterly_evaluation_cycles SET cancelled_at=NOW(),cancelled_by=?,cancellation_reason=?,ready_for_approval_at=NULL WHERE cycle_id=?',[(int)$actor['user_id'],$reason,$cycleId]);
+    logAudit($conn,(int)$actor['user_id'],'CANCEL','Quarterly Cycle',$cycleId,$cycle['department_name'].' '.$cycle['period_start'].' to '.$cycle['period_end'].'. Reason: '.$reason);
+    $recipients=quarterlyQuery($conn,'SELECT DISTINCT u.user_id FROM users u JOIN employees e ON e.employee_id=u.employee_id WHERE u.is_active=1 AND u.deleted_at IS NULL AND (EXISTS(SELECT 1 FROM quarterly_evaluation_members m WHERE m.cycle_id=? AND m.employee_id=e.employee_id) OR EXISTS(SELECT 1 FROM quarterly_evaluation_members m WHERE m.cycle_id=? AND m.reviewer_position_id=e.job_title_id))',[$cycleId,$cycleId]);
+    foreach ($recipients as $recipient) {
+        $memberActor=quarterlyActor($conn,(int)$recipient['user_id']);
+        if ($memberActor) createNotification($conn,(int)$recipient['user_id'],'Quarterly cycle cancelled',$cycle['department_name'].' Quarterly cycle for '.$cycle['period_start'].' to '.$cycle['period_end'].' was cancelled. Submitted ratings are retained in history. Reason: '.$reason,quarterlyUrl($memberActor,'?view=history&cycle_id='.$cycleId),'evaluations',false);
+    }
+}
+
 function quarterlyCycleForSelfRating($conn, int $departmentId, int $employeeId): ?array
 {
     if (!$conn->query("SHOW TABLES LIKE 'quarterly_evaluation_cycles'")->num_rows) return null;
@@ -495,7 +518,7 @@ function quarterlyCycleForSelfRating($conn, int $departmentId, int $employeeId):
         FROM quarterly_evaluation_cycles c
         JOIN employees e ON e.employee_id=?
         LEFT JOIN quarterly_evaluation_members m ON m.cycle_id=c.cycle_id AND m.employee_id=?
-        WHERE c.department_id=? AND c.started_at IS NOT NULL
+        WHERE c.department_id=? AND c.started_at IS NOT NULL AND c.cancelled_at IS NULL
           AND (m.member_id IS NULL OR m.evaluation_id IS NULL OR m.revision_pending=1)
         ORDER BY c.period_end DESC,c.cycle_id DESC',[$employeeId,$employeeId,$departmentId]);
     $department=quarterlyQuery($conn,'SELECT department_name FROM departments WHERE department_id=?',[$departmentId])[0] ?? [];
@@ -541,6 +564,7 @@ function quarterlySyncApCycleRoster($conn, array $cycle): int
 
 function quarterlyAssertSnapshotActive(array $member): void
 {
+    if (!empty($member['cancelled_at'])) throw new DomainException('This Quarterly cycle was cancelled. Its retained ratings are view only.');
     if (!$member['employee_active'] || $member['employee_deleted_at'] || $member['employment_status'] !== 'Regular') {
         throw new DomainException('This participant requires HR review before the quarterly workflow can continue.');
     }
@@ -1037,6 +1061,10 @@ function quarterlyUpdateCycleCompletion($conn, int $cycleId, int $approvalUserId
     $cycle=quarterlyQuery($conn,'SELECT c.*,d.department_name FROM quarterly_evaluation_cycles c JOIN departments d ON d.department_id=c.department_id WHERE c.cycle_id=?',[$cycleId])[0] ?? null;
     if (!$cycle) {
         if ($approvalUserId) throw new DomainException('This quarterly cycle is unavailable.');
+        return false;
+    }
+    if (!empty($cycle['cancelled_at'])) {
+        if ($approvalUserId) throw new DomainException('This Quarterly cycle was cancelled and cannot be approved.');
         return false;
     }
     quarterlySyncApCycleRoster($conn,$cycle);

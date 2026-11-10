@@ -277,8 +277,13 @@ require_once '../includes/header.php';
                 <div class="eh-list">
                     <?php foreach ($filtered_evaluations as $ev): ?>
                     <?php
-                        $annualHistoryMember=$ev['evaluation_type']==='Annual' && annualUsesPeerWorkflow($conn,(int)$ev['evaluation_id']) ? annualMember($conn,(int)$ev['evaluation_id']) : null;
-                        $annualHistoryComplete=$annualHistoryMember && count(annualPeers($conn,$annualHistoryMember))>=annualExpectedPeers($conn,(int)$annualHistoryMember['cycle_id'],$employee_id);
+                        $historyCycleMember=null;
+                        if ($ev['evaluation_type']==='Annual' && annualUsesPeerWorkflow($conn,(int)$ev['evaluation_id'])) $historyCycleMember=annualMember($conn,(int)$ev['evaluation_id']);
+                        elseif ($ev['evaluation_type']==='Quarterly' && quarterlyUsesPeerWorkflow($conn,(int)$ev['evaluation_id'])) $historyCycleMember=quarterlyMember($conn,(int)$ev['evaluation_id']);
+                        $cycleCancelled=$historyCycleMember && !empty($historyCycleMember['cancelled_at']);
+                        $annualHistoryMember=$historyCycleMember && !$cycleCancelled ? $historyCycleMember : null;
+                        if ($cycleCancelled) { $ev['status']='Cycle Cancelled'; $ev['package_id']=null; }
+                        $annualHistoryComplete=$annualHistoryMember && count($ev['evaluation_type']==='Quarterly' ? quarterlyPeers($conn,$annualHistoryMember) : annualPeers($conn,$annualHistoryMember))>=($ev['evaluation_type']==='Quarterly' ? quarterlyExpectedPeers($conn,(int)$annualHistoryMember['cycle_id'],$employee_id) : annualExpectedPeers($conn,(int)$annualHistoryMember['cycle_id'],$employee_id));
                         $is_completed = ($ev['package_status'] === 'Approved and Applied' || in_array($ev['status'], ['Approved', 'Imported'], true));
                         $has_total    = $is_completed && ($ev['total_score'] !== null);
                         $level        = $is_completed ? ($ev['performance_level'] ?: null) : null;

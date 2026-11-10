@@ -2,6 +2,11 @@
 /** Read-only analysis of official results. Never recalculate or write approved scores. */
 require_once __DIR__ . '/functions.php';
 
+// The shared score filter references annual and quarterly cycle tables even
+// when analytics is opened before either evaluation module has been visited.
+ensureAnnualEvaluationSchema($conn);
+ensureQuarterlyEvaluationSchema($conn);
+
 /** Shared eligibility for employee, manager and aggregate analytics queries. */
 function finalizedPerformanceSql(string $alias = 'ev'): string
 {

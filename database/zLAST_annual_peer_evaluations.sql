@@ -19,8 +19,12 @@ CREATE TABLE IF NOT EXISTS annual_evaluation_cycles (
     first_completed_at DATETIME NULL,
     ready_for_approval_at DATETIME NULL,
     cycle_approved_by INT NULL,
+    cancelled_at DATETIME NULL,
+    cancelled_by INT NULL,
+    cancellation_reason TEXT NULL,
+    active_period_key TINYINT GENERATED ALWAYS AS (IF(cancelled_at IS NULL, 1, NULL)) STORED,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE KEY annual_department_period (department_id, period_start, period_end)
+    UNIQUE KEY annual_department_active_period (department_id, period_start, period_end, active_period_key)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS annual_kra_approvals (

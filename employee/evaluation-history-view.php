@@ -42,6 +42,7 @@ $peerEvalType=($evaluation['evaluation_type'] ?? '') === 'Quarterly' ? 'quarterl
 $is_annual_peer_evaluation = in_array($evaluation['evaluation_type'] ?? '', ['Annual','Quarterly'],true)
     && ($peerEvalType === 'quarterly' ? quarterlyUsesPeerWorkflow($conn,$evaluation_id) : annualUsesPeerWorkflow($conn,$evaluation_id));
 $annualResultMember=$is_annual_peer_evaluation ? ($peerEvalType === 'quarterly' ? quarterlyMember($conn,$evaluation_id) : annualMember($conn,$evaluation_id)) : null;
+$is_cancelled_cycle=$annualResultMember && !empty($annualResultMember['cancelled_at']);
 $annualReceivedPeers=$annualResultMember ? ($peerEvalType === 'quarterly' ? quarterlyPeers($conn,$annualResultMember) : annualPeers($conn,$annualResultMember)) : [];
 $annualResultComplete=$annualResultMember && count($annualReceivedPeers)>=($peerEvalType === 'quarterly' ? quarterlyExpectedPeers($conn,(int)$annualResultMember['cycle_id'],(int)$annualResultMember['employee_id']) : annualExpectedPeers($conn,(int)$annualResultMember['cycle_id'],(int)$annualResultMember['employee_id']));
 $annualOwnActor=$annualResultMember ? ($peerEvalType === 'quarterly' ? quarterlyActor($conn,$user_id) : annualActor($conn,$user_id)) : null;
@@ -133,6 +134,9 @@ require_once '../includes/header.php';
     <?php if ($is_historical_import): ?>
     <div class="alert alert-info mt-3" role="status"><strong><i class="fas fa-file-import me-1"></i>Imported historical record.</strong> This record preserves a past evaluation; no new employee consent or HRIS approval was recorded.<?php if (!empty($evaluation['legacy_reference'])): ?> Reference: <?php echo e($evaluation['legacy_reference']); ?>.<?php endif; ?> <?php echo $criteria ? 'Criterion ratings are included below.' : 'This is a summary record; criterion ratings were not supplied.'; ?></div>
     <?php endif; ?>
+    <?php if ($is_cancelled_cycle): ?>
+    <div class="alert alert-warning mt-3" role="status"><strong><i class="fas fa-ban me-1" aria-hidden="true"></i><?php echo e($evaluation['evaluation_type']); ?> cycle cancelled.</strong> Submitted ratings and scores are retained as historical records. Cancelled <?php echo e($annualResultMember['cancelled_at']); ?>. Reason: <?php echo e($annualResultMember['cancellation_reason'] ?? ''); ?></div>
+    <?php endif; ?>
 
     <!-- ── Original vs. Modified Score Comparison (Req 4) ──────────────────── -->
     <section class="package-card" aria-label="Original vs Modified Score Comparison">
@@ -147,7 +151,9 @@ require_once '../includes/header.php';
                 </div>
             </div>
             <div>
-                <?php if (!empty($evaluation['package_id'])): ?>
+                <?php if ($is_cancelled_cycle): ?>
+                    <span class="badge bg-warning text-dark">Cycle Cancelled</span>
+                <?php elseif (!empty($evaluation['package_id'])): ?>
                     <?php echo renderOrganizationPipelineBadge($conn, (int)$evaluation['package_id'], '', (int)($evaluation['evaluation_id'] ?? 0)); ?>
                 <?php else: ?>
                     <span class="badge <?php echo $evaluation['status'] === 'Approved' ? 'bg-success' : 'bg-secondary'; ?>">
@@ -157,7 +163,7 @@ require_once '../includes/header.php';
             </div>
         </header>
         <div class="package-card__body">
-            <?php if ($annualResultMember && $evaluation['status']==='Approved'): ?>
+            <?php if ($annualResultMember && !$is_cancelled_cycle && $evaluation['status']==='Approved'): ?>
             <div class="alert <?php echo $annualResultComplete ? 'alert-success' : 'alert-info'; ?>" role="status"><strong>Approved · <?php echo $annualResultComplete ? 'Score complete' : 'Score provisional'; ?></strong><p class="mb-0"><?php echo $annualResultComplete ? 'All required department ratings have been received. Your score is complete.' : 'Your immediate head has approved your evaluation. Your overall score may change as remaining department members submit their 360 ratings. You will be notified when your score changes.'; ?></p></div>
             <?php endif; ?>
             <?php if (!$is_package_completed): ?>

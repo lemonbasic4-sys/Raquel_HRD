@@ -84,6 +84,12 @@ function ensureAnnualEvaluationSchema($conn): void
     foreach (['started_at'=>'DATETIME NULL','started_by'=>'INT NULL','self_rating_deadline'=>'DATE NULL'] as $column=>$definition) {
         if (!$conn->query("SHOW COLUMNS FROM annual_evaluation_cycles LIKE '{$column}'")->num_rows) $conn->query("ALTER TABLE annual_evaluation_cycles ADD COLUMN {$column} {$definition}");
     }
+    foreach (['cancelled_at'=>'DATETIME NULL','cancelled_by'=>'INT NULL','cancellation_reason'=>'TEXT NULL'] as $column=>$definition) {
+        if (!$conn->query("SHOW COLUMNS FROM annual_evaluation_cycles LIKE '{$column}'")->num_rows) $conn->query("ALTER TABLE annual_evaluation_cycles ADD COLUMN {$column} {$definition}");
+    }
+    if (!$conn->query("SHOW COLUMNS FROM annual_evaluation_cycles LIKE 'active_period_key'")->num_rows) $conn->query('ALTER TABLE annual_evaluation_cycles ADD COLUMN active_period_key TINYINT GENERATED ALWAYS AS (IF(cancelled_at IS NULL, 1, NULL)) STORED');
+    if ($conn->query("SHOW INDEX FROM annual_evaluation_cycles WHERE Key_name='annual_department_period'")->num_rows) $conn->query('ALTER TABLE annual_evaluation_cycles DROP INDEX annual_department_period');
+    if (!$conn->query("SHOW INDEX FROM annual_evaluation_cycles WHERE Key_name='annual_department_active_period'")->num_rows) $conn->query('ALTER TABLE annual_evaluation_cycles ADD UNIQUE KEY annual_department_active_period (department_id,period_start,period_end,active_period_key)');
     if (!$conn->query("SHOW COLUMNS FROM employees LIKE 'regularization_effective_date'")->num_rows) {
         $conn->query('ALTER TABLE employees ADD COLUMN regularization_effective_date DATE NULL');
     }
@@ -267,7 +273,7 @@ function annualMember($conn, int $evaluationId): ?array
 {
     $reviewerSql = hrEvaluationReviewerSql('m', 'c.department_id');
     return annualQuery($conn, "SELECT m.*, m.reviewer_position_id AS original_reviewer_position_id,
-            $reviewerSql AS reviewer_position_id, c.department_id, c.period_start, c.period_end, c.first_finalized_at,
+            $reviewerSql AS reviewer_position_id, c.department_id, c.period_start, c.period_end, c.first_finalized_at, c.cancelled_at, c.cancellation_reason,
             e.first_name, e.last_name, e.department_id AS current_department_id, e.job_title_id AS current_position_id,
             e.is_active AS employee_active, e.employment_status, e.deleted_at AS employee_deleted_at,
             ev.status AS evaluation_status, ev.total_score AS official_score, et.template_name,
@@ -410,7 +416,7 @@ function annualApCycleReadyToStart($conn, array $actor): bool
     $year=date('Y');
     $from=$year.'-01-01';
     $to=$year.'-12-31';
-    if (annualQuery($conn,'SELECT 1 FROM annual_evaluation_cycles WHERE department_id=?
+    if (annualQuery($conn,'SELECT 1 FROM annual_evaluation_cycles WHERE department_id=? AND cancelled_at IS NULL
             AND ((started_at IS NOT NULL AND completed_at IS NULL) OR (period_start<=? AND period_end>=?)) LIMIT 1',
             [(int)$actor['department_id'],$to,$from])) return false;
     $roster=annualCycleRosterPreview($conn,(int)$actor['department_id']);
@@ -458,10 +464,10 @@ function annualStartCycle($conn, array $actor, int $departmentId, string $from, 
     $conn->begin_transaction();
     try {
         $existing = annualQuery($conn,'SELECT cycle_id FROM annual_evaluation_cycles
-            WHERE department_id=? AND period_start<=? AND period_end>=? LIMIT 1 FOR UPDATE',[$departmentId,$to,$from]);
+            WHERE department_id=? AND cancelled_at IS NULL AND period_start<=? AND period_end>=? LIMIT 1 FOR UPDATE',[$departmentId,$to,$from]);
         if ($existing) throw new DomainException('An Annual cycle already covers some or all of this period for the department.');
         if (annualQuery($conn,'SELECT cycle_id FROM annual_evaluation_cycles
-                WHERE department_id=? AND started_at IS NOT NULL AND completed_at IS NULL LIMIT 1 FOR UPDATE',[$departmentId])) {
+                WHERE department_id=? AND started_at IS NOT NULL AND completed_at IS NULL AND cancelled_at IS NULL LIMIT 1 FOR UPDATE',[$departmentId])) {
             throw new DomainException('Complete the department’s current Annual cycle before starting a new period.');
         }
         annualQuery($conn,'INSERT INTO annual_evaluation_cycles
@@ -490,6 +496,23 @@ function annualStartCycle($conn, array $actor, int $departmentId, string $from, 
     } catch (Throwable $error) { $conn->rollback(); throw $error; }
 }
 
+function annualCancelCycle($conn, array $actor, int $cycleId, string $reason): void
+{
+    $reason=trim($reason);
+    if ($reason==='') throw new DomainException('Enter a reason for cancelling this Annual cycle.');
+    if (mb_strlen($reason)>2000) throw new DomainException('The cancellation reason must not exceed 2,000 characters.');
+    $cycle=annualQuery($conn,'SELECT c.*,d.department_name FROM annual_evaluation_cycles c JOIN departments d ON d.department_id=c.department_id WHERE c.cycle_id=? FOR UPDATE',[$cycleId])[0] ?? null;
+    if (!$cycle || !annualCanOwnCycle($conn,$actor,(int)$cycle['department_id'])) throw new DomainException('Only the assigned department cycle owner can cancel this Annual cycle.');
+    if (!empty($cycle['cancelled_at'])) throw new DomainException('This Annual cycle is already cancelled.');
+    annualQuery($conn,'UPDATE annual_evaluation_cycles SET cancelled_at=NOW(),cancelled_by=?,cancellation_reason=?,ready_for_approval_at=NULL WHERE cycle_id=?',[(int)$actor['user_id'],$reason,$cycleId]);
+    logAudit($conn,(int)$actor['user_id'],'CANCEL','Annual Cycle',$cycleId,$cycle['department_name'].' '.$cycle['period_start'].' to '.$cycle['period_end'].'. Reason: '.$reason);
+    $recipients=annualQuery($conn,'SELECT DISTINCT u.user_id FROM users u JOIN employees e ON e.employee_id=u.employee_id WHERE u.is_active=1 AND u.deleted_at IS NULL AND (EXISTS(SELECT 1 FROM annual_evaluation_members m WHERE m.cycle_id=? AND m.employee_id=e.employee_id) OR EXISTS(SELECT 1 FROM annual_evaluation_members m WHERE m.cycle_id=? AND m.reviewer_position_id=e.job_title_id))',[$cycleId,$cycleId]);
+    foreach ($recipients as $recipient) {
+        $memberActor=annualActor($conn,(int)$recipient['user_id']);
+        if ($memberActor) createNotification($conn,(int)$recipient['user_id'],'Annual cycle cancelled',$cycle['department_name'].' Annual cycle for '.$cycle['period_start'].' to '.$cycle['period_end'].' was cancelled. Submitted ratings are retained in history. Reason: '.$reason,annualUrl($memberActor,'?view=history&cycle_id='.$cycleId),'evaluations',false);
+    }
+}
+
 function annualCycleForSelfRating($conn, int $departmentId, int $employeeId): ?array
 {
     if (!$conn->query("SHOW TABLES LIKE 'annual_evaluation_cycles'")->num_rows) return null;
@@ -498,7 +521,7 @@ function annualCycleForSelfRating($conn, int $departmentId, int $employeeId): ?a
         FROM annual_evaluation_cycles c
         JOIN employees e ON e.employee_id=?
         LEFT JOIN annual_evaluation_members m ON m.cycle_id=c.cycle_id AND m.employee_id=?
-        WHERE c.department_id=? AND c.started_at IS NOT NULL
+        WHERE c.department_id=? AND c.started_at IS NOT NULL AND c.cancelled_at IS NULL
           AND (m.member_id IS NULL OR m.evaluation_id IS NULL OR m.revision_pending=1)
         ORDER BY c.period_end DESC,c.cycle_id DESC',[$employeeId,$employeeId,$departmentId]);
     $department=annualQuery($conn,'SELECT department_name FROM departments WHERE department_id=?',[$departmentId])[0] ?? [];
@@ -544,6 +567,7 @@ function annualSyncApCycleRoster($conn, array $cycle): int
 
 function annualAssertSnapshotActive(array $member): void
 {
+    if (!empty($member['cancelled_at'])) throw new DomainException('This Annual cycle was cancelled. Its retained ratings are view only.');
     if (!$member['employee_active'] || $member['employee_deleted_at'] || $member['employment_status'] !== 'Regular') {
         throw new DomainException('This participant requires HR review before the annual workflow can continue.');
     }
@@ -1085,6 +1109,10 @@ function annualUpdateCycleCompletion($conn, int $cycleId, int $approvalUserId = 
     $cycle=annualQuery($conn,'SELECT c.*,d.department_name FROM annual_evaluation_cycles c JOIN departments d ON d.department_id=c.department_id WHERE c.cycle_id=?',[$cycleId])[0] ?? null;
     if (!$cycle) {
         if ($approvalUserId) throw new DomainException('This annual cycle is unavailable.');
+        return false;
+    }
+    if (!empty($cycle['cancelled_at'])) {
+        if ($approvalUserId) throw new DomainException('This Annual cycle was cancelled and cannot be approved.');
         return false;
     }
     annualSyncApCycleRoster($conn,$cycle);
