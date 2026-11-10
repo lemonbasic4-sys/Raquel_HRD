@@ -1538,14 +1538,20 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
         });
 
         // 4. Branch Comparison (Horizontal Bar Chart)
+        const branchScores = <?php echo json_encode(array_column($branch_comp_data, 'value')); ?>;
+        const branchRating = (score) => score >= 3.60
+            ? { color: '#28a745', label: 'Outstanding' }
+            : score >= 2.60 ? { color: '#17a2b8', label: 'Exceeds Expectations' }
+            : score >= 2.00 ? { color: '#ffc107', label: 'Meets Expectations' }
+            : { color: '#dc3545', label: 'Needs Improvement' };
         new Chart(document.getElementById('branchComparisonChart'), {
             type: 'bar',
             data: {
                 labels: <?php echo json_encode(array_column($branch_comp_data, 'label')); ?>,
                 datasets: [{
-                    data: <?php echo json_encode(array_column($branch_comp_data, 'value')); ?>,
-                    backgroundColor: 'rgba(23, 162, 184, 0.7)',
-                    borderColor: '#17a2b8',
+                    data: branchScores,
+                    backgroundColor: branchScores.map(score => branchRating(Number(score)).color),
+                    borderColor: branchScores.map(score => branchRating(Number(score)).color),
                     borderWidth: 1,
                     borderRadius: 5,
                     barThickness: 12
@@ -1555,7 +1561,14 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
                 indexAxis: 'y',
                 responsive: true,
                 maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: context => `${Number(context.raw).toFixed(2)} / 4.00 · ${branchRating(Number(context.raw)).label}`
+                        }
+                    }
+                },
                 scales: {
                     x: { max: 4.0, grid: { display: true, color: '#f8f9fa' } },
                     y: { grid: { display: false } }

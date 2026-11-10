@@ -771,6 +771,20 @@ $hero_name = trim($emp['first_name'] . ' ' . ($emp['middle_name'] ? $emp['middle
         require_once __DIR__ . '/../includes/employee-performance-analysis.php';
         $performance_history = employeePerformanceHistory($conn, (int)$eid);
         $perf_history_data = $performance_history['evaluations'];
+        $performanceYears = array_values(array_unique(array_map(static fn($item) => date('Y', strtotime($item['display_date'])), $perf_history_data)));
+        rsort($performanceYears);
+        $performanceYear = (string)($_GET['performance_year'] ?? 'all');
+        if (!in_array($performanceYear, $performanceYears, true)) $performanceYear = 'all';
+        $performanceFiltered = array_values(array_filter($perf_history_data, static fn($item) => $performanceYear === 'all' || date('Y', strtotime($item['display_date'])) === $performanceYear));
+        $performancePages = max(1, (int)ceil(count($performanceFiltered) / 10));
+        $performancePage = min($performancePages, max(1, (int)($_GET['performance_page'] ?? 1)));
+        $performanceVisible = array_reverse(array_slice(array_reverse($performanceFiltered), ($performancePage - 1) * 10, 10));
+        $performancePageUrl = static function ($page) use ($performanceYear) {
+            $query = $_GET;
+            $query['performance_year'] = $performanceYear;
+            $query['performance_page'] = $page;
+            return '?' . http_build_query($query) . '#performance-panel';
+        };
         $chart_labels = array_column($perf_history_data, 'cycle_label');
         $chart_scores = array_column($perf_history_data, 'total_score');
         $avg_5yr_score = $perf_history_data ? round(array_sum($chart_scores) / count($chart_scores), 2) : 0;
@@ -2135,13 +2149,27 @@ foreach ($completionSections as $k => $done) {
                     </div>
                 </div>
                 <div class="card-body">
+                    <form method="get" action="#performance-panel" class="d-flex flex-wrap align-items-center gap-2 mb-3">
+                        <?php foreach ($_GET as $key => $value): if (in_array($key, ['performance_year', 'performance_page'], true) || !is_scalar($value)) continue; ?>
+                            <input type="hidden" name="<?php echo e($key); ?>" value="<?php echo e((string)$value); ?>">
+                        <?php endforeach; ?>
+                        <label for="performanceYear" class="small fw-bold">Evaluation year</label>
+                        <select id="performanceYear" name="performance_year" class="form-select form-select-sm" style="width:auto;">
+                            <option value="all">All years</option>
+                            <?php foreach ($performanceYears as $year): ?>
+                                <option value="<?php echo e($year); ?>" <?php echo $performanceYear === $year ? 'selected' : ''; ?>><?php echo e($year); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <button class="btn btn-sm btn-primary" type="submit">Apply</button>
+                        <span class="text-muted small">Chart and summary show up to 10 evaluations per page. Average and trend badges use the full history.</span>
+                    </form>
                 <?php if (empty($perf_history_data)): ?>
                     <div class="empty-state py-4">
                         <i class="fas fa-chart-line"></i>
                         <p>No finalized performance evaluation history recorded for this employee yet.</p>
                     </div>
                 <?php else: ?>
-                    <div class="row align-items-center g-3 mb-3">
+                    <div class="row align-items-start g-3 mb-3">
                         <div class="col-lg-8">
                             <div style="height: 220px; position: relative;">
                                 <canvas id="empPerformanceTrendChart"></canvas>
@@ -2149,8 +2177,8 @@ foreach ($completionSections as $k => $done) {
                         </div>
                         <div class="col-lg-4 border-start">
                             <h6 class="fw-bold small text-muted uppercase mb-3">Evaluation History Summary</h6>
-                            <div class="d-grid gap-2">
-                                <?php foreach (array_reverse($perf_history_data) as $phItem):
+                            <div class="d-grid gap-2" style="max-height:320px;overflow-y:auto;padding-right:6px;" tabindex="0" aria-label="Evaluation history summary">
+                                <?php foreach (array_reverse($performanceVisible) as $phItem):
                                     $scoreVal = (float)$phItem['total_score'];
                                     $lvl = $phItem['performance_level'] ?? getPerformanceLevel($scoreVal);
                                     $lvlBadge = ($scoreVal >= 3.6) ? 'bg-success' : (($scoreVal >= 2.6) ? 'bg-info text-dark' : (($scoreVal >= 2.0) ? 'bg-warning text-dark' : 'bg-danger'));
@@ -2169,6 +2197,11 @@ foreach ($completionSections as $k => $done) {
                             </div>
                         </div>
                     </div>
+                    <nav class="d-flex align-items-center justify-content-between gap-2 mb-3" aria-label="Employee performance history pages">
+                        <?php if ($performancePage > 1): ?><a class="btn btn-sm btn-outline-primary" href="<?php echo e($performancePageUrl($performancePage - 1)); ?>">Newer records</a><?php else: ?><span></span><?php endif; ?>
+                        <span class="small text-muted"><?php echo count($performanceFiltered); ?> evaluations · Page <?php echo $performancePage; ?> of <?php echo $performancePages; ?></span>
+                        <?php if ($performancePage < $performancePages): ?><a class="btn btn-sm btn-outline-primary" href="<?php echo e($performancePageUrl($performancePage + 1)); ?>">Older records</a><?php else: ?><span></span><?php endif; ?>
+                    </nav>
                     <script src="<?php echo BASE_URL; ?>/assets/vendor/chartjs/chart.umd.min.js"></script>
                     <script>
                     document.addEventListener('DOMContentLoaded', function() {
@@ -2176,10 +2209,10 @@ foreach ($completionSections as $k => $done) {
                         new Chart(ctx, {
                             type: 'line',
                             data: {
-                                labels: <?php echo json_encode($chart_labels); ?>,
+                                labels: <?php echo json_encode(array_map(static fn($item) => date('M d, Y', strtotime($item['display_date'])) . ' · ' . $item['evaluation_type'], $performanceVisible)); ?>,
                                 datasets: [{
                                     label: 'Evaluation Score (1.00 - 4.00)',
-                                    data: <?php echo json_encode($chart_scores); ?>,
+                                    data: <?php echo json_encode(array_column($performanceVisible, 'total_score')); ?>,
                                     borderColor: '#BD9414',
                                     backgroundColor: 'rgba(189, 148, 20, 0.15)',
                                     borderWidth: 3,

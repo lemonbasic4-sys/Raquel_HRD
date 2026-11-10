@@ -1,0 +1,11 @@
+1st_schema_tables.sql:
+
+2nd_seed_organization.sql:
+
+3rd_seed_HR_accounts_.sql:
+
+01_fictional_workflow_demo.sql:
+result
+D26 import complete; all records are fictional
+
+Rerun/collision guard: correctly rejected. Base rows byte-for-byte preserved.
