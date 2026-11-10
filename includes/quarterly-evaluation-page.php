@@ -322,8 +322,8 @@ require_once __DIR__ . '/header.php';
             <?php endif; ?>
             <div class="row g-2 mb-3"><div class="col-md-7"><label for="quarterlySearch" class="form-label">Find employee</label><input id="quarterlySearch" class="form-control" type="search" placeholder="Employee name or position"></div>
                 <div class="col-md-5"><label for="quarterlyStatus" class="form-label">Status</label><select id="quarterlyStatus" class="form-select"><option value="">All</option><option value="submitted">Self-rating submitted</option><option value="pending">For consolidation</option><option value="finalized">Finalized</option><option value="revision">Revision pending</option></select></div></div>
-            <div class="table-responsive"><table class="table align-middle <?php echo $historyView ? 'peer-mobile-history' : ''; ?>" id="quarterlyRoster" data-peer-columns="<?php echo $view==='peers' ? 'yes' : 'no'; ?>">
-            <thead><tr><th>Employee</th><th>Position</th><th>Self-rating</th><th><?php echo $view==='peers' ? 'Your 360 rating' : '360 received'; ?></th><?php if ($view==='peers'): ?><th class="text-center">360 received</th><?php endif; ?><th><?php if ($historyView): ?><span class="peer-history-full-heading">Quarterly result</span><span class="peer-history-short-heading">Result</span><?php else: ?>Quarterly result<?php endif; ?></th><th class="text-center">Final score</th><th>Action</th></tr></thead>
+            <div class="table-responsive"><table class="table align-middle <?php echo ($historyView || $view==='peers') ? 'peer-mobile-history' : ''; ?>" id="quarterlyRoster" data-peer-columns="<?php echo $view==='peers' ? 'yes' : 'no'; ?>">
+            <thead><tr><th>Employee</th><th>Position</th><th>Self-rating</th><th><?php echo $view==='peers' ? 'Your 360 rating' : '360 received'; ?></th><?php if ($view==='peers'): ?><th class="text-center">360 received</th><?php endif; ?><th><?php if ($historyView || $view==='peers'): ?><span class="peer-history-full-heading">Quarterly result</span><span class="peer-history-short-heading">Result</span><?php else: ?>Quarterly result<?php endif; ?></th><th class="text-center">Final score</th><th>Action</th></tr></thead>
             <tbody><?php foreach ($members as $m):
                 $isOwnRow=(int)$m['employee_id']===(int)$actor['employee_id'];
                 $target=$m['evaluation_id'] ? quarterlyMember($conn,(int)$m['evaluation_id']) : null;
@@ -333,13 +333,13 @@ require_once __DIR__ . '/header.php';
                 if ($view!=='peers' && (!$target || !quarterlyCanFinalize($conn,$actor,$target))) continue;
                 $state=$m['current_version'] ? ((int)$m['received']>=quarterlyExpectedPeers($conn,$cycleId,(int)$m['employee_id']) ? 'Approved · Score complete' : 'Approved · Score provisional') : 'Awaiting immediate-head approval';
                 ?>
-                <tr data-quarterly-state="<?php echo $m['revision_pending'] ? 'revision' : ($m['current_version'] ? 'finalized' : 'pending'); ?>" data-quarterly-submitted="<?php echo $m['evaluation_id'] ? '1' : '0'; ?>"><td><?php echo e($m['first_name'].' '.$m['last_name']); ?><?php if ($view==='peers' && $isOwnRow): ?> <span class="quarterly-you-indicator" aria-label="Your evaluation"><i class="fas fa-user-check" aria-hidden="true"></i>You</span><?php endif; ?></td><td><?php echo e($m['position_name']); ?></td>
+                <tr data-quarterly-state="<?php echo $m['revision_pending'] ? 'revision' : ($m['current_version'] ? 'finalized' : 'pending'); ?>" data-quarterly-submitted="<?php echo $m['evaluation_id'] ? '1' : '0'; ?>"><td><?php echo e($m['first_name'].' '.$m['last_name']); ?><?php if ($view==='peers' && $isOwnRow): ?> <span class="quarterly-you-indicator" aria-label="Your evaluation"><i class="fas fa-user-check" aria-hidden="true"></i>You</span><?php endif; ?><?php if ($view==='peers' && !$historyView): ?><small class="peer-mobile-score"><?php echo !$m['evaluation_id'] ? 'Self-rating pending' : ($isOwnRow ? 'Your evaluation' : ($m['rated'] ? '360 submitted' : '360 to do')); ?></small><?php endif; ?></td><td><?php echo e($m['position_name']); ?></td>
                     <td><span class="quarterly-status-pill <?php echo $m['evaluation_id'] ? 'is-complete' : 'is-waiting'; ?>"><?php echo $m['evaluation_id'] ? 'Submitted' : 'Awaiting self-rating'; ?></span></td>
                     <td><?php if ($view==='peers'): ?><span class="quarterly-status-pill <?php echo $isOwnRow ? ($m['evaluation_id'] ? 'is-self' : 'is-waiting') : ($m['rated'] ? 'is-complete' : 'is-waiting'); ?>"><?php echo $isOwnRow ? ($m['evaluation_id'] ? 'Self-rating included' : 'Awaiting self-rating') : ($m['rated'] ? 'Submitted · Locked' : 'Not submitted'); ?></span><?php else: echo (int)$m['received'].' / '.max(0,count($members)-1); endif; ?></td>
                     <?php if ($view==='peers'): $receivedCount=(int)$m['received']; $expectedCount=quarterlyExpectedPeers($conn,$cycleId,(int)$m['employee_id']); ?>
                     <td class="text-center"><span class="quarterly-status-pill <?php echo $receivedCount>=$expectedCount && $m['evaluation_id'] ? 'is-complete' : 'is-pending'; ?>" title="<?php echo $receivedCount; ?> of <?php echo $expectedCount; ?> expected coworker ratings submitted; excludes self-rating"><i class="fas fa-users me-1" aria-hidden="true"></i><?php echo $receivedCount.' / '.$expectedCount; ?></span></td>
                     <?php endif; ?>
-                    <td><span class="quarterly-status-pill <?php echo $m['revision_pending'] ? 'is-revision' : ($m['current_version'] ? 'is-complete' : 'is-pending'); ?>"><?php echo e($state); ?></span><?php if ($historyView && $m['current_version']): ?><small class="peer-mobile-score"><?php echo number_format((float)$m['total_score'],2); ?> / 4.00</small><?php endif; ?>
+                    <td><span class="quarterly-status-pill <?php echo $m['revision_pending'] ? 'is-revision' : ($m['current_version'] ? 'is-complete' : 'is-pending'); ?>"><?php echo e($state); ?></span><?php if (($historyView || $view==='peers') && $m['current_version']): ?><small class="peer-mobile-score"><?php echo number_format((float)$m['total_score'],2); ?> / 4.00</small><?php endif; ?>
                     </td>
                     <td class="text-center text-nowrap">
                         <?php if ($m['current_version']): ?><strong style="font-size:1.15rem;color:#24452b"><?php echo number_format((float)$m['total_score'],2); ?></strong><small class="d-block text-muted">/ 4.00</small><?php else: ?><span class="text-muted">—</span><?php endif; ?>
@@ -350,7 +350,7 @@ require_once __DIR__ . '/header.php';
                         <a class="btn btn-sm btn-outline-success" href="<?php echo $isOwnRow && $actor['role']==='Employee' ? BASE_URL.'/employee/evaluation-history-view.php?evaluation_id='.(int)$m['evaluation_id'] : quarterlyUrl($actor,'?view='.(quarterlyCanFinalize($conn,$actor,$target) && $m['rated'] ? 'head-review' : 'review').'&evaluation_id='.(int)$m['evaluation_id']); ?>" aria-label="View completed evaluation"><i class="fas fa-eye peer-mobile-eye" aria-hidden="true"></i><span class="peer-desktop-action">View completed evaluation</span></a>
                     <?php elseif ($view==='peers' && $isOwnRow): ?>
                         <?php if ($m['evaluation_id']): ?>
-                            <a class="btn btn-sm btn-outline-success" href="<?php echo $actor['role']==='Employee' ? BASE_URL.'/employee/evaluation-history-view.php?evaluation_id='.(int)$m['evaluation_id'] : quarterlyUrl($actor,'?view=review&evaluation_id='.(int)$m['evaluation_id']); ?>">View my score</a>
+                            <a class="btn btn-sm btn-outline-success" href="<?php echo $actor['role']==='Employee' ? BASE_URL.'/employee/evaluation-history-view.php?evaluation_id='.(int)$m['evaluation_id'] : quarterlyUrl($actor,'?view=review&evaluation_id='.(int)$m['evaluation_id']); ?>" aria-label="View my score"><i class="fas fa-eye peer-mobile-eye" aria-hidden="true"></i><span class="peer-desktop-action">View my score</span></a>
                         <?php else: ?>
                             <span class="quarterly-roster-action-muted">Your self-rating is not yet submitted</span>
                         <?php endif; ?>
@@ -363,17 +363,17 @@ require_once __DIR__ . '/header.php';
                             <?php if (!empty($m['revision_pending'])): ?>
                                 <a class="btn btn-sm btn-outline-success" href="<?php echo quarterlyUrl($actor,'?view='.( (int)$actor['department_id']!==(int)$cycle['department_id'] ? 'rate' : 'review').'&evaluation_id='.(int)$m['evaluation_id']); ?>"><?php echo (int)$actor['department_id']!==(int)$cycle['department_id'] ? 'Review revised KRA' : 'Review revised result'; ?></a>
                             <?php else: ?>
-                                <a class="btn btn-sm btn-outline-success" href="<?php echo quarterlyUrl($actor,'?view=head-review&evaluation_id='.(int)$m['evaluation_id']); ?>">View submitted review</a>
+                                <a class="btn btn-sm btn-outline-success" href="<?php echo quarterlyUrl($actor,'?view=head-review&evaluation_id='.(int)$m['evaluation_id']); ?>" aria-label="View submitted review"><i class="fas fa-eye peer-mobile-eye" aria-hidden="true"></i><span class="peer-desktop-action">View submitted review</span></a>
                             <?php endif; ?>
                         <?php elseif (quarterlyCanFinalize($conn,$actor,$target)): ?>
-                            <a class="btn btn-sm btn-outline-success quarterly-rate-pending" href="<?php echo quarterlyUrl($actor,'?view=rate&evaluation_id='.(int)$m['evaluation_id']); ?>">Rate &amp; review</a>
+                            <a class="btn btn-sm btn-outline-success quarterly-rate-pending" href="<?php echo quarterlyUrl($actor,'?view=rate&evaluation_id='.(int)$m['evaluation_id']); ?>" aria-label="Rate and review"><i class="fas fa-clipboard-check peer-mobile-eye" aria-hidden="true"></i><span class="peer-desktop-action">Rate &amp; review</span></a>
                         <?php elseif ($m['rated']): ?>
-                            <a class="btn btn-sm btn-outline-success" href="<?php echo quarterlyUrl($actor,'?view=review&evaluation_id='.(int)$m['evaluation_id']); ?>">View behavior</a>
+                            <a class="btn btn-sm btn-outline-success" href="<?php echo quarterlyUrl($actor,'?view=review&evaluation_id='.(int)$m['evaluation_id']); ?>" aria-label="View behavior"><i class="fas fa-eye peer-mobile-eye" aria-hidden="true"></i><span class="peer-desktop-action">View behavior</span></a>
                         <?php else: ?>
-                            <a class="btn btn-sm btn-outline-success quarterly-rate-pending" href="<?php echo quarterlyUrl($actor,'?view=rate&evaluation_id='.(int)$m['evaluation_id']); ?>">Rate</a>
+                            <a class="btn btn-sm btn-outline-success quarterly-rate-pending" href="<?php echo quarterlyUrl($actor,'?view=rate&evaluation_id='.(int)$m['evaluation_id']); ?>" aria-label="Rate"><i class="fas fa-pen peer-mobile-eye" aria-hidden="true"></i><span class="peer-desktop-action">Rate</span></a>
                         <?php endif; ?>
                     <?php elseif ($canRead): ?>
-                        <a class="btn btn-sm btn-outline-success" href="<?php echo quarterlyUrl($actor,'?view=review&evaluation_id='.(int)$m['evaluation_id']); ?>">View evaluation</a>
+                        <a class="btn btn-sm btn-outline-success" href="<?php echo quarterlyUrl($actor,'?view=review&evaluation_id='.(int)$m['evaluation_id']); ?>" aria-label="View evaluation"><i class="fas fa-eye peer-mobile-eye" aria-hidden="true"></i><span class="peer-desktop-action">View evaluation</span></a>
                     <?php else: ?>—<?php endif; ?>
                     <?php if (!$historyView && empty($cycle['completed_at']) && $target && !empty($target['self_values_json']) && quarterlyCanFinalize($conn,$actor,$target)): ?>
                         <button type="button" class="btn btn-sm btn-outline-danger flex-shrink-0" title="Return evaluation" aria-label="Return evaluation" data-bs-toggle="modal" data-bs-target="#quarterlyReturnModal" data-return-id="<?php echo (int)$target['evaluation_id']; ?>" data-return-name="<?php echo e($target['first_name'].' '.$target['last_name']); ?>"><i class="fas fa-undo-alt" aria-hidden="true"></i></button>
@@ -1107,12 +1107,29 @@ if (headReviewTabs) {
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    document.querySelectorAll('table.quarterly-core-score-table').forEach(function (table) {
+    document.querySelectorAll('table.quarterly-core-score-table, #quarterlyRatingForm table.quarterly-score-table:not(:has(tbody[id]))').forEach(function (table) {
         const labels = Array.from(table.querySelectorAll('thead th')).map(function (th) { return th.textContent.trim(); });
         table.classList.add('mobile-peer-detail-table');
         table.querySelectorAll('tbody tr').forEach(function (row) {
             Array.from(row.cells).forEach(function (cell, i) { cell.setAttribute('data-label', labels[i] || 'Rating'); });
         });
+    });
+});
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('#quarterlyRateReviewPanel table, #quarterlyRatingSummary table').forEach(function (table) {
+        table.classList.add('mobile-peer-detail-table');
+        const labels = Array.from(table.querySelectorAll('thead th')).map(function (th) { return th.textContent.trim(); });
+        const labelRows = function () {
+            table.querySelectorAll('tbody tr').forEach(function (row) {
+                Array.from(row.cells).forEach(function (cell,i) { cell.setAttribute('data-label', cell.colSpan > 1 ? '' : (labels[i] || 'Rating')); });
+            });
+        };
+        labelRows();
+        const body=table.querySelector('tbody');
+        if(body) new MutationObserver(labelRows).observe(body, {childList:true, subtree:true});
     });
 });
 </script>

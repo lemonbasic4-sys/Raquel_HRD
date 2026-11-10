@@ -41,7 +41,15 @@ $quarterly_pending = $performance_actor ? quarterlyPendingCount($conn, $performa
 .performance-category-copy strong{font-size:.9rem}.performance-category-copy small{color:#6b7280;font-size:.72rem}
 .performance-category-count{display:grid;place-items:center;min-width:23px;height:23px;padding:0 .4rem;margin-left:auto;border-radius:999px;background:#ffc107;color:#082e06;font-size:.74rem;font-weight:800;flex-shrink:0}
 .performance-category-tab.has-pending{box-shadow:inset 0 0 0 1px #efcf5e}
-@media(max-width:575.98px){.performance-category-tabs{gap:.4rem}.performance-category-tab{flex:1;min-width:0;padding:.65rem .5rem;gap:.45rem}.performance-category-icon{width:30px;height:30px}.performance-category-copy strong{font-size:.76rem}.performance-category-copy small{font-size:.65rem}}
+@media(max-width:650px){
+    .performance-category-tabs{display:grid;grid-template-columns:minmax(0,1fr);gap:.45rem;border-bottom:0}
+    .performance-category-tab{width:100%;min-width:0;gap:.65rem;padding:.65rem .75rem;border-radius:9px;border-bottom-width:2px;box-sizing:border-box}
+    .performance-category-icon{width:32px;height:32px;font-size:.95rem}
+    .performance-category-copy{flex:1;min-width:0}
+    .performance-category-copy strong{font-size:.8rem;line-height:1.4;word-break:normal}
+    .performance-category-copy small{font-size:.66rem;line-height:1.4}
+    .performance-category-count{position:static;margin:0;min-width:24px;height:24px;font-size:.7rem;transform:none}
+}
 </style>
 <nav class="performance-category-tabs" aria-label="Evaluation review type">
     <a class="performance-category-tab <?php echo !$regular_category && !$quarterly_category ? 'active' : ''; ?> <?php echo $probationary_pending > 0 ? 'has-pending' : ''; ?>" <?php echo !$regular_category && !$quarterly_category ? 'aria-current="page"' : ''; ?> href="<?php echo BASE_URL; ?>/employee/team-evaluation-packages.php?category=probationary">

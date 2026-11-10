@@ -23,7 +23,7 @@ $positionRoster=annualCyclePositionReadinessRows($hrdRoster);
 $annualFormCount=(int)(annualQuery($conn,"SELECT COUNT(*) AS total FROM evaluation_templates
     WHERE target_department_id=? AND evaluation_type='Annual' AND status='Active' AND deleted_at IS NULL",[$hrdDepartmentId])[0]['total'] ?? 0);
 $annualSetupPending=!$hrdOpenCycle && $annualFormCount===0;
-$annualSetupCollapsed=$cycleSetupReadOnly || ($annualSetupPending && !isset($_GET['cycle_from']));
+$annualSetupCollapsed=$cycleSetupReadOnly || !empty($hrdOpenCycle) || ($annualSetupPending && !isset($_GET['cycle_from']));
 ?>
 <section class="content-card p-3 p-md-4 mb-4" id="annual-cycle-start" aria-labelledby="hrdCycleStartTitle">
     <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap <?php echo $annualSetupCollapsed ? 'mb-0' : 'mb-3'; ?>">

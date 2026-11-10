@@ -354,3 +354,73 @@
     table.mobile-peer-detail-table tfoot { display:table; width:100%; }
     table.mobile-peer-detail-table tfoot th, table.mobile-peer-detail-table tfoot td { padding:10px!important; font-size:12px!important; white-space:normal!important; }
 }
+
+@media(max-width:650px) {
+    #annualRoster.peer-mobile-history td:last-child>div { flex-wrap:wrap; row-gap:5px!important; }
+    #annualRoster.peer-mobile-history .annual-roster-action-muted { display:block; font-size:9px!important; line-height:1.35; word-break:normal; }
+}
+
+/* Active Rate / Rate & review inputs use the same labeled phone cards. */
+@media(max-width:650px) {
+    .annual-page #annualRatingForm .annual-score-table-wrap:has(.mobile-peer-detail-table) { min-width:0; width:100%; overflow:visible; }
+    .annual-page #annualRatingForm table.mobile-peer-detail-table { display:block!important; min-width:0!important; width:100%!important; table-layout:auto; }
+    .annual-page #annualRatingForm table.mobile-peer-detail-table tbody td { width:100%!important; min-width:0!important; font-size:12px!important; padding:10px 12px!important; }
+    .annual-page #annualRatingForm table.mobile-peer-detail-table tbody td:first-child { width:100%!important; }
+    .annual-page #annualRatingForm table.mobile-peer-detail-table .annual-number { width:105px!important; min-width:0!important; max-width:45%; height:42px; margin:0; font-size:16px!important; flex-shrink:0; }
+    .annual-page #annualRatingForm table.mobile-peer-detail-table td::before { min-width:0; white-space:normal; }
+}
+
+/* Immediate-head mobile section navigation and editable development plans. */
+@media(max-width:650px) {
+    .annual-page #annualRatingForm .annual-review-tabs {
+        display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px;
+        width:100%; min-width:0; padding:8px; overflow:visible; white-space:normal;
+    }
+    .annual-page #annualRatingForm .annual-review-tabs>button {
+        display:flex; align-items:center; justify-content:flex-start; gap:5px;
+        min-width:0; width:100%; min-height:54px; margin:0; padding:9px 7px;
+        font-size:11px; line-height:1.4; text-align:left; white-space:normal;
+        word-break:normal; overflow-wrap:normal;
+    }
+    .annual-page #annualRatingForm .annual-review-tabs>button>i { flex-shrink:0; margin-right:0!important; }
+    .annual-page #annualRatingForm .annual-review-tabs>button>span { flex-shrink:0; margin-left:auto; font-size:10px; }
+    .annual-page #annualRatePlanPanel .table-responsive { overflow:visible; }
+    .annual-page #annualRatePlanPanel table.annual-development-table { display:block; width:100%; min-width:0; border:0; }
+    .annual-page #annualRatePlanPanel .annual-development-table thead { display:none; }
+    .annual-page #annualRatePlanPanel .annual-development-table tbody { display:block; width:100%; }
+    .annual-page #annualRatePlanPanel .annual-development-table tr { display:block; margin-bottom:12px; padding:10px; border:1px solid #dce5d7; border-radius:10px; background:#f9fbf7; }
+    .annual-page #annualRatePlanPanel .annual-development-table td { display:block; width:100%; border:0; padding:6px 0; text-align:left!important; }
+    .annual-page #annualRatePlanPanel .annual-development-table td::before { display:block; margin-bottom:5px; color:#244b15; font-size:11px; font-weight:650; }
+    .annual-page #annualRatePlanPanel .annual-development-table td:nth-child(1)::before { content:'Area for Improvement / Development'; }
+    .annual-page #annualRatePlanPanel .annual-development-table td:nth-child(2)::before { content:'Support Needed / Action Plan'; }
+    .annual-page #annualRatePlanPanel .annual-development-table td:nth-child(3)::before { content:'Target Time Frame'; }
+    .annual-page #annualRatePlanPanel .annual-development-table input { width:100%; min-width:0; min-height:44px; font-size:16px; }
+    .annual-page #annualRatePlanPanel .annual-development-table td:last-child { text-align:right!important; }
+    .annual-page #annualRatePlanPanel .annual-development-table td:last-child button { min-width:40px; min-height:40px; }
+}
+
+@media(max-width:650px) {
+    .annual-page #annualRateReviewPanel .table-responsive,
+    #annualRatingSummary .table-responsive { overflow:visible; min-width:0; }
+    .annual-page #annualRateReviewPanel table.mobile-peer-detail-table,
+    #annualRatingSummary table.mobile-peer-detail-table { min-width:0!important; width:100%!important; }
+    .annual-page #annualRateReviewPanel>p { font-size:12px; line-height:1.5; }
+    .annual-page #annualRateReviewPanel h4 { display:flex; flex-wrap:wrap; align-items:center; gap:6px; font-size:13px; }
+    .annual-page #annualRateReviewPanel h4 span { font-size:11px; }
+    #annualRatingSummary table.mobile-peer-detail-table tbody td { font-size:12px!important; padding:9px 12px!important; }
+}
+
+/* All rating steps, including immediate-head development and review panels. */
+@media(max-width:650px) {
+    .annual-page #annualRatingForm .annual-rating-step-actions {
+        display:flex; flex-direction:column; align-items:stretch; gap:10px; width:100%; min-width:0;
+    }
+    .annual-page #annualRatingForm .annual-rating-step-actions>.btn {
+        display:flex; justify-content:center; align-items:center; flex:0 0 auto;
+        width:100%; max-width:100%; min-width:0; min-height:44px; height:auto;
+        padding:11px 12px; font-size:13px; line-height:1.45;
+        white-space:normal!important; overflow:visible; text-overflow:clip;
+        word-break:normal; overflow-wrap:break-word; text-align:center;
+    }
+    .annual-page #annualRatingForm .annual-rating-step-actions>.btn i { flex-shrink:0; }
+}
