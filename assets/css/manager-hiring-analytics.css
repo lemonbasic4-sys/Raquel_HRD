@@ -132,3 +132,23 @@
     .hiring-kpi.fadeup { animation:none; }
 }
 
+/* Stronger green/gold contrast for hiring reports. */
+.hiring-workspace { --hire-ink:#19351c; --hire-muted:#52634f; --hire-line:#d4dfce; }
+.hiring-workspace .hiring-surface { border-color:#d4dfce; box-shadow:0 4px 14px #19351c0a; }
+.hiring-workspace .hiring-card-heading { background:#edf4e8; border-bottom:1px solid #d4dfce; }
+.hiring-workspace .hiring-card-heading h3 { color:#173f13; }
+.hiring-workspace .hiring-chip { color:#244b15; background:#deedcf; border-color:#b8cea9; font-weight:700; }
+.hiring-workspace .hiring-toolbar-icon,.hiring-workspace .hiring-heading-icon { color:#80600a; }
+.hiring-workspace .hiring-bar-fill { background:linear-gradient(#548332,#244b15); }
+.hiring-workspace .is-selected .hiring-bar-fill { background:linear-gradient(#dcb83d,#99730a); }
+.hiring-workspace .hiring-bar-fill>span { color:#244b15; font-weight:750; }
+.hiring-workspace .hiring-share-track { height:8px; background:#e7eedf; }
+.hiring-workspace .hiring-share-track>span { background:#376622; }
+.hiring-workspace .hiring-chart-caption,.hiring-workspace .hiring-footnote,.hiring-workspace .hiring-pagination,
+.hiring-workspace .hiring-table small,.hiring-workspace .hiring-department small { color:#52634f; }
+.hiring-workspace .hiring-table thead th { background:#e7f0df; color:#244b15; border-color:#ccdbbf; font-weight:750; }
+.hiring-workspace .hiring-table td { color:#30452d; }
+.hiring-workspace .hiring-avatar { background:#deebd3; color:#244b15; border-color:#c2d6b1; }
+.hiring-workspace .hiring-status { color:#344d2c; background:#edf2e8; border-color:#c9d6c0; font-weight:650; }
+.hiring-workspace .hiring-status[data-status="Regular"] { color:#146139; background:#ddf2e4; border-color:#a6d3b5; }
+.hiring-workspace .hiring-status[data-status="Probationary"] { color:#765000; background:#fff0c2; border-color:#e5c468; }

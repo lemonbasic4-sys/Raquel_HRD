@@ -63,7 +63,7 @@ $hiringLink = static function (int $page) use ($hiringYear, $hiringMonth): strin
     return 'analytics.php?' . http_build_query(array_merge($query, ['tab'=>'hiring','hire_year'=>$hiringYear,'hire_month'=>$hiringMonth,'hire_page'=>$page])) . '#hiring-analytics';
 };
 ?>
-<link rel="stylesheet" href="../assets/css/manager-hiring-analytics.css?v=3">
+<link rel="stylesheet" href="../assets/css/manager-hiring-analytics.css?v=<?php echo filemtime(__DIR__.'/../assets/css/manager-hiring-analytics.css'); ?>">
 <section id="hiring-analytics" class="hiring-workspace" aria-labelledby="hiring-title">
     <header class="hiring-heading">
         <div>
@@ -170,7 +170,7 @@ $hiringLink = static function (int $page) use ($hiringYear, $hiringMonth): strin
                 <tr><td><div class="hiring-person"><span class="hiring-avatar" aria-hidden="true"><?php echo e(mb_substr($hiringEmployee['first_name'],0,1).mb_substr($hiringEmployee['last_name'],0,1)); ?></span><div><strong><?php echo e($hiringEmployee['first_name'].' '.$hiringEmployee['last_name']); ?></strong><small><?php echo e($hiringEmployee['employee_code'].' · '.$hiringEmployee['job_title']); ?></small></div></div></td>
                 <td><?php echo e($hiringEmployee['department_name']); ?><small><?php echo e($hiringEmployee['branch_name']); ?></small></td>
                 <td class="text-nowrap"><?php echo e(date('M d, Y',strtotime($hiringEmployee['hire_date']))); ?></td>
-                <td><span class="hiring-status"><?php echo e($hiringEmployee['employment_status']); ?></span></td></tr>
+                <td><span class="hiring-status" data-status="<?php echo e($hiringEmployee['employment_status']); ?>"><?php echo e($hiringEmployee['employment_status']); ?></span></td></tr>
                 <?php endforeach; ?>
                 </tbody>
             </table>
@@ -187,3 +187,36 @@ $hiringLink = static function (int $page) use ($hiringYear, $hiringMonth): strin
     <p class="hiring-footnote"><i class="fas fa-info-circle" aria-hidden="true"></i>Counts use employee hire dates, including separated employees. Deleted records, administrators, and future start dates are excluded.</p>
 </section>
 
+<script>
+(function () {
+    function initHiringAnimation() {
+        const chart=document.querySelector('.hiring-bars');
+        if(!chart) return;
+        let animations=[];
+        const reduced=window.matchMedia('(prefers-reduced-motion: reduce)');
+        function rise() {
+            if(!chart.getClientRects().length || reduced.matches) return;
+            animations.forEach(function(animation){animation.cancel();});
+            animations=[];
+            chart.querySelectorAll('.hiring-bar-fill').forEach(function(bar,index){
+                const height=bar.getBoundingClientRect().height;
+                if(typeof bar.animate!=='function' || height<=2) return;
+                animations.push(bar.animate([{height:'2px'},{height:height+'px'}],{
+                    duration:1400,delay:index*60,easing:'cubic-bezier(.22,.61,.36,1)',fill:'backwards'
+                }));
+            });
+        }
+        let visible=false;
+        if('IntersectionObserver' in window) {
+            new IntersectionObserver(function(entries){
+                const now=entries[0].isIntersecting;
+                if(now && !visible) requestAnimationFrame(rise);
+                visible=now;
+            },{threshold:.1}).observe(chart);
+        } else requestAnimationFrame(rise);
+        document.getElementById('hiring-tab')?.addEventListener('shown.bs.tab',function(){requestAnimationFrame(rise);});
+    }
+    if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',initHiringAnimation,{once:true});
+    else initHiringAnimation();
+})();
+</script>
