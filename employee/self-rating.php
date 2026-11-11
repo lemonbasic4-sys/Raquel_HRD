@@ -422,11 +422,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     $evaluation_type = trim($template['evaluation_type'] ?? 'Annual');
-    if ($evaluation_type === 'Annual' && $ap_annual_waiting && empty($individualTemplate['individual_workflow'])) {
-        $errors[] = 'The department cycle owner has not started an available Annual cycle. Please wait before opening this self-rating form.';
-    }
-    if ($evaluation_type === 'Quarterly' && !$available_quarterly_cycle && empty($individualTemplate['individual_workflow'])) {
-        $errors[] = 'The department cycle owner has not started an available Quarterly cycle. Please wait before opening this self-rating form.';
+    if (in_array($evaluation_type, ['Annual','Quarterly'], true) && empty($individualTemplate['individual_workflow']) && !$edit_eval) {
+        $errors[] = 'Ask the immediate head to publish an individual evaluation form with Period From and Period To.';
     }
     if (($employee['employment_status'] ?? '') === 'Probationary'
         && in_array($evaluation_type, ['Initial', 'Final'], true)
@@ -2476,7 +2473,7 @@ require_once '../includes/header.php';
                                 <strong>Annual cycle:</strong> <?php echo e(formatDate($display_start)); ?> to <?php echo e(formatDate($display_end)); ?>.
                                 Self-rating deadline: <?php echo e(formatDate($available_annual_cycle['self_rating_deadline'])); ?>.
                             <?php else: ?>
-                                Your department cycle owner has not started an available Annual cycle. You can prepare a draft, but submission is unavailable until the cycle starts.
+                                This is a legacy form. Ask the immediate head to publish an individual evaluation form with Period From and Period To.
                             <?php endif; ?>
                         </div>
                         <?php endif; ?>

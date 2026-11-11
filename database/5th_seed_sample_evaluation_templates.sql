@@ -14,11 +14,11 @@ START TRANSACTION;
 INSERT INTO evaluation_templates
 (template_name,description,target_department,target_department_id,target_job_title_id,
  behavior_framework_code,behavior_framework_version,evaluation_type,kra_weight,behavior_weight,
- form_code,revision_date,effective_date_form,status,created_by)
+ form_code,revision_date,effective_date_form,status,individual_workflow,assessment_from,assessment_to,created_by)
 VALUES ('[SAMPLE] Quarterly - HR Manager',
  'Fictional testing form. Review performance against documented role targets.',
  (SELECT department_name FROM departments WHERE department_id=7),7,700,
- 'CORE-VALUES','1.0','Quarterly',80,20,'SAMPLE-HR-700-QUARTERLY','2026-11-11','2026-11-11','Active',
+ 'CORE-VALUES','1.0','Quarterly',80,20,'SAMPLE-HR-700-QUARTERLY','2026-11-11','2026-11-11','Active',1,'2026-11-11','2027-02-11',
  (SELECT user_id FROM users WHERE username='CEO-001'));
 SET @sample_template_id = LAST_INSERT_ID();
 
@@ -52,11 +52,11 @@ INSERT INTO evaluation_criteria
 INSERT INTO evaluation_templates
 (template_name,description,target_department,target_department_id,target_job_title_id,
  behavior_framework_code,behavior_framework_version,evaluation_type,kra_weight,behavior_weight,
- form_code,revision_date,effective_date_form,status,created_by)
+ form_code,revision_date,effective_date_form,status,individual_workflow,assessment_from,assessment_to,created_by)
 VALUES ('[SAMPLE] Annual - HR Manager',
  'Fictional testing form. Review performance against documented role targets.',
  (SELECT department_name FROM departments WHERE department_id=7),7,700,
- 'CORE-VALUES','1.0','Annual',80,20,'SAMPLE-HR-700-ANNUAL','2026-11-11','2026-11-11','Active',
+ 'CORE-VALUES','1.0','Annual',80,20,'SAMPLE-HR-700-ANNUAL','2026-11-11','2026-11-11','Active',1,'2026-01-01','2026-12-31',
  (SELECT user_id FROM users WHERE username='CEO-001'));
 SET @sample_template_id = LAST_INSERT_ID();
 
@@ -90,11 +90,11 @@ INSERT INTO evaluation_criteria
 INSERT INTO evaluation_templates
 (template_name,description,target_department,target_department_id,target_job_title_id,
  behavior_framework_code,behavior_framework_version,evaluation_type,kra_weight,behavior_weight,
- form_code,revision_date,effective_date_form,status,created_by)
+ form_code,revision_date,effective_date_form,status,individual_workflow,assessment_from,assessment_to,created_by)
 VALUES ('[SAMPLE] Quarterly - HR Supervisor',
  'Fictional testing form. Review performance against documented role targets.',
  (SELECT department_name FROM departments WHERE department_id=7),7,705,
- 'CORE-VALUES','1.0','Quarterly',80,20,'SAMPLE-HR-705-QUARTERLY','2026-11-11','2026-11-11','Active',
+ 'CORE-VALUES','1.0','Quarterly',80,20,'SAMPLE-HR-705-QUARTERLY','2026-11-11','2026-11-11','Active',1,'2026-11-11','2027-02-11',
  (SELECT user_id FROM users WHERE username='elena.delgado'));
 SET @sample_template_id = LAST_INSERT_ID();
 
@@ -128,11 +128,11 @@ INSERT INTO evaluation_criteria
 INSERT INTO evaluation_templates
 (template_name,description,target_department,target_department_id,target_job_title_id,
  behavior_framework_code,behavior_framework_version,evaluation_type,kra_weight,behavior_weight,
- form_code,revision_date,effective_date_form,status,created_by)
+ form_code,revision_date,effective_date_form,status,individual_workflow,assessment_from,assessment_to,created_by)
 VALUES ('[SAMPLE] Annual - HR Supervisor',
  'Fictional testing form. Review performance against documented role targets.',
  (SELECT department_name FROM departments WHERE department_id=7),7,705,
- 'CORE-VALUES','1.0','Annual',80,20,'SAMPLE-HR-705-ANNUAL','2026-11-11','2026-11-11','Active',
+ 'CORE-VALUES','1.0','Annual',80,20,'SAMPLE-HR-705-ANNUAL','2026-11-11','2026-11-11','Active',1,'2026-01-01','2026-12-31',
  (SELECT user_id FROM users WHERE username='elena.delgado'));
 SET @sample_template_id = LAST_INSERT_ID();
 
@@ -166,11 +166,11 @@ INSERT INTO evaluation_criteria
 INSERT INTO evaluation_templates
 (template_name,description,target_department,target_department_id,target_job_title_id,
  behavior_framework_code,behavior_framework_version,evaluation_type,kra_weight,behavior_weight,
- form_code,revision_date,effective_date_form,status,created_by)
+ form_code,revision_date,effective_date_form,status,individual_workflow,assessment_from,assessment_to,created_by)
 VALUES ('[SAMPLE] Quarterly - HR Staff',
  'Fictional testing form. Review performance against documented role targets.',
  (SELECT department_name FROM departments WHERE department_id=7),7,710,
- 'CORE-VALUES','1.0','Quarterly',80,20,'SAMPLE-HR-710-QUARTERLY','2026-11-11','2026-11-11','Active',
+ 'CORE-VALUES','1.0','Quarterly',80,20,'SAMPLE-HR-710-QUARTERLY','2026-11-11','2026-11-11','Active',1,'2026-11-11','2027-02-11',
  (SELECT user_id FROM users WHERE username='patricia.gomez'));
 SET @sample_template_id = LAST_INSERT_ID();
 
@@ -204,11 +204,11 @@ INSERT INTO evaluation_criteria
 INSERT INTO evaluation_templates
 (template_name,description,target_department,target_department_id,target_job_title_id,
  behavior_framework_code,behavior_framework_version,evaluation_type,kra_weight,behavior_weight,
- form_code,revision_date,effective_date_form,status,created_by)
+ form_code,revision_date,effective_date_form,status,individual_workflow,assessment_from,assessment_to,created_by)
 VALUES ('[SAMPLE] Annual - HR Staff',
  'Fictional testing form. Review performance against documented role targets.',
  (SELECT department_name FROM departments WHERE department_id=7),7,710,
- 'CORE-VALUES','1.0','Annual',80,20,'SAMPLE-HR-710-ANNUAL','2026-11-11','2026-11-11','Active',
+ 'CORE-VALUES','1.0','Annual',80,20,'SAMPLE-HR-710-ANNUAL','2026-11-11','2026-11-11','Active',1,'2026-01-01','2026-12-31',
  (SELECT user_id FROM users WHERE username='patricia.gomez'));
 SET @sample_template_id = LAST_INSERT_ID();
 
@@ -242,11 +242,11 @@ INSERT INTO evaluation_criteria
 INSERT INTO evaluation_templates
 (template_name,description,target_department,target_department_id,target_job_title_id,
  behavior_framework_code,behavior_framework_version,evaluation_type,kra_weight,behavior_weight,
- form_code,revision_date,effective_date_form,status,created_by)
+ form_code,revision_date,effective_date_form,status,individual_workflow,assessment_from,assessment_to,created_by)
 VALUES ('[SAMPLE] Quarterly - VP for Acquired Properties',
  'Fictional testing form. Review performance against documented role targets.',
  (SELECT department_name FROM departments WHERE department_id=1),1,100,
- 'CORE-VALUES','1.0','Quarterly',80,20,'SAMPLE-AP-100-QUARTERLY','2026-11-11','2026-11-11','Active',
+ 'CORE-VALUES','1.0','Quarterly',80,20,'SAMPLE-AP-100-QUARTERLY','2026-11-11','2026-11-11','Active',1,'2026-11-11','2027-02-11',
  (SELECT user_id FROM users WHERE username='CEO-001'));
 SET @sample_template_id = LAST_INSERT_ID();
 
@@ -280,11 +280,11 @@ INSERT INTO evaluation_criteria
 INSERT INTO evaluation_templates
 (template_name,description,target_department,target_department_id,target_job_title_id,
  behavior_framework_code,behavior_framework_version,evaluation_type,kra_weight,behavior_weight,
- form_code,revision_date,effective_date_form,status,created_by)
+ form_code,revision_date,effective_date_form,status,individual_workflow,assessment_from,assessment_to,created_by)
 VALUES ('[SAMPLE] Annual - VP for Acquired Properties',
  'Fictional testing form. Review performance against documented role targets.',
  (SELECT department_name FROM departments WHERE department_id=1),1,100,
- 'CORE-VALUES','1.0','Annual',80,20,'SAMPLE-AP-100-ANNUAL','2026-11-11','2026-11-11','Active',
+ 'CORE-VALUES','1.0','Annual',80,20,'SAMPLE-AP-100-ANNUAL','2026-11-11','2026-11-11','Active',1,'2026-01-01','2026-12-31',
  (SELECT user_id FROM users WHERE username='CEO-001'));
 SET @sample_template_id = LAST_INSERT_ID();
 
@@ -318,11 +318,11 @@ INSERT INTO evaluation_criteria
 INSERT INTO evaluation_templates
 (template_name,description,target_department,target_department_id,target_job_title_id,
  behavior_framework_code,behavior_framework_version,evaluation_type,kra_weight,behavior_weight,
- form_code,revision_date,effective_date_form,status,created_by)
+ form_code,revision_date,effective_date_form,status,individual_workflow,assessment_from,assessment_to,created_by)
 VALUES ('[SAMPLE] Quarterly - AP Manager',
  'Fictional testing form. Review performance against documented role targets.',
  (SELECT department_name FROM departments WHERE department_id=1),1,101,
- 'CORE-VALUES','1.0','Quarterly',80,20,'SAMPLE-AP-101-QUARTERLY','2026-11-11','2026-11-11','Active',
+ 'CORE-VALUES','1.0','Quarterly',80,20,'SAMPLE-AP-101-QUARTERLY','2026-11-11','2026-11-11','Active',1,'2026-11-11','2027-02-11',
  (SELECT user_id FROM users WHERE username='AP-001'));
 SET @sample_template_id = LAST_INSERT_ID();
 
@@ -356,11 +356,11 @@ INSERT INTO evaluation_criteria
 INSERT INTO evaluation_templates
 (template_name,description,target_department,target_department_id,target_job_title_id,
  behavior_framework_code,behavior_framework_version,evaluation_type,kra_weight,behavior_weight,
- form_code,revision_date,effective_date_form,status,created_by)
+ form_code,revision_date,effective_date_form,status,individual_workflow,assessment_from,assessment_to,created_by)
 VALUES ('[SAMPLE] Annual - AP Manager',
  'Fictional testing form. Review performance against documented role targets.',
  (SELECT department_name FROM departments WHERE department_id=1),1,101,
- 'CORE-VALUES','1.0','Annual',80,20,'SAMPLE-AP-101-ANNUAL','2026-11-11','2026-11-11','Active',
+ 'CORE-VALUES','1.0','Annual',80,20,'SAMPLE-AP-101-ANNUAL','2026-11-11','2026-11-11','Active',1,'2026-01-01','2026-12-31',
  (SELECT user_id FROM users WHERE username='AP-001'));
 SET @sample_template_id = LAST_INSERT_ID();
 
@@ -389,6 +389,18 @@ INSERT INTO evaluation_criteria
 (@sample_template_id,'Behavior','Integrity','Exhibits honesty and strong moral uprightness.','Exhibits honesty and strong moral uprightness.',0,'Scale_1_4',6),
 (@sample_template_id,'Behavior','Continuous Improvement','Provides diligent effort to continuously focus on getting better.','Provides diligent effort to continuously focus on getting better.',0,'Scale_1_4',7),
 (@sample_template_id,'Behavior','Excellent Client Experience','Delivers the service beyond the expectations of the internal and external clients.','Delivers the service beyond the expectations of the internal and external clients.',0,'Scale_1_4',8);
+
+-- Explicit fictional fixture dates, six months after each original seed hire date.
+-- These are test data, not a rule for calculating real employee regularization.
+UPDATE employees SET regularization_effective_date='2020-07-15'
+WHERE employee_code='HRD-001' AND first_name='Elena' AND last_name='Delgado'
+ AND hire_date='2020-01-15' AND regularization_effective_date IS NULL;
+UPDATE employees SET regularization_effective_date='2017-08-14'
+WHERE employee_code='HRD-002' AND first_name='Patricia' AND last_name='Gomez'
+ AND hire_date='2017-02-14' AND regularization_effective_date IS NULL;
+UPDATE employees SET regularization_effective_date='2022-07-05'
+WHERE employee_code='HRD-003' AND first_name='Miguel' AND last_name='Torres'
+ AND hire_date='2022-01-05' AND regularization_effective_date IS NULL;
 
 COMMIT;
 

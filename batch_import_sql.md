@@ -41,3 +41,18 @@ The fifth seed adds Active Quarterly and Annual forms, each with 10 KRA items (1
 Import once after the fourth seed. This creates templates only. AP Manager positions have forms ready, but this base setup does not yet include AP Manager employees/accounts. No form is created for the CEO because the CEO has no configured immediate head.
 
 Revision Date and Effective Date are template metadata; set evaluation periods through the evaluation workflow.
+
+## Sample form periods (individual workflow)
+
+Quarterly sample: November 11, 2026 to February 11, 2027. Annual sample: January 1 to December 31, 2026, adjusted to each employee's recorded regularization date when applicable. These are editable sample dates, not hardcoded application rules. No department Start Cycle action is needed.
+
+The fifth seed supplies explicit fictional regularization dates for the three mock HR employees. It does not calculate regularization dates for real employees.
+
+If the old sample seed was already imported, do not reset the database or reimport the fifth seed. Apply the scoped repair once:
+
+```powershell
+cd C:\xampp\htdocs\Raquel_HRD
+C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 -u root -e "source database/repair_sample_individual_templates.sql"
+```
+
+The repair skips forms with submitted evaluations and leaves existing regularization dates unchanged.

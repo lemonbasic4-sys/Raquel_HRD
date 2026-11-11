@@ -448,55 +448,7 @@ function quarterlySyncApCycleReadinessNotification($conn, array $actor): bool
 
 function quarterlyStartCycle($conn, array $actor, int $departmentId, string $from, string $to, string $deadline): int
 {
-    if (!quarterlyCanOwnCycle($conn,$actor,$departmentId)) {
-        throw new DomainException('Only the assigned department cycle owner can start this Quarterly cycle.');
-    }
-    foreach ([$from,$to,$deadline] as $date) {
-        $parsed = DateTimeImmutable::createFromFormat('!Y-m-d',$date);
-        if (!$parsed || $parsed->format('Y-m-d')!==$date) throw new DomainException('Enter valid period and deadline dates.');
-    }
-    if ($from>$to) throw new DomainException('Period From must be on or before Period To.');
-    if ($deadline < date('Y-m-d')) throw new DomainException('The self-rating deadline cannot be in the past.');
-    $department = quarterlyQuery($conn,'SELECT department_name FROM departments WHERE department_id=? AND is_active=1 AND deleted_at IS NULL',[$departmentId])[0] ?? null;
-    if (!$department) throw new DomainException('Select an active department.');
-    $roster = quarterlyCycleRosterPreview($conn,$departmentId);
-    if (!$roster) throw new DomainException('This department has no active regular employees.');
-    foreach ($roster as $employee) {
-        if ($employee['issues']) throw new DomainException($employee['first_name'].' '.$employee['last_name'].': '.implode('; ',$employee['issues']));
-    }
-    $conn->begin_transaction();
-    try {
-        $existing = quarterlyQuery($conn,'SELECT cycle_id FROM quarterly_evaluation_cycles
-            WHERE department_id=? AND cancelled_at IS NULL AND period_start<=? AND period_end>=? LIMIT 1 FOR UPDATE',[$departmentId,$to,$from]);
-        if ($existing) throw new DomainException('An Quarterly cycle already covers some or all of this period for the department.');
-        if (quarterlyQuery($conn,'SELECT cycle_id FROM quarterly_evaluation_cycles
-                WHERE department_id=? AND started_at IS NOT NULL AND completed_at IS NULL AND cancelled_at IS NULL LIMIT 1 FOR UPDATE',[$departmentId])) {
-            throw new DomainException('Complete the department’s current Quarterly cycle before starting a new period.');
-        }
-        quarterlyQuery($conn,'INSERT INTO quarterly_evaluation_cycles
-            (department_id,period_start,period_end,started_at,started_by,self_rating_deadline)
-            VALUES (?,?,?,NOW(),?,?)',[$departmentId,$from,$to,(int)$actor['user_id'],$deadline]);
-        $cycleId=(int)$conn->insert_id;
-        foreach ($roster as $employee) {
-            quarterlyQuery($conn,'INSERT INTO quarterly_evaluation_members
-                (cycle_id,employee_id,position_id,reviewer_position_id,position_name) VALUES (?,?,?,?,?)',
-                [$cycleId,(int)$employee['employee_id'],(int)$employee['job_title_id'],(int)$employee['reports_to'],$employee['job_title']]);
-            foreach (quarterlyQuery($conn,"SELECT user_id FROM users WHERE employee_id=? AND role='Employee'
-                    AND is_active=1 AND deleted_at IS NULL AND COALESCE(account_hold,0)=0",[(int)$employee['employee_id']]) as $user) {
-                createNotification($conn,(int)$user['user_id'],'Quarterly self-rating is open',
-                    $department['department_name'].' Quarterly evaluation covers '.$from.' to '.$to.'. Submit your self-rating by '.$deadline.'.',
-                    BASE_URL.'/employee/self-rating.php','evaluations',true);
-            }
-        }
-        logAudit($conn,(int)$actor['user_id'],'CREATE','Quarterly Cycle',$cycleId,
-            $department['department_name'].' '.$from.' to '.$to.'; self-rating deadline '.$deadline.'; '.count($roster).' members.');
-        if (quarterlyUsesManagedCycle($department)) {
-            quarterlyQuery($conn,'UPDATE notifications SET needs_action=0 WHERE user_id=? AND title=? AND needs_action=1',
-                [(int)$actor['user_id'],(quarterlyIsApDepartment($department) ? 'AP' : $department['department_name']).' Quarterly cycle ready to start']);
-        }
-        $conn->commit();
-        return $cycleId;
-    } catch (Throwable $error) { $conn->rollback(); throw $error; }
+    throw new DomainException('Department Start Cycle is no longer supported. Publish an individual evaluation form with Period From and Period To.');
 }
 
 function quarterlyCancelCycle($conn, array $actor, int $cycleId, string $reason): void
@@ -733,6 +685,7 @@ function quarterlyRegisterSubmission($conn, int $evaluationId): void
         }
         individualRegisterSubmission($conn,'quarterly',$ev,$values); return;
     }
+    if (!quarterlyQuery($conn,'SELECT 1 FROM quarterly_evaluation_members WHERE evaluation_id=?',[$evaluationId])) throw new DomainException('This is a legacy form. Ask the immediate head to publish an individual evaluation form with Period From and Period To.');
     $departmentName = quarterlyQuery($conn,'SELECT department_name FROM departments WHERE department_id=?',[(int)$ev['department_id']])[0]['department_name'] ?? '';
     if ($departmentName==='Office of the President' && !$ev['reports_to']) {
         throw new DomainException('The President/CEO is excluded from this department Quarterly cycle.');
@@ -746,7 +699,7 @@ function quarterlyRegisterSubmission($conn, int $evaluationId): void
     }
     $cycle = quarterlyQuery($conn, 'SELECT * FROM quarterly_evaluation_cycles WHERE department_id=? AND period_start=? AND period_end=? FOR UPDATE',
         [(int)$ev['department_id'], $start, $end])[0] ?? null;
-    if (!$cycle || ($isManagedCycle && empty($cycle['started_at']))) throw new DomainException('The department cycle owner must start the Quarterly cycle before self-ratings can be submitted.');
+    if (!$cycle) throw new DomainException('Ask the immediate head to publish an individual evaluation form with Period From and Period To.');
     $cycleId = (int)$cycle['cycle_id'];
     if (!$isManagedCycle) {
         $roster = quarterlyQuery($conn, "SELECT DISTINCT e.employee_id,e.job_title_id,e.job_title,j.reports_to

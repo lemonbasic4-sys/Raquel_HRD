@@ -238,12 +238,10 @@ require_once __DIR__ . '/header.php';
         <?php endif; ?>
         <?php require __DIR__.'/annual-cycle-start-panel.php'; ?>
     <?php endif; ?>
-    <?php if ($cycles): ?>
     <nav class="annual-workflow-nav d-flex flex-wrap gap-2 mb-4" aria-label="Annual workflow">
         <a class="btn btn-outline-success <?php echo !$historyView ? 'active' : ''; ?>" <?php echo !$historyView ? 'aria-current="page"' : ''; ?> href="<?php echo annualUrl($actor,'?view=peers'); ?>"><i class="fas fa-users me-2" aria-hidden="true"></i>360 · Department peers</a>
-        <a class="btn btn-outline-success <?php echo $historyView ? 'active' : ''; ?>" <?php echo $historyView ? 'aria-current="page"' : ''; ?> href="<?php echo annualUrl($actor,'?view=history'); ?>"><i class="fas fa-history me-2" aria-hidden="true"></i>Annual Evaluation History</a>
+        <a class="btn btn-outline-success active" <?php echo $historyView ? 'aria-current="page"' : ''; ?> href="<?php echo annualUrl($actor,'?view=history'); ?>"><i class="fas fa-history me-2" aria-hidden="true"></i>Annual Evaluation History</a>
     </nav>
-    <?php endif; ?>
     <?php if ($cycle && empty($cycle['individual_evaluation_id']) && annualCanOwnCycle($conn,$actor,(int)$cycle['department_id']) && empty($cycle['cancelled_at'])): ?>
         <div class="modal fade" id="annualCancelCycleModal" tabindex="-1" aria-labelledby="annualCancelCycleTitle" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content">
             <div class="modal-header"><h2 class="modal-title h5 mb-0" id="annualCancelCycleTitle"><i class="fas fa-ban text-danger me-2" aria-hidden="true"></i>Cancel Annual cycle?</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
