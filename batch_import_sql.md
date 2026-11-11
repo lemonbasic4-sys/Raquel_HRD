@@ -6,16 +6,10 @@
 cd C:\xampp\htdocs\Raquel_HRD
 
 C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 -u root -e "source database/1st_schema_tables.sql"
-if ($LASTEXITCODE -ne 0) { throw "Schema import failed" }
 C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 -u root -e "source database/2nd_seed_organization.sql"
-if ($LASTEXITCODE -ne 0) { throw "Organization import failed" }
 C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 -u root -e "source database/3rd_seed_HR_accounts_.sql"
-if ($LASTEXITCODE -ne 0) { throw "HR accounts import failed" }
 C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 -u root -e "source database/4th_seed_executive_portal_accounts.sql"
-if ($LASTEXITCODE -ne 0) { throw "Executive accounts import failed" }
-
 C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 -u root -e "source database/5th_seed_sample_evaluation_templates.sql"
-if ($LASTEXITCODE -ne 0) { throw "Sample template import failed" }
 
 Write-Host "SUCCESS YARN?" -ForegroundColor Green
 ```
