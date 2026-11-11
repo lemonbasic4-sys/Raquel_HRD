@@ -606,6 +606,10 @@ if ($annual_nav_actor && $annual_nav_actor['employment_status'] === 'Regular'
     <link href="<?php echo BASE_URL; ?>/assets/css/employee-portal-progress.css?v=<?php echo time(); ?>" rel="stylesheet">
     <link href="<?php echo BASE_URL; ?>/assets/css/employee-portal-notifications.css?v=<?php echo time(); ?>" rel="stylesheet">
     <?php endif; ?>
+    <?php if ($effective_role === 'HR Staff' && $current_page === 'evaluation-history.php'): ?>
+    <link rel="stylesheet" href="<?php echo BASE_URL; ?>/assets/css/hr-history-details.css?v=<?php echo filemtime(__DIR__.'/../assets/css/hr-history-details.css'); ?>">
+    <script src="<?php echo BASE_URL; ?>/assets/js/hr-history-details.js?v=<?php echo filemtime(__DIR__.'/../assets/js/hr-history-details.js'); ?>" defer></script>
+    <?php endif; ?>
     <!-- Feedback System CSS — loaded for all roles -->
     <link href="<?php echo BASE_URL; ?>/assets/css/employee-portal-feedback.css?v=<?php echo time(); ?>" rel="stylesheet">
     <link href="<?php echo BASE_URL; ?>/assets/css/evaluation-packages.css?v=<?php echo time(); ?>" rel="stylesheet">

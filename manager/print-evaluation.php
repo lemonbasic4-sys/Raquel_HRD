@@ -6,6 +6,8 @@ require_once '../includes/functions.php';
 ensureProbationaryEvaluationSchema($conn);
 require_once '../includes/annual-evaluations.php';
 ensureAnnualEvaluationSchema($conn);
+require_once '../includes/quarterly-evaluations.php';
+ensureQuarterlyEvaluationSchema($conn);
 
 $id = isset($_GET['id']) ? (int) $_GET['id'] : 0;
 if (!$id)
@@ -59,11 +61,32 @@ if (($row['status'] ?? '') === 'Imported') {
   http_response_code(403);
   exit('Imported historical records have no new HRIS approval or signature form. View the record in Evaluation History.');
 }
-$annual_print_member=null;
-$annual_print_candidate=null;
-if (($row['evaluation_type'] ?? '') === 'Annual') {
-    $annual_print_member=annualMember($conn,$id);
-    if ($annual_print_member) $annual_print_candidate=annualCandidate($conn,$annual_print_member);
+$regular_print_member=null;
+$regular_print_candidate=null;
+if (in_array($row['evaluation_type'] ?? '',['Annual','Quarterly'],true)) {
+    $print_kind=strtolower($row['evaluation_type']);
+    $regular_print_member=($print_kind.'Member')($conn,$id);
+    if ($regular_print_member) {
+        $regular_print_candidate=($print_kind.'Candidate')($conn,$regular_print_member);
+        // The recorded final approver is the immediate head in the individual workflow.
+        $print_head_user_id=(int)($row['approved_by'] ?: ($regular_print_member['head_approved_by'] ?? 0));
+        if (!$print_head_user_id) {
+            $print_head_user_id=(int)(annualQuery($conn,"SELECT a.approved_by FROM {$print_kind}_kra_approvals a
+                JOIN users u ON u.user_id=a.approved_by JOIN employees e ON e.employee_id=u.employee_id
+                WHERE a.member_id=? AND e.job_title_id=? ORDER BY a.approval_id DESC LIMIT 1",
+                [(int)$regular_print_member['member_id'],(int)$regular_print_member['reviewer_position_id']])[0]['approved_by'] ?? 0);
+        }
+        $print_head=annualQuery($conn,'SELECT u.full_name,e.job_title FROM users u LEFT JOIN employees e ON e.employee_id=u.employee_id WHERE u.user_id=?',[$print_head_user_id])[0] ?? null;
+        $print_head_review=annualQuery($conn,"SELECT rater_signature_data FROM {$print_kind}_kra_approvals WHERE member_id=? AND approved_by=? ORDER BY approval_id DESC LIMIT 1",
+            [(int)$regular_print_member['member_id'],$print_head_user_id])[0] ?? null;
+        if ($print_head) $row['rater_name']=$print_head['full_name'];
+        $row['rater_signature_data']=$print_head_review['rater_signature_data'] ?? null;
+        if (empty($row['rater_signature_data'])) {
+            $print_head_peer=annualQuery($conn,"SELECT s.rater_signature_data FROM {$print_kind}_peer_submissions s WHERE s.cycle_id=? AND s.target_employee_id=? AND s.submitted_by=? ORDER BY s.submission_id DESC LIMIT 1",
+                [(int)$regular_print_member['cycle_id'],(int)$regular_print_member['employee_id'],$print_head_user_id])[0] ?? null;
+            $row['rater_signature_data']=$print_head_peer['rater_signature_data'] ?? null;
+        }
+    }
 }
 $is_probationary_hr_supervisor = ($row['employment_status'] ?? '') === 'Probationary'
     && (int)($row['rank_category_id'] ?? 0) === 4
@@ -146,7 +169,7 @@ if (empty($higher_officials)) {
     ];
 
     // 2. Department Manager
-    $mgr_name = $row['dept_manager_endorsed_by_name'] ?: ($row['approved_by_name'] ?: 'Department Manager');
+    $mgr_name = $row['dept_manager_endorsed_by_name'] ?: '';
     $higher_officials[] = [
         'role_label' => 'Department Manager',
         'name'       => $mgr_name,
@@ -292,6 +315,11 @@ if (empty($board_name)) {
     $board_obj = getDepartmentDesignatedOfficial($conn, 'Board of Directors');
     $board_name = $board_obj ? $board_obj['full_name'] : 'MANUEL RIVERA RAMOS';
     $board_title = $board_obj ? $board_obj['job_title'] : 'Board of Directors';
+}
+
+if (!empty($row['rater_name'])) {
+    $supervisor_name=$row['rater_name'];
+    if (!empty($print_head['job_title'])) $supervisor_title=$print_head['job_title'];
 }
 
 // Resolve template metadata with fallbacks
@@ -748,7 +776,7 @@ if ((float)($row['total_score'] ?? 0) > 0 && (empty($pl) || $pl === '0')) {
           if ($k['manager_override_score'] !== null) {
               $effective_score = $k['manager_override_score'];
           }
-          if ($annual_print_member) $effective_score=$k['supervisor_override_score'] ?? $k['score_value'];
+          if ($regular_print_member) $effective_score=$k['supervisor_override_score'] ?? $k['score_value'];
           $weighted_score = round(($k['weight'] / 100) * $effective_score, 2);
           ?>
           <tr>
@@ -827,7 +855,7 @@ if ((float)($row['total_score'] ?? 0) > 0 && (empty($pl) || $pl === '0')) {
           if ($b['manager_override_score'] !== null) {
               $effective_score = $b['manager_override_score'];
           }
-          if ($annual_print_candidate && $row['status']==='Approved') $effective_score=$annual_print_candidate['item_averages'][$idx-1];
+          if ($regular_print_candidate && $row['status']==='Approved') $effective_score=$regular_print_candidate['item_averages'][$idx-1];
           ?>
           <tr>
             <td><?php echo $idx++; ?>. <?php echo e($b['criterion_name']); ?></td>
@@ -893,17 +921,16 @@ if ((float)($row['total_score'] ?? 0) > 0 && (empty($pl) || $pl === '0')) {
 
     <!-- Immediate Supervisor Comments -->
     <div class="comment-box">
-      <div class="label">Immediate Head Comments:</div>
-      <div class="content"><?php echo !empty($supervisor_comments) ? nl2br(e($supervisor_comments)) : '&nbsp;'; ?></div>
+      <div class="label">Evaluator's Comments:</div>
+      <div class="content">&nbsp;</div>
       <div class="comment-signature">
         <div class="signature-line"></div>
-        <div style="font-weight:bold;font-size:10px;text-align:center;"><?php echo e(mb_strtoupper($row['rater_name'] ?: $supervisor_name)); ?></div>
         <div class="signature-caption">Signature over Printed Name</div>
       </div>
     </div>
 
     <!-- Department Manager's Comments -->
-    <?php if (!$annual_print_member && !empty($dept_manager_name) && strcasecmp(trim($dept_manager_name), trim($supervisor_name)) !== 0): ?>
+    <?php if (!$regular_print_member && !empty($dept_manager_name) && strcasecmp(trim($dept_manager_name), trim($supervisor_name)) !== 0): ?>
     <div class="comment-box">
       <div class="label">Department Manager:</div>
       <div class="content"><?php echo !empty($dept_manager_comments) ? nl2br(e($dept_manager_comments)) : '&nbsp;'; ?></div>

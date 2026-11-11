@@ -817,4 +817,6 @@ function saveRatings(evalId) {
 </script>
 <script src="<?php echo BASE_URL; ?>/assets/js/hr-evaluation-history.js?v=<?php echo filemtime(__DIR__.'/../assets/js/hr-evaluation-history.js'); ?>" defer></script>
 
+<link rel="stylesheet" href="<?php echo BASE_URL; ?>/assets/css/hr-history-details.css?v=<?php echo filemtime(__DIR__.'/../assets/css/hr-history-details.css'); ?>">
+<script src="<?php echo BASE_URL; ?>/assets/js/hr-history-details.js?v=<?php echo filemtime(__DIR__.'/../assets/js/hr-history-details.js'); ?>"></script>
 <?php require_once '../includes/footer.php'; ?>
