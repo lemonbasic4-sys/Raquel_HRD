@@ -11,6 +11,8 @@
  const box=document.getElementById('individualTemplatePeriod');
  function sync(){
   box.hidden=!['Annual','Quarterly'].includes(type.value);
+  const toggle=document.getElementById('probationaryTemplateToggle');
+  if(toggle) toggle.closest('.form-check').hidden=!['Initial','Final'].includes(type.value);
   box.querySelectorAll('[data-individual-type]').forEach(function(group){
    group.hidden=group.dataset.individualType!==type.value;
    group.querySelectorAll('input').forEach(function(input){input.disabled=group.hidden;input.required=!group.hidden;});

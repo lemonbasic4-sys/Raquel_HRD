@@ -9,6 +9,9 @@ function ensureIndividualEvaluationSchema($conn, string $kind): void
     foreach(['individual_workflow'=>'TINYINT NOT NULL DEFAULT 0','assessment_from'=>'DATE NULL','assessment_to'=>'DATE NULL'] as $column=>$definition) {
         if(!$conn->query("SHOW COLUMNS FROM evaluation_templates LIKE '$column'")->num_rows) $conn->query("ALTER TABLE evaluation_templates ADD COLUMN $column $definition");
     }
+    foreach(['head_approved_by'=>'INT NULL','head_approved_at'=>'DATETIME NULL'] as $column=>$definition) {
+        if(!$conn->query("SHOW COLUMNS FROM {$kind}_evaluation_members LIKE '$column'")->num_rows) $conn->query("ALTER TABLE {$kind}_evaluation_members ADD COLUMN $column $definition");
+    }
     $table=$kind.'_evaluation_cycles';
     if(!$conn->query("SHOW COLUMNS FROM $table LIKE 'individual_evaluation_id'")->num_rows) $conn->query("ALTER TABLE $table ADD COLUMN individual_evaluation_id INT NOT NULL DEFAULT 0");
     $index=$kind.'_department_active_period';
@@ -80,7 +83,7 @@ function individualRegisterSubmission($conn,string $kind,array $ev,string $value
         if($cycle['completed_at'] || $cycle['cancelled_at']) throw new DomainException('A completed or cancelled evaluation cannot be resubmitted.');
         annualQuery($conn,"DELETE FROM {$kind}_peer_submissions WHERE cycle_id=?",[$cycleId]);
         annualQuery($conn,"DELETE FROM {$kind}_kra_approvals WHERE member_id=?",[(int)$existing['member_id']]);
-        annualQuery($conn,"UPDATE {$kind}_evaluation_members SET self_values_json=?,revision_pending=0 WHERE member_id=?",[$values,(int)$existing['member_id']]);
+        annualQuery($conn,"UPDATE {$kind}_evaluation_members SET self_values_json=?,revision_pending=0,head_approved_by=NULL,head_approved_at=NULL WHERE member_id=?",[$values,(int)$existing['member_id']]);
         ($kind.'NotifyCycleRaters')($conn,$cycleId,(int)$ev['evaluation_id'],(int)$ev['employee_id'],false);
         return;
     }
@@ -133,4 +136,17 @@ function individualTemplateEligibilitySql(string $alias,int $employeeId): string
 {
     if(!preg_match('/^[a-z_]+$/i',$alias)) throw new InvalidArgumentException('Invalid template alias');
     return "($alias.individual_workflow=0 OR ($alias.assessment_from IS NOT NULL AND $alias.assessment_to IS NOT NULL AND $alias.assessment_from<=$alias.assessment_to AND EXISTS(SELECT 1 FROM employees ie WHERE ie.employee_id=$employeeId AND ie.is_active=1 AND ie.deleted_at IS NULL AND ie.employment_status='Regular' AND ie.department_id=$alias.target_department_id AND ($alias.evaluation_type<>'Annual' OR (ie.regularization_effective_date IS NOT NULL AND ie.regularization_effective_date<=$alias.assessment_to)))))";
+}
+
+/** Count a combined head-review/peer-rating task only once per evaluation. */
+function individualPendingPeerCount($conn,string $kind,array $actor): int
+{
+    $rows=annualQuery($conn,"SELECT DISTINCT m.evaluation_id FROM {$kind}_required_raters rr JOIN {$kind}_evaluation_cycles c ON c.cycle_id=rr.cycle_id JOIN {$kind}_evaluation_members m ON m.cycle_id=rr.cycle_id AND m.employee_id=rr.target_employee_id WHERE rr.rater_employee_id=? AND c.completed_at IS NULL AND c.cancelled_at IS NULL AND c.department_id=? AND m.self_values_json IS NOT NULL AND NOT EXISTS(SELECT 1 FROM {$kind}_peer_submissions ps WHERE ps.cycle_id=rr.cycle_id AND ps.target_employee_id=rr.target_employee_id AND ps.rater_employee_id=rr.rater_employee_id)",[(int)$actor['employee_id'],(int)$actor['department_id']]);
+    $count=0;
+    foreach($rows as $row) {
+        $member=($kind.'Member')($conn,(int)$row['evaluation_id']);
+        // PendingReviewCount already includes this evaluation for its head.
+        if($member && !($kind.'CanFinalize')($conn,$actor,$member)) $count++;
+    }
+    return $count;
 }

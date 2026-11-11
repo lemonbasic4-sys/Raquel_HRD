@@ -48,7 +48,7 @@ The same submission/rating/approval sequence applies to Annual, with James's ind
 - Annual forms require a real `regularization_effective_date`. Missing dates do not fall back to the hire date; HR must correct the employee record.
 - Required peer raters are fixed from the other active, Regular employees in the department when the employee submits. Coworkers with no portal account still count; access must be provided rather than silently excluding them.
 - New joiners are not automatically added to an already submitted evaluation's rater snapshot. There is no automated waiver if a required rater later separates or becomes inactive; administrative resolution is still needed in that case.
-- The immediate head can save the KRA review and submit their own peer rating before other peers finish. This does not approve the overall evaluation. Once peers finish, open Review & approve to finalize.
+- The immediate head can save the KRA review and submit their own peer rating before other peers finish. This does not approve the overall evaluation. After all required peers have submitted, the immediate head must explicitly select Review & approve and confirm the final result. A peer submission never grants final approval.
 - With no other eligible department peers, the behavior component is the employee's self-rating; immediate-head approval is still required.
 - Existing templates and existing open/complete cycles are not migrated. Their records and old completion behavior are preserved. The obsolete start/setup panel is no longer shown; existing open cycles keep their legacy completion controls.
 

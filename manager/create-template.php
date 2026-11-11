@@ -595,24 +595,24 @@ require_once '../includes/header.php';
                     </select>
                 </div>
             </div>
+            <div id="probationaryTargetFields">
+            <div class="row mb-3">
+                <div class="col-12">
+                    <label class="form-label fw-semibold">Target Position(s) <span class="text-danger">*</span></label>
+                    <select class="form-select" id="inputTargetPosition" multiple disabled size="3" style="display:none" aria-hidden="true">
+                        <?php foreach ($target_positions as $position): ?>
+                            <option value="<?php echo (int)$position['job_title_id']; ?>" data-department-id="<?php echo (int)$position['department_id']; ?>"><?php echo e($position['job_title']); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <div id="targetPositionDisplay" class="template-position-display" aria-label="Target positions"></div>
+                </div>
+            </div>
+            </div>
             <?php require __DIR__.'/../includes/individual-template-period-fields.php'; ?>
             <div class="form-check form-switch mb-3">
                 <input class="form-check-input" type="checkbox" role="switch" id="probationaryTemplateToggle" name="probationary_template" value="1">
                 <label class="form-check-label fw-semibold" for="probationaryTemplateToggle">This template is exclusively for OJT / Trainee / Probationary / Project Based employees</label>
                 <div class="form-text">Uses 80% KRA and 20% individual Core Values for Initial or Final reviews. Core Values questions are still added in Stage 4. Every employee has a separate Period From and Period To. For Initial evaluations: Probationary uses the hire date plus three calendar months; OJT, Trainee, and Project Based use recorded contract dates. Dates are filled in on the employee form, not shared across the template.</div>
-            </div>
-            <div id="probationaryTargetFields">
-            <div class="row mb-3">
-                <div class="col-12">
-                    <label class="form-label fw-semibold">Target Position(s) <span class="text-danger">*</span></label>
-                    <select class="form-select" id="inputTargetPosition" multiple disabled size="4" aria-describedby="targetPositionHelp">
-                        <?php foreach ($target_positions as $position): ?>
-                            <option value="<?php echo (int)$position['job_title_id']; ?>" data-department-id="<?php echo (int)$position['department_id']; ?>"><?php echo e($position['job_title']); ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                    <div class="form-text" id="targetPositionHelp">All active positions assigned to your role in the selected department are included automatically.</div>
-                </div>
-            </div>
             </div>
             <div class="row mb-3">
                 <div class="col-md-12 mb-3">
@@ -1942,5 +1942,6 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
+<?php require_once '../includes/template-position-display.php'; ?>
 <?php require_once '../includes/annual-template-controls.php'; ?>
 <?php require_once '../includes/footer.php'; ?>

@@ -67,8 +67,13 @@ foreach(['annual','quarterly'] as $kind) {
  check(individualApprovalReady($conn,$kind,$m),"$type all required peer ratings complete");
  try{($kind.'SubmitPeers')($conn,$peer,$ev,[3,3,3,3,3,3,3,3]);throw new Exception('Duplicate peer accepted');}catch(DomainException $e){check(true,"$type locks duplicate peer ratings");}
 
- $m=($kind.'Member')($conn,$ev);($kind.'Finalize')($conn,$head,$ev,$kraRatings,'Final check complete.',($kind.'ReviewToken')($conn,$m),[]);
- $m=($kind.'Member')($conn,$ev);check($m['evaluation_status']==='Approved' && (int)$m['current_version']===1,"$type immediate head approves independently");
+ $m=($kind.'Member')($conn,$ev);
+ check($m['evaluation_status']!=='Approved' && (int)$m['current_version']===0,"$type last peer waits for explicit head approval");
+ check(($kind.'PendingReviewCount')($conn,$head)>0,"$type final approval appears in head pending count");
+ $kraRatings=[];foreach(($kind.'KraRows')($conn,$ev) as $kr)$kraRatings[(int)$kr['score_id']]=(float)$kr['rating'];
+ try{($kind.'Finalize')($conn,$peer,$ev,$kraRatings,'',($kind.'ReviewToken')($conn,$m),[]);throw new Exception('Peer approved result');}catch(DomainException $e){check(true,"$type peer cannot approve final result");}
+ ($kind.'Finalize')($conn,$head,$ev,$kraRatings,'Final results checked.',($kind.'ReviewToken')($conn,$m),[]);
+ $m=($kind.'Member')($conn,$ev);check($m['evaluation_status']==='Approved' && (int)$m['current_version']===1,"$type explicit head approval finalizes result");
  check((bool)annualQuery($conn,"SELECT completed_at FROM {$kind}_evaluation_cycles WHERE cycle_id=? AND completed_at IS NOT NULL",[(int)$m['cycle_id']]),"$type record archived without department approval");
 
  check(abs((float)$m['official_score']-3.01)<.001,"$type preserves 80/20 calculation");

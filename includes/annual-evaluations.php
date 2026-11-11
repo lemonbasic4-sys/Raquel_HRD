@@ -257,6 +257,10 @@ function annualPortal(array $actor): string
 
 function annualUrl(array $actor, string $query = ''): string
 {
+    if ($actor['role'] === 'HR Staff') {
+        return BASE_URL . '/staff/performance-evaluation.php?category=regular'
+            . ($query !== '' ? '&' . ltrim($query, '?&') : '');
+    }
     if (in_array($actor['role'], ['HR Manager', 'HR Supervisor'], true)
         || (!empty($GLOBALS['annual_in_performance_page']) && $actor['role'] === 'Employee')) {
         return BASE_URL . '/employee/team-evaluation-packages.php?category=regular'
@@ -1022,7 +1026,8 @@ function annualReviewAndRate($conn, array $actor, int $evaluationId, array $rati
             foreach ($plans as $index=>$plan) annualQuery($conn,'INSERT INTO evaluation_dev_plans (evaluation_id,improvement_area,support_needed,time_frame,sort_order) VALUES (?,?,?,?,?)',
                 [$evaluationId,$plan['improvement_area'],$plan['support_needed'],$plan['time_frame'],$index]);
         }
-        if(empty($member['individual_evaluation_id']) || individualApprovalReady($conn,'annual',$member)) annualRefreshApprovedResult($conn,annualMember($conn,$evaluationId),(int)$actor['user_id'],true);
+        if(!empty($member['individual_evaluation_id'])) annualQuery($conn,'UPDATE annual_evaluation_members SET head_approved_by=?,head_approved_at=NOW() WHERE member_id=?',[(int)$actor['user_id'],(int)$member['member_id']]);
+        if(empty($member['individual_evaluation_id'])) annualRefreshApprovedResult($conn,annualMember($conn,$evaluationId),(int)$actor['user_id'],true);
         $conn->commit();
     } catch (Throwable $e) { $conn->rollback(); throw $e; }
 }
@@ -1285,7 +1290,7 @@ function annualPendingReviewCount($conn, array $actor): int
     $count=0;
     foreach ($reviews as $review) {
         $member=annualMember($conn,(int)$review['evaluation_id']);
-        if ($member && annualCanFinalize($conn,$actor,$member)) $count++;
+        if ($member && annualCanFinalize($conn,$actor,$member) && (empty($member['individual_evaluation_id']) || empty($member['head_approved_by']) || individualApprovalReady($conn,'annual',$member))) $count++;
     }
     return $count;
 }
@@ -1294,7 +1299,7 @@ function annualPendingCount($conn, array $actor): int
 {
     if (!$conn->query("SHOW TABLES LIKE 'annual_evaluation_members'")->num_rows) return 0;
     $count=annualPendingReviewCount($conn,$actor);
-    if (annualCanRate($actor)) $count+=(int)annualQuery($conn,"SELECT COUNT(*) n FROM annual_required_raters rr JOIN annual_evaluation_cycles c ON c.cycle_id=rr.cycle_id WHERE rr.rater_employee_id=? AND c.completed_at IS NULL AND c.cancelled_at IS NULL AND c.department_id=? AND NOT EXISTS(SELECT 1 FROM annual_peer_submissions ps WHERE ps.cycle_id=rr.cycle_id AND ps.target_employee_id=rr.target_employee_id AND ps.rater_employee_id=rr.rater_employee_id)",[(int)$actor['employee_id'],(int)$actor['department_id']])[0]['n'];
+    if (annualCanRate($actor)) $count+=individualPendingPeerCount($conn,'annual',$actor);
     if (annualCanOwnCycle($conn,$actor,(int)$actor['department_id'])) {
         $ready=annualQuery($conn,'SELECT COUNT(*) AS n FROM annual_evaluation_cycles
             WHERE department_id=? AND ready_for_approval_at IS NOT NULL AND completed_at IS NULL AND cancelled_at IS NULL',

@@ -17,7 +17,7 @@ Use fictional employees. For Annual, HR must record the actual regularization ef
 5. In the department peers page, verify this employee appears without a department Start Cycle. Other employees do not need to submit their own self-ratings to rate this person.
 6. As another active Regular employee in that department, submit the eight behavior ratings. A coworker outside the department must not be able to submit.
 7. As the immediate head, save the KRA review, behavior rating, comments and plan. If another required rating is missing, the overall evaluation must remain pending.
-8. After remaining peers submit, use **Review & approve** to finalize. The evaluation moves to history independently. No department-manager cycle approval is needed.
+8. After all required peers submit, the evaluation stays pending and the immediate head sees Review & approve with a pending indicator. Only explicit final approval moves it to history; the department manager does not approve the cycle separately.
 9. On a phone, check the existing mobile roster, rating cards, development plan, review summary and buttons.
 
 ## Annual dry run

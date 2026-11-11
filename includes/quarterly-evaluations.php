@@ -256,6 +256,10 @@ function quarterlyPortal(array $actor): string
 
 function quarterlyUrl(array $actor, string $query = ''): string
 {
+    if ($actor['role'] === 'HR Staff') {
+        return BASE_URL . '/staff/performance-evaluation.php?category=quarterly'
+            . ($query !== '' ? '&' . ltrim($query, '?&') : '');
+    }
     if (in_array($actor['role'], ['HR Manager', 'HR Supervisor'], true)
         || (!empty($GLOBALS['quarterly_in_performance_page']) && $actor['role'] === 'Employee')) {
         return BASE_URL . '/employee/team-evaluation-packages.php?category=quarterly'
@@ -1022,7 +1026,8 @@ function quarterlyReviewAndRate($conn, array $actor, int $evaluationId, array $r
             foreach ($plans as $index=>$plan) quarterlyQuery($conn,'INSERT INTO evaluation_dev_plans (evaluation_id,improvement_area,support_needed,time_frame,sort_order) VALUES (?,?,?,?,?)',
                 [$evaluationId,$plan['improvement_area'],$plan['support_needed'],$plan['time_frame'],$index]);
         }
-        if(empty($member['individual_evaluation_id']) || individualApprovalReady($conn,'quarterly',$member)) quarterlyRefreshApprovedResult($conn,quarterlyMember($conn,$evaluationId),(int)$actor['user_id'],true);
+        if(!empty($member['individual_evaluation_id'])) quarterlyQuery($conn,'UPDATE quarterly_evaluation_members SET head_approved_by=?,head_approved_at=NOW() WHERE member_id=?',[(int)$actor['user_id'],(int)$member['member_id']]);
+        if(empty($member['individual_evaluation_id'])) quarterlyRefreshApprovedResult($conn,quarterlyMember($conn,$evaluationId),(int)$actor['user_id'],true);
         $conn->commit();
     } catch (Throwable $e) { $conn->rollback(); throw $e; }
 }
@@ -1286,7 +1291,7 @@ function quarterlyPendingReviewCount($conn, array $actor): int
     $count=0;
     foreach ($reviews as $review) {
         $member=quarterlyMember($conn,(int)$review['evaluation_id']);
-        if ($member && quarterlyCanFinalize($conn,$actor,$member)) $count++;
+        if ($member && quarterlyCanFinalize($conn,$actor,$member) && (empty($member['individual_evaluation_id']) || empty($member['head_approved_by']) || individualApprovalReady($conn,'quarterly',$member))) $count++;
     }
     return $count;
 }
@@ -1295,7 +1300,7 @@ function quarterlyPendingCount($conn, array $actor): int
 {
     if (!$conn->query("SHOW TABLES LIKE 'quarterly_evaluation_members'")->num_rows) return 0;
     $count=quarterlyPendingReviewCount($conn,$actor);
-    if (quarterlyCanRate($actor)) $count+=(int)quarterlyQuery($conn,"SELECT COUNT(*) n FROM quarterly_required_raters rr JOIN quarterly_evaluation_cycles c ON c.cycle_id=rr.cycle_id WHERE rr.rater_employee_id=? AND c.completed_at IS NULL AND c.cancelled_at IS NULL AND c.department_id=? AND NOT EXISTS(SELECT 1 FROM quarterly_peer_submissions ps WHERE ps.cycle_id=rr.cycle_id AND ps.target_employee_id=rr.target_employee_id AND ps.rater_employee_id=rr.rater_employee_id)",[(int)$actor['employee_id'],(int)$actor['department_id']])[0]['n'];
+    if (quarterlyCanRate($actor)) $count+=individualPendingPeerCount($conn,'quarterly',$actor);
     if (quarterlyCanOwnCycle($conn,$actor,(int)$actor['department_id'])) {
         $ready=quarterlyQuery($conn,'SELECT COUNT(*) AS n FROM quarterly_evaluation_cycles
             WHERE department_id=? AND ready_for_approval_at IS NOT NULL AND completed_at IS NULL AND cancelled_at IS NULL',

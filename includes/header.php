@@ -512,7 +512,12 @@ if ($annual_nav_actor && $annual_nav_actor['employment_status'] === 'Regular'
     && in_array($annual_nav_actor['role'], ['Employee','President and CEO','HR Staff'], true)) {
     $annual_nav_section = $annual_nav_actor['role'] === 'HR Staff' ? 'EVALUATIONS & MONITORING' : 'EVALUATIONS';
     $annual_nav_count = annualPendingCount($conn, $annual_nav_actor);
-    if (!isset($sidebar_menus['MY TEAM']) || $annual_nav_actor['role'] === 'HR Staff') {
+    if ($annual_nav_actor['role'] === 'HR Staff') {
+        $staff_performance_count = $annual_nav_count + quarterlyPendingCount($conn, $annual_nav_actor);
+        $sidebar_menus[$annual_nav_section][] = ['icon'=>'fas fa-layer-group', 'label'=>'Performance Evaluation',
+            'url'=>BASE_URL.'/staff/performance-evaluation.php', 'page'=>'performance-evaluation.php',
+            'badge'=>$staff_performance_count ?: null, 'badge_class'=>'bg-warning text-dark'];
+    } elseif (!isset($sidebar_menus['MY TEAM'])) {
         $sidebar_menus[$annual_nav_section][] = ['icon'=>'fas fa-users-cog', 'label'=>'Annual & 360 Ratings',
             'url'=>annualUrl($annual_nav_actor), 'page'=>'annual-evaluations.php',
             'badge'=>$annual_nav_count ?: null, 'badge_class'=>'bg-warning text-dark'];
@@ -530,7 +535,9 @@ if ($annual_nav_actor && $annual_nav_actor['employment_status'] === 'Regular'
     && in_array($annual_nav_actor['role'], ['Employee','President and CEO','HR Staff'], true)) {
     $quarterly_nav_section = $annual_nav_actor['role'] === 'HR Staff' ? 'EVALUATIONS & MONITORING' : 'EVALUATIONS';
     $quarterly_nav_count = quarterlyPendingCount($conn, $annual_nav_actor);
-    if (!isset($sidebar_menus['MY TEAM']) || $annual_nav_actor['role'] === 'HR Staff') {
+    if ($annual_nav_actor['role'] === 'HR Staff') {
+        // Quarterly work is included in Performance Evaluation above.
+    } elseif (!isset($sidebar_menus['MY TEAM'])) {
         $sidebar_menus[$quarterly_nav_section][] = ['icon'=>'fas fa-calendar-alt', 'label'=>'Quarterly & 360 Ratings',
             'url'=>quarterlyUrl($annual_nav_actor), 'page'=>'quarterly-evaluations.php',
             'badge'=>$quarterly_nav_count ?: null, 'badge_class'=>'bg-warning text-dark'];
