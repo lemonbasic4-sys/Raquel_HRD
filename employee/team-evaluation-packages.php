@@ -17,35 +17,14 @@ if ($_session_role === 'HR Staff' ||
     redirectWith(BASE_URL . '/employee/dashboard.php', 'info', 'Human Resource personnel perform self-rating only on the Employee Portal. Team management is handled via HRIS.');
 }
 
-// An Annual-only workload must not land on the empty legacy package screen.
-if ($_SERVER['REQUEST_METHOD'] === 'GET' && !isset($_GET['category'])
-    && in_array($_SESSION['role'] ?? '', ['HR Manager','HR Supervisor'],true)) {
-    ensureOrganizationEvaluationPackageSchema($conn);
-    $entry_user_id=(int)($_SESSION['user_id'] ?? 0);
-    $entry_role=(string)$_SESSION['role'];
-    $entry_reviewer_match=organizationPackageReviewerMatchSql('rs');
-    $entry_probationary=$conn->prepare("SELECT 1 FROM evaluation_packages ep
-        JOIN evaluation_package_route_steps rs ON rs.package_id=ep.package_id
-        WHERE ep.evaluation_type IN ('Initial','Final') AND ep.status NOT IN ('Approved and Applied','Cancelled')
-          AND ($entry_reviewer_match OR (rs.eligible_role=? AND rs.claimed_at IS NULL))
-          AND ((rs.step_order=1 AND rs.action_status IN ('Pending','Waiting')) OR (rs.step_order>1 AND rs.action_status='Pending')) LIMIT 1");
-    $entry_probationary->bind_param('iis',$entry_user_id,$entry_user_id,$entry_role);
-    $entry_probationary->execute();
-    $has_pending_probationary=(bool)$entry_probationary->get_result()->fetch_row();
-    $entry_probationary->close();
-    if ($has_pending_probationary) {
-        header('Location: '.BASE_URL.'/employee/team-evaluation-packages.php?category=probationary'); exit;
-    }
-    ensureAnnualEvaluationSchema($conn);
-    $entry_actor = annualActor($conn,(int)($_SESSION['user_id'] ?? 0));
-    if ($entry_actor && $entry_actor['employment_status'] === 'Regular'
-        && annualQuery($conn,"SELECT 1 FROM annual_evaluation_members m
-            JOIN annual_evaluation_cycles c ON c.cycle_id=m.cycle_id
-            WHERE m.employee_id=? OR m.reviewer_position_id=? OR c.department_id=? LIMIT 1",
-            [(int)$entry_actor['employee_id'],(int)$entry_actor['job_title_id'],(int)$entry_actor['department_id']])) {
-        header('Location: '.annualUrl($entry_actor));
-        exit;
-    }
+// Default to the tab with the largest pending workload, matching the tab badges.
+if ($_SERVER['REQUEST_METHOD']==='GET' && !isset($_GET['category'])
+    && !isset($_GET['evaluation_id']) && !isset($_GET['cycle_id']) && !isset($_GET['view'])) {
+    require_once __DIR__.'/../includes/quarterly-evaluations.php';
+    require_once __DIR__.'/../includes/performance-evaluation-priority.php';
+    $entryCategory=performanceEvaluationDefaultCategory($conn,(int)($_SESSION['user_id'] ?? 0),true);
+    header('Location: '.BASE_URL.'/employee/team-evaluation-packages.php?category='.$entryCategory);
+    exit;
 }
 
 // Managed regular-employee cycles use their own review engines.

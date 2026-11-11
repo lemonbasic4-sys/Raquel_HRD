@@ -3,7 +3,7 @@
 $regular_category = !empty($annual_in_performance_page);
 $quarterly_category = !empty($quarterly_in_performance_page);
 $staff_performance_page = ($_SESSION['role'] ?? '') === 'HR Staff';
-$performance_category_url = BASE_URL . ($staff_performance_page ? '/staff/performance-evaluation.php' : '/employee/team-evaluation-packages.php');
+$performance_category_url = BASE_URL . ($staff_performance_page ? '/staff/performance-evaluation.php' : (!empty($employee_performance_page) ? '/employee/performance-evaluation.php' : '/employee/team-evaluation-packages.php'));
 $performance_user_id = (int)($_SESSION['user_id'] ?? 0);
 $performance_actor = annualActor($conn, $performance_user_id);
 $probationary_pending = countPendingOrganizationPackagesForUser($conn, $performance_user_id, true);
@@ -51,7 +51,7 @@ $quarterly_pending = $performance_actor ? quarterlyPendingCount($conn, $performa
 }
 </style>
 <nav class="performance-category-tabs" aria-label="Evaluation review type">
-    <?php if (!$staff_performance_page): ?>
+    <?php if (!$staff_performance_page && empty($employee_performance_page)): ?>
     <a class="performance-category-tab <?php echo !$regular_category && !$quarterly_category ? 'active' : ''; ?> <?php echo $probationary_pending > 0 ? 'has-pending' : ''; ?>" <?php echo !$regular_category && !$quarterly_category ? 'aria-current="page"' : ''; ?> href="<?php echo BASE_URL; ?>/employee/team-evaluation-packages.php?category=probationary">
         <span class="performance-category-icon"><i class="fas fa-users" aria-hidden="true"></i></span><span class="performance-category-copy"><strong>Probationary Employee</strong><small>Initial and Final evaluations</small></span>
         <?php if ($probationary_pending > 0): ?><span class="performance-category-count" aria-label="<?php echo $probationary_pending; ?> pending probationary reviews"><?php echo $probationary_pending; ?></span><?php endif; ?>

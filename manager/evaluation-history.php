@@ -28,7 +28,7 @@ $show_progressive_notice=hasOpenProgressiveEvaluationCohort($conn);
 require_once '../includes/header.php';
 ?>
 
-<link rel="stylesheet" href="<?php echo BASE_URL; ?>/assets/css/evaluation-history-table.css?v=7">
+<link rel="stylesheet" href="<?php echo BASE_URL; ?>/assets/css/evaluation-history-table.css?v=<?php echo filemtime(__DIR__.'/../assets/css/evaluation-history-table.css'); ?>">
 <div class="evaluation-history-page">
 <div class="page-hero fadeup">
     <div class="d-flex flex-wrap align-items-center justify-content-between mb-4 gap-3">
@@ -481,32 +481,29 @@ require_once '../includes/header.php';
             <i class="fas fa-rotate-left me-1"></i>Returned <span class="ms-1 opacity-75" data-status-count="Returned">(<?php echo $returned_c; ?>)</span>
         </button>
     </div>
-    <div class="d-flex align-items-center gap-2 flex-wrap">
-        <div class="d-flex align-items-center gap-1">
+    <div class="history-filter-grid">
+        <div class="history-filter-field">
             <label class="text-muted small fw-semibold" for="histBranchFilter"><i class="fas fa-code-branch me-1" aria-hidden="true"></i>Branch:</label>
-            <select class="form-select form-select-sm" id="histBranchFilter" style="min-width:160px; max-width:240px;"><option value="All">All Branches</option></select>
+            <select class="form-select form-select-sm" id="histBranchFilter"><option value="All">All Branches</option></select>
         </div>
-        <div class="d-flex align-items-center gap-1">
-            <span class="text-muted small fw-semibold"><i class="fas fa-building me-1"></i>Dept:</span>
-            <select class="form-select form-select-sm" id="histDeptFilter" style="min-width:160px; max-width:200px;">
+        <div class="history-filter-field">
+            <label class="text-muted small fw-semibold" for="histDeptFilter"><i class="fas fa-building me-1"></i>Department</label><select class="form-select form-select-sm" id="histDeptFilter">
                 <option value="All">All Departments</option>
                 <?php foreach ($existing_departments as $dept_name): ?>
                     <option value="<?php echo e($dept_name); ?>"><?php echo e($dept_name); ?></option>
                 <?php endforeach; ?>
             </select>
         </div>
-        <div class="d-flex align-items-center gap-1">
-            <span class="text-muted small fw-semibold"><i class="fas fa-file-alt me-1"></i>Template:</span>
-            <select class="form-select form-select-sm" id="histTemplateFilter" style="min-width:180px; max-width:260px;">
+        <div class="history-filter-field">
+            <label class="text-muted small fw-semibold" for="histTemplateFilter"><i class="fas fa-file-alt me-1"></i>Template:</label><select class="form-select form-select-sm" id="histTemplateFilter">
                 <option value="All">All Templates</option>
                 <?php foreach ($existing_templates as $tmpl_name): ?>
                     <option value="<?php echo e($tmpl_name); ?>"><?php echo e($tmpl_name); ?></option>
                 <?php endforeach; ?>
             </select>
         </div>
-        <div class="d-flex align-items-center gap-1">
-            <span class="text-muted small fw-semibold"><i class="fas fa-clipboard-check me-1"></i>Eval Type:</span>
-            <select class="form-select form-select-sm" id="histEvalTypeFilter" style="min-width:150px; max-width:190px;">
+        <div class="history-filter-field">
+            <label class="text-muted small fw-semibold" for="histEvalTypeFilter"><i class="fas fa-clipboard-check me-1"></i>Evaluation type</label><select class="form-select form-select-sm" id="histEvalTypeFilter">
                 <option value="All">All Types</option>
                 <option value="Annual">Annual</option>
                 <option value="Quarterly">Quarterly</option>
@@ -514,7 +511,7 @@ require_once '../includes/header.php';
                 <option value="Final">Final</option>
             </select>
         </div>
-        <div class="input-group input-group-sm" style="min-width:200px;">
+        <div class="input-group input-group-sm history-filter-search">
             <span class="input-group-text bg-white border-end-0 text-muted"><i class="fas fa-search"></i></span>
             <input type="search" class="form-control border-start-0 ps-0" id="histSearchInput" placeholder="Search employee, position...">
         </div>

@@ -261,6 +261,10 @@ function annualUrl(array $actor, string $query = ''): string
         return BASE_URL . '/staff/performance-evaluation.php?category=regular'
             . ($query !== '' ? '&' . ltrim($query, '?&') : '');
     }
+    if (in_array($actor['role'], ['Employee','President and CEO'], true) && (empty($GLOBALS['annual_in_performance_page']) || !empty($GLOBALS['employee_performance_page']))) {
+        return BASE_URL . '/employee/performance-evaluation.php?category=regular'
+            . ($query !== '' ? '&' . ltrim($query, '?&') : '');
+    }
     if (in_array($actor['role'], ['HR Manager', 'HR Supervisor'], true)
         || (!empty($GLOBALS['annual_in_performance_page']) && $actor['role'] === 'Employee')) {
         return BASE_URL . '/employee/team-evaluation-packages.php?category=regular'
@@ -683,6 +687,7 @@ function annualRegisterSubmission($conn, int $evaluationId): void
     $values = json_encode(annualValidateScores(array_column($criteria, 'score_value')));
     $individualTemplate=annualQuery($conn,'SELECT * FROM evaluation_templates WHERE template_id=? AND individual_workflow=1',[(int)$ev['template_id']])[0]??null;
     if ($individualTemplate) {
+        individualAssertAnnualPrerequisite($conn,$ev,$individualTemplate);
         if(!annualQuery($conn,'SELECT 1 FROM annual_evaluation_members WHERE evaluation_id=?',[$evaluationId])) {
             [$expectedStart,$expectedEnd]=individualAssessmentDates($ev,$individualTemplate);
             if($start!==$expectedStart || $end!==$expectedEnd) throw new DomainException('The evaluation period does not match the authoritative employee/form period.');

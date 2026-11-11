@@ -57,3 +57,18 @@
 .staff-evaluation-history-page .hr-history-table thead th{background:#f0f4ee;color:#536052;font-size:.68rem;text-transform:uppercase}
 .staff-evaluation-history-page .hr-history-table tbody td{font-size:.76rem}
 @media(max-width:640px){.staff-evaluation-history-page .history-review-tab{flex:1;min-width:0;padding:10px}.staff-evaluation-history-page .history-review-tab small{display:none!important}}
+
+/* Aligned evaluation history filters shared by Manager and Supervisor. */
+.hist-filter-bar.fadeup { display:block; }
+.hist-filter-bar .hist-status-pills,
+.supervisor-history-filters .hist-status-pills { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px; }
+.history-filter-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px 16px; width:100%; }
+.history-filter-field { display:flex; flex-direction:column; align-items:stretch; gap:6px; min-width:0; }
+.history-filter-field label { display:block; margin:0; line-height:1.4; white-space:nowrap; }
+.history-filter-field .form-select { width:100%; min-width:0; max-width:none; min-height:44px; margin:0; }
+.history-filter-grid .history-filter-search { grid-column:1 / -1; width:100%; min-width:0; max-width:none; min-height:44px; }
+.history-filter-search .form-control { min-width:0; min-height:44px; }
+.history-filter-search .input-group-text { padding-inline:12px; }
+.history-filter-search .btn { min-height:44px; padding-inline:20px; }
+@media(max-width:1100px) { .history-filter-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media(max-width:575px) { .history-filter-grid { grid-template-columns:minmax(0,1fr); gap:12px; } }

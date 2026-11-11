@@ -19,7 +19,7 @@ $requestedPreviewId=(int)($_GET['preview_department'] ?? 0);
 $cycleSetupDepartmentId=isset($cycleSetupChoices[$requestedPreviewId]) ? $requestedPreviewId
     : ($externalCyclePreviews ? (int)$externalCyclePreviews[0]['department_id'] : (int)$actor['department_id']);
 if ($_SERVER['REQUEST_METHOD']==='GET' && !$annual_in_performance_page
-    && (in_array($actor['role'], ['HR Manager','HR Supervisor','HR Staff'], true)
+    && (in_array($actor['role'], ['HR Manager','HR Supervisor','HR Staff','Employee','President and CEO'], true)
         || basename(dirname($_SERVER['SCRIPT_NAME']))!==annualPortal($actor))) {
     header('Location: '.annualUrl($actor, $_GET ? '?'.http_build_query($_GET) : '')); exit;
 }
@@ -45,7 +45,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (!empty($_POST['kra'])) throw new DomainException('Only the immediate head may adjust KRA ratings.');
                 annualSubmitPeers($conn,$actor,$evaluationId,(array)($_POST['scores'] ?? []));
             }
-            redirectWith(annualUrl($actor,'?view=peers&cycle_id='.(int)$_POST['cycle_id']),'success',$withKra ? 'Your KRA review and 360 rating were saved. Individual final approval waits for all required peer ratings.' : 'Your 360 ratings were submitted and locked.');
+            redirectWith(annualUrl($actor,'?view=peers&cycle_id='.(int)$_POST['cycle_id']),'success',$withKra ? ((int)$actor['department_id']!==(int)$ratingTarget['department_id'] ? 'Your KRA review was saved. No cross-department 360 rating was submitted. Open Review & approve once all required department peer ratings are complete.' : 'Your KRA review and 360 rating were saved. Open Review & approve once all required peer ratings are complete.') : 'Your 360 ratings were submitted and locked.');
         } elseif (($_POST['action'] ?? '') === 'cancel_cycle') {
             $cancelCycleId=(int)($_POST['cycle_id'] ?? 0);
             $conn->begin_transaction();
@@ -277,25 +277,55 @@ require_once __DIR__ . '/header.php';
             <p class="mb-0"><?php echo $historyView ? 'Completed department cycles appear here after all required approvals and 360 ratings are submitted.' : 'Submitted Annual cycles appear here while reviews and ratings are in progress. Completed cycles are available in Annual Evaluation History.'; ?></p>
         </div>
     <?php elseif (!$evaluationId): ?>
+        <div data-cycle-results="annual">
         <form class="content-card annual-cycle-filter p-3 mb-4 d-flex gap-2 flex-wrap" method="get">
             <?php if ($annual_in_performance_page): ?><input type="hidden" name="category" value="regular"><?php endif; ?>
             <input type="hidden" name="view" value="<?php echo $historyView ? 'history' : e($view); ?>">
             <label for="annualCycle" class="align-self-center">Department / period</label>
-            <select id="annualCycle" name="cycle_id" class="form-select annual-cycle">
+            <select id="annualCycle" name="cycle_id" class="form-select annual-cycle" data-cycle-filter="annual">
             <?php if ($individualRosterOptions): ?><option value="0" <?php echo $showAllIndividual ? 'selected' : ''; ?>>All individual evaluations in this department</option><?php endif; ?>
             <?php foreach ($cycleOptions as $c): ?>
                 <option value="<?php echo (int)$c['cycle_id']; ?>" <?php echo !$showAllIndividual && (int)$c['cycle_id']===$cycleId ? 'selected' : ''; ?>><?php echo e($c['department_name'].(!empty($c['individual_evaluation_id']) ? ' - '.$c['individual_name'] : '').' - '.$c['period_start'].' to '.$c['period_end']); ?></option>
             <?php endforeach; ?>
-            </select><button class="btn btn-success">Show cycle</button>
+            </select>
         </form>
         <?php if ($historyView): ?>
             <?php if (!empty($cycle['cancelled_at'])): ?><div class="alert alert-warning" role="status"><i class="fas fa-ban me-2" aria-hidden="true"></i><strong>Cycle cancelled.</strong> Ratings are retained. Reason: <?php echo e($cycle['cancellation_reason'] ?? ''); ?></div><?php else: ?><div class="alert alert-success d-flex flex-wrap align-items-center justify-content-between gap-2" role="status"><span><i class="fas fa-check-circle me-2" aria-hidden="true"></i>All required Annual approvals and 360 ratings are complete. This record is archived for viewing. Completed <?php echo e($cycle['completed_at']); ?>.</span><?php if (empty($cycle['individual_evaluation_id']) && annualCanOwnCycle($conn,$actor,(int)$cycle['department_id'])): ?><button class="btn btn-outline-danger" type="button" data-bs-toggle="modal" data-bs-target="#annualCancelCycleModal"><i class="fas fa-ban me-2"></i>Cancel cycle</button><?php endif; ?></div><?php endif; ?>
         <?php elseif ($view==='peers'): ?>
-            <?php if (!annualCanRate($actor)): ?><div class="alert alert-warning">HR department peer ratings are completed through your HRIS account. Your Employee Portal remains available for self-rating and your results.</div><?php endif; ?>
+            <?php if (!annualCanRate($actor)):
+                $hrisAccessAccounts=annualQuery($conn,"SELECT is_active,account_hold FROM users WHERE employee_id=? AND role IN ('HR Manager','HR Supervisor','HR Staff') AND deleted_at IS NULL",[(int)$actor['employee_id']]);
+                $hasUsableHrisAccess=false;
+                foreach ($hrisAccessAccounts as $hrisAccessAccount) {
+                    if ($hrisAccessAccount['is_active'] && !$hrisAccessAccount['account_hold']) $hasUsableHrisAccess=true;
+                }
+            ?>
+            <div class="alert alert-warning" role="status">
+                <?php if (!$hrisAccessAccounts): ?>
+                    <strong>HRIS access account required.</strong> You do not have an HRIS account yet. Please contact your immediate head to request HRIS access so you can complete department peer ratings.
+                <?php elseif (!$hasUsableHrisAccess): ?>
+                    <strong>HRIS access unavailable.</strong> Your HRIS account is inactive or on hold. Please contact your immediate head for help restoring HRIS access so you can complete department peer ratings.
+                <?php else: ?>
+                    HR department peer ratings are completed through your HRIS account. Please sign in to HRIS to perform your peer ratings.
+                <?php endif; ?>
+                Your Employee Portal remains available for self-rating and your results. Please contact your immediate head if you need access to HRIS.
+            </div>
+            <?php endif; ?>
             <?php if ($own && !$own[0]['evaluation_id']): ?><div class="alert alert-warning"><?php echo $actor['role']==='HR Manager' ? 'Your own Annual self-rating is pending. You may rate submitted department evaluations now and complete your self-rating separately.' : 'Your own Annual self-rating is pending. Direct-report Rate & Review remains available; submit your self-rating before rating other coworkers.'; ?></div><?php endif; ?>
         <?php endif; ?>
         <div class="content-card p-3">
-            <header class="annual-section-heading <?php echo $view==='peers' ? 'annual-peer-heading' : ''; ?>"><div><h2 class="h5 mb-1"><?php echo $historyView ? 'Annual Evaluation History' : ($view==='peers' ? '360 Rating — Department Peers' : 'Annual Evaluation Progress'); ?><?php if ($view==='peers' && !$historyView): ?> <button type="button" class="annual-peer-help" data-bs-toggle="tooltip" data-bs-placement="bottom" data-bs-container="body" title="Rate coworkers on Core Behaviors &amp; Values. For your direct reports, review KRA and submit your Core Values rating on the same screen. Your self-rating is included once. Confirmed peer ratings are locked." aria-label="Department peer rating instructions"><i class="fas fa-info-circle" aria-hidden="true"></i></button><?php endif; ?></h2><?php if ($view==='peers'): ?><?php foreach (array_unique(array_filter(array_column($members, 'template_name'))) as $peerTemplateName): ?><h3 class="h5 mt-2 mb-1" style="overflow-wrap:break-word;"><i class="fas fa-file-alt me-1" aria-hidden="true"></i><?php echo e($peerTemplateName); ?></h3><?php endforeach; ?><?php endif; ?><p class="text-muted small mb-0"><?php echo $historyView ? 'Completed department evaluations and their approved results. View only.' : ($view==='peers' ? 'Rate your coworkers on the eight Core Behaviors & Values items.' : 'Review submitted self-ratings, department 360 participation, and annual results.'); ?></p></div>
+            <header class="annual-section-heading <?php echo $view==='peers' ? 'annual-peer-heading' : ''; ?>"><div><h2 class="h5 mb-1"><?php echo $historyView ? 'Annual Evaluation History' : ($view==='peers' ? '360 Rating — Department Peers' : 'Annual Evaluation Progress'); ?><?php if ($view==='peers' && !$historyView): ?> <button type="button" class="annual-peer-help" data-bs-toggle="tooltip" data-bs-placement="bottom" data-bs-container="body" title="Rate coworkers on Core Behaviors &amp; Values. For your direct reports, review KRA and submit your Core Values rating on the same screen. Your self-rating is included once. Confirmed peer ratings are locked." aria-label="Department peer rating instructions"><i class="fas fa-info-circle" aria-hidden="true"></i></button><?php endif; ?></h2><?php if ($view==='peers'):
+                $peerTemplateNames=array_values(array_unique(array_filter(array_column($members,'template_name'))));
+                if (count($peerTemplateNames)>1): ?>
+                    <details class="mt-2 mb-2 small">
+                        <summary style="color:#294306;cursor:pointer;font-weight:600;"><?php echo count($peerTemplateNames); ?> evaluation forms <span class="text-muted fw-normal">&middot; View names</span></summary>
+                        <ul class="mt-2 mb-0 ps-3 text-muted" style="overflow-wrap:anywhere;">
+                            <?php foreach ($peerTemplateNames as $peerTemplateName): ?><li class="mb-1"><?php echo e($peerTemplateName); ?></li><?php endforeach; ?>
+                        </ul>
+                    </details>
+                <?php elseif ($peerTemplateNames): ?>
+                    <p class="small fw-semibold mt-2 mb-1" style="overflow-wrap:anywhere;"><i class="fas fa-file-alt me-1" aria-hidden="true"></i><?php echo e($peerTemplateNames[0]); ?></p>
+                <?php endif; ?>
+            <?php endif; ?><p class="text-muted small mb-0"><?php echo $historyView ? 'Completed department evaluations and their approved results. View only.' : ($view==='peers' ? 'Rate your coworkers on the eight Core Behaviors & Values items.' : 'Review submitted self-ratings, department 360 participation, and annual results.'); ?></p></div>
                 <?php if ($view==='peers'): ?>
                 <div class="annual-peer-size">
                     <div class="package-stat" aria-label="Department overall score: <?php echo $departmentOverallScore===null ? 'not available' : number_format($departmentOverallScore,2).' out of 4'; ?>, based on <?php echo count($departmentCompletedScores); ?> of <?php echo count($members); ?> complete employee scores">
@@ -348,7 +378,7 @@ require_once __DIR__ . '/header.php';
                     <?php elseif ($view==='peers' && ($isDepartmentPeer || ($target && annualCanFinalize($conn,$actor,$target))) && annualCanRate($actor) && $m['evaluation_id']): ?>
                         <?php if (empty($own[0]['evaluation_id']) && !annualCanRateBeforeSelf($conn,$actor,$target)): ?>
                             <button class="btn btn-sm btn-outline-secondary" type="button" disabled aria-disabled="true" title="Submit your Annual self-rating first to unlock peer ratings.">Self-rating required</button>
-                        <?php elseif (annualCanFinalize($conn,$actor,$target) && $m['rated']): ?>
+                        <?php elseif (annualCanFinalize($conn,$actor,$target) && ($m['rated'] || (!empty($target['individual_evaluation_id']) && !empty($target['head_approved_by'])))): ?>
                             <?php if (!empty($m['revision_pending'])): ?>
                                 <a class="btn btn-sm btn-outline-success" href="<?php echo annualUrl($actor,'?view=review&evaluation_id='.(int)$m['evaluation_id']); ?>" aria-label="Review revised result"><i class="fas fa-eye peer-mobile-eye" aria-hidden="true"></i><span class="peer-desktop-action">Review revised result</span></a>
                             <?php elseif (!empty($target['individual_evaluation_id']) && $m['evaluation_status']!=='Approved' && individualApprovalReady($conn,'annual',$target)): ?>
@@ -380,6 +410,7 @@ require_once __DIR__ . '/header.php';
                 <div class="d-flex flex-wrap gap-2"><button class="btn btn-success" type="button" data-bs-toggle="modal" data-bs-target="#annualApproveCycleModal"><i class="fas fa-check-circle me-2" aria-hidden="true"></i>Approve cycle</button><button class="btn btn-danger quarterly-cycle-reject" type="button" data-bs-toggle="modal" data-bs-target="#annualRejectCycleModal"><i class="fas fa-rotate-left me-2" aria-hidden="true"></i>Reject &amp; restart</button></div>
             </div>
         <?php endif; ?></div>
+        </div>
     <?php elseif ($view==='head-review'): $headReviewScores=json_decode($headReviewSubmission['scores_json'],true) ?: []; $headReviewSelf=json_decode($member['self_values_json'] ?? '[]',true) ?: []; $headReviewScore=annualCalculate($headReviewKra,$headReviewScores,[]); ?>
         <section class="content-card p-4 annual-head-review-view">
             <div class="annual-submission-heading">
@@ -1099,6 +1130,7 @@ if (headReviewTabs) {
     else restoreHeadTab();
 }
 </script>
+<script src="<?php echo BASE_URL; ?>/assets/js/evaluation-cycle-filter.js?v=<?php echo filemtime(__DIR__ . '/../assets/js/evaluation-cycle-filter.js'); ?>"></script>
 <?php require_once __DIR__ . '/footer.php'; ?>
 
 <script>

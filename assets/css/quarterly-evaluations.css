@@ -79,7 +79,7 @@
 .quarterly-page .table td { vertical-align:middle; }
 .quarterly-page .quarterly-number { min-width:88px; width:100px; }
 .quarterly-page .quarterly-cycle { max-width:650px; width:100%; }
-.quarterly-page .quarterly-summary .stat-card.page-hero { display:flex; flex-direction:column; align-items:flex-start; gap:5px; min-height:120px; height:100%; margin:0; padding:18px; color:#fff; }
+.quarterly-page .quarterly-summary .stat-card.page-hero { background:linear-gradient(135deg,var(--hero-from,#294306) 0%,var(--hero-mid,#294306) 50%,var(--hero-to,#294306) 100%); display:flex; flex-direction:column; align-items:flex-start; gap:5px; min-height:120px; height:100%; margin:0; padding:18px; color:#fff; }
 .quarterly-page .quarterly-summary .stat-card span { color:rgba(255,255,255,.86); font-size:.85rem; font-weight:600; }
 .quarterly-page .quarterly-summary .stat-card strong { display:block; color:#fff; font-size:1.8rem; line-height:1.1; }
 .quarterly-page .quarterly-summary .stat-card small { display:block; color:rgba(255,255,255,.78); font-size:.75rem; }
@@ -431,3 +431,33 @@
     }
     .quarterly-page #quarterlyRatingForm .quarterly-rating-step-actions>.btn i { flex-shrink:0; }
 }
+
+/* Match the system page hero within the Quarterly peer heading only. */
+.quarterly-section-heading.quarterly-peer-heading.page-hero {
+    background:linear-gradient(135deg,var(--hero-from,#082e06) 0%,var(--hero-mid,#294306) 50%,var(--hero-to,#183a03) 100%);
+    color:#fff;
+    border-bottom:0;
+    border-radius:0 !important;
+    box-shadow:0 8px 24px rgba(8,46,6,.14);
+}
+.quarterly-peer-heading.page-hero > div { position:relative; z-index:1; }
+.quarterly-peer-heading.page-hero h2,
+.quarterly-peer-heading.page-hero .package-stat-content strong { color:#fff; }
+.quarterly-peer-heading.page-hero .text-muted,
+.quarterly-peer-heading.page-hero .package-stat-content span,
+.quarterly-peer-heading.page-hero .package-stat-content small { color:#e0ead7 !important; }
+.quarterly-peer-heading.page-hero summary,
+.quarterly-peer-heading.page-hero .quarterly-peer-help { color:#f2d66d !important; }
+.quarterly-peer-heading.page-hero .package-stat {
+    background:rgba(255,255,255,.1);
+    border:1px solid rgba(255,255,255,.2);
+    box-shadow:none;
+}
+.quarterly-peer-heading.page-hero .package-stat-icon {
+    background:rgba(255,255,255,.12) !important;
+    color:#f2d66d !important;
+}
+
+/* Keep the portal's generic white-card gloss from washing out score summaries. */
+.quarterly-page .quarterly-summary .stat-card.page-hero::after { content:none; }
+.quarterly-page .quarterly-summary .stat-card.page-hero > * { position:relative; z-index:1; }

@@ -118,7 +118,6 @@ switch ($effective_role) {
         $_annual_manager_actor=annualActor($conn,(int)($_SESSION['user_id'] ?? 0));
         if ($_annual_manager_actor) {
             $_mgr_pkg_pending+=annualPendingCount($conn,$_annual_manager_actor);
-            if (annualApCycleReadyToStart($conn,$_annual_manager_actor)) $_mgr_pkg_pending++;
         }
         if ($_annual_manager_actor) $_mgr_pkg_pending+=quarterlyPendingCount($conn,$_annual_manager_actor);
         $_mgr_approvals_pending = countManagerPendingApprovals($conn);
@@ -507,6 +506,18 @@ switch ($effective_role) {
         break;
 
 }
+// Put the selected category in the sidebar URL itself, including on already open pages.
+require_once __DIR__.'/performance-evaluation-priority.php';
+foreach ($sidebar_menus as &$priorityMenuItems) {
+    foreach ($priorityMenuItems as &$priorityMenuItem) {
+        if (($priorityMenuItem['page'] ?? '')==='team-evaluation-packages.php') {
+            $priorityCategory=performanceEvaluationDefaultCategory($conn,(int)($_SESSION['user_id'] ?? 0),true);
+            $priorityMenuItem['url']=BASE_URL.'/employee/team-evaluation-packages.php?category='.$priorityCategory;
+        }
+    }
+    unset($priorityMenuItem);
+}
+unset($priorityMenuItems);
 $annual_nav_actor = annualActor($conn, (int)($_SESSION['user_id'] ?? 0));
 if ($annual_nav_actor && $annual_nav_actor['employment_status'] === 'Regular'
     && in_array($annual_nav_actor['role'], ['Employee','President and CEO','HR Staff'], true)) {
@@ -518,9 +529,9 @@ if ($annual_nav_actor && $annual_nav_actor['employment_status'] === 'Regular'
             'url'=>BASE_URL.'/staff/performance-evaluation.php', 'page'=>'performance-evaluation.php',
             'badge'=>$staff_performance_count ?: null, 'badge_class'=>'bg-warning text-dark'];
     } elseif (!isset($sidebar_menus['MY TEAM'])) {
-        $sidebar_menus[$annual_nav_section][] = ['icon'=>'fas fa-users-cog', 'label'=>'Annual & 360 Ratings',
-            'url'=>annualUrl($annual_nav_actor), 'page'=>'annual-evaluations.php',
-            'badge'=>$annual_nav_count ?: null, 'badge_class'=>'bg-warning text-dark'];
+        $sidebar_menus[$annual_nav_section][] = ['icon'=>'fas fa-layer-group', 'label'=>'Performance Evaluation',
+            'url'=>BASE_URL.'/employee/performance-evaluation.php', 'page'=>'performance-evaluation.php',
+            'badge'=>($annual_nav_count + quarterlyPendingCount($conn,$annual_nav_actor)) ?: null, 'badge_class'=>'bg-warning text-dark'];
     } else {
         foreach ($sidebar_menus['MY TEAM'] as &$team_nav_item) {
             if (($team_nav_item['page'] ?? '') === 'team-evaluation-packages.php') {
@@ -538,9 +549,7 @@ if ($annual_nav_actor && $annual_nav_actor['employment_status'] === 'Regular'
     if ($annual_nav_actor['role'] === 'HR Staff') {
         // Quarterly work is included in Performance Evaluation above.
     } elseif (!isset($sidebar_menus['MY TEAM'])) {
-        $sidebar_menus[$quarterly_nav_section][] = ['icon'=>'fas fa-calendar-alt', 'label'=>'Quarterly & 360 Ratings',
-            'url'=>quarterlyUrl($annual_nav_actor), 'page'=>'quarterly-evaluations.php',
-            'badge'=>$quarterly_nav_count ?: null, 'badge_class'=>'bg-warning text-dark'];
+        // Both evaluation types share the Performance Evaluation item above.
     } else {
         foreach ($sidebar_menus['MY TEAM'] as &$team_nav_item) {
             if (($team_nav_item['page'] ?? '') === 'team-evaluation-packages.php') {

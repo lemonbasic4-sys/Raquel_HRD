@@ -260,6 +260,10 @@ function quarterlyUrl(array $actor, string $query = ''): string
         return BASE_URL . '/staff/performance-evaluation.php?category=quarterly'
             . ($query !== '' ? '&' . ltrim($query, '?&') : '');
     }
+    if (in_array($actor['role'], ['Employee','President and CEO'], true) && (empty($GLOBALS['quarterly_in_performance_page']) || !empty($GLOBALS['employee_performance_page']))) {
+        return BASE_URL . '/employee/performance-evaluation.php?category=quarterly'
+            . ($query !== '' ? '&' . ltrim($query, '?&') : '');
+    }
     if (in_array($actor['role'], ['HR Manager', 'HR Supervisor'], true)
         || (!empty($GLOBALS['quarterly_in_performance_page']) && $actor['role'] === 'Employee')) {
         return BASE_URL . '/employee/team-evaluation-packages.php?category=quarterly'

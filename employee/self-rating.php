@@ -373,6 +373,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $individualTemplate=annualQuery($conn,'SELECT * FROM evaluation_templates WHERE template_id=?',[$template_id])[0]??[];
     $individualPeriodError=false;
+    try { individualAssertAnnualPrerequisite($conn,$employee,$individualTemplate); }
+    catch (DomainException $error) { $errors[]=$error->getMessage(); $individualPeriodError=true; }
     if(!empty($individualTemplate['individual_workflow'])) {
         try {
             $savedPeriod=$editing_id>0 && $is_valid_existing_edit ? annualQuery($conn,'SELECT evaluation_period_start,evaluation_period_end FROM evaluations WHERE evaluation_id=? AND employee_id=?',[$editing_id,$employee_id])[0]??null : null;

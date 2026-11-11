@@ -31,6 +31,15 @@ function ensureIndividualEvaluationSchema($conn, string $kind): void
     $ready[$key]=true;
 }
 
+/** Annual unlocks after an Approved Quarterly whose period starts in the Annual year. */
+function individualAssertAnnualPrerequisite($conn,array $employee,array $template): void
+{
+    if (($template['evaluation_type'] ?? '') !== 'Annual') return;
+    $year=(int)substr((string)($template['assessment_from'] ?? ''),0,4);
+    $approved=annualQuery($conn,"SELECT 1 FROM evaluations WHERE employee_id=? AND evaluation_type='Quarterly' AND status='Approved' AND deleted_at IS NULL AND evaluation_period_start>=? AND evaluation_period_start<? LIMIT 1",[(int)$employee['employee_id'],$year.'-01-01',($year+1).'-01-01']);
+    if (!$approved) throw new DomainException('Complete at least one approved Quarterly evaluation in this Annual year before answering the Annual form.');
+}
+
 function individualAssessmentDates(array $employee,array $template): array
 {
     $from=$template['assessment_from']??''; $to=$template['assessment_to']??'';
@@ -122,7 +131,7 @@ function individualNotifyTemplateAvailability($conn,int $templateId=0,int $emplo
     $rows=annualQuery($conn,"SELECT DISTINCT e.*,t.template_id,t.template_name,t.evaluation_type,t.assessment_from,t.assessment_to,u.user_id FROM evaluation_templates t JOIN evaluation_template_positions tp ON tp.template_id=t.template_id JOIN employees e ON e.job_title_id=tp.job_title_id AND e.department_id=t.target_department_id JOIN users u ON u.employee_id=e.employee_id AND u.role='Employee' WHERE t.individual_workflow=1 AND t.status='Active' AND t.deleted_at IS NULL AND e.is_active=1 AND e.deleted_at IS NULL AND e.employment_status='Regular' AND u.is_active=1 AND u.deleted_at IS NULL AND COALESCE(u.account_hold,0)=0 AND (?=0 OR t.template_id=?) AND (?=0 OR e.employee_id=?) AND NOT EXISTS(SELECT 1 FROM evaluations ev WHERE ev.template_id=t.template_id AND ev.employee_id=e.employee_id AND ev.deleted_at IS NULL AND ev.status NOT IN ('Draft','Pending Self-Rating','Returned','Rejected'))",[$templateId,$templateId,$employeeId,$employeeId]);
     $count=0;
     foreach($rows as $row) {
-        try {[$from,$to]=individualAssessmentDates($row,$row);} catch(DomainException $e){continue;}
+        try {individualAssertAnnualPrerequisite($conn,$row,$row);[$from,$to]=individualAssessmentDates($row,$row);} catch(DomainException $e){continue;}
         $count++;
         $link=BASE_URL.'/employee/self-rating.php?template='.(int)$row['template_id'];
         $title=$row['evaluation_type'].' self-rating available';
@@ -135,7 +144,8 @@ function individualNotifyTemplateAvailability($conn,int $templateId=0,int $emplo
 function individualTemplateEligibilitySql(string $alias,int $employeeId): string
 {
     if(!preg_match('/^[a-z_]+$/i',$alias)) throw new InvalidArgumentException('Invalid template alias');
-    return "($alias.individual_workflow=0 OR ($alias.assessment_from IS NOT NULL AND $alias.assessment_to IS NOT NULL AND $alias.assessment_from<=$alias.assessment_to AND EXISTS(SELECT 1 FROM employees ie WHERE ie.employee_id=$employeeId AND ie.is_active=1 AND ie.deleted_at IS NULL AND ie.employment_status='Regular' AND ie.department_id=$alias.target_department_id AND ($alias.evaluation_type<>'Annual' OR (ie.regularization_effective_date IS NOT NULL AND ie.regularization_effective_date<=$alias.assessment_to)))))";
+    $annualReady="($alias.evaluation_type<>'Annual' OR EXISTS(SELECT 1 FROM evaluations aq WHERE aq.employee_id=$employeeId AND aq.evaluation_type='Quarterly' AND aq.status='Approved' AND aq.deleted_at IS NULL AND YEAR(aq.evaluation_period_start)=YEAR($alias.assessment_from)))";
+    return "$annualReady AND ($alias.individual_workflow=0 OR ($alias.assessment_from IS NOT NULL AND $alias.assessment_to IS NOT NULL AND $alias.assessment_from<=$alias.assessment_to AND EXISTS(SELECT 1 FROM employees ie WHERE ie.employee_id=$employeeId AND ie.is_active=1 AND ie.deleted_at IS NULL AND ie.employment_status='Regular' AND ie.department_id=$alias.target_department_id AND ($alias.evaluation_type<>'Annual' OR (ie.regularization_effective_date IS NOT NULL AND ie.regularization_effective_date<=$alias.assessment_to)))))";
 }
 
 /** Count a combined head-review/peer-rating task only once per evaluation. */
