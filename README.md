@@ -105,3 +105,8 @@ misc/             Additional project documentation
 5. Follow the selected department fixture's evaluation dry-run instructions.
 
 If the application cannot connect to the database, confirm MySQL is running and the credentials in `config/database.php` match the local installation.
+
+
+
+
+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
