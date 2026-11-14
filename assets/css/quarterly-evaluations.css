@@ -437,7 +437,8 @@
     background:linear-gradient(135deg,var(--hero-from,#082e06) 0%,var(--hero-mid,#294306) 50%,var(--hero-to,#183a03) 100%);
     color:#fff;
     border-bottom:0;
-    border-radius:0 !important;
+    margin:0 0 1.25rem !important;
+    border-radius:12px !important;
     box-shadow:0 8px 24px rgba(8,46,6,.14);
 }
 .quarterly-peer-heading.page-hero > div { position:relative; z-index:1; }

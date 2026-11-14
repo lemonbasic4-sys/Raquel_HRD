@@ -292,24 +292,6 @@ require_once __DIR__ . '/header.php';
         <?php if ($historyView): ?>
             <?php if (!empty($cycle['cancelled_at'])): ?><div class="alert alert-warning" role="status"><i class="fas fa-ban me-2" aria-hidden="true"></i><strong>Cycle cancelled.</strong> Ratings are retained. Reason: <?php echo e($cycle['cancellation_reason'] ?? ''); ?></div><?php else: ?><div class="alert alert-success d-flex flex-wrap align-items-center justify-content-between gap-2" role="status"><span><i class="fas fa-check-circle me-2" aria-hidden="true"></i>All required Annual approvals and 360 ratings are complete. This record is archived for viewing. Completed <?php echo e($cycle['completed_at']); ?>.</span><?php if (empty($cycle['individual_evaluation_id']) && annualCanOwnCycle($conn,$actor,(int)$cycle['department_id'])): ?><button class="btn btn-outline-danger" type="button" data-bs-toggle="modal" data-bs-target="#annualCancelCycleModal"><i class="fas fa-ban me-2"></i>Cancel cycle</button><?php endif; ?></div><?php endif; ?>
         <?php elseif ($view==='peers'): ?>
-            <?php if (!annualCanRate($actor)):
-                $hrisAccessAccounts=annualQuery($conn,"SELECT is_active,account_hold FROM users WHERE employee_id=? AND role IN ('HR Manager','HR Supervisor','HR Staff') AND deleted_at IS NULL",[(int)$actor['employee_id']]);
-                $hasUsableHrisAccess=false;
-                foreach ($hrisAccessAccounts as $hrisAccessAccount) {
-                    if ($hrisAccessAccount['is_active'] && !$hrisAccessAccount['account_hold']) $hasUsableHrisAccess=true;
-                }
-            ?>
-            <div class="alert alert-warning" role="status">
-                <?php if (!$hrisAccessAccounts): ?>
-                    <strong>HRIS access account required.</strong> You do not have an HRIS account yet. Please contact your immediate head to request HRIS access so you can complete department peer ratings.
-                <?php elseif (!$hasUsableHrisAccess): ?>
-                    <strong>HRIS access unavailable.</strong> Your HRIS account is inactive or on hold. Please contact your immediate head for help restoring HRIS access so you can complete department peer ratings.
-                <?php else: ?>
-                    HR department peer ratings are completed through your HRIS account. Please sign in to HRIS to perform your peer ratings.
-                <?php endif; ?>
-                Your Employee Portal remains available for self-rating and your results. Please contact your immediate head if you need access to HRIS.
-            </div>
-            <?php endif; ?>
             <?php if ($own && !$own[0]['evaluation_id']): ?><div class="alert alert-warning"><?php echo $actor['role']==='HR Manager' ? 'Your own Annual self-rating is pending. You may rate submitted department evaluations now and complete your self-rating separately.' : 'Your own Annual self-rating is pending. Direct-report Rate & Review remains available; submit your self-rating before rating other coworkers.'; ?></div><?php endif; ?>
         <?php endif; ?>
         <div class="content-card p-3">
@@ -404,6 +386,24 @@ require_once __DIR__ . '/header.php';
                 </tr>
             <?php endforeach; ?></tbody>
         </table></div>
+        <?php if ($view==='peers' && !annualCanRate($actor)):
+            $hrisAccessAccounts=annualQuery($conn,"SELECT is_active,account_hold FROM users WHERE employee_id=? AND role IN ('HR Manager','HR Supervisor','HR Staff') AND deleted_at IS NULL",[(int)$actor['employee_id']]);
+            $hasUsableHrisAccess=false;
+            foreach ($hrisAccessAccounts as $hrisAccessAccount) {
+                if ($hrisAccessAccount['is_active'] && !$hrisAccessAccount['account_hold']) $hasUsableHrisAccess=true;
+            }
+        ?>
+        <div class="alert alert-warning mt-3" role="status">
+            <?php if (!$hrisAccessAccounts): ?>
+                <strong>HRIS access account required.</strong> You do not have an HRIS account yet. Please contact your immediate head to request HRIS access so you can complete department peer ratings.
+            <?php elseif (!$hasUsableHrisAccess): ?>
+                <strong>HRIS access unavailable.</strong> Your HRIS account is inactive or on hold. Please contact your immediate head for help restoring HRIS access so you can complete department peer ratings.
+            <?php else: ?>
+                HR department peer ratings are completed through your HRIS account. Please sign in to HRIS to perform your peer ratings.
+            <?php endif; ?>
+            Your Employee Portal remains available for self-rating and your results. Please contact your immediate head if you need access to HRIS.
+        </div>
+        <?php endif; ?>
         <?php if ($view==='peers' && !$historyView && $cycle && empty($cycle['individual_evaluation_id']) && annualCanOwnCycle($conn,$actor,(int)$cycle['department_id']) && empty($cycle['completed_at']) && !empty($cycle['ready_for_approval_at'])): ?>
             <div class="alert alert-success d-flex flex-wrap align-items-center justify-content-between gap-3 mt-3 mb-0" role="status" data-persistent-alert>
                 <div><strong>Ready for <?php echo e(annualCycleOwnerName($conn,(int)$cycle['department_id'])); ?> approval</strong><div>All annual requirements are complete. The cycle will move to history after approval.</div></div>

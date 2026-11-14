@@ -2467,6 +2467,10 @@ require_once '../includes/header.php';
                             <div class="col-sm-6"><label class="form-label" for="evaluationPeriodFrom">Period From</label><input id="evaluationPeriodFrom" type="date" class="form-control" value="<?php echo e($display_start); ?>" readonly></div>
                             <div class="col-sm-6"><label class="form-label" for="evaluationPeriodTo">Period To</label><input id="evaluationPeriodTo" type="date" class="form-control" value="<?php echo e($display_end); ?>" readonly></div>
                         </div>
+                        <div class="border rounded bg-light p-3 mb-3 text-center" style="overflow-wrap: anywhere;">
+                            <div class="small text-muted fw-semibold mb-1">Evaluation Template</div>
+                            <div class="fw-bold fs-5"><?php echo e($selected_template['template_name']); ?></div>
+                        </div>
                         <input type="hidden" name="period_start" value="<?php echo e($display_start); ?>">
                         <input type="hidden" name="period_end" value="<?php echo e($display_end); ?>">
                         <?php if (empty($selected_template['individual_workflow']) && ($eval_type ?? '') === 'Annual' && $is_managed_annual_employee): ?>
