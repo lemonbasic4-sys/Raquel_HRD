@@ -15,7 +15,8 @@ if (isset($_SESSION['user_id']) && in_array(($_SESSION['role'] ?? ''), ['Employe
 $error = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verifyCsrfToken();
-    $username = trim($_POST['username'] ?? '');
+    $entered_username = (string) ($_POST['username'] ?? '');
+    $username = trim($entered_username);
     $password = $_POST['password'] ?? '';
     $ip = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
 
@@ -26,6 +27,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (empty($username) || empty($password)) {
         $error = 'Please enter both username and password.';
         logLoginAudit($conn, $username, 'Employee Portal', 'Failed', 'Username or password was not provided.');
+    } elseif ($entered_username !== $username) {
+        $error = 'Invalid credentials.';
+        registerLoginAttempt($conn, $username, $ip);
+        logLoginAudit($conn, $username, 'Employee Portal', 'Failed', 'Username contained leading or trailing whitespace.');
     } else {
         $stmt = $conn->prepare("
             SELECT u.user_id, u.employee_id, u.username, u.email, u.password_hash, u.full_name, u.role, u.branch_id, u.is_active, u.account_hold, u.first_login_completed, u.must_change_password, e.is_active as emp_is_active, e.employment_status
