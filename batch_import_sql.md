@@ -14,31 +14,29 @@ C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 -u root -e "source 
 Write-Host "SUCCESS YARN?" -ForegroundColor Green
 ```
 
-## Additional Employee Portal accounts
+## Executive employee records
 
-| Position | Department | Username | Temporary password |
+| Position | Department | Company ID |
 | --- | --- | --- | --- |
-| President and CEO | Office of the President | `CEO-001` | `password` |
-| VP for Acquired Properties | Acquired Properties | `AP-001` | `password` |
+| President and CEO | Office of the President | `CEO-001` |
+| VP for Acquired Properties | Acquired Properties | `AP-001` |
 
-Use **Employee Portal sign-in**, not HRIS sign-in. Both accounts require a password change on first login.
+The fourth seed adds fictional employee records only. It does not create portal accounts, evaluation templates, or evaluations. Create portal accounts manually from Admin > Portal Accounts when needed. Existing Admin and HR accounts remain supplied by the third seed.
 
-The fourth seed adds fictional employee records and portal accounts only. It does not create evaluation templates or evaluations. Existing Admin and HR accounts remain supplied by the third seed.
-
-Import the fourth seed once per fresh setup. It deliberately rejects duplicate Company IDs and usernames instead of replacing existing employees.
+Import the fourth seed once per fresh setup. It deliberately rejects duplicate Company IDs instead of replacing existing employees.
 
 ## Sample evaluation forms
 
 The fifth seed adds Active Quarterly and Annual forms, each with 10 KRA items (10% each), 8 standard behavior items, and overall weights of 80% KRA / 20% Behavior.
 
-| Creator | Target positions |
+| Intended owner | Target positions |
 | --- | --- |
-| President/CEO (`CEO-001`) | HR Manager I-V and VP for Acquired Properties |
+| President/CEO (`CEO-001` employee) | HR Manager I-V and VP for Acquired Properties |
 | Elena Delgado (`elena.delgado`) | HR Supervisor I-V |
 | Patricia Gomez (`patricia.gomez`) | HR Staff I-V |
-| AP VP (`AP-001`) | AP Manager I-IV |
+| AP VP (`AP-001` employee) | AP Manager I-IV |
 
-Import once after the fourth seed. This creates templates only. AP Manager positions have forms ready, but this base setup does not yet include AP Manager employees/accounts. No form is created for the CEO because the CEO has no configured immediate head.
+Import once after the fourth seed. This creates templates only. Executive templates have no recorded creator when their portal accounts do not yet exist; creating an account later does not retroactively assign it as creator. AP Manager positions have forms ready, but this base setup does not yet include AP Manager employees/accounts. No form is created for the CEO because the CEO has no configured immediate head.
 
 Revision Date and Effective Date are template metadata; set evaluation periods through the evaluation workflow.
 

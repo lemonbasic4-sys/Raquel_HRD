@@ -1,9 +1,9 @@
--- Fictional test accounts. Import once after the three base seeds, on a fresh database.
+-- Fictional executive employee records. Import once after the three base seeds, on a fresh database.
 -- Order: 1st_schema_tables.sql -> 2nd_seed_organization.sql ->
 --        3rd_seed_HR_accounts_.sql -> 4th_seed_executive_portal_accounts.sql
--- Employee Portal only: CEO-001 and AP-001. Temporary password: password
+-- Adds CEO-001 and AP-001 as employees only; create portal accounts in Admin when needed.
 -- No HRIS executive accounts, templates, or completed evaluations are created.
--- Duplicate Company IDs/usernames cause an error; existing accounts are never replaced.
+-- Duplicate Company IDs cause an error; existing employees are never replaced.
 SET NAMES utf8mb4;
 USE raquel_hris;
 SET FOREIGN_KEY_CHECKS = 1;
@@ -55,23 +55,8 @@ INSERT INTO employee_emergency_contacts (employee_id,contact_name,relationship,c
 (@ceo_employee_id,'Gabriel Villanueva','Spouse','09170005003',1),
 (@ap_vp_employee_id,'Rafael Santos','Spouse','09170005004',1);
 
--- role Employee is intentional: executive authority comes from the employee's job title.
--- A password change is requested on first sign-in.
-INSERT INTO users
-(employee_id,username,email,full_name,password_hash,role,branch_id,is_active,
- account_hold,first_login_completed,must_change_password)
-VALUES
-(@ceo_employee_id,'CEO-001','isabella.villanueva@example.com','Isabella Villanueva',
- '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi','Employee',102,1,0,0,1),
-(@ap_vp_employee_id,'AP-001','marisol.santos@example.com','Marisol Santos',
- '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi','Employee',102,1,0,0,1);
-
 COMMIT;
 
-SELECT e.employee_code,e.first_name,e.last_name,j.job_title,d.department_name,
-       u.username,u.role,u.must_change_password
-FROM employees e
-JOIN users u ON u.employee_id=e.employee_id
-JOIN job_titles j ON j.job_title_id=e.job_title_id
-JOIN departments d ON d.department_id=e.department_id
-WHERE e.employee_code IN ('CEO-001','AP-001');
+SELECT employee_code,first_name,last_name
+FROM employees
+WHERE employee_code IN ('CEO-001','AP-001');

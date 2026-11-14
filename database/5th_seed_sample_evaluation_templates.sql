@@ -2,7 +2,8 @@
 -- Import AFTER base seeds 1, 2, 3 and 4th_seed_executive_portal_accounts.sql.
 -- 10 templates: 5 target role groups x Quarterly/Annual.
 -- Each has 10 KRA (10% each), 8 standard behaviors, and overall weights 80/20.
--- Creator accounts must exist. Import once per fresh setup; no employees are replaced.
+-- Executive creator accounts are optional; templates imported without them retain NULL created_by.
+-- Import once per fresh setup; no employees are replaced.
 -- Templates only: no scores, evaluations, cycles, or approvals are fabricated.
 -- Revision/effective dates are form metadata, not evaluation Period From/To.
 SET NAMES utf8mb4;
@@ -10,7 +11,7 @@ USE raquel_hris;
 SET FOREIGN_KEY_CHECKS = 1;
 START TRANSACTION;
 
--- CEO-001 creates Quarterly for HR Manager.
+-- Quarterly for HR Manager; CEO-001 is recorded as creator only if its portal account exists.
 INSERT INTO evaluation_templates
 (template_name,description,target_department,target_department_id,target_job_title_id,
  behavior_framework_code,behavior_framework_version,evaluation_type,kra_weight,behavior_weight,
@@ -48,7 +49,7 @@ INSERT INTO evaluation_criteria
 (@sample_template_id,'Behavior','Continuous Improvement','Provides diligent effort to continuously focus on getting better.','Provides diligent effort to continuously focus on getting better.',0,'Scale_1_4',7),
 (@sample_template_id,'Behavior','Excellent Client Experience','Delivers the service beyond the expectations of the internal and external clients.','Delivers the service beyond the expectations of the internal and external clients.',0,'Scale_1_4',8);
 
--- CEO-001 creates Annual for HR Manager.
+-- Annual for HR Manager; CEO-001 is recorded as creator only if its portal account exists.
 INSERT INTO evaluation_templates
 (template_name,description,target_department,target_department_id,target_job_title_id,
  behavior_framework_code,behavior_framework_version,evaluation_type,kra_weight,behavior_weight,
@@ -238,7 +239,7 @@ INSERT INTO evaluation_criteria
 (@sample_template_id,'Behavior','Continuous Improvement','Provides diligent effort to continuously focus on getting better.','Provides diligent effort to continuously focus on getting better.',0,'Scale_1_4',7),
 (@sample_template_id,'Behavior','Excellent Client Experience','Delivers the service beyond the expectations of the internal and external clients.','Delivers the service beyond the expectations of the internal and external clients.',0,'Scale_1_4',8);
 
--- CEO-001 creates Quarterly for VP for Acquired Properties.
+-- Quarterly for VP for Acquired Properties; CEO-001 is recorded as creator only if its portal account exists.
 INSERT INTO evaluation_templates
 (template_name,description,target_department,target_department_id,target_job_title_id,
  behavior_framework_code,behavior_framework_version,evaluation_type,kra_weight,behavior_weight,
@@ -276,7 +277,7 @@ INSERT INTO evaluation_criteria
 (@sample_template_id,'Behavior','Continuous Improvement','Provides diligent effort to continuously focus on getting better.','Provides diligent effort to continuously focus on getting better.',0,'Scale_1_4',7),
 (@sample_template_id,'Behavior','Excellent Client Experience','Delivers the service beyond the expectations of the internal and external clients.','Delivers the service beyond the expectations of the internal and external clients.',0,'Scale_1_4',8);
 
--- CEO-001 creates Annual for VP for Acquired Properties.
+-- Annual for VP for Acquired Properties; CEO-001 is recorded as creator only if its portal account exists.
 INSERT INTO evaluation_templates
 (template_name,description,target_department,target_department_id,target_job_title_id,
  behavior_framework_code,behavior_framework_version,evaluation_type,kra_weight,behavior_weight,
@@ -314,7 +315,7 @@ INSERT INTO evaluation_criteria
 (@sample_template_id,'Behavior','Continuous Improvement','Provides diligent effort to continuously focus on getting better.','Provides diligent effort to continuously focus on getting better.',0,'Scale_1_4',7),
 (@sample_template_id,'Behavior','Excellent Client Experience','Delivers the service beyond the expectations of the internal and external clients.','Delivers the service beyond the expectations of the internal and external clients.',0,'Scale_1_4',8);
 
--- AP-001 creates Quarterly for AP Manager.
+-- Quarterly for AP Manager; AP-001 is recorded as creator only if its portal account exists.
 INSERT INTO evaluation_templates
 (template_name,description,target_department,target_department_id,target_job_title_id,
  behavior_framework_code,behavior_framework_version,evaluation_type,kra_weight,behavior_weight,
@@ -352,7 +353,7 @@ INSERT INTO evaluation_criteria
 (@sample_template_id,'Behavior','Continuous Improvement','Provides diligent effort to continuously focus on getting better.','Provides diligent effort to continuously focus on getting better.',0,'Scale_1_4',7),
 (@sample_template_id,'Behavior','Excellent Client Experience','Delivers the service beyond the expectations of the internal and external clients.','Delivers the service beyond the expectations of the internal and external clients.',0,'Scale_1_4',8);
 
--- AP-001 creates Annual for AP Manager.
+-- Annual for AP Manager; AP-001 is recorded as creator only if its portal account exists.
 INSERT INTO evaluation_templates
 (template_name,description,target_department,target_department_id,target_job_title_id,
  behavior_framework_code,behavior_framework_version,evaluation_type,kra_weight,behavior_weight,
@@ -409,7 +410,7 @@ SELECT t.template_name,u.full_name AS created_by,t.evaluation_type,
  SUM(c.section='KRA') AS kra_items,SUM(c.section='Behavior') AS behavior_items,
  SUM(CASE WHEN c.section='KRA' THEN c.weight ELSE 0 END) AS kra_total
 FROM evaluation_templates t
-JOIN users u ON u.user_id=t.created_by
+LEFT JOIN users u ON u.user_id=t.created_by
 JOIN evaluation_criteria c ON c.template_id=t.template_id
 WHERE t.form_code LIKE 'SAMPLE-%'
 GROUP BY t.template_id,t.template_name,u.full_name,t.evaluation_type
