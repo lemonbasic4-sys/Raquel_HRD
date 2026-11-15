@@ -14,6 +14,7 @@
     let selectedId;
     let comparisonId;
     let chart;
+    let chartCycles = [];
 
     function previousCycle(ev) {
         return evaluations[evaluations.indexOf(ev) + 1] ?? null;
@@ -166,6 +167,7 @@
     function renderComparison() {
         const ev = evaluations.find(r => r.evaluation_id === selectedId);
         const previous = evaluations.find(r => r.evaluation_id === comparisonId) ?? null;
+        updateChart();
         for (const id of ['comparison-summary', 'comparison-notice', 'paired-criteria', 'mobile-comparison']) byId(id).hidden = !ev;
         const help = document.querySelector('.mp-desktop-comparison-help');
         if (help) help.hidden = !ev;
@@ -215,19 +217,36 @@
         renderComparison();
     });
 
+    function updateChart() {
+        if (!chart) return;
+        const reviewed = evaluations.find(ev => ev.evaluation_id === selectedId);
+        const compared = evaluations.find(ev => ev.evaluation_id === comparisonId);
+        const comparing = Boolean(reviewed && compared);
+        chartCycles = comparing ? [reviewed, compared] : [...evaluations].reverse();
+        chart.data.labels = chartCycles.map(ev => ev.cycle_label);
+        chart.data.datasets[0].data = chartCycles.map(ev => ev.total_score);
+        chart.data.datasets[0].label = comparing ? 'Selected evaluation scores' : 'Finalized score';
+        chart.data.datasets[0].pointBackgroundColor = comparing ? ['#244b15', '#CBA135'] : '#CBA135';
+        byId('perfTrendChart').setAttribute('aria-label',
+            `${comparing ? 'Selected comparison' : 'Finalized evaluation scores'}: ${chartCycles.map((ev, i) => `${comparing ? (i ? 'Compare against' : 'Cycle to review') + ', ' : ''}${ev.cycle_label}: ${num(ev.total_score)} out of 4`).join('; ')}`);
+        byId('chart-hint').textContent = comparing
+            ? 'The first point is the cycle to review; the second is the comparison cycle. Hover or tap for details.'
+            : 'Hover over or tap a point to see its evaluation date and score.';
+        chart.update('none');
+    }
+
     function renderChart(data) {
-        const chronological = [...evaluations].reverse();
         chart = new Chart(byId('perfTrendChart'), {
             type:'line',data:{labels:data.chart_labels,datasets:[{label:'Finalized score',data:data.chart_scores,
                 borderColor:'#244b15',backgroundColor:'rgba(203,161,53,.1)',pointBackgroundColor:'#CBA135',pointBorderColor:'#244b15',pointRadius:5,pointHoverRadius:7,tension:0,fill:true}]},
             options:{responsive:true,maintainAspectRatio:false,
                 interaction:{mode:'nearest',intersect:true},
                 events:['mousemove','mouseout','click','touchstart','touchmove'],
-                plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx => `${num(ctx.raw)} / 4`}}},
+                plugins:{legend:{display:false},tooltip:{callbacks:{title:items => chartCycles[items[0]?.dataIndex]?.cycle_label ?? '',label:ctx => `${num(ctx.raw)} / 4`}}},
                 scales:{y:{min:1,max:4,ticks:{stepSize:1},grid:{color:'#edf0e9'}},x:{offset:true,ticks:{autoSkip:true,maxTicksLimit:5,maxRotation:0,font:{size:10},
-                    callback:value => {const ev = chronological[Number(value)];return ev ? [ev.evaluation_type,(ev.approved_date || ev.evaluation_period_end).slice(0,10)] : '';}},grid:{display:false}}}}
+                    callback:value => {const index = Number(value);const ev = chartCycles[index];return ev ? [selectedId && comparisonId ? (index ? 'Compare' : 'Review') : ev.evaluation_type,(ev.approved_date || ev.evaluation_period_end).slice(0,10)] : '';}},grid:{display:false}}}}
         });
-        byId('perfTrendChart').setAttribute('aria-label',`Finalized evaluation scores: ${data.chart_labels.map((label,i) => `${label}: ${num(data.chart_scores[i])} out of 4`).join('; ')}`);
+        updateChart();
     }
 
     function renderDevelopment(data) {

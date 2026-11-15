@@ -72,7 +72,7 @@ $default_avatar_url = getEmployeeAvatar('');
                 <section class="mp-card">
                     <div class="mp-card-heading"><div><h2>Performance trend</h2><p>Approved, finalized cycles</p></div><span id="finalized-count" class="mp-muted"></span></div>
                     <div class="mp-chart"><canvas id="perfTrendChart" role="img" aria-label="Scores for finalized evaluation cycles"></canvas></div>
-                    <p class="mp-muted mp-chart-hint">Hover over or tap a point to see its evaluation date and score.</p>
+                    <p id="chart-hint" class="mp-muted mp-chart-hint">Hover over or tap a point to see its evaluation date and score.</p>
                 </section>
                 <section class="mp-card" aria-label="Latest evaluation highlights">
                     <div class="mp-card-heading"><div><h2>What to focus on</h2><p>From your latest evaluation</p></div></div>
