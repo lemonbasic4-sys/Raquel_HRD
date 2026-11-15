@@ -122,7 +122,7 @@ $initials = strtoupper(substr($row['employee_name'], 0, 1) . substr(explode(' ',
                                             $manager_override_score = $k['manager_override_score'] ?? null;
                                             $badge_html = '';
                                             
-                                            if ($supervisor_override_score !== null) {
+                                            if ($supervisor_override_score !== null && abs((float)$supervisor_override_score - (float)$k['score_value']) >= 0.005) {
                                                 $effective_score = $supervisor_override_score;
                                                 
                                                 $override_actor = getEvaluationOverrideActor($conn, (int)($k['supervisor_override_by'] ?? 0));
@@ -130,7 +130,7 @@ $initials = strtoupper(substr($row['employee_name'], 0, 1) . substr(explode(' ',
                                                 $badge_html .= '<span class="badge-audit ms-2" data-bs-toggle="tooltip" data-bs-html="true" title="<strong>' . e($override_actor['label']) . '</strong><br>Edited by: ' . e($override_actor['name']) . '<br>On: ' . $formatted_date . '<br>Original: ' . $k['score_value'] . '"><i class="fas fa-user-edit me-1"></i>' . e($override_actor['short']) . '</span>';
                                             }
                                             
-                                            if ($manager_override_score !== null) {
+                                            if ($manager_override_score !== null && abs((float)$manager_override_score - (float)($supervisor_override_score ?? $k['score_value'])) >= 0.005) {
                                                 $effective_score = $manager_override_score;
                                                 
                                                 $mgr_name_q = $conn->query("SELECT full_name FROM users WHERE user_id = " . (int)($k['manager_override_by'] ?? 0))->fetch_assoc();
@@ -186,7 +186,7 @@ $initials = strtoupper(substr($row['employee_name'], 0, 1) . substr(explode(' ',
                                             $manager_override_score = $b['manager_override_score'] ?? null;
                                             $badge_html = '';
                                             
-                                            if ($supervisor_override_score !== null) {
+                                            if ($supervisor_override_score !== null && abs((float)$supervisor_override_score - (float)$b['score_value']) >= 0.005) {
                                                 $effective_score = $supervisor_override_score;
                                                 
                                                 $override_actor = getEvaluationOverrideActor($conn, (int)($b['supervisor_override_by'] ?? 0));
@@ -194,7 +194,7 @@ $initials = strtoupper(substr($row['employee_name'], 0, 1) . substr(explode(' ',
                                                 $badge_html .= '<span class="badge-audit ms-2" data-bs-toggle="tooltip" data-bs-html="true" title="<strong>' . e($override_actor['label']) . '</strong><br>Edited by: ' . e($override_actor['name']) . '<br>On: ' . $formatted_date . '<br>Original: ' . $b['score_value'] . '"><i class="fas fa-user-edit me-1"></i>' . e($override_actor['short']) . '</span>';
                                             }
                                             
-                                            if ($manager_override_score !== null) {
+                                            if ($manager_override_score !== null && abs((float)$manager_override_score - (float)($supervisor_override_score ?? $b['score_value'])) >= 0.005) {
                                                 $effective_score = $manager_override_score;
                                                 
                                                 $mgr_name_q = $conn->query("SELECT full_name FROM users WHERE user_id = " . (int)($b['manager_override_by'] ?? 0))->fetch_assoc();

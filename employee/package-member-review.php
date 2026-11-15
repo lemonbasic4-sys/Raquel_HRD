@@ -189,6 +189,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $current = $score['supervisor_override_score'] !== null ? (float) $score['supervisor_override_score'] : (float) $score['score_value'];
         if (abs($new_rating - $current) < 0.001) continue;
 
+        if (abs($new_rating - (float)$score['score_value']) < 0.005) {
+            $update = $conn->prepare('UPDATE evaluation_scores SET supervisor_override_score = NULL, supervisor_override_by = NULL, supervisor_override_at = NULL WHERE score_id = ?');
+            $update->bind_param('i', $score_id);
+            $update->execute();
+            $update->close();
+            $changes[] = $score['criterion_name'] . ': ' . number_format($current, 2) . ' → ' . number_format($new_rating, 2);
+            continue;
+        }
+
         $update = $conn->prepare('UPDATE evaluation_scores SET supervisor_override_score = ?, supervisor_override_by = ?, supervisor_override_at = NOW() WHERE score_id = ?');
         $update->bind_param('dii', $new_rating, $user_id, $score_id);
         $update->execute();

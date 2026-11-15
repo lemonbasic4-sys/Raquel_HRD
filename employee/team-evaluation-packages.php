@@ -521,7 +521,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!is_array($ratings) || !is_array($plans)) {
             redirectWith($decision_review_url, 'danger', 'Invalid review details. Please reload and try again.');
         }
-        $score_stmt = $conn->prepare('SELECT es.score_id FROM evaluation_scores es WHERE es.evaluation_id = ?');
+        $score_stmt = $conn->prepare('SELECT es.score_id, es.score_value, es.supervisor_override_score FROM evaluation_scores es WHERE es.evaluation_id = ?');
         $score_stmt->bind_param('i', $probationary_eval_id);
         $score_stmt->execute();
         $score_rows = $score_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
@@ -537,6 +537,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $score_id = (int)$score_row['score_id'];
             if (!isset($ratings[$score_id]) || $ratings[$score_id] === '') continue;
             $rating = (float)$ratings[$score_id];
+            $original = (float)$score_row['score_value'];
+            $previous_override = $score_row['supervisor_override_score'];
+            if (abs($rating - $original) < 0.005) {
+                if ($previous_override !== null) {
+                    $clear_score = $conn->prepare('UPDATE evaluation_scores SET supervisor_override_score = NULL, supervisor_override_by = NULL, supervisor_override_at = NULL WHERE score_id = ?');
+                    $clear_score->bind_param('i', $score_id);
+                    $clear_score->execute();
+                    $clear_score->close();
+                }
+                continue;
+            }
+            if ($previous_override !== null && abs($rating - (float)$previous_override) < 0.005) continue;
             $update_score = $conn->prepare('UPDATE evaluation_scores SET supervisor_override_score = ?, supervisor_override_by = ?, supervisor_override_at = NOW() WHERE score_id = ?');
             $update_score->bind_param('dii', $rating, $user_id, $score_id);
             $update_score->execute();

@@ -111,7 +111,7 @@ $initials = strtoupper(substr($row['employee_name'], 0, 1) . substr(explode(' ',
                                             $is_overridden = false;
                                             $badge_html = '';
                                             
-                                            if ($k['supervisor_override_score'] !== null) {
+                                            if ($k['supervisor_override_score'] !== null && abs((float)$k['supervisor_override_score'] - (float)$k['score_value']) >= 0.005) {
                                                 $effective_score = $k['supervisor_override_score'];
                                                 $is_overridden = true;
                                                 
@@ -120,7 +120,7 @@ $initials = strtoupper(substr($row['employee_name'], 0, 1) . substr(explode(' ',
                                                 $badge_html = '<span class="badge-audit ms-2" data-bs-toggle="tooltip" data-bs-html="true" title="<strong>' . e($override_actor['label']) . '</strong><br>Edited by: ' . e($override_actor['name']) . '<br>On: ' . $formatted_date . '<br>Original: ' . $k['score_value'] . '"><i class="fas fa-user-edit me-1"></i>' . e($override_actor['short']) . '</span>';
                                             }
                                             
-                                            if ($k['manager_override_score'] !== null) {
+                                            if ($k['manager_override_score'] !== null && abs((float)$k['manager_override_score'] - (float)($k['supervisor_override_score'] ?? $k['score_value'])) >= 0.005) {
                                                 $effective_score = $k['manager_override_score'];
                                                 $is_overridden = true;
                                                 
@@ -176,7 +176,7 @@ $initials = strtoupper(substr($row['employee_name'], 0, 1) . substr(explode(' ',
                                             $is_overridden = false;
                                             $badge_html = '';
                                             
-                                            if ($b['supervisor_override_score'] !== null) {
+                                            if ($b['supervisor_override_score'] !== null && abs((float)$b['supervisor_override_score'] - (float)$b['score_value']) >= 0.005) {
                                                 $effective_score = $b['supervisor_override_score'];
                                                 $is_overridden = true;
                                                 
@@ -185,7 +185,7 @@ $initials = strtoupper(substr($row['employee_name'], 0, 1) . substr(explode(' ',
                                                 $badge_html = '<span class="badge-audit ms-2" data-bs-toggle="tooltip" data-bs-html="true" title="<strong>' . e($override_actor['label']) . '</strong><br>Edited by: ' . e($override_actor['name']) . '<br>On: ' . $formatted_date . '<br>Original: ' . $b['score_value'] . '"><i class="fas fa-user-edit me-1"></i>' . e($override_actor['short']) . '</span>';
                                             }
                                             
-                                            if ($b['manager_override_score'] !== null) {
+                                            if ($b['manager_override_score'] !== null && abs((float)$b['manager_override_score'] - (float)($b['supervisor_override_score'] ?? $b['score_value'])) >= 0.005) {
                                                 $effective_score = $b['manager_override_score'];
                                                 $is_overridden = true;
                                                 

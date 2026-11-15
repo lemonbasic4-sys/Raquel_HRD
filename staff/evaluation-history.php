@@ -412,14 +412,14 @@ foreach ($all_history as $row):
                                                 <?php
                                                 $effective_score = $k['score_value'];
                                                 $badge_html = '';
-                                                if ($k['supervisor_override_score'] !== null) {
+                                                if ($k['supervisor_override_score'] !== null && abs((float)$k['supervisor_override_score'] - (float)$k['score_value']) >= 0.005) {
                                                     $effective_score = $k['supervisor_override_score'];
                                                     $sup_name_q = $conn->query("SELECT full_name FROM users WHERE user_id = " . (int)$k['supervisor_override_by'])->fetch_assoc();
                                                     $sup_name = $sup_name_q['full_name'] ?? 'Supervisor';
                                                     $formatted_date = formatDate($k['supervisor_override_at'], 'M d, Y h:i A');
                                                     $badge_html = '<span class="badge-audit ms-2" data-bs-toggle="tooltip" data-bs-html="true" title="<strong>Supervisor Override</strong><br>Edited by: ' . e($sup_name) . '<br>On: ' . $formatted_date . '<br>Original: ' . $k['score_value'] . '"><i class="fas fa-user-edit me-1"></i>Sup Override</span>';
                                                 }
-                                                if ($k['manager_override_score'] !== null) {
+                                                if ($k['manager_override_score'] !== null && abs((float)$k['manager_override_score'] - (float)($k['supervisor_override_score'] ?? $k['score_value'])) >= 0.005) {
                                                     $effective_score = $k['manager_override_score'];
                                                     $mgr_name_q = $conn->query("SELECT full_name FROM users WHERE user_id = " . (int)$k['manager_override_by'])->fetch_assoc();
                                                     $mgr_name = $mgr_name_q['full_name'] ?? 'Manager';
@@ -476,14 +476,14 @@ foreach ($all_history as $row):
                                                 <?php
                                                 $effective_score = $b['score_value'];
                                                 $badge_html = '';
-                                                if ($b['supervisor_override_score'] !== null) {
+                                                if ($b['supervisor_override_score'] !== null && abs((float)$b['supervisor_override_score'] - (float)$b['score_value']) >= 0.005) {
                                                     $effective_score = $b['supervisor_override_score'];
                                                     $sup_name_q = $conn->query("SELECT full_name FROM users WHERE user_id = " . (int)$b['supervisor_override_by'])->fetch_assoc();
                                                     $sup_name = $sup_name_q['full_name'] ?? 'Supervisor';
                                                     $formatted_date = formatDate($b['supervisor_override_at'], 'M d, Y h:i A');
                                                     $badge_html = '<span class="badge-audit ms-2" data-bs-toggle="tooltip" data-bs-html="true" title="<strong>Supervisor Override</strong><br>Edited by: ' . e($sup_name) . '<br>On: ' . $formatted_date . '<br>Original: ' . $b['score_value'] . '"><i class="fas fa-user-edit me-1"></i>Sup Override</span>';
                                                 }
-                                                if ($b['manager_override_score'] !== null) {
+                                                if ($b['manager_override_score'] !== null && abs((float)$b['manager_override_score'] - (float)($b['supervisor_override_score'] ?? $b['score_value'])) >= 0.005) {
                                                     $effective_score = $b['manager_override_score'];
                                                     $mgr_name_q = $conn->query("SELECT full_name FROM users WHERE user_id = " . (int)$b['manager_override_by'])->fetch_assoc();
                                                     $mgr_name = $mgr_name_q['full_name'] ?? 'Manager';
