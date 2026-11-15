@@ -838,6 +838,40 @@ function quarterlyNotifyHeads($conn, array $member, string $title, string $messa
     }
 }
 
+function quarterlyNotifyHrOfCompletion($conn, array $department): void
+{
+    if (quarterlyIsHrDepartment($department)) return;
+    $total = (int)(quarterlyQuery($conn, "SELECT COUNT(DISTINCT ev.evaluation_id) AS total
+        FROM evaluations ev
+        JOIN quarterly_evaluation_members m ON m.evaluation_id = ev.evaluation_id
+        JOIN quarterly_evaluation_cycles c ON c.cycle_id = m.cycle_id AND c.completed_at IS NOT NULL AND c.cancelled_at IS NULL
+        JOIN departments d ON d.department_id = c.department_id
+        WHERE ev.status = 'Approved' AND ev.deleted_at IS NULL
+          AND d.department_name NOT IN ('Human Resources', 'Human Resource', 'HRD')")[0]['total'] ?? 0);
+    $title = 'Outside-department Quarterly evaluations completed';
+    $message = $total . ' completed Quarterly evaluation' . ($total === 1 ? ' is' : 's are') .
+        ' available in Evaluation History. Latest department: ' . $department['department_name'] . '. No HR approval is required.';
+    $recipients = quarterlyQuery($conn, "SELECT u.user_id, u.role FROM users u
+        JOIN employees e ON e.employee_id = u.employee_id
+        JOIN departments d ON d.department_id = e.department_id
+        WHERE u.role IN ('HR Manager', 'HR Supervisor', 'HR Staff')
+          AND d.department_name IN ('Human Resources', 'Human Resource', 'HRD')
+          AND u.is_active = 1 AND u.deleted_at IS NULL AND COALESCE(u.account_hold, 0) = 0
+          AND e.is_active = 1 AND e.deleted_at IS NULL");
+    foreach ($recipients as $recipient) {
+        $portal = ['HR Manager' => 'manager', 'HR Supervisor' => 'supervisor', 'HR Staff' => 'staff'][$recipient['role']];
+        $link = BASE_URL . '/' . $portal . '/evaluation-history.php';
+        $existing = quarterlyQuery($conn, 'SELECT notification_id FROM notifications WHERE user_id = ? AND title = ? ORDER BY notification_id DESC LIMIT 1',
+            [(int)$recipient['user_id'], $title])[0] ?? null;
+        if ($existing) {
+            quarterlyQuery($conn, 'UPDATE notifications SET message = ?, link = ?, is_read = 0, created_at = NOW() WHERE notification_id = ?',
+                [$message, $link, (int)$existing['notification_id']]);
+        } else {
+            createNotification($conn, (int)$recipient['user_id'], $title, $message, $link, 'evaluations', false);
+        }
+    }
+}
+
 function quarterlySubmitPeers($conn, array $actor, int $evaluationId, array $scores, bool $manageTransaction = true, string $signature = ''): void
 {
     ensureAuditTrailSchema($conn);
@@ -1051,8 +1085,10 @@ function quarterlyRefreshApprovedResult($conn, array $member, int $actorUserId, 
 function quarterlyUpdateCycleCompletion($conn, int $cycleId, int $approvalUserId = 0): bool
 {
     if(individualIsCycle($conn,'quarterly',$cycleId)) {
+        $cycle = quarterlyQuery($conn, 'SELECT c.completed_at, d.department_name FROM quarterly_evaluation_cycles c JOIN departments d ON d.department_id = c.department_id WHERE c.cycle_id = ?', [$cycleId])[0] ?? null;
         $done=(bool)quarterlyQuery($conn,"SELECT 1 FROM quarterly_evaluation_members m JOIN evaluations ev ON ev.evaluation_id=m.evaluation_id WHERE m.cycle_id=? AND m.current_version>0 AND m.revision_pending=0 AND ev.status='Approved'",[$cycleId]);
         if($done) quarterlyQuery($conn,'UPDATE quarterly_evaluation_cycles SET completed_at=COALESCE(completed_at,NOW()),first_completed_at=COALESCE(first_completed_at,NOW()),cycle_approved_by=COALESCE(cycle_approved_by,?) WHERE cycle_id=?',[$approvalUserId ?: null,$cycleId]);
+        if ($done && $cycle && empty($cycle['completed_at'])) quarterlyNotifyHrOfCompletion($conn, $cycle);
         return $done;
     }
     $cycle=quarterlyQuery($conn,'SELECT c.*,d.department_name FROM quarterly_evaluation_cycles c JOIN departments d ON d.department_id=c.department_id WHERE c.cycle_id=?',[$cycleId])[0] ?? null;
@@ -1101,20 +1137,7 @@ function quarterlyUpdateCycleCompletion($conn, int $cycleId, int $approvalUserId
     if ($complete===!empty($cycle['completed_at'])) return $complete;
     quarterlyQuery($conn,'UPDATE quarterly_evaluation_cycles SET '.($complete ? 'completed_at=NOW(),first_completed_at=COALESCE(first_completed_at,NOW())' : 'completed_at=NULL').' WHERE cycle_id=?',[$cycleId]);
     if ($complete && $approvalUserId && !quarterlyIsHrDepartment($cycle)) {
-        $hrRecipients=quarterlyQuery($conn,"SELECT u.user_id,u.role,d.department_name FROM users u
-            JOIN employees e ON e.employee_id=u.employee_id
-            JOIN departments d ON d.department_id=e.department_id
-            WHERE u.role IN ('HR Manager','HR Supervisor','HR Staff')
-              AND u.is_active=1 AND u.deleted_at IS NULL AND COALESCE(u.account_hold,0)=0
-              AND e.is_active=1 AND e.deleted_at IS NULL");
-        foreach ($hrRecipients as $hrRecipient) {
-            if (!quarterlyIsHrDepartment($hrRecipient)) continue;
-            $historyPortal=['HR Manager'=>'manager','HR Supervisor'=>'supervisor','HR Staff'=>'staff'][$hrRecipient['role']];
-            createNotification($conn,(int)$hrRecipient['user_id'],
-                $cycle['department_name'].' Quarterly cycle approved',
-                $cycle['department_name'].' approved its Quarterly evaluation cycle for '.$cycle['period_start'].' to '.$cycle['period_end'].'. Completed results are available in Evaluation History. This is for HR visibility; no further HR approval is required.',
-                BASE_URL.'/'.$historyPortal.'/evaluation-history.php','evaluations',false);
-        }
+        quarterlyNotifyHrOfCompletion($conn, $cycle);
     }
     $reviewerSql = hrEvaluationReviewerSql('m', (string)(int)$cycle['department_id']);
     $recipients=quarterlyQuery($conn,"SELECT DISTINCT u.user_id FROM users u JOIN employees e ON e.employee_id=u.employee_id WHERE u.is_active=1 AND u.deleted_at IS NULL AND e.is_active=1 AND e.deleted_at IS NULL AND (EXISTS(SELECT 1 FROM quarterly_evaluation_members m WHERE m.cycle_id=? AND m.employee_id=e.employee_id) OR EXISTS(SELECT 1 FROM quarterly_evaluation_members m WHERE m.cycle_id=? AND ($reviewerSql)=e.job_title_id))",[$cycleId,$cycleId]);

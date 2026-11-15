@@ -1708,7 +1708,17 @@ select option.position-group-label {
 }
 
 .notification-dropdown .notification-item.unread {
-    background: #f0f7ef;
+    background: #e7f4dd;
+    border-left: 4px solid #bd941d;
+    padding-left: 12px;
+}
+
+.notification-dropdown .notification-item.unread:hover {
+    background: #d9edca;
+}
+
+.notification-dropdown .notification-item.unread .notif-title {
+    color: #123916;
 }
 
 .notification-dropdown .notification-item .notif-avatar {
