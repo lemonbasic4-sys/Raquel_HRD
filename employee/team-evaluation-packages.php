@@ -82,6 +82,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($package_category_row) $return_category = in_array($package_category_row['evaluation_type'], ['Initial','Final'], true) ? 'probationary' : 'regular';
     }
     $package_return_url = BASE_URL . '/employee/team-evaluation-packages.php?category=' . $return_category;
+    if ($package_id > 0 && $return_category === 'probationary') {
+        $package_return_url .= '&open_package=' . $package_id . '#package-' . $package_id;
+    }
     $action = $_POST['package_action'] ?? '';
     $comments = trim($_POST['comments'] ?? '');
 
@@ -312,33 +315,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirectWith($package_return_url, 'success', 'Reviewer recommendation and signature saved. You can now approve the evaluation.');
     }
 
-    if ($action === 'save_initial_rater_signature') {
-        $head_signature = trim($_POST['immediate_head_signature_data'] ?? '');
-        if (!$is_probationary_step
-            || $step['evaluation_type'] !== 'Initial'
-            || (int)($step['step_order'] ?? 0) !== 1
-            || !in_array((int)($probationary_review['rank_category_id'] ?? 0), [1, 2, 3, 4, 5], true)
-            || $probationary_eval_id <= 0) {
-            redirectWith($package_return_url, 'danger', 'Only the assigned reviewer can sign this probationary Initial evaluation.');
-        }
-        if (!preg_match('/^data:image\/png;base64,/', $head_signature) || strlen($head_signature) > 100000) {
-            redirectWith($decision_review_url, 'danger', 'Sign in the rater signature box before saving.');
-        }
-        ensureProbationaryEvaluationSchema($conn);
-        $signature_stmt = $conn->prepare("INSERT INTO probationary_evaluation_reviews
-            (evaluation_id, immediate_head_user_id, immediate_head_signature_data, immediate_head_signed_at)
-            VALUES (?, ?, ?, NOW())
-            ON DUPLICATE KEY UPDATE immediate_head_user_id = VALUES(immediate_head_user_id),
-                immediate_head_signature_data = VALUES(immediate_head_signature_data), immediate_head_signed_at = NOW()");
-        $signature_stmt->bind_param('iis', $probationary_eval_id, $user_id, $head_signature);
-        $signature_stmt->execute();
-        $signature_stmt->close();
-        logAudit($conn, $user_id, 'SIGN', 'Evaluation', $probationary_eval_id,
-            'Assigned immediate head saved the rater signature for an Initial probationary evaluation.',
-            ['module' => 'Performance & Evaluation', 'target_employee_id' => $probationary_employee_id]);
-        redirectWith($package_return_url, 'success', 'Rater signature saved. It will appear on the printed evaluation form.');
-    }
-
     // F7 Action: Consolidator returns individual member self-rating back to employee
     if ($action === 'return_member') {
         $member_eval_id = (int) ($_POST['member_evaluation_id'] ?? 0);
@@ -508,15 +484,85 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // 🔒 Prevention: verify next consolidator/reviewer exists and is assigned before advancing
     if ($action === 'approve' && $is_probationary_step && $step['evaluation_type'] === 'Initial'
         && in_array((int)($probationary_review['rank_category_id'] ?? 0), [1, 2, 3, 4, 5], true)) {
-        if (empty($probationary_review['immediate_head_signature_data'])
-            || (int)($probationary_review['immediate_head_user_id'] ?? 0) !== $user_id) {
-            redirectWith($decision_review_url, 'danger', 'Save your Immediate head signature before approving this probationary Initial evaluation.');
+        $submitted_signature = trim((string)($_POST['immediate_head_signature_data'] ?? ''));
+        $has_saved_signature = !empty($probationary_review['immediate_head_signature_data'])
+            && (int)($probationary_review['immediate_head_user_id'] ?? 0) === $user_id;
+        if (!$has_saved_signature && $submitted_signature === '') {
+            redirectWith($decision_review_url, 'danger', 'Sign this probationary Initial evaluation before approving it.');
+        }
+        if ($submitted_signature !== '' && (!preg_match('/^data:image\/png;base64,/', $submitted_signature)
+            || strlen($submitted_signature) > 100000)) {
+            redirectWith($decision_review_url, 'danger', 'The Immediate head signature is invalid. Sign again before approving.');
         }
     }
 
     $next_check = checkNextPackageStepIsAssigned($conn, $package_id, (int)$step['step_order']);
     if (!$next_check['ok']) {
         redirectWith($package_return_url, 'danger', $next_check['message']);
+    }
+
+    if ($action === 'approve' && !empty($_POST['review_form_submission'])
+        && $is_probationary_step && $step['evaluation_type'] === 'Initial'
+        && (int)$step['step_order'] === 1 && $probationary_eval_id > 0) {
+        $ratings = $_POST['rating'] ?? [];
+        $plans = $_POST['plans'] ?? [];
+        if (!is_array($ratings) || !is_array($plans)) {
+            redirectWith($decision_review_url, 'danger', 'Invalid review details. Please reload and try again.');
+        }
+        $score_stmt = $conn->prepare('SELECT es.score_id FROM evaluation_scores es WHERE es.evaluation_id = ?');
+        $score_stmt->bind_param('i', $probationary_eval_id);
+        $score_stmt->execute();
+        $score_rows = $score_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        $score_stmt->close();
+        foreach ($score_rows as $score_row) {
+            $score_id = (int)$score_row['score_id'];
+            if (!isset($ratings[$score_id]) || $ratings[$score_id] === '') continue;
+            if (!is_numeric($ratings[$score_id]) || (float)$ratings[$score_id] < 1 || (float)$ratings[$score_id] > 4) {
+                redirectWith($decision_review_url, 'danger', 'Every adjusted rating must be between 1.00 and 4.00.');
+            }
+        }
+        foreach ($score_rows as $score_row) {
+            $score_id = (int)$score_row['score_id'];
+            if (!isset($ratings[$score_id]) || $ratings[$score_id] === '') continue;
+            $rating = (float)$ratings[$score_id];
+            $update_score = $conn->prepare('UPDATE evaluation_scores SET supervisor_override_score = ?, supervisor_override_by = ?, supervisor_override_at = NOW() WHERE score_id = ?');
+            $update_score->bind_param('dii', $rating, $user_id, $score_id);
+            $update_score->execute();
+            $update_score->close();
+        }
+        $delete_plans = $conn->prepare('DELETE FROM evaluation_dev_plans WHERE evaluation_id = ?');
+        $delete_plans->bind_param('i', $probationary_eval_id);
+        $delete_plans->execute();
+        $delete_plans->close();
+        $insert_plan = $conn->prepare('INSERT INTO evaluation_dev_plans (evaluation_id, improvement_area, support_needed, time_frame, sort_order) VALUES (?, ?, ?, ?, ?)');
+        $sort_idx = 0;
+        foreach ($plans as $plan) {
+            if (!is_array($plan)) continue;
+            $area = trim((string)($plan['improvement_area'] ?? ''));
+            $support = trim((string)($plan['support_needed'] ?? ''));
+            $time_frame = trim((string)($plan['time_frame'] ?? ''));
+            if ($area === '' && $support === '' && $time_frame === '') continue;
+            $insert_plan->bind_param('isssi', $probationary_eval_id, $area, $support, $time_frame, $sort_idx);
+            $insert_plan->execute();
+            $sort_idx++;
+        }
+        $insert_plan->close();
+        recalculateEvaluationScores($conn, $probationary_eval_id);
+        recalculateOrganizationPackageBehaviorScore($conn, $package_id);
+    }
+
+    if ($action === 'approve' && $is_probationary_step && $step['evaluation_type'] === 'Initial'
+        && in_array((int)($probationary_review['rank_category_id'] ?? 0), [1, 2, 3, 4, 5], true)
+        && $submitted_signature !== '') {
+        ensureProbationaryEvaluationSchema($conn);
+        $signature_stmt = $conn->prepare("INSERT INTO probationary_evaluation_reviews
+            (evaluation_id, immediate_head_user_id, immediate_head_signature_data, immediate_head_signed_at)
+            VALUES (?, ?, ?, NOW())
+            ON DUPLICATE KEY UPDATE immediate_head_user_id = VALUES(immediate_head_user_id),
+                immediate_head_signature_data = VALUES(immediate_head_signature_data), immediate_head_signed_at = NOW()");
+        $signature_stmt->bind_param('iis', $probationary_eval_id, $user_id, $submitted_signature);
+        $signature_stmt->execute();
+        $signature_stmt->close();
     }
 
     $approve = $conn->prepare("UPDATE evaluation_package_route_steps SET action_status = 'Approved', acted_at = NOW(), comments = ? WHERE package_route_step_id = ?");
@@ -580,13 +626,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'Your immediate head reviewed your ' . $step['evaluation_type'] . ' evaluation and forwarded it to ' . $next['step_label'] . '. Your original self-rating and signature remain on file; no additional signature is needed.',
                     BASE_URL . '/employee/evaluation-history-view.php?evaluation_id=' . $probationary_eval_id);
             }
-        }
-
-        if (!$was_merged && $is_probationary && $step['evaluation_type'] === 'Final'
-            && (int)$step['step_order'] === 1 && (int)($probationary_review['rank_category_id'] ?? 0) === 5
-            && ($probationary_review['recommendation'] ?? '') === 'Recommend regularization'
-            && !isHumanResourcesPackageDepartment($conn, (int)$step['department_id'])) {
-            notifyHRManagementOfProbationaryApproval($conn, $probationary_eval_id);
         }
 
         $audit = $conn->prepare("INSERT INTO evaluation_package_audit (package_id, user_id, action, remarks) VALUES (?, ?, 'APPROVED', ?)");
@@ -671,12 +710,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             $reviewers_stmt->close();
 
-            // Non-HR probationary approvals are sent to HR leaders as an informational record only.
+            // Outside-department probationary results reach HR only after final approval.
             if ($is_final_probationary && $step['evaluation_type'] === 'Final' && $is_final_hr && $probationary_eval_id > 0) {
                 notifyHrManagersOfStaffProbationaryApproval($conn, $probationary_eval_id);
-            } elseif ($is_final_probationary && $step['evaluation_type'] === 'Final' && !$is_final_hr && $probationary_eval_id > 0) {
-                notifyHRManagementOfProbationaryApproval($conn, $probationary_eval_id);
-                notifyDepartmentManagersOfProbationaryOutcome($conn, $probationary_eval_id);
+            } elseif ($is_final_probationary && !$is_final_hr && $probationary_eval_id > 0) {
+                notifyHRPersonnelOfCompletedProbationaryEvaluation($conn, $probationary_eval_id);
+                if ($step['evaluation_type'] === 'Final') notifyDepartmentManagersOfProbationaryOutcome($conn, $probationary_eval_id);
             } elseif (!$is_probationary) {
                 notifyHRPersonnelPackageFinalized($conn, $package_id, $step['department_name'], $step['template_name'] ?? 'Evaluation');
             }
@@ -786,6 +825,7 @@ if (in_array($session_role, ['HR Manager', 'HR Supervisor', 'Admin'], true) || $
 $probationary_package_count = count(array_filter($packages, static fn($package) => in_array($package['evaluation_type'] ?? '', ['Initial', 'Final'], true)))
     + count(array_filter($waiting_packages, static fn($package) => in_array($package['evaluation_type'] ?? '', ['Initial', 'Final'], true)));
 $active_package_tab = 'probationary';
+$open_package_id = max(0, (int)($_GET['open_package'] ?? 0));
 ?>
 <div class="evaluation-packages">
     <?php $shared_performance_heading=true; require __DIR__ . '/../includes/performance-evaluation-heading.php'; ?>
@@ -997,6 +1037,7 @@ $active_package_tab = 'probationary';
         $team_size_stmt->execute();
         $department_team_size = (int)($team_size_stmt->get_result()->fetch_assoc()['team_size'] ?? 0);
         $team_size_stmt->close();
+        $package_is_open = (int)$package['package_id'] === $open_package_id;
         ?>
         <article id="package-<?php echo (int)$package['package_id']; ?>" class="package-card <?php echo $is_probationary_package ? 'package-card--probationary package-card--probationary-summary ' : ''; ?><?php echo $is_probationary_package === ($active_package_tab === 'probationary') ? '' : 'd-none'; ?>" data-package-category="<?php echo $is_probationary_package ? 'probationary' : 'regular'; ?>" data-package-department="<?php echo (int)$package['department_id']; ?>" role="region" aria-label="<?php echo e($package['department_name']); ?> Evaluation Review">
             <header class="package-card__header">
@@ -1007,12 +1048,12 @@ $active_package_tab = 'probationary';
                 <div class="d-flex align-items-center gap-2">
                     <?php if ($is_probationary_package): ?><span class="probationary-type-badge">Probationary</span><?php endif; ?>
                     <?php echo renderOrganizationPipelineBadge($conn, (int)$package['package_id']); ?>
-                    <button class="btn btn-sm btn-package-collapse collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#pkgBody-act-<?php echo (int)$package['package_id']; ?>" aria-expanded="false" aria-controls="pkgBody-act-<?php echo (int)$package['package_id']; ?>" title="Expand Review">
-                        <i class="fas fa-chevron-up collapse-icon"></i> <span class="d-none d-sm-inline">Expand</span>
+                    <button class="btn btn-sm btn-package-collapse<?php echo $package_is_open ? '' : ' collapsed'; ?>" type="button" data-bs-toggle="collapse" data-bs-target="#pkgBody-act-<?php echo (int)$package['package_id']; ?>" aria-expanded="<?php echo $package_is_open ? 'true' : 'false'; ?>" aria-controls="pkgBody-act-<?php echo (int)$package['package_id']; ?>" title="<?php echo $package_is_open ? 'Minimize Review' : 'Expand Review'; ?>">
+                        <i class="fas fa-chevron-up collapse-icon"></i> <span class="d-none d-sm-inline"><?php echo $package_is_open ? 'Minimize' : 'Expand'; ?></span>
                     </button>
                 </div>
             </header>
-            <div class="collapse" id="pkgBody-act-<?php echo (int)$package['package_id']; ?>">
+            <div class="collapse<?php echo $package_is_open ? ' show' : ''; ?>" id="pkgBody-act-<?php echo (int)$package['package_id']; ?>">
                 <div class="package-card__body">
                 <?php if ($is_probationary_package && !empty($members)): ?>
                 <?php foreach ($members as $summary_member):
@@ -1206,7 +1247,7 @@ $active_package_tab = 'probationary';
 
 
                 <!-- Action Panel with descriptive hand-off copy & F3 Pre-Submission Modal -->
-                <form method="post" class="package-action-panel<?php echo $is_probationary_package ? ' package-action-panel--probationary' : ''; ?><?php echo $is_probationary_package && $is_unclaimed_group_step && !empty($members) ? ' d-none' : ''; ?>" id="pkgForm-<?php echo (int)$package['package_id']; ?>">
+                <form method="post" class="package-action-panel<?php echo $is_probationary_package ? ' package-action-panel--probationary' : ''; ?><?php echo $is_probationary_package && !empty($members) && ($is_unclaimed_group_step || (($package['evaluation_type'] ?? '') === 'Initial' && (int)$package['current_step_order'] === 1)) ? ' d-none' : ''; ?>" id="pkgForm-<?php echo (int)$package['package_id']; ?>">
                     <input type="hidden" name="package_id" value="<?php echo (int)$package['package_id']; ?>">
                     <input type="hidden" name="package_action" id="actionInput-<?php echo (int)$package['package_id']; ?>" value="<?php echo $is_unclaimed_group_step ? 'claim' : 'approve'; ?>">
                     <?php if ($is_probationary_package && (int)$package['current_step_order'] === 1 && count($members) === 1): ?>

@@ -15,6 +15,9 @@ $package_back_row=$package_back_stmt->get_result()->fetch_assoc();
 $package_back_stmt->close();
 $package_back_category=$package_back_row && !in_array($package_back_row['evaluation_type'],['Initial','Final'],true) ? 'regular' : 'probationary';
 $package_back_url=BASE_URL.'/employee/team-evaluation-packages.php?category='.$package_back_category;
+if ($package_back_category === 'probationary' && $package_id > 0) {
+    $package_back_url .= '&open_package=' . $package_id . '#package-' . $package_id;
+}
 
 if ($package_id <= 0 || $evaluation_id <= 0) {
     redirectWith($package_back_url, 'danger', 'Choose a package member to view.');

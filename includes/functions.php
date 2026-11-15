@@ -310,6 +310,29 @@ function createNotification($conn, $user_id, $title, $message, $link = null, $ca
 
 }
 
+function refreshProbationaryReviewNotification($conn, int $user_id, string $link): void
+{
+    $title = 'Probationary Evaluation Ready for Review';
+    $count = max(1, countPendingOrganizationPackagesForUser($conn, $user_id, true));
+    $message = $count === 1
+        ? '1 probationary employee evaluation is ready for review.'
+        : "$count probationary employee evaluations are ready for review.";
+    $existing = $conn->prepare('SELECT notification_id FROM notifications
+        WHERE user_id = ? AND title = ? AND link = ? ORDER BY notification_id DESC LIMIT 1');
+    $existing->bind_param('iss', $user_id, $title, $link);
+    $existing->execute();
+    $notification_id = (int)($existing->get_result()->fetch_assoc()['notification_id'] ?? 0);
+    $existing->close();
+    if ($notification_id > 0) {
+        $update = $conn->prepare('UPDATE notifications SET message = ?, is_read = 0, created_at = NOW() WHERE notification_id = ?');
+        $update->bind_param('si', $message, $notification_id);
+        $update->execute();
+        $update->close();
+        return;
+    }
+    createNotification($conn, $user_id, $title, $message, $link);
+}
+
 function managerNotificationSchemaAvailable($conn): bool
 {
     static $available = null;
@@ -601,6 +624,12 @@ function notifyHrStaffOfPackageProgress($conn, $package_id, $department, $stage,
 {
     $package_id = (int) $package_id;
     if ($package_id <= 0) return;
+    $type_stmt = $conn->prepare('SELECT evaluation_type FROM evaluation_packages WHERE package_id = ? LIMIT 1');
+    $type_stmt->bind_param('i', $package_id);
+    $type_stmt->execute();
+    $type = $type_stmt->get_result()->fetch_assoc()['evaluation_type'] ?? '';
+    $type_stmt->close();
+    if (in_array($type, ['Initial', 'Final'], true)) return;
     $title = $returned ? 'Evaluation Review Returned' : 'Evaluation Review Advanced';
     $message = "The {$department} evaluation review #{$package_id} was "
         . ($returned ? 'returned for revision.' : "forwarded to {$stage}.");
@@ -3455,12 +3484,12 @@ function applyDueStaffRegularizations($conn): void
     }
 }
 
-/** Send the non-HR final decision to the two HR leaders as an informational record. */
-function notifyHRManagementOfProbationaryApproval($conn, $evaluation_id)
+/** Inform HR personnel when an outside-department probationary evaluation is complete. */
+function notifyHRPersonnelOfCompletedProbationaryEvaluation($conn, $evaluation_id)
 {
     $evaluation_id = (int)$evaluation_id;
-    $stmt = $conn->prepare("SELECT ev.total_score, ev.evaluation_type, ev.evaluation_id, ev.employee_id,
-            e.first_name, e.last_name, e.job_title, d.department_name, et.template_name,
+    $stmt = $conn->prepare("SELECT ev.total_score, ev.evaluation_type, ev.status, ev.evaluation_id, ev.employee_id,
+            e.first_name, e.last_name, e.job_title, e.department_id, d.department_name, et.template_name,
             per.recommendation, per.recommendation_reason, rr.status AS regularization_request_status,
             rr.decision_reason
         FROM evaluations ev
@@ -3474,13 +3503,15 @@ function notifyHRManagementOfProbationaryApproval($conn, $evaluation_id)
     $stmt->execute();
     $row = $stmt->get_result()->fetch_assoc();
     $stmt->close();
-    if (!$row) return 0;
+    if (!$row || $row['status'] !== 'Approved'
+        || !in_array($row['evaluation_type'], ['Initial', 'Final'], true)
+        || isHumanResourcesPackageDepartment($conn, (int)$row['department_id'])) return 0;
 
     $recipient_stmt = $conn->prepare("SELECT u.user_id, u.role FROM users u
         JOIN employees hr_employee ON hr_employee.employee_id = u.employee_id
         JOIN departments hr_department ON hr_department.department_id = hr_employee.department_id
             AND hr_department.department_name = 'Human Resources'
-        WHERE u.role IN ('HR Supervisor','HR Manager') AND u.is_active = 1
+        WHERE u.role IN ('HR Supervisor','HR Manager','HR Staff') AND u.is_active = 1
           AND COALESCE(u.account_hold,0) = 0 AND u.deleted_at IS NULL
           AND hr_employee.is_active = 1 AND hr_employee.deleted_at IS NULL");
     $recipient_stmt->execute();
@@ -3488,18 +3519,28 @@ function notifyHRManagementOfProbationaryApproval($conn, $evaluation_id)
     $recipient_stmt->close();
 
     $name = trim(($row['first_name'] ?? '') . ' ' . ($row['last_name'] ?? ''));
-    $recommendation = $row['recommendation'] ?? 'Decision not recorded';
-    $reason = trim((string)($row['recommendation_reason'] ?? ''));
-    $message = $name . ' (' . ($row['department_name'] ?? 'Department') . ' — ' . ($row['job_title'] ?? 'Probationary') . ') has a department-approved ' . $row['evaluation_type'] . ' evaluation. Final score: ' . number_format((float)$row['total_score'], 2) . '. Recommendation: ' . $recommendation . '. Reason: ' . ($reason !== '' ? $reason : 'Not provided') . '. This is an informational HR record; no further HR approval is required.';
-    $message = str_replace('department-approved', 'supervisor-approved', $message);
-    if (!empty($row['regularization_request_status'])) {
-        $message .= ' Regularization record status: ' . $row['regularization_request_status'] . '.';
-        if (!empty($row['decision_reason'])) $message .= ' Decision reason: ' . trim((string)$row['decision_reason']);
+    $message = $name . ' (' . ($row['department_name'] ?? 'Department') . ' - ' . ($row['job_title'] ?? 'Probationary')
+        . ') completed the ' . $row['evaluation_type'] . ' probationary evaluation. Final score: '
+        . number_format((float)$row['total_score'], 2) . '. This is an informational HR record; no further HR approval is required.';
+    if ($row['evaluation_type'] === 'Final') {
+        $reason = trim((string)($row['recommendation_reason'] ?? ''));
+        $message .= ' Recommendation: ' . ($row['recommendation'] ?: 'Not recorded')
+            . '. Reason: ' . ($reason !== '' ? $reason : 'Not provided') . '.';
+        if (!empty($row['regularization_request_status'])) {
+            $message .= ' Regularization record status: ' . $row['regularization_request_status'] . '.';
+            if (!empty($row['decision_reason'])) $message .= ' Decision reason: ' . trim((string)$row['decision_reason']);
+        }
     }
+    $title = 'Probationary evaluation completed';
     foreach ($recipients as $recipient) {
-        $history_portal = $recipient['role'] === 'HR Supervisor' ? 'supervisor' : 'manager';
+        $history_portal = match ($recipient['role']) { 'HR Supervisor' => 'supervisor', 'HR Staff' => 'staff', default => 'manager' };
         $link = BASE_URL . '/' . $history_portal . '/evaluation-history.php?evaluation_id=' . $evaluation_id;
-        createNotification($conn, (int)$recipient['user_id'], 'Probationary evaluation update', $message, $link);
+        $existing = $conn->prepare('SELECT 1 FROM notifications WHERE user_id = ? AND title = ? AND link = ? LIMIT 1');
+        $existing->bind_param('iss', $recipient['user_id'], $title, $link);
+        $existing->execute();
+        $already_notified = (bool)$existing->get_result()->fetch_row();
+        $existing->close();
+        if (!$already_notified) createNotification($conn, (int)$recipient['user_id'], $title, $message, $link, 'probation', 0);
     }
     return count($recipients);
 }
@@ -3553,67 +3594,6 @@ function notifyDepartmentManagersOfProbationaryOutcome($conn, int $evaluation_id
         $count++;
     }
     return $count;
-}
-
-/** Inform HR Managers and Supervisors not already assigned as the reviewer of an Initial evaluation. */
-function notifyHRManagementOfProbationaryInitialSubmission($conn, int $evaluation_id): int
-{
-    $evaluation_id = (int)$evaluation_id;
-    $stmt = $conn->prepare("SELECT ev.evaluation_type, e.first_name, e.last_name,
-            e.job_title, e.employment_status, d.department_name, et.template_name
-        FROM evaluations ev
-        JOIN employees e ON e.employee_id = ev.employee_id
-        LEFT JOIN departments d ON d.department_id = e.department_id
-        LEFT JOIN evaluation_templates et ON et.template_id = ev.template_id
-        WHERE ev.evaluation_id = ? LIMIT 1");
-    $stmt->bind_param('i', $evaluation_id);
-    $stmt->execute();
-    $row = $stmt->get_result()->fetch_assoc();
-    $stmt->close();
-    if (!$row || $row['evaluation_type'] !== 'Initial' || $row['employment_status'] !== 'Probationary') return 0;
-
-    $recipients_stmt = $conn->prepare("SELECT u.user_id, u.role
-        FROM users u
-        JOIN employees hr_employee ON hr_employee.employee_id = u.employee_id
-        JOIN departments hr_department ON hr_department.department_id = hr_employee.department_id
-            AND hr_department.department_name = 'Human Resources'
-        WHERE u.role IN ('HR Manager', 'HR Supervisor') AND u.is_active = 1
-          AND COALESCE(u.account_hold, 0) = 0 AND u.deleted_at IS NULL
-          AND hr_employee.is_active = 1 AND hr_employee.deleted_at IS NULL
-          AND NOT EXISTS (
-              SELECT 1
-              FROM evaluation_package_members pm
-              JOIN evaluation_packages ep ON ep.package_id = pm.package_id
-              JOIN evaluation_package_route_steps rs
-                ON rs.package_id = ep.package_id AND rs.step_order = ep.current_step_order
-              WHERE pm.evaluation_id = ? AND ep.status <> 'Cancelled'
-                AND (
-                    rs.reviewer_user_id = u.user_id
-                    OR rs.reviewer_employee_id = hr_employee.employee_id
-                    OR (rs.eligible_role = u.role AND rs.claimed_at IS NULL)
-                    OR (rs.eligible_rank_category_id = hr_employee.rank_category_id
-                        AND ep.department_id = hr_employee.department_id
-                        AND hr_employee.employment_status = 'Regular'
-                        AND rs.claimed_at IS NULL)
-                )
-          )");
-    $recipients_stmt->bind_param('i', $evaluation_id);
-    $recipients_stmt->execute();
-    $recipients = $recipients_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-    $recipients_stmt->close();
-
-    $employee_name = trim((string)$row['first_name'] . ' ' . (string)$row['last_name']);
-    $message = $employee_name . ' (' . ($row['department_name'] ?? 'Department') . ' - '
-        . ($row['job_title'] ?? 'Probationary employee') . ') submitted the Initial probationary evaluation'
-        . (!empty($row['template_name']) ? ' using ' . $row['template_name'] : '')
-        . '. The designated department reviewer will handle the evaluation; this notification is for HR visibility and analytics.';
-    foreach ($recipients as $recipient) {
-        $portal = $recipient['role'] === 'HR Supervisor' ? 'supervisor' : 'manager';
-        createNotification($conn, (int)$recipient['user_id'], 'Initial probationary evaluation submitted',
-            $message, BASE_URL . '/' . $portal . '/evaluation-history.php?evaluation_id=' . $evaluation_id,
-            'probation', 0);
-    }
-    return count($recipients);
 }
 
 /** Inform HR Managers after an HR Staff probationary result is finalized by an HR Supervisor. */
@@ -4705,7 +4685,11 @@ function notifyOrganizationPackageStepAssignees($conn, $package_id, $step_order,
             $existing->close();
             if ($already_notified) return;
         }
-        createNotification($conn, $user_id, $title, $message, $link);
+        if ($title === 'Probationary Evaluation Ready for Review') {
+            refreshProbationaryReviewNotification($conn, $user_id, $link);
+        } else {
+            createNotification($conn, $user_id, $title, $message, $link);
+        }
     };
     if (!empty($step['eligible_role']) && empty($step['claimed_at'])) {
         $eligible_stmt = $conn->prepare("SELECT DISTINCT u.user_id
@@ -5806,9 +5790,6 @@ function syncEvaluationToOrganizationPackage($conn, $evaluation_id)
         notifyOrganizationPackageStepAssignees($conn, $package_id, 1,
             'Probationary Evaluation Ready for Review',
             trim(($evaluation['first_name'] ?? '') . ' ' . ($evaluation['last_name'] ?? '')) . " submitted their $type evaluation for review.");
-        if ($type === 'Initial') {
-            notifyHRManagementOfProbationaryInitialSubmission($conn, $evaluation_id);
-        }
         return $package_id;
     }
     // Prefer a same-cycle package that is still at step 1. This lets a

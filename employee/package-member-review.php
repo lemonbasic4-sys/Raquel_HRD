@@ -15,6 +15,9 @@ $package_back_row=$package_back_stmt->get_result()->fetch_assoc();
 $package_back_stmt->close();
 $package_back_category=$package_back_row && !in_array($package_back_row['evaluation_type'],['Initial','Final'],true) ? 'regular' : 'probationary';
 $package_back_url=BASE_URL.'/employee/team-evaluation-packages.php?category='.$package_back_category;
+if ($package_back_category === 'probationary' && $package_id > 0) {
+    $package_back_url .= '&open_package=' . $package_id . '#package-' . $package_id;
+}
 
 
 $reviewer_identity = $conn->prepare("SELECT employee_id FROM users
@@ -217,12 +220,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $audit->close();
     }
 
-    redirectWith(BASE_URL . '/employee/package-member-review.php?package_id=' . $package_id . '&evaluation_id=' . $evaluation_id, 'success', 'Developmental plan and adjustments saved successfully.');
+    redirectWith(BASE_URL . '/employee/package-member-review.php?package_id=' . $package_id . '&evaluation_id=' . $evaluation_id . ($is_probationary_head_review ? '#tab-decision' : ''), 'success', 'Developmental plan and adjustments saved successfully.');
 }
 
 require_once '../includes/header.php';
 $evaluation_stmt = $conn->prepare("SELECT ev.*, emp.first_name, emp.last_name, emp.job_title, emp.rank_category_id, et.template_name, et.kra_weight, et.behavior_weight, ep.shared_behavior_score,
-        per.recommendation, per.recommendation_reason, per.immediate_head_signature_data, per.immediate_head_signed_at
+        per.recommendation, per.recommendation_reason, per.immediate_head_user_id, per.immediate_head_signature_data, per.immediate_head_signed_at
     FROM evaluations ev
     JOIN evaluation_package_members pm ON pm.evaluation_id = ev.evaluation_id
     JOIN evaluation_packages ep ON ep.package_id = pm.package_id
@@ -454,6 +457,8 @@ $devplan_count = count($existing_dev_plans);
     <form method="post" class="package-card p-0 shadow-sm" id="reviewForm" style="border-radius:12px; border:1px solid #E2E8F0; overflow:hidden;">
         <input type="hidden" name="package_id" value="<?php echo $package_id; ?>">
         <input type="hidden" name="evaluation_id" value="<?php echo $evaluation_id; ?>">
+        <input type="hidden" name="member_evaluation_id" value="<?php echo $evaluation_id; ?>">
+        <input type="hidden" name="review_form_submission" value="1">
         <?php echo csrfField(); ?>
 
         <!-- Tabs Header -->
@@ -470,7 +475,7 @@ $devplan_count = count($existing_dev_plans);
                 </button>
                 <?php if ($show_probationary_decision || $show_initial_rater_signature): ?>
                 <button type="button" class="eval-tab-btn" id="btn-tab-decision" onclick="switchReviewTab(event, 'tab-decision')" role="tab" aria-selected="false" aria-controls="tab-decision">
-                    <i class="fas fa-file-signature me-1"></i><?php echo $show_initial_rater_signature ? 'Immediate head signature' : 'Decision &amp; Signature'; ?>
+                    <i class="fas fa-clipboard-check me-1"></i><?php echo $show_initial_rater_signature ? 'Review &amp; Decide' : 'Decision &amp; Signature'; ?>
                 </button>
                 <?php endif; ?>
             </div>
@@ -698,7 +703,7 @@ $devplan_count = count($existing_dev_plans);
 
             <?php if ($show_probationary_decision || $show_initial_rater_signature): ?>
             <div id="tab-decision" class="eval-tab-content" role="tabpanel" aria-labelledby="btn-tab-decision">
-                <div class="eval-section-title"><span><i class="fas fa-file-signature me-2"></i><?php echo $show_initial_rater_signature ? 'Immediate head signature' : (isHumanResourcesPackageDepartment($conn, (int)($review_step['department_id'] ?? 0)) ? 'Final Reviewer' : 'Immediate Head') . ' Decision &amp; Signature'; ?></span></div>
+                <div class="eval-section-title"><span><i class="fas fa-clipboard-check me-2"></i><?php echo $show_initial_rater_signature ? 'Review &amp; Decide' : (isHumanResourcesPackageDepartment($conn, (int)($review_step['department_id'] ?? 0)) ? 'Final Reviewer' : 'Immediate Head') . ' Decision &amp; Signature'; ?></span></div>
                 <?php if (($_GET['attention'] ?? '') === 'decision'): ?>
                 <div class="alert alert-warning border-warning small" role="alert"><i class="fas fa-exclamation-circle me-2"></i><?php echo $show_initial_rater_signature ? 'Sign here before approving the Initial evaluation so your signature appears in the Rater field on the print form.' : 'Complete and save the recommendation, reason, and signature here before approving the evaluation.'; ?></div>
                 <?php endif; ?>
@@ -715,21 +720,26 @@ $devplan_count = count($existing_dev_plans);
                     <?php if ($show_probationary_decision): ?>
                     <div class="col-12"><button class="btn btn-success fw-semibold" type="submit" name="package_action" value="save_probationary_decision" formaction="<?php echo e($package_back_url); ?>" formnovalidate><i class="fas fa-file-signature me-1"></i>Save Decision &amp; Signature</button></div>
                     <?php else: ?>
-                    <div class="col-12"><button class="btn btn-success fw-semibold" type="submit" name="package_action" value="save_initial_rater_signature" formaction="<?php echo e($package_back_url); ?>" formnovalidate><i class="fas fa-file-signature me-1"></i>Save Signature</button></div>
+                    <div class="col-12 border-top pt-3 mt-3">
+                        <h5 class="fw-bold mb-2">Review decision</h5>
+                        <label class="form-label fw-semibold" for="initialReviewComments">Review remarks &amp; feedback <span class="text-muted fw-normal">(optional for approval, required for return)</span></label>
+                        <textarea class="form-control mb-3" id="initialReviewComments" name="comments" rows="2" placeholder="Enter endorsement remarks or return instructions"></textarea>
+                        <div class="d-flex flex-wrap gap-2">
+                            <button class="btn btn-success fw-semibold" type="submit" name="package_action" value="approve" formaction="<?php echo e($package_back_url); ?>" formnovalidate><i class="fas fa-check-circle me-1"></i>Approve Evaluation</button>
+                            <button class="btn btn-outline-danger fw-semibold" type="submit" name="package_action" value="return_member" formaction="<?php echo e($package_back_url); ?>" formnovalidate><i class="fas fa-undo me-1"></i>Return for Revision</button>
+                        </div>
+                    </div>
                     <?php endif; ?>
                 </div>
             </div>
             <?php endif; ?>
 
             <!-- Form Action Buttons -->
-            <div class="d-flex flex-wrap gap-3 mt-4 pt-3 border-top align-items-center probationary-review-actions">
+            <?php if (!$show_initial_rater_signature): ?><div class="d-flex flex-wrap gap-3 mt-4 pt-3 border-top align-items-center probationary-review-actions">
                 <button class="btn-action-primary btn" type="submit">
                     <i class="fas fa-save me-1"></i>Save Adjustments &amp; Developmental Plan
                 </button>
-                <a class="btn btn-outline-secondary px-4 py-2 fw-semibold" href="<?php echo e($package_back_url); ?>" style="min-height:46px; border-radius:8px;">
-                    Back to Evaluation Review
-                </a>
-            </div>
+            </div><?php endif; ?>
         </div>
     </form>
 </main>
@@ -806,16 +816,17 @@ document.addEventListener('DOMContentLoaded', function () {
             hasInk = false;
         });
         document.getElementById('reviewForm').addEventListener('submit', (event) => {
-            if (!['save_probationary_decision', 'save_initial_rater_signature'].includes(event.submitter?.value)) return;
-            if (event.submitter?.value === 'save_initial_rater_signature') {
-                if (!signatureData.value) {
+            if (['approve', 'return_member'].includes(event.submitter?.value)) {
+                const comments = document.getElementById('initialReviewComments');
+                if ((event.submitter.value === 'approve' && !signatureData.value)
+                    || (event.submitter.value === 'return_member' && !comments.value.trim())) {
                     event.preventDefault();
                     switchReviewTab(null, 'tab-decision');
-                    alert('Sign in the Immediate head signature box before saving.');
-                    signatureCanvas.focus();
+                    alert(event.submitter.value === 'approve' ? 'Sign in the Immediate head signature box before approving.' : 'Enter a reason before returning this evaluation for revision.');
                 }
                 return;
             }
+            if (event.submitter?.value !== 'save_probationary_decision') return;
             const recommendation = document.getElementById('headRecommendation');
             const reason = document.getElementById('headRecommendationReason');
             if (!recommendation.value || !reason.value.trim() || !signatureData.value) {
