@@ -14,7 +14,8 @@ $selected_department = isset($_GET['department']) && $_GET['department'] !== '' 
 $selected_position   = isset($_GET['position'])   && $_GET['position']   !== '' ? trim($_GET['position'])   : '';
 $employee_search     = trim($_GET['search'] ?? '');
 $selected_employment = in_array($_GET['employment'] ?? '', ['Regular', 'Probationary'], true) ? $_GET['employment'] : '';
-$has_portal_filters = $selected_department > 0 || $selected_position !== '' || $selected_employment !== '' || $employee_search !== '';
+$selected_account_status = in_array($_GET['account_status'] ?? '', ['has', 'none', 'disabled'], true) ? $_GET['account_status'] : '';
+$has_portal_filters = $selected_department > 0 || $selected_position !== '' || $selected_employment !== '' || $employee_search !== '' || $selected_account_status !== '';
 
 $department_options = $conn->query("
     SELECT department_id, department_name
@@ -77,10 +78,34 @@ if ($employee_search !== '') {
 }
 
 // Fast COUNT — LEFT JOIN anti-join to exclude Admin-linked employees
+$portal_account_join = "LEFT JOIN users uportal ON uportal.employee_id = e.employee_id
+    AND uportal.role = 'Employee'
+    AND uportal.user_id = (SELECT MIN(u2.user_id) FROM users u2
+                           WHERE u2.employee_id = e.employee_id AND u2.role = 'Employee')";
+$account_counts_result = $conn->query("
+    SELECT COUNT(uportal.user_id) AS has_account,
+           COUNT(*) - COUNT(uportal.user_id) AS no_account,
+           SUM(CASE WHEN uportal.user_id IS NOT NULL AND uportal.is_active = 0 THEN 1 ELSE 0 END) AS disabled
+    FROM employees e
+    LEFT JOIN users ua ON ua.employee_id = e.employee_id AND ua.role = 'Admin'
+    $portal_account_join
+    WHERE $base_where_conditions
+");
+$account_counts = $account_counts_result->fetch_assoc();
+
+if ($selected_account_status === 'has') {
+    $base_where_conditions .= ' AND uportal.user_id IS NOT NULL';
+} elseif ($selected_account_status === 'none') {
+    $base_where_conditions .= ' AND uportal.user_id IS NULL';
+} elseif ($selected_account_status === 'disabled') {
+    $base_where_conditions .= ' AND uportal.user_id IS NOT NULL AND uportal.is_active = 0';
+}
+
 $total_accounts_result = $conn->query("
     SELECT COUNT(*) AS total
     FROM employees e
     LEFT JOIN users ua ON ua.employee_id = e.employee_id AND ua.role = 'Admin'
+    $portal_account_join
     WHERE $base_where_conditions
 ");
 $total_accounts = (int)($total_accounts_result->fetch_assoc()['total'] ?? 0);
@@ -96,6 +121,7 @@ $id_result = $conn->query("
     SELECT e.employee_id
     FROM employees e
     LEFT JOIN users ua ON ua.employee_id = e.employee_id AND ua.role = 'Admin'
+    $portal_account_join
     WHERE $base_where_conditions
     ORDER BY e.last_name, e.first_name
     LIMIT $per_page OFFSET $offset
@@ -254,14 +280,29 @@ document.addEventListener('DOMContentLoaded', () => new bootstrap.Modal(document
     .admin-employee-accounts-page .employment-badge { display:inline-flex; margin-top:.3rem; padding:.2rem .45rem; border-radius:999px; font-size:.64rem; font-weight:750; }
     .admin-employee-accounts-page .employment-badge.regular { color:#237242; background:#e5f5e9; }
     .admin-employee-accounts-page .employment-badge.probationary { color:#5141a4; background:#ece9ff; }
+    .admin-employee-accounts-page .portal-status-cards { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.85rem; margin:0 0 1rem; }
+    .admin-employee-accounts-page .portal-status-card.page-hero { display:flex; align-items:center; gap:.85rem; min-width:0; min-height:92px; margin:0; padding:1rem 1.1rem; border:1px solid rgba(255,255,255,.12); border-radius:14px; color:#fff; text-decoration:none; background:linear-gradient(135deg,var(--hero-from) 0%,var(--hero-mid) 50%,var(--hero-to) 100%); box-shadow:0 8px 22px rgba(23,75,18,.16); transition:transform .18s ease, box-shadow .18s ease; }
+    .admin-employee-accounts-page .portal-status-card:hover { color:#fff; transform:translateY(-2px); box-shadow:0 11px 25px rgba(23,75,18,.23); }
+    .admin-employee-accounts-page .portal-status-card:focus-visible { outline:3px solid #e7c85a; outline-offset:3px; }
+    .admin-employee-accounts-page .portal-status-card.is-selected { border-color:#f4cb53; box-shadow:0 0 0 2px rgba(244,203,83,.6),0 8px 22px rgba(23,75,18,.16); }
+    .admin-employee-accounts-page .portal-status-icon { display:grid; place-items:center; flex:0 0 42px; width:42px; height:42px; border-radius:12px; color:#f4cb53; background:rgba(255,255,255,.12); }
+    .admin-employee-accounts-page .portal-status-count { display:block; color:#fff; font-size:1.55rem; font-weight:800; line-height:1.1; }
+    .admin-employee-accounts-page .portal-status-label { display:block; color:rgba(255,255,255,.75); font-size:.72rem; font-weight:700; }
+    .admin-employee-accounts-page .portal-status-card.disabled-card .portal-status-icon { color:#ffb7ad; }
+    .admin-employee-accounts-page .portal-status-match > td,
+    .admin-employee-accounts-page .student-item.portal-status-match { animation:portal-status-flash 1.5s ease-out 2; }
+    @keyframes portal-status-flash { 0%,100% { background-color:transparent; } 50% { background-color:#fff0b8; } }
     @media (max-width:991.98px) {
         .admin-employee-accounts-page .portal-filter-form { grid-template-columns:repeat(2,minmax(0,1fr)); }
         .admin-employee-accounts-page .portal-filter-form > [name="search"] { grid-column:auto; }
     }
     @media (max-width:767.98px) {
+        .admin-employee-accounts-page .portal-status-cards { grid-template-columns:1fr; gap:.6rem; }
+        .admin-employee-accounts-page .portal-status-card.page-hero { min-height:72px; padding:.75rem 1rem; }
         .admin-employee-accounts-page .portal-filter-form { grid-template-columns:1fr; }
         .admin-employee-accounts-page .portal-filter-form .btn { width:100%; }
     }
+    @media (prefers-reduced-motion:reduce) { .admin-employee-accounts-page .portal-status-match > td, .admin-employee-accounts-page .student-item.portal-status-match { animation:none; background:#fff0b8; } }
 </style>
 
 <div class="admin-employee-accounts-page">
@@ -278,12 +319,25 @@ document.addEventListener('DOMContentLoaded', () => new bootstrap.Modal(document
     <p class="text-white-50 small mb-0"><i class="fas fa-key me-1"></i>Manage employee access to the self-service portal.</p>
 </div>
 
+<?php $status_query_params = $_GET; unset($status_query_params['page'], $status_query_params['account_status']); ?>
+<div class="portal-status-cards fadeup-1" aria-label="Portal account status filters">
+    <a class="portal-status-card page-hero <?php echo $selected_account_status === 'has' ? 'is-selected' : ''; ?>" href="?<?php echo e(http_build_query(array_merge($status_query_params, ['account_status' => 'has']))); ?>#portal-status-results" <?php echo $selected_account_status === 'has' ? 'aria-current="true"' : ''; ?>>
+        <span class="portal-status-icon"><i class="fas fa-user-check"></i></span><span><span class="portal-status-count"><?php echo (int)$account_counts['has_account']; ?></span><span class="portal-status-label">Has Account</span></span>
+    </a>
+    <a class="portal-status-card page-hero <?php echo $selected_account_status === 'none' ? 'is-selected' : ''; ?>" href="?<?php echo e(http_build_query(array_merge($status_query_params, ['account_status' => 'none']))); ?>#portal-status-results" <?php echo $selected_account_status === 'none' ? 'aria-current="true"' : ''; ?>>
+        <span class="portal-status-icon"><i class="fas fa-user-plus"></i></span><span><span class="portal-status-count"><?php echo (int)$account_counts['no_account']; ?></span><span class="portal-status-label">No Account</span></span>
+    </a>
+    <a class="portal-status-card page-hero disabled-card <?php echo $selected_account_status === 'disabled' ? 'is-selected' : ''; ?>" href="?<?php echo e(http_build_query(array_merge($status_query_params, ['account_status' => 'disabled']))); ?>#portal-status-results" <?php echo $selected_account_status === 'disabled' ? 'aria-current="true"' : ''; ?>>
+        <span class="portal-status-icon"><i class="fas fa-user-slash"></i></span><span><span class="portal-status-count"><?php echo (int)$account_counts['disabled']; ?></span><span class="portal-status-label">Disabled Accounts</span></span>
+    </a>
+</div>
+
 <div class="alert alert-info py-2 fadeup-1" style="font-size:0.9rem;">
     <i class="fas fa-info-circle me-2"></i>
     Employee Portal accounts are separate from HR system accounts. Company ID is suggested as the portal username, but you can use a custom one.
 </div>
 
-<div class="content-card portal-accounts-card fadeup-2">
+<div class="content-card portal-accounts-card fadeup-2" id="portal-status-results">
     <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-3">
         <h5 class="mb-0"><i class="fas fa-user-lock me-2"></i>Portal Account Status</h5>
         <span class="badge rounded-pill" style="background:#edf5eb;color:#37633a;"><?php echo $total_accounts; ?> employees</span>
@@ -295,6 +349,7 @@ document.addEventListener('DOMContentLoaded', () => new bootstrap.Modal(document
         </summary>
     <div class="portal-filterbar">
             <form method="GET" class="portal-filter-form mb-0">
+                <?php if ($selected_account_status !== ''): ?><input type="hidden" name="account_status" value="<?php echo e($selected_account_status); ?>"><?php endif; ?>
                 <select class="form-select form-select-sm" id="department_filter" name="department" aria-label="Filter portal accounts by department">
                     <option value="">All Departments</option>
                     <?php while ($department = $department_options->fetch_assoc()): ?>
@@ -352,7 +407,7 @@ document.addEventListener('DOMContentLoaded', () => new bootstrap.Modal(document
                         </tr>
                     <?php else: ?>
                         <?php while ($emp = $employees->fetch_assoc()): ?>
-                            <tr>
+                            <tr class="<?php echo $selected_account_status !== '' ? 'portal-status-match' : ''; ?>">
                                 <td data-label="#"><strong><?php echo $row_number++; ?></strong></td>
                                 <td data-label="Employee">
                                     <div class="employee-identity">
@@ -434,7 +489,7 @@ document.addEventListener('DOMContentLoaded', () => new bootstrap.Modal(document
                         $avatar_num = ($row_number_mob % 6) + 1;
                         $initials = strtoupper(substr($emp['first_name'] ?? '', 0, 1) . substr($emp['last_name'] ?? '', 0, 1));
                     ?>
-                        <div class="student-item">
+                        <div class="student-item <?php echo $selected_account_status !== '' ? 'portal-status-match' : ''; ?>">
                             <div class="student-avatar">
                                 <img src="<?php echo getEmployeeAvatar($emp['profile_picture']); ?>" alt="Profile" class="avatar-img">
                             </div>
@@ -566,7 +621,7 @@ document.addEventListener('DOMContentLoaded', () => new bootstrap.Modal(document
                     <input type="hidden" name="full_name" id="modal_full_name">
                     <input type="hidden" name="email" id="modal_email">
                     <input type="hidden" name="role" value="Employee">
-                    <input type="hidden" name="redirect" value="employee-accounts.php?page=<?php echo $current_page; ?><?php echo $selected_department > 0 ? '&department=' . (int) $selected_department : ''; ?><?php echo $selected_position !== '' ? '&position=' . urlencode($selected_position) : ''; ?><?php echo $selected_employment !== '' ? '&employment=' . urlencode($selected_employment) : ''; ?><?php echo $employee_search !== '' ? '&search=' . urlencode($employee_search) : ''; ?>">
+                    <input type="hidden" name="redirect" value="employee-accounts.php?page=<?php echo $current_page; ?><?php echo $selected_department > 0 ? '&amp;department=' . (int) $selected_department : ''; ?><?php echo $selected_position !== '' ? '&amp;position=' . urlencode($selected_position) : ''; ?><?php echo $selected_employment !== '' ? '&amp;employment=' . urlencode($selected_employment) : ''; ?><?php echo $employee_search !== '' ? '&amp;search=' . urlencode($employee_search) : ''; ?><?php echo $selected_account_status !== '' ? '&amp;account_status=' . urlencode($selected_account_status) : ''; ?>">
                     
                     <!-- Employee Badge Info -->
                     <div class="portal-emp-badge">
