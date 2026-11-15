@@ -157,16 +157,15 @@ require_once '../includes/header.php';
                         <th class="ps-3">Employee Name</th>
                         <th>Department</th>
                         <th>Position</th>
-                        <th>Form Code</th>
                         <th>Overall Rating</th>
                         <th>Status</th>
-                        <th>Current Reviewer</th><th>Date Submitted</th>
+                        <th>Date Submitted</th>
                         <th class="text-end pe-3">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php if (empty($all_history)): ?>
-                        <tr class="no-results-row text-center"><td colspan="9" class="text-muted py-5"><i class="fas fa-history fa-3x mb-3 d-block opacity-25"></i>No evaluations match these filters.</td></tr>
+                        <tr class="no-results-row text-center"><td colspan="7" class="text-muted py-5"><i class="fas fa-history fa-3x mb-3 d-block opacity-25"></i>No evaluations match these filters.</td></tr>
                     <?php else: ?>
                         <?php foreach ($all_history as $row): ?>
                             <tr class="eval-row" data-type="<?php echo in_array($row['package_evaluation_type'] ?? '', ['Initial', 'Final'], true) ? 'probationary' : 'regular'; ?>"
@@ -181,7 +180,7 @@ require_once '../includes/header.php';
                                     <div class="employee-copy"><strong><?php echo e($row['employee_name']); ?></strong><small>ID <?php echo e($row['employee_id']); ?></small></div>
                                 </div></td>
                                 <td><?php echo e($row['department_name'] ?? 'N/A'); ?></td>
-                                <td><?php echo e($row['job_title'] ?? 'N/A'); ?></td><td class="history-form-code"><?php echo e($row['form_code'] ?: 'N/A'); ?></td>
+                                <td><?php echo e($row['job_title'] ?? 'N/A'); ?></td>
                                 <td class="text-center">
                                     <?php
                                     $h_score = (float)($row['total_score'] ?? 0);
@@ -208,7 +207,6 @@ require_once '../includes/header.php';
                                         <span class="hist-status-badge <?php echo e(strtolower($row['status'])); ?>"><?php echo e($row['status']); ?></span>
                                     <?php endif; ?>
                                 </td>
-                                <td><div class="current-reviewer"><?php echo e($row['status'] === 'Imported' ? 'Historical import' : (($row['approved_by_name'] ?? '') ?: (($row['endorsed_by_name'] ?? '') ?: 'Completed'))); ?></div></td>
                                 <td><small><?php echo formatDate($row['submitted_date'] ?? $row['updated_at']); ?></small></td>
                                 <td>
                                     <button class="btn btn-sm btn-primary rounded-pill px-3 fw-semibold shadow-sm" data-history-detail="<?php echo (int)$row['evaluation_id']; ?>">

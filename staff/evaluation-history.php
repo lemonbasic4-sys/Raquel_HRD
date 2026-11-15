@@ -65,7 +65,7 @@ ksort($existing_departments);
 ksort($existing_templates);
 ?>
 
-<link rel="stylesheet" href="<?php echo BASE_URL; ?>/assets/css/evaluation-history-table.css?v=7">
+<link rel="stylesheet" href="<?php echo BASE_URL; ?>/assets/css/evaluation-history-table.css?v=<?php echo filemtime(__DIR__.'/../assets/css/evaluation-history-table.css'); ?>">
 <div class="evaluation-history-page staff-evaluation-history-page">
 <div class="page-hero fadeup">
     <div class="d-flex flex-wrap align-items-center justify-content-between mb-4 gap-3">
@@ -227,10 +227,8 @@ ksort($existing_templates);
                         <th>Employee Name</th>
                         <th>Department</th>
                         <th>Position</th>
-                        <th>Form Code</th>
                         <th>Overall Rating</th>
                         <th>Status</th>
-                        <th>Current Reviewer</th>
                         <th>Date Submitted</th>
                         <th class="text-end">Actions</th>
                     </tr>
@@ -238,14 +236,14 @@ ksort($existing_templates);
                 <tbody>
                     <?php if (empty($all_history)): ?>
                         <tr class="no-history-row">
-                            <td colspan="9" class="text-center py-5 text-muted">
+                            <td colspan="7" class="text-center py-5 text-muted">
                                 <i class="fas fa-folder-open fa-3x mb-3 opacity-25"></i>
                                 <p class="mb-0">No historical evaluation records found.</p>
                             </td>
                         </tr>
                     <?php else: ?>
                         <tr class="no-history-row text-center py-5 text-muted" style="display:none;">
-                            <td colspan="9" class="text-center py-5 text-muted">
+                            <td colspan="7" class="text-center py-5 text-muted">
                                 <i class="fas fa-search fa-3x mb-3 opacity-25"></i>
                                 <p class="mb-0">No matching evaluation records found.</p>
                             </td>
@@ -273,7 +271,7 @@ ksort($existing_templates);
                                     </div>
                                 </td>
                                 <td><?php echo e($row['department_name'] ?? 'N/A'); ?></td>
-                                <td><?php echo e($row['job_title'] ?? 'N/A'); ?></td><td class="history-form-code"><?php echo e($row['form_code'] ?: 'N/A'); ?></td>
+                                <td><?php echo e($row['job_title'] ?? 'N/A'); ?></td>
                                 <td class="text-center">
                                     <strong class="d-block"><?php echo number_format($score, 2); ?> / 4</strong>
                                     <span class="badge <?php echo $perf_class; ?> rounded-pill mt-1"><?php echo e($row['performance_level']); ?></span>
@@ -285,7 +283,6 @@ ksort($existing_templates);
                                         <span class="badge <?php echo $status_class; ?> px-3 py-2 rounded-pill"><?php echo e($row['status']); ?></span>
                                     <?php endif; ?>
                                 </td>
-                                <td><small><?php echo e(($row['approved_by_name'] ?? '') ?: (($row['endorsed_by_name'] ?? '') ?: 'Completed')); ?></small></td>
                                 <td><small><?php echo !empty($row['submitted_date']) ? formatDate($row['submitted_date']) : (!empty($row['updated_at']) ? formatDate($row['updated_at']) : 'N/A'); ?></small></td>
                                 <td class="text-end">
                                     <button class="btn btn-sm btn-outline-primary rounded-pill px-3 shadow-sm" data-bs-toggle="modal" data-bs-target="#reviewModal<?php echo $row['evaluation_id']; ?>">
