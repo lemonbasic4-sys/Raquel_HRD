@@ -446,7 +446,6 @@ switch ($effective_role) {
         // The current department controls this Employee Portal menu. A held
         // former HRIS role may remain linked for audit/history after transfer.
         if (!$is_probationary_employee && !$is_hr_personnel && ($is_supervisor_menu || $m_pending_pkg_count > 0 || $is_ceo_employee_portal)) {
-            $menu_my_team[] = ['icon' => 'fas fa-users',       'label' => 'My Team',                  'url' => BASE_URL . '/employee/team-list.php',              'page' => 'team-list.php'];
             $menu_my_team[] = ['icon' => 'fas fa-layer-group', 'label' => 'Performance Evaluation', 'url' => BASE_URL . '/employee/team-evaluation-packages.php', 'page' => 'team-evaluation-packages.php', 'badge' => $m_pending_pkg_count ?: null, 'badge_class' => 'bg-warning text-dark'];
         }
 
@@ -491,7 +490,7 @@ switch ($effective_role) {
 
         // Only add MY TEAM section when there are items to show
         if (!empty($menu_my_team)) {
-            $sidebar_menus['MY TEAM'] = $menu_my_team;
+            $sidebar_menus['PERFORMANCE'] = $menu_my_team;
         }
 
         // Only add CAREER section when there are items to show
@@ -1008,18 +1007,11 @@ if ($annual_nav_actor && $annual_nav_actor['employment_status'] === 'Regular'
                                 <i class="fas fa-chart-line me-2" style="width: 18px; text-align: center;"></i>My Performance
                             </a>
                         </li>
-                        <?php if ($_g_is_sup && !$_g_is_hr_manager): ?>
-                            <li>
-                                <a class="dropdown-item d-flex align-items-center" href="<?php echo BASE_URL; ?>/employee/team-list.php" style="font-size:0.82rem; padding: 6px 10px;">
-                                    <i class="fas fa-users me-2" style="width: 18px; text-align: center;"></i>My Team
-                                </a>
-                            </li>
-                        <?php endif; ?>
                         <?php
                         // Add other currently authorized sidebar tools to the existing mobile gear menu.
                         $_mobile_gear_skip_pages = ['dashboard.php', 'my-employment.php', 'self-rating.php',
                             'evaluation-history.php', 'notifications.php', 'profile-settings.php',
-                            'my-performance.php', 'team-list.php'];
+                            'my-performance.php'];
                         $_mobile_gear_has_extra_items = false;
                         foreach (($sidebar_menus ?? []) as $_mobile_section_items) {
                             foreach ($_mobile_section_items as $_mobile_section_item) {

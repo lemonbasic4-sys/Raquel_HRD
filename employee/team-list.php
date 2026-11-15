@@ -5,6 +5,8 @@
  */
 $page_title = 'My Team';
 require_once '../includes/session-check.php';
+http_response_code(404);
+exit('Page not found.');
 checkRole(['Employee']);
 require_once '../includes/functions.php';
 
