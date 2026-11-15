@@ -123,7 +123,7 @@ BEGIN
   INSERT INTO evaluation_templates (template_name,description,target_department,target_department_id,target_job_title_id,behavior_framework_code,behavior_framework_version,evaluation_type,individual_workflow,kra_weight,behavior_weight,form_code,revision_date,effective_date_form,status,created_by)
   SELECT DISTINCT CONCAT('[SAMPLE] ',t.evaluation_type,' - ',j.job_title,' - Main Office'),
     'Fictional probationary test form. Agree actual role targets before use.',d.department_name,d.department_id,j.job_title_id,
-    'CORE-VALUES','1.0',t.evaluation_type,1,80,20,CONCAT('MO26-',p.job_title_id,'-',UPPER(t.evaluation_type)),
+    'CORE-VALUES','1.0',t.evaluation_type,0,80,20,CONCAT('MO26-',p.job_title_id,'-',UPPER(t.evaluation_type)),
     '2026-11-15','2026-11-15','Active',u.user_id
   FROM mo26_people p JOIN job_titles j ON j.job_title_id=p.job_title_id
   JOIN departments d ON d.department_id=j.department_id
@@ -163,7 +163,7 @@ BEGIN
   IF (SELECT COUNT(*) FROM employees e JOIN mo26_people p ON p.employee_code=e.employee_code WHERE p.status_name='Probationary' AND e.branch_id=102 AND e.reports_to IS NOT NULL) <> 24
     OR (SELECT COUNT(DISTINCT e.department_id) FROM employees e JOIN mo26_people p ON p.employee_code=e.employee_code WHERE p.status_name='Probationary') <> 12
     OR EXISTS (SELECT 1 FROM employees e JOIN mo26_people p ON p.employee_code=e.employee_code WHERE p.status_name='Probationary' GROUP BY e.department_id HAVING COUNT(*) <> 2)
-    OR (SELECT COUNT(*) FROM evaluation_templates WHERE form_code LIKE 'MO26-%') <> 24
+    OR (SELECT COUNT(*) FROM evaluation_templates WHERE form_code LIKE 'MO26-%' AND individual_workflow=0) <> 24
   THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Seed coverage check failed'; END IF;
   COMMIT;
   DROP TEMPORARY TABLE mo26_people;

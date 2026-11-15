@@ -803,8 +803,8 @@ $active_package_tab = 'probationary';
             .package-category-tab__copy small{color:#6b7280;font-size:.72rem}
             .package-category-tab__count{display:grid;place-items:center;min-width:26px;height:26px;padding:0 .4rem;border-radius:999px;background:#fff;color:#374151;font-size:.76rem;font-weight:700}
             .package-category-tab.active .package-category-tab__count{background:#082e06;color:#fff}
-            .package-card.package-card--probationary{border-color:#3730a3!important}
-            .package-card.package-card--probationary .package-card__header{border-left:4px solid #3730a3}
+            .package-card.package-card--probationary:not(.package-card--probationary-summary){border-color:#3730a3!important}
+            .package-card.package-card--probationary:not(.package-card--probationary-summary) .package-card__header{border-left:4px solid #3730a3}
             @media(max-width:575.98px){.package-category-tabs{gap:.4rem}.package-category-tab{flex:1;min-width:0;padding:.65rem .5rem;gap:.45rem}.package-category-tab__icon{width:30px;height:30px}.package-category-tab__copy strong{font-size:.76rem}.package-category-tab__copy small{font-size:.65rem}}
 
 @media(max-width:650px) {
@@ -869,12 +869,12 @@ $active_package_tab = 'probationary';
                     <span class="pipeline-badge pipeline-badge--waiting">
                         <i class="fas fa-user-clock me-1"></i>Waiting for Team Self-Ratings (<?php echo $summary['submitted']; ?>/<?php echo $summary['required']; ?>)
                     </span>
-                    <button class="btn btn-sm btn-package-collapse" type="button" data-bs-toggle="collapse" data-bs-target="#pkgBody-wait-<?php echo (int)$package['package_id']; ?>" aria-expanded="true" aria-controls="pkgBody-wait-<?php echo (int)$package['package_id']; ?>" title="Minimize / Expand Review">
-                        <i class="fas fa-chevron-up collapse-icon"></i> <span class="d-none d-sm-inline">Minimize</span>
+                    <button class="btn btn-sm btn-package-collapse collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#pkgBody-wait-<?php echo (int)$package['package_id']; ?>" aria-expanded="false" aria-controls="pkgBody-wait-<?php echo (int)$package['package_id']; ?>" title="Expand Review">
+                        <i class="fas fa-chevron-up collapse-icon"></i> <span class="d-none d-sm-inline">Expand</span>
                     </button>
                 </div>
             </header>
-            <div class="collapse show" id="pkgBody-wait-<?php echo (int)$package['package_id']; ?>">
+            <div class="collapse" id="pkgBody-wait-<?php echo (int)$package['package_id']; ?>">
                 <div class="package-card__body">
                     <div class="alert alert-warning py-2 px-3 small mb-3">
                         <i class="fas fa-exclamation-triangle me-1"></i><strong>Consolidation Pending:</strong> All team members must submit their self-ratings before you can consolidate and forward this evaluation review.
@@ -931,7 +931,8 @@ $active_package_tab = 'probationary';
         }
         $is_final_probationary_step = $is_probationary_package && (int)$package['current_step_order'] >= $route_count;
         $is_final_hr_step = $is_final_probationary_step && isHumanResourcesPackageDepartment($conn, (int)$package['department_id']);
-        $members_stmt = $conn->prepare("SELECT e.evaluation_id, emp.first_name, emp.last_name, emp.job_title, emp.rank_category_id,
+        $members_stmt = $conn->prepare("SELECT e.evaluation_id, emp.first_name, emp.last_name, emp.job_title, emp.rank_category_id, emp.profile_picture,
+                b.branch_name,
                 e.kra_subtotal, e.behavior_average, e.total_score, e.status, pm.member_status,
                 (SELECT AVG(COALESCE(es.manager_override_score, es.supervisor_override_score,
                                      es.dept_manager_override_score, es.score_value))
@@ -943,6 +944,7 @@ $active_package_tab = 'probationary';
             FROM evaluation_package_members pm
             JOIN evaluations e ON e.evaluation_id = pm.evaluation_id
             JOIN employees emp ON emp.employee_id = e.employee_id
+            LEFT JOIN branches b ON b.branch_id = emp.branch_id
             LEFT JOIN probationary_evaluation_reviews per ON per.evaluation_id = e.evaluation_id
             WHERE pm.package_id = ? AND e.status != 'Approved'
             ORDER BY emp.last_name, emp.first_name");
@@ -976,12 +978,6 @@ $active_package_tab = 'probationary';
         $late_rejoined_members = $late_rejoined_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
         $late_rejoined_stmt->close();
 
-        $route_stmt = $conn->prepare('SELECT step_label, action_status, acted_at, comments FROM evaluation_package_route_steps WHERE package_id = ? ORDER BY step_order');
-        $route_stmt->bind_param('i', $package['package_id']);
-        $route_stmt->execute();
-        $timeline = $route_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-        $route_stmt->close();
-
         // Next reviewer for modal summary
         $next_step_order = (int)$package['current_step_order'] + 1;
         $next_rev_stmt = $conn->prepare('SELECT step_label, reviewer_user_id, reviewer_employee_id, eligible_role, eligible_rank_category_id, claimed_at FROM evaluation_package_route_steps WHERE package_id = ? AND step_order = ? LIMIT 1');
@@ -1002,21 +998,56 @@ $active_package_tab = 'probationary';
         $department_team_size = (int)($team_size_stmt->get_result()->fetch_assoc()['team_size'] ?? 0);
         $team_size_stmt->close();
         ?>
-        <article id="package-<?php echo (int)$package['package_id']; ?>" class="package-card <?php echo $is_probationary_package ? 'package-card--probationary ' : ''; ?><?php echo $is_probationary_package === ($active_package_tab === 'probationary') ? '' : 'd-none'; ?>" data-package-category="<?php echo $is_probationary_package ? 'probationary' : 'regular'; ?>" data-package-department="<?php echo (int)$package['department_id']; ?>" role="region" aria-label="<?php echo e($package['department_name']); ?> Evaluation Review">
+        <article id="package-<?php echo (int)$package['package_id']; ?>" class="package-card <?php echo $is_probationary_package ? 'package-card--probationary package-card--probationary-summary ' : ''; ?><?php echo $is_probationary_package === ($active_package_tab === 'probationary') ? '' : 'd-none'; ?>" data-package-category="<?php echo $is_probationary_package ? 'probationary' : 'regular'; ?>" data-package-department="<?php echo (int)$package['department_id']; ?>" role="region" aria-label="<?php echo e($package['department_name']); ?> Evaluation Review">
             <header class="package-card__header">
                 <div>
                     <h2 class="h5 mb-1 fw-bold"><?php echo e($package['department_name']); ?> &mdash; <?php echo e($package['template_name']); ?></h2>
                     <p class="mb-0 text-muted small"><i class="fas fa-calendar-alt me-1"></i>Period: <?php echo e($package['period_start']); ?> to <?php echo e($package['period_end']); ?></p>
                 </div>
                 <div class="d-flex align-items-center gap-2">
+                    <?php if ($is_probationary_package): ?><span class="probationary-type-badge">Probationary</span><?php endif; ?>
                     <?php echo renderOrganizationPipelineBadge($conn, (int)$package['package_id']); ?>
-                    <button class="btn btn-sm btn-package-collapse" type="button" data-bs-toggle="collapse" data-bs-target="#pkgBody-act-<?php echo (int)$package['package_id']; ?>" aria-expanded="true" aria-controls="pkgBody-act-<?php echo (int)$package['package_id']; ?>" title="Minimize / Expand Review">
-                        <i class="fas fa-chevron-up collapse-icon"></i> <span class="d-none d-sm-inline">Minimize</span>
+                    <button class="btn btn-sm btn-package-collapse collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#pkgBody-act-<?php echo (int)$package['package_id']; ?>" aria-expanded="false" aria-controls="pkgBody-act-<?php echo (int)$package['package_id']; ?>" title="Expand Review">
+                        <i class="fas fa-chevron-up collapse-icon"></i> <span class="d-none d-sm-inline">Expand</span>
                     </button>
                 </div>
             </header>
-            <div class="collapse show" id="pkgBody-act-<?php echo (int)$package['package_id']; ?>">
+            <div class="collapse" id="pkgBody-act-<?php echo (int)$package['package_id']; ?>">
                 <div class="package-card__body">
+                <?php if ($is_probationary_package && !empty($members)): ?>
+                <?php foreach ($members as $summary_member):
+                    $summary_kra = (float)$summary_member['kra_subtotal'];
+                    $summary_behavior = (float)($summary_member['individual_behavior'] ?? $summary_member['behavior_average']);
+                    $summary_total = calculateEvalTotal($summary_kra, $summary_behavior, 80, 20);
+                ?>
+                <section class="probationary-review-summary" aria-label="<?php echo e($summary_member['first_name'] . ' ' . $summary_member['last_name']); ?> score summary">
+                    <div class="probationary-review-top">
+                        <div class="probationary-review-person page-hero fadeup mb-0">
+                            <img class="probationary-review-avatar" src="<?php echo e(getEmployeeAvatar($summary_member['profile_picture'] ?? '')); ?>" alt="<?php echo e($summary_member['first_name'] . ' ' . $summary_member['last_name']); ?> profile picture" data-default-avatar="<?php echo e(getEmployeeAvatar('')); ?>" onerror="this.onerror=null;this.src=this.dataset.defaultAvatar;">
+                            <div><strong><?php echo e($summary_member['first_name'] . ' ' . $summary_member['last_name']); ?></strong><span><?php echo e($summary_member['job_title']); ?></span></div>
+                            <div class="probationary-review-location"><span><i class="fas fa-building" aria-hidden="true"></i><?php echo e($summary_member['branch_name'] ?? ''); ?></span><span><i class="fas fa-sitemap" aria-hidden="true"></i><?php echo e($package['department_name']); ?></span></div>
+                        </div>
+                    <div class="probationary-review-score page-hero fadeup mb-0"><span>Current Overall Score</span><div><strong><?php echo number_format($summary_total, 2); ?></strong> / 4.00</div><small><i class="far fa-clock" aria-hidden="true"></i> Pending Review</small></div>
+                    </div>
+                    <div class="table-responsive"><table class="table probationary-review-breakdown mb-0"><thead><tr><th>Category</th><th class="text-end">Score</th></tr></thead><tbody>
+                        <tr><td><i class="fas fa-bullseye" aria-hidden="true"></i> Key Result Areas (KRA)</td><td class="text-end"><?php echo number_format($summary_kra, 2); ?> / 4.00</td></tr>
+                        <tr><td><i class="fas fa-award" aria-hidden="true"></i> Core Values / Behavior</td><td class="text-end"><?php echo number_format($summary_behavior, 2); ?> / 4.00</td></tr>
+                        <tr class="probationary-review-total"><th>Current Overall Score</th><th class="text-end"><?php echo number_format($summary_total, 2); ?> / 4.00</th></tr>
+                    </tbody></table></div>
+                </section>
+                <?php endforeach; ?>
+                <div class="d-flex flex-wrap gap-2 mb-3">
+                    <?php if ($is_unclaimed_group_step): ?>
+                        <button class="btn btn-success fw-bold px-4" type="submit" form="pkgForm-<?php echo (int)$package['package_id']; ?>"><i class="fas fa-check me-2" aria-hidden="true"></i>Accept Review</button>
+                    <?php endif; ?>
+                    <?php if ($can_adjust): foreach ($members as $summary_member): ?>
+                        <a class="btn btn-action-adjust" href="<?php echo BASE_URL; ?>/employee/package-member-review.php?package_id=<?php echo (int)$package['package_id']; ?>&evaluation_id=<?php echo (int)$summary_member['evaluation_id']; ?>">
+                            <i class="fas fa-sliders-h me-1" aria-hidden="true"></i>Review &amp; Decide<?php echo count($members) > 1 ? ' — ' . e($summary_member['first_name'] . ' ' . $summary_member['last_name']) : ''; ?>
+                        </a>
+                    <?php endforeach; endif; ?>
+                </div>
+                <?php endif; ?>
+                <?php if (!$is_probationary_package): ?>
                 <div class="package-stat-grid mb-3">
                     <div class="package-stat">
                         <div class="package-stat-icon" style="background: rgba(8, 46, 6, 0.08); color: var(--rp-forest-green, #082E06);">
@@ -1042,31 +1073,12 @@ $active_package_tab = 'probationary';
                         </div>
                     </div>
                 </div>
+                <?php endif; ?>
 
-                <!-- Tabbed Detail Navigation -->
-                <ul class="nav nav-tabs package-nav-tabs mb-3" id="pkgTabs-<?php echo (int)$package['package_id']; ?>" role="tablist">
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link active" id="tab-members-btn-<?php echo (int)$package['package_id']; ?>" data-bs-toggle="tab" data-bs-target="#tab-members-<?php echo (int)$package['package_id']; ?>" type="button" role="tab" aria-controls="tab-members-<?php echo (int)$package['package_id']; ?>" aria-selected="true">
-                            <i class="fas fa-users-cog me-2"></i>Evaluations
-                            <span class="badge bg-secondary ms-1 rounded-pill"><?php echo count($members); ?></span>
-                        </button>
-                    </li>
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="tab-timeline-btn-<?php echo (int)$package['package_id']; ?>" data-bs-toggle="tab" data-bs-target="#tab-timeline-<?php echo (int)$package['package_id']; ?>" type="button" role="tab" aria-controls="tab-timeline-<?php echo (int)$package['package_id']; ?>" aria-selected="false">
-                            <i class="fas fa-stream me-2"></i>Approval Timeline &amp; History
-                            <span class="badge bg-secondary ms-1 rounded-pill"><?php echo count($timeline); ?></span>
-                        </button>
-                    </li>
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="tab-audit-btn-<?php echo (int)$package['package_id']; ?>" data-bs-toggle="tab" data-bs-target="#tab-audit-<?php echo (int)$package['package_id']; ?>" type="button" role="tab" aria-controls="tab-audit-<?php echo (int)$package['package_id']; ?>" aria-selected="false">
-                            <i class="fas fa-history me-2"></i>Evaluation Review Audit Trail &amp; Revision History
-                        </button>
-                    </li>
-                </ul>
-
-                <div class="tab-content package-tab-content mb-4" id="pkgTabContent-<?php echo (int)$package['package_id']; ?>">
-                    <!-- Tab 1: Evaluations -->
-                    <div class="tab-pane fade show active" id="tab-members-<?php echo (int)$package['package_id']; ?>" role="tabpanel" aria-labelledby="tab-members-btn-<?php echo (int)$package['package_id']; ?>">
+                <?php if (!$is_probationary_package): ?>
+                <section class="package-tab-content mb-4" aria-label="Evaluations">
+                    <h3 class="h6 fw-bold mb-3"><i class="fas fa-users-cog me-2" aria-hidden="true"></i>Evaluations <span class="badge bg-secondary rounded-pill"><?php echo count($members); ?></span></h3>
+                    <div>
                         <div class="table-responsive mb-3">
                             <table class="package-table table align-middle mb-0 probationary-mobile-roster">
                                 <thead>
@@ -1189,70 +1201,12 @@ $active_package_tab = 'probationary';
                         <?php endif; ?>
                     </div>
 
-                    <!-- Tab 2: Approval Timeline & History -->
-                    <div class="tab-pane fade" id="tab-timeline-<?php echo (int)$package['package_id']; ?>" role="tabpanel" aria-labelledby="tab-timeline-btn-<?php echo (int)$package['package_id']; ?>">
-                        <section class="package-history py-2">
-                            <ol class="package-timeline mb-0">
-                                <?php foreach ($timeline as $entry): ?>
-                                    <?php
-                                    $act_status = $entry['action_status'];
-                                    $status_class = match($act_status) {
-                                        'Approved' => 'is-approved',
-                                        'Returned' => 'is-returned',
-                                        'Pending'  => 'is-pending',
-                                        default    => 'is-waiting'
-                                    };
-                                    $badge_class = match($act_status) {
-                                        'Approved' => 'bg-success text-white',
-                                        'Returned' => 'bg-danger text-white',
-                                        'Pending'  => 'bg-warning text-dark border border-warning',
-                                        default    => 'bg-secondary text-white'
-                                    };
-                                    $icon_class = match($act_status) {
-                                        'Approved' => 'fa-check-circle text-success',
-                                        'Returned' => 'fa-undo-alt text-danger',
-                                        'Pending'  => 'fa-clock text-warning',
-                                        default    => 'fa-hourglass-start text-muted'
-                                    };
-                                    ?>
-                                    <li class="<?php echo $status_class; ?>">
-                                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
-                                            <div class="fw-bold text-dark fs-6">
-                                                <i class="fas <?php echo $icon_class; ?> me-1"></i> <?php echo e($entry['step_label']); ?>
-                                            </div>
-                                            <span class="badge <?php echo $badge_class; ?> px-2 py-1">
-                                                <?php echo e($entry['action_status']); ?>
-                                            </span>
-                                        </div>
-                                        <div class="small text-muted mt-1">
-                                            <?php if (!empty($entry['acted_at'])): ?>
-                                                <i class="far fa-calendar-check me-1"></i> <?php echo e(date('M d, Y h:i A', strtotime($entry['acted_at']))); ?>
-                                            <?php else: ?>
-                                                <span class="fst-italic"><?php echo $act_status === 'Pending' ? 'Currently Under Review' : 'Waiting for prior stage approval'; ?></span>
-                                            <?php endif; ?>
-                                        </div>
-                                        <?php if (!empty($entry['comments'])): ?>
-                                            <div class="small p-2 mt-2 rounded border" style="background:#FFFBF0; border-color:#FDE68A !important;">
-                                                <i class="fas fa-comment-dots text-warning me-1"></i><strong>Remarks:</strong> <em><?php echo e($entry['comments']); ?></em>
-                                            </div>
-                                        <?php endif; ?>
-                                    </li>
-                                <?php endforeach; ?>
-                            </ol>
-                        </section>
-                    </div>
-
-                    <!-- Tab 3: Package Audit Trail & Revision History -->
-                    <div class="tab-pane fade" id="tab-audit-<?php echo (int)$package['package_id']; ?>" role="tabpanel" aria-labelledby="tab-audit-btn-<?php echo (int)$package['package_id']; ?>">
-                        <div class="py-2">
-                            <?php echo renderOrganizationPackageAuditTrail($conn, (int)$package['package_id']); ?>
-                        </div>
-                    </div>
-                </div>
+                </section>
+                <?php endif; ?>
 
 
                 <!-- Action Panel with descriptive hand-off copy & F3 Pre-Submission Modal -->
-                <form method="post" class="package-action-panel" id="pkgForm-<?php echo (int)$package['package_id']; ?>">
+                <form method="post" class="package-action-panel<?php echo $is_probationary_package ? ' package-action-panel--probationary' : ''; ?><?php echo $is_probationary_package && $is_unclaimed_group_step && !empty($members) ? ' d-none' : ''; ?>" id="pkgForm-<?php echo (int)$package['package_id']; ?>">
                     <input type="hidden" name="package_id" value="<?php echo (int)$package['package_id']; ?>">
                     <input type="hidden" name="package_action" id="actionInput-<?php echo (int)$package['package_id']; ?>" value="<?php echo $is_unclaimed_group_step ? 'claim' : 'approve'; ?>">
                     <?php if ($is_probationary_package && (int)$package['current_step_order'] === 1 && count($members) === 1): ?>
@@ -1265,7 +1219,7 @@ $active_package_tab = 'probationary';
                         <div class="alert alert-info py-2 px-3 small mb-3">
                             <i class="fas fa-user-check me-1"></i>This evaluation review is available to any eligible active <strong><?php echo e($group_reviewer_label); ?></strong>. Accepting it assigns this review to you; other reviewers can no longer accept this stage.
                         </div>
-                        <button class="btn btn-success px-4 py-2 fw-bold" type="submit" style="min-height:46px; border-radius:8px;">
+                        <button class="btn btn-success px-4 py-2 fw-bold <?php echo $is_probationary_package && !empty($members) ? 'd-none' : ''; ?>" type="submit" style="min-height:46px; border-radius:8px;">
                             <i class="fas fa-hand-paper me-1"></i>Accept Review
                         </button>
                     <?php else: ?>
@@ -1276,9 +1230,9 @@ $active_package_tab = 'probationary';
                     <?php endif; ?>
 
                     <?php if ($signature_gate_locked): ?>
-                        <div class="alert alert-warning py-2 px-3 small mb-3" role="status">
+                        <div class="alert alert-warning py-2 px-3 small mb-2" role="status">
                             <i class="fas fa-lock me-1"></i><strong>Approval locked.</strong>
-                            Open <strong>Review &amp; Decide</strong> for this employee<?php echo ($package['evaluation_type'] ?? '') === 'Final' ? ', record the recommendation and reason, sign, and save' : ', sign the Immediate head signature, and save'; ?> to unlock approval.
+                            Open <strong>Review &amp; Decide</strong><?php echo ($package['evaluation_type'] ?? '') === 'Final' ? ', save the recommendation and signature' : ', save the Immediate head signature'; ?> to unlock approval.
                         </div>
                     <?php endif; ?>
 
@@ -1291,16 +1245,17 @@ $active_package_tab = 'probationary';
                             <i class="fas fa-shield-alt me-1"></i><strong>Final Board Step:</strong> Approving will lock this evaluation review, apply shared Behavior scores to all <?php echo count($members); ?> members, and publish final appraisal results.
                         </div>
                     <?php elseif ($is_final_probationary_step): ?>
-                        <div class="alert alert-info py-2 px-3 small mb-3">
-                            <strong><?php echo $is_final_hr_step ? e($package['step_label'] ?? 'Final HR approval') . ':' : 'Final Department Manager approval:'; ?></strong> Approval records the individual KRA and Core Values score, applies the probationary outcome, and completes this evaluation. The HR Manager receives an informational notification after HR Staff approval.
-                        </div>
+                        <details class="package-approval-details mb-2">
+                            <summary><?php echo $is_final_hr_step ? e($package['step_label'] ?? 'Final HR approval') : 'What happens on final approval'; ?></summary>
+                            <p class="mb-0 small">Approval records the individual KRA and Core Values score, applies the probationary outcome, and completes this evaluation. The HR Manager receives an informational notification after HR Staff approval.</p>
+                        </details>
                     <?php elseif ($package['step_type'] === 'Governance'): ?>
                         <div class="alert alert-secondary py-2 px-3 small mb-3">
                             <i class="fas fa-balance-scale me-1"></i>Governance review stage. Review and adjust scores if necessary before forwarding or approving.
                         </div>
                     <?php endif; ?>
 
-                    <div class="mb-3 package-review-remarks">
+                    <div class="mb-2 package-review-remarks<?php echo $is_probationary_package && $signature_gate_locked ? ' d-none' : ''; ?>">
                         <label class="form-label fw-bold" for="comments-<?php echo (int)$package['package_id']; ?>">
                             Review Remarks &amp; Feedback <span class="text-muted fw-normal">(Optional for approval, required for returns)</span>
                         </label>
@@ -1315,6 +1270,7 @@ $active_package_tab = 'probationary';
                                 <i class="fas fa-times-circle me-1"></i>Decline Regularization
                             </button>
                         <?php endif; ?>
+                        <?php if (!$is_probationary_package || !$signature_gate_locked): ?>
                         <?php if (!$package_next_check['ok']): ?>
                             <!-- Blocked Action Button with direct modal to explain reason and route to config -->
                             <button class="btn btn-warning px-4 py-2 fw-bold text-dark" type="button" data-bs-toggle="modal" data-bs-target="#confirmApproveModal-<?php echo (int)$package['package_id']; ?>" <?php echo $signature_gate_locked ? 'disabled' : ''; ?> style="min-height:46px; border-radius:8px;">
@@ -1329,6 +1285,7 @@ $active_package_tab = 'probationary';
                                     <i class="fas fa-check-circle me-1"></i>Approve &amp; Forward to Next Reviewer
                                 <?php endif; ?>
                             </button>
+                        <?php endif; ?>
                         <?php endif; ?>
 
                         <?php if ($is_probationary_package && (int)$package['current_step_order'] === 1 && count($members) === 1): ?>
@@ -1465,6 +1422,19 @@ function rejectProbationaryRegularization(packageId) {
 const packageCategoryTabs = Array.from(document.querySelectorAll('[data-package-category-tab]'));
 const packageCards = Array.from(document.querySelectorAll('[data-package-category]'));
 const packageFilterEmpty = document.getElementById('packageFilterEmpty');
+
+document.querySelectorAll('.btn-package-collapse').forEach((button) => {
+    const body = document.getElementById(button.getAttribute('aria-controls'));
+    if (!body) return;
+    body.addEventListener('shown.bs.collapse', () => {
+        button.title = 'Minimize Review';
+        button.querySelector('span').textContent = 'Minimize';
+    });
+    body.addEventListener('hidden.bs.collapse', () => {
+        button.title = 'Expand Review';
+        button.querySelector('span').textContent = 'Expand';
+    });
+});
 
 document.querySelectorAll('[data-return-toggle]').forEach((button) => {
     button.addEventListener('click', () => {

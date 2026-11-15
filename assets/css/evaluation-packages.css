@@ -109,6 +109,50 @@
     box-sizing: border-box;
 }
 
+.evaluation-packages .package-card--probationary-summary {
+    border-color: #e1e8eb;
+    box-shadow: 0 5px 18px rgba(25, 51, 59, .1);
+}
+.evaluation-packages .package-card--probationary-summary .package-card__header {
+    background: #fff;
+    border-bottom: 0;
+}
+.evaluation-packages .probationary-type-badge {
+    padding: .3rem .7rem;
+    border-radius: 5px;
+    background: #e4f5e6;
+    color: #17632a;
+    font-size: .75rem;
+    font-weight: 700;
+}
+.evaluation-packages .probationary-review-summary { margin-bottom: 1.5rem; }
+.evaluation-packages .probationary-review-top { display: grid; grid-template-columns: 1.25fr 1fr; gap: 1rem; margin-bottom: 1.25rem; }
+.evaluation-packages .probationary-review-person,
+.evaluation-packages .probationary-review-score { min-width: 0; border-radius: 12px; padding: 1rem; }
+.evaluation-packages .probationary-review-top .page-hero { background: linear-gradient(135deg, var(--hero-from) 0%, var(--hero-mid) 50%, var(--hero-to) 100%); border-top: 3px solid #d6aa32; box-shadow: 0 8px 20px rgba(22,47,8,.16); }
+.evaluation-packages .probationary-review-top .page-hero > * { position: relative; z-index: 1; }
+.evaluation-packages .probationary-review-person { display: flex; align-items: center; gap: .8rem; }
+.evaluation-packages .probationary-review-person strong { display: block; color: #fff; font-size: 1.1rem; }
+.evaluation-packages .probationary-review-person span { display: block; color: #eaf1dc; font-size: .8rem; }
+.evaluation-packages .probationary-review-avatar { display: block; flex: 0 0 42px; width: 42px; height: 42px; border-radius: 50%; background: #fff; object-fit: cover; border: 2px solid rgba(255,255,255,.65); }
+.evaluation-packages .probationary-review-location { margin-left: auto; padding-left: 1rem; border-left: 1px solid rgba(255,255,255,.25); }
+.evaluation-packages .probationary-review-location span { display: flex; align-items: center; gap: .4rem; }
+.evaluation-packages .probationary-review-score > span { color: #f5e8bd; font-size: .78rem; font-weight: 700; }
+.evaluation-packages .probationary-review-score > div { color: #eaf1dc; font-weight: 600; }
+.evaluation-packages .probationary-review-score strong { color: #fff; font-size: 1.9rem; }
+.evaluation-packages .probationary-review-score small { display: inline-flex; align-items: center; gap: .35rem; padding: .25rem .55rem; border-radius: 5px; background: #f8edc5; color: #6a4b0a; font-weight: 700; }
+.evaluation-packages .probationary-review-breakdown { border: 1px solid #dce5e8; border-radius: 7px; overflow: hidden; font-size: .85rem; }
+.evaluation-packages .probationary-review-breakdown th { background: #eaf0f1; color: #23333a; }
+.evaluation-packages .probationary-review-breakdown td,
+.evaluation-packages .probationary-review-breakdown th { padding: .55rem .8rem; }
+.evaluation-packages .probationary-review-breakdown td i { color: #16813a; margin-right: .4rem; }
+.evaluation-packages .probationary-review-breakdown .probationary-review-total th { background: #e0f2dd; color: #126329; font-size: .95rem; }
+@media (max-width: 767px) {
+    .evaluation-packages .probationary-review-top { grid-template-columns: 1fr; }
+    .evaluation-packages .probationary-review-person { flex-wrap: wrap; }
+    .evaluation-packages .probationary-review-location { width: 100%; margin-left: 0; padding: .7rem 0 0; border-left: 0; border-top: 1px solid rgba(255,255,255,.25); }
+}
+
 .evaluation-packages .package-card__header {
     align-items: center;
     background: var(--rp-bg-muted);
@@ -641,6 +685,17 @@
     width: 100%;
     box-sizing: border-box;
 }
+.evaluation-packages .package-action-panel--probationary { padding: .85rem 1rem; }
+.evaluation-packages .package-action-panel--probationary .package-review-remarks textarea { min-height: 48px !important; }
+.evaluation-packages .package-approval-details {
+    border: 1px solid #cbdfe5;
+    border-radius: 7px;
+    background: #f3f9fb;
+    color: #285260;
+    padding: .4rem .7rem;
+}
+.evaluation-packages .package-approval-details summary { cursor: pointer; font-size: .8rem; font-weight: 700; }
+.evaluation-packages .package-approval-details p { padding: .45rem 0 .15rem; }
 
 .evaluation-packages .btn-action-primary {
     align-items: center;

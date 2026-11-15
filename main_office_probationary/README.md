@@ -31,3 +31,7 @@ For the new sample people's Employee Portal accounts, the username is the exact 
 The existing HR immediate head uses `patricia.gomez` and her existing password. The seed creates an Employee Portal account for `AP-001` only when it does not already have one, using `AP-001` as the username. A CEO HRIS account, if created, uses `ceo.001` to leave `CEO-001` available for a separate Employee Portal account.
 
 These templates use sample criteria for workflow testing. Confirm the actual role measures before using them for real evaluations.
+
+## Start the probationary evaluation
+
+Log in to the Employee Portal as a probationary employee, for example `MO26-AP-P` or `MO26-AP-P2`, then open **Self Rating** and choose the **Initial** form for AP Staff I. The employee submits the self-rating first; the immediate head (`MO26-AP-H`) receives the review afterward. The **Final** form is available only after the Initial evaluation is fully approved. Regular AP heads and the VP do not self-rate against these probationary forms.

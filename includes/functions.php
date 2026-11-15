@@ -7921,7 +7921,7 @@ function recalculateEvaluationScores($conn, $evaluation_id)
         if ($row['section'] === 'KRA') {
             $weight = (float)$row['weight'];
             $weighted = round(($weight / 100) * $effective_score, 2);
-            $kra_subtotal += $weighted;
+            $kra_subtotal += ($weight / 100) * $effective_score;
             
             $conn->query("UPDATE evaluation_scores SET weighted_score = $weighted WHERE score_id = $score_id");
         } else {
@@ -8575,7 +8575,7 @@ function getOriginalSelfRatingScore($conn, $evaluation_id)
         if ($row['section'] === 'KRA') {
             $weight = (float)$row['weight'];
             $weighted = round(($weight / 100) * $score, 2);
-            $kra_subtotal += $weighted;
+            $kra_subtotal += ($weight / 100) * $score;
         } else {
             $beh_total += $score;
             $beh_count++;

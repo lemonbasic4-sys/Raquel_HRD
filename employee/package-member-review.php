@@ -333,28 +333,26 @@ $devplan_count = count($existing_dev_plans);
     </div>
     </section>
 
-    <!-- Score Summary Stats (F1: Computed Final Score Badge) -->
-    <section class="package-card" aria-label="Score Summary">
-        <div class="package-card__body">
-            <div class="row g-3">
-                <div class="col-md-6 col-sm-6">
-                    <div class="package-stat h-100 d-flex flex-column justify-content-between" style="background: #F4FBF7; border: 2px solid #86EFAC; border-radius: 12px; padding: 1.1rem 1.25rem;">
-                        <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
-                            <strong class="tabular-nums text-success m-0" id="stat-shared-behavior" style="font-size: 1.6rem; line-height: 1;"><?php echo number_format((float)$shared_beh, 2); ?></strong>
-                            <span class="badge bg-success-subtle text-success border border-success px-2 py-1 small"><?php echo $is_probationary ? 'Individual' : 'Department Shared'; ?></span>
-                        </div>
-                        <div class="text-muted fw-semibold" style="font-size: 0.85rem;"><?php echo $is_probationary ? 'Individual Core Values Result' : 'Shared Department Behavior Result'; ?></div>
-                    </div>
-                </div>
-                <div class="col-md-6 col-sm-6">
-                    <div class="package-stat h-100 d-flex flex-column justify-content-between" style="background: #FAF8F0; border: 2px solid var(--rp-primary-gold); border-radius: 12px; padding: 1.1rem 1.25rem;">
-                        <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
-                            <strong class="tabular-nums text-primary m-0" id="stat-est-total-score" style="font-size: 1.6rem; line-height: 1;"><?php echo number_format($est_final_score, 2); ?></strong>
-                            <span class="badge bg-success px-2 py-1 small" id="stat-perf-level"><?php echo e($est_perf_level); ?></span>
-                        </div>
-                        <div class="text-muted fw-semibold" style="font-size: 0.85rem;">Estimated Current / Final Score</div>
-                    </div>
-                </div>
+    <section class="review-score-summary row g-3 mb-4" aria-label="Score Summary">
+        <div class="col-12 col-md-4">
+            <div class="page-hero fadeup review-score-card h-100 mb-0">
+                <span class="review-score-label"><i class="fas fa-bullseye me-2" aria-hidden="true"></i>KRA</span>
+                <strong class="tabular-nums review-score-value" id="stat-kra-score"><?php echo number_format($adj_kra_subtotal, 2); ?></strong>
+                <span class="review-score-detail">Key Result Areas (<?php echo number_format($kra_w, 0); ?>%)</span>
+            </div>
+        </div>
+        <div class="col-12 col-md-4">
+            <div class="page-hero fadeup review-score-card h-100 mb-0">
+                <span class="review-score-label"><i class="fas fa-heart me-2" aria-hidden="true"></i>Behavior</span>
+                <strong class="tabular-nums review-score-value" id="stat-shared-behavior"><?php echo number_format((float)$shared_beh, 2); ?></strong>
+                <span class="review-score-detail"><?php echo $is_probationary ? 'Individual Core Values' : 'Department Shared Score'; ?> (<?php echo number_format($beh_w, 0); ?>%)</span>
+            </div>
+        </div>
+        <div class="col-12 col-md-4">
+            <div class="page-hero fadeup review-score-card h-100 mb-0">
+                <span class="review-score-label"><i class="fas fa-chart-line me-2" aria-hidden="true"></i>Final Score</span>
+                <strong class="tabular-nums review-score-value" id="stat-est-total-score"><?php echo number_format($est_final_score, 2); ?></strong>
+                <span class="review-score-detail"><span id="stat-perf-level"><?php echo e($est_perf_level); ?></span> &middot; Estimated until approval</span>
             </div>
         </div>
     </section>
@@ -843,6 +841,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const individualBehavior = <?php echo $is_probationary ? 'true' : 'false'; ?>;
 
     const ratingInputs = document.querySelectorAll('.eval-score-input');
+    const statKraScore = document.getElementById('stat-kra-score');
+    const statBehavior = document.getElementById('stat-shared-behavior');
     const statEstTotal = document.getElementById('stat-est-total-score');
     const statPerfLevel = document.getElementById('stat-perf-level');
 
@@ -878,6 +878,8 @@ document.addEventListener('DOMContentLoaded', function () {
         const level = getPerfLevel(estTotal);
 
         // Update Top Score Stat Cards
+        if (statKraScore) statKraScore.textContent = kraSubtotal.toFixed(2);
+        if (statBehavior && individualBehavior) statBehavior.textContent = behAverage.toFixed(2);
         if (statEstTotal) statEstTotal.textContent = estTotalRounded;
         if (statPerfLevel) statPerfLevel.textContent = level;
 

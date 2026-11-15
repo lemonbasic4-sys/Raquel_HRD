@@ -102,6 +102,36 @@ if (!empty($creator_context['is_ceo'])) {
         ? $owned_template_scope_sql : '1 = 1';
     $manageable_template_scope_sql = $owned_template_scope_sql;
 }
+// Heads may inspect templates authored by their reporting chain. Management
+// permissions still come from canManageEvaluationTemplate(), so these are read only.
+if ($template_viewer_role === 'Employee' && empty($creator_context['is_ceo'])
+    && $_template_viewer_employee_id > 0 && $viewer_department_id > 0) {
+    $reporting_rows = $conn->query("SELECT employee_id, reports_to FROM employees
+        WHERE department_id = $viewer_department_id AND is_active = 1 AND deleted_at IS NULL");
+    $reporting_children = [];
+    while ($reporting_row = $reporting_rows->fetch_assoc()) {
+        $reporting_children[(int)$reporting_row['reports_to']][] = (int)$reporting_row['employee_id'];
+    }
+    $reporting_queue = [$_template_viewer_employee_id];
+    $reporting_descendants = [];
+    while ($reporting_queue) {
+        $head_id = array_shift($reporting_queue);
+        foreach ($reporting_children[$head_id] ?? [] as $child_id) {
+            if ($child_id === $_template_viewer_employee_id || isset($reporting_descendants[$child_id])) continue;
+            $reporting_descendants[$child_id] = true;
+            $reporting_queue[] = $child_id;
+        }
+    }
+    if ($reporting_descendants) {
+        $descendant_ids = implode(',', array_keys($reporting_descendants));
+        $template_scope_sql = "($template_scope_sql OR (et.target_department_id = $viewer_department_id AND et.created_by IN (
+            SELECT subordinate_user.user_id FROM users subordinate_user
+            WHERE subordinate_user.employee_id IN ($descendant_ids)
+              AND subordinate_user.is_active = 1 AND COALESCE(subordinate_user.account_hold, 0) = 0
+              AND subordinate_user.deleted_at IS NULL
+        )))";
+    }
+}
 $is_cross_department_template_viewer = !empty($creator_context['is_ceo'])
     || in_array($template_viewer_role, ['HR Manager', 'HR Supervisor', 'HR Staff'], true);
 $viewer_department_name = '';

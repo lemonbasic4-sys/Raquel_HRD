@@ -922,9 +922,12 @@ if ((float)($row['total_score'] ?? 0) > 0 && (empty($pl) || $pl === '0')) {
     <!-- Immediate Supervisor Comments -->
     <div class="comment-box">
       <div class="label">Evaluator's Comments:</div>
-      <div class="content">&nbsp;</div>
+      <div class="content"><?php echo !empty($supervisor_comments) ? nl2br(e($supervisor_comments)) : '&nbsp;'; ?></div>
       <div class="comment-signature">
         <div class="signature-line"></div>
+        <?php if (in_array(($row['evaluation_type'] ?? ''), ['Initial', 'Final'], true) && !empty($row['rater_name'])): ?>
+          <div style="font-weight:bold;font-size:10px;text-align:center;"><?php echo e(mb_strtoupper($row['rater_name'])); ?></div>
+        <?php endif; ?>
         <div class="signature-caption">Signature over Printed Name</div>
       </div>
     </div>

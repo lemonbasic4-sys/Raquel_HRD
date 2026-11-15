@@ -210,60 +210,52 @@ require_once '../includes/header.php';
                     </div>
                 </div>
                 <?php endif; ?>
-                <div class="<?php echo $is_annual_peer_evaluation ? 'col-12 col-md-4' : 'col-sm-6'; ?>">
-                    <?php
-                    $ts_val = $show_reviewed_scores && $evaluation['total_score'] !== null ? (float)$evaluation['total_score'] : (float)$orig_total_score;
-                    if ($show_reviewed_scores && $ts_val !== null) {
-                        if ($ts_val >= 3.60)     { $score_bg = 'linear-gradient(135deg,#146c43,#198754)'; $score_border = '#146c43'; }
-                        elseif ($ts_val >= 2.60) { $score_bg = 'linear-gradient(135deg,#087990,#0dcaf0)'; $score_border = '#087990'; }
-                        elseif ($ts_val >= 2.00) { $score_bg = 'linear-gradient(135deg,#cc8800,#ffc107)'; $score_border = '#cc8800'; }
-                        else                     { $score_bg = 'linear-gradient(135deg,#a71d2a,#dc3545)'; $score_border = '#a71d2a'; }
-                        $score_card_style = "background:{$score_bg};border:2px solid {$score_border};border-radius:10px;padding:14px 18px;";
-                        $score_label_style = 'color:rgba(255,255,255,.75)';
-                        $score_value_style = 'font-size:1.8rem;color:#fff;';
-                        $score_sub_style   = 'color:rgba(255,255,255,.8)';
-                    } else {
-                        $score_card_style  = 'border:2px solid var(--bs-border-color,#dee2e6);border-radius:10px;padding:14px 18px;background:#F8FAFC;';
-                        $score_label_style = 'color:#6c757d';
-                        $score_value_style = 'font-size:1.8rem;color:#0F172A;';
-                        $score_sub_style   = 'color:#6c757d';
-                    }
-                    ?>
-                    <div class="package-stat h-100 d-flex flex-column justify-content-between" style="<?php echo $score_card_style; ?>">
-                        <span class="small text-uppercase fw-bold" style="<?php echo $score_label_style; ?>">
-                            <?php echo $is_annual_peer_evaluation ? 'Final Score' : ($is_package_completed ? 'Overall Score' : ($show_reviewed_scores ? 'Head-Reviewed Score' : 'Submitted Self Total')); ?>
-                        </span>
-                        <div class="d-flex align-items-baseline gap-2 mt-1">
-                            <strong class="tabular-nums" style="<?php echo $score_value_style; ?>"><?php echo number_format($ts_val, 2); ?></strong>
-                            <?php if (!$is_annual_peer_evaluation && $show_reviewed_scores && abs($ts_val - $orig_total_score) > 0.001): ?>
-                                <span class="badge bg-light text-dark border small" title="Original Self Total: <?php echo number_format($orig_total_score, 2); ?>">
-                                    Orig: <?php echo number_format($orig_total_score, 2); ?>
-                                </span>
-                            <?php endif; ?>
-                        </div>
-                        <div class="small mt-1" style="<?php echo $score_sub_style; ?>">
-                            Performance Level: <strong><?php echo e($show_reviewed_scores ? ($evaluation['performance_level'] ?: getPerformanceLevel($ts_val)) : 'Pending Final Approval'); ?></strong>
-                        </div>
+                <?php if (!$is_annual_peer_evaluation): ?>
+                <div class="col-12 col-md-4">
+                    <div class="package-stat page-hero fadeup h-100 d-flex flex-column justify-content-between mb-0">
+                        <span class="score-card-label small text-uppercase fw-bold"><i class="fas fa-bullseye me-2" aria-hidden="true"></i>KRA</span>
+                        <strong class="score-card-value tabular-nums mt-1"><?php echo $is_historical_import && $evaluation['kra_subtotal'] === null ? '—' : number_format($show_reviewed_scores ? (float)$evaluation['kra_subtotal'] : $orig_kra_subtotal, 2); ?></strong>
+                        <div class="score-card-detail small mt-1">Key Result Areas (<?php echo number_format($kra_weight, 0); ?>%)</div>
                     </div>
                 </div>
-
-                <?php if (!$is_annual_peer_evaluation): ?>
-                <div class="col-sm-6">
-                    <div class="package-stat h-100 d-flex flex-column justify-content-between" style="border:2px solid var(--bs-border-color,#dee2e6);border-radius:10px;padding:14px 18px;">
-                        <span class="text-muted small text-uppercase fw-bold"><?php echo $is_probationary_evaluation ? 'Individual Core Values' : 'Shared Team Behavior'; ?></span>
-                        <strong class="tabular-nums mt-1" style="color:var(--rp-primary-gold-dark);font-size:1.8rem;">
+                <div class="col-12 col-md-4">
+                    <div class="package-stat page-hero fadeup h-100 d-flex flex-column justify-content-between mb-0">
+                        <span class="score-card-label small text-uppercase fw-bold"><i class="fas fa-heart me-2" aria-hidden="true"></i>Behavior</span>
+                        <strong class="score-card-value tabular-nums mt-1">
                             <?php echo $is_historical_import
                                 ? ($evaluation['behavior_average'] === null ? '—' : number_format((float)$evaluation['behavior_average'], 2))
                                 : ($is_probationary_evaluation
                                     ? number_format($show_reviewed_scores ? (float)$evaluation['behavior_average'] : $orig_beh_average, 2)
                                     : (($is_package_completed && $evaluation['shared_behavior_score'] !== null) ? number_format((float)$evaluation['shared_behavior_score'], 2) : 'Pending')); ?>
                         </strong>
-                        <div class="small text-muted mt-1">
-                            <?php echo $is_probationary_evaluation ? 'Individual score (20%)' : ($is_package_completed ? 'Finalized department shared score' : 'Calculated and applied at final Board approval'); ?>
+                        <div class="score-card-detail small mt-1">
+                            <?php echo $is_probationary_evaluation ? 'Individual Core Values (' . number_format($beh_weight, 0) . '%)' : ($is_package_completed ? 'Finalized department shared score' : 'Calculated and applied at final Board approval'); ?>
                         </div>
                     </div>
                 </div>
                 <?php endif; ?>
+                <div class="col-12 col-md-4">
+                    <?php
+                    $ts_val = $show_reviewed_scores && $evaluation['total_score'] !== null ? (float)$evaluation['total_score'] : (float)$orig_total_score;
+                    ?>
+                    <div class="package-stat page-hero fadeup h-100 d-flex flex-column justify-content-between mb-0">
+                        <span class="score-card-label small text-uppercase fw-bold"><i class="fas fa-chart-line me-2" aria-hidden="true"></i>
+                            <?php echo $is_annual_peer_evaluation ? 'Final Score' : 'Overall Score'; ?>
+                        </span>
+                        <div class="d-flex align-items-baseline gap-2 mt-1">
+                            <strong class="score-card-value tabular-nums"><?php echo number_format($ts_val, 2); ?></strong>
+                            <?php if (!$is_annual_peer_evaluation && $show_reviewed_scores && abs($ts_val - $orig_total_score) > 0.001): ?>
+                                <span class="badge bg-light text-dark border small" title="Original Self Total: <?php echo number_format($orig_total_score, 2); ?>">
+                                    Orig: <?php echo number_format($orig_total_score, 2); ?>
+                                </span>
+                            <?php endif; ?>
+                        </div>
+                        <div class="score-card-detail small mt-1">
+                            <span>Performance Level</span><strong><?php echo e($show_reviewed_scores ? ($evaluation['performance_level'] ?: getPerformanceLevel($ts_val)) : 'Pending Final Approval'); ?></strong>
+                        </div>
+                    </div>
+                </div>
+
             </div>
 
             <?php endif; ?>
@@ -281,6 +273,37 @@ require_once '../includes/header.php';
 
     <!-- ── Tabbed Sections ──────────────────────────────────────────────── -->
     <style>
+
+        .evaluation-history-view .package-stat.page-hero {
+            background: linear-gradient(135deg, var(--hero-from) 0%, var(--hero-mid) 50%, var(--hero-to) 100%);
+            border: 1px solid rgba(255,255,255,.16);
+            border-top: 4px solid #d6aa32;
+            color: #fff;
+            padding: 18px 20px;
+            align-items: flex-start;
+            gap: 14px;
+            box-shadow: 0 8px 20px rgba(22,47,8,.16);
+        }
+        .evaluation-history-view .package-stat.page-hero .score-card-label {
+            color: #f5e8bd;
+            letter-spacing: .04em;
+        }
+        .evaluation-history-view .package-stat.page-hero .score-card-value {
+            color: #fff;
+            font-size: 2.15rem;
+            line-height: 1;
+        }
+        .evaluation-history-view .package-stat.page-hero .score-card-detail {
+            width: 100%;
+            padding-top: 10px;
+            border-top: 1px solid rgba(255,255,255,.22);
+            color: #eaf1dc;
+        }
+        .evaluation-history-view .package-stat.page-hero .score-card-detail strong {
+            color: #fff;
+            font-size: 1rem;
+            margin: 2px 0 0;
+        }
 
         .eval-tabs-wrapper{background:#fff;border-radius:14px;border:1px solid var(--bs-border-color,#dee2e6);box-shadow:0 2px 12px rgba(0,0,0,.07);overflow:hidden;display:flex;flex-direction:column;}
         .eval-tab-nav{display:flex;gap:6px;padding:14px 16px 0;border-bottom:1px solid #e2e8f0;background:#f8fafc;flex-shrink:0;flex-wrap:wrap;}

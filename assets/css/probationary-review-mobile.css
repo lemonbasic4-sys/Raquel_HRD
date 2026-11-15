@@ -1,4 +1,18 @@
-/* Probationary immediate-head review only; desktop is unchanged. */
+.probationary-review-page .review-score-card {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: .8rem;
+    padding: 1.2rem 1.4rem;
+    border-top: 4px solid #d6aa32;
+    box-shadow: 0 8px 20px rgba(22, 47, 8, .16);
+    color: #fff;
+}
+.probationary-review-page .review-score-card > * { position: relative; z-index: 1; }
+.probationary-review-page .review-score-label { color: #f5e8bd; font-size: .8rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+.probationary-review-page .review-score-value { color: #fff; font-size: 2.1rem; font-weight: 800; line-height: 1; }
+.probationary-review-page .review-score-detail { width: 100%; padding-top: .6rem; border-top: 1px solid rgba(255,255,255,.25); color: #eaf1dc; font-size: .8rem; font-weight: 600; }
+/* Probationary immediate-head review mobile layout. */
 @media(max-width:650px) {
  .probationary-review-page #reviewForm .package-card__body { padding:12px!important; }
  .probationary-review-page #reviewForm .eval-tabs-header { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px; padding:8px; overflow:visible; }

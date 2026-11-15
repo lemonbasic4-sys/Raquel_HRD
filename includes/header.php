@@ -197,7 +197,7 @@ switch ($effective_role) {
                 ['icon' => 'fas fa-chart-line', 'label' => 'Career Progression', 'url' => BASE_URL . '/supervisor/career-progression.php', 'page' => 'career-progression.php'],
             ],
             'ANALYTICS' => [
-                ['icon' => 'fas fa-chart-bar', 'label' => 'Branch Analytics', 'url' => BASE_URL . '/supervisor/analytics.php', 'page' => 'analytics.php'],
+                ['icon' => 'fas fa-chart-bar', 'label' => 'Analytics', 'url' => BASE_URL . '/supervisor/analytics.php', 'page' => 'analytics.php'],
                 ['icon' => 'fas fa-clipboard-list', 'label' => 'My Audit Trail', 'url' => BASE_URL . '/supervisor/audit-trail.php', 'page' => 'audit-trail.php'],
             ],
         ];

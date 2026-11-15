@@ -556,7 +556,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $rating = 0;
         $weight = (float) $criterion['weight'];
         $weighted = round(($weight / 100) * $rating, 2);
-        $kra_subtotal += $weighted;
+        $kra_subtotal += ($weight / 100) * $rating;
         $kra_score_data[] = ['criterion_id' => $criterion_id, 'score_value' => $rating, 'weighted_score' => $weighted];
     }
     $kra_subtotal = round($kra_subtotal, 2);
@@ -2467,9 +2467,9 @@ require_once '../includes/header.php';
                             <div class="col-sm-6"><label class="form-label" for="evaluationPeriodFrom">Period From</label><input id="evaluationPeriodFrom" type="date" class="form-control" value="<?php echo e($display_start); ?>" readonly></div>
                             <div class="col-sm-6"><label class="form-label" for="evaluationPeriodTo">Period To</label><input id="evaluationPeriodTo" type="date" class="form-control" value="<?php echo e($display_end); ?>" readonly></div>
                         </div>
-                        <div class="border rounded bg-light p-3 mb-3 text-center" style="overflow-wrap: anywhere;">
-                            <div class="small text-muted fw-semibold mb-1">Evaluation Template</div>
-                            <div class="fw-bold fs-5"><?php echo e($selected_template['template_name']); ?></div>
+                        <div class="page-hero fadeup p-3 mb-3 text-center" style="overflow-wrap: anywhere;">
+                            <div class="small text-white-50 fw-semibold mb-1">Evaluation Template</div>
+                            <div class="fw-bold fs-5 text-white"><?php echo e($selected_template['template_name']); ?></div>
                         </div>
                         <input type="hidden" name="period_start" value="<?php echo e($display_start); ?>">
                         <input type="hidden" name="period_end" value="<?php echo e($display_end); ?>">
