@@ -213,8 +213,8 @@ $selected_branch = $_GET['branch'] ?? $user_assigned_branch_name;
         white-space: normal;
     }
     #empTable th:last-child,#empTable td:last-child{text-align:center}
-    #empTable .employee-row-actions{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;padding:0;border:1px solid #b7cfad;border-radius:50%;background:#edf5e9;color:#17451d;box-shadow:0 2px 5px rgba(8,46,6,.12);font-size:16px;transition:background .15s,color .15s,box-shadow .15s}
-    #empTable .employee-row-actions:hover,#empTable .employee-row-actions:focus-visible,#empTable .employee-row-actions[aria-expanded="true"]{background:#17451d;color:#fff;border-color:#17451d;box-shadow:0 3px 9px rgba(8,46,6,.22)}
+    .employee-row-actions{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;padding:0;border:1px solid #b7cfad;border-radius:50%;background:#edf5e9;color:#17451d;box-shadow:0 2px 5px rgba(8,46,6,.12);font-size:16px;transition:background .15s,color .15s,box-shadow .15s}
+    .employee-row-actions:hover,.employee-row-actions:focus-visible,.employee-row-actions[aria-expanded="true"]{background:#17451d;color:#fff;border-color:#17451d;box-shadow:0 3px 9px rgba(8,46,6,.22)}
     .job-badge-executive   { background: #fff3cd; color: #856404; border: 1px solid #ffc107; }
     .job-badge-mgmt-team   { background: #ede7f6; color: #5e35b1; border: 1px solid #9c77e0; }
     .job-badge-manager     { background: #dbeafe; color: #1d4ed8; border: 1px solid #60a5fa; }
@@ -710,8 +710,8 @@ $selected_branch = $_GET['branch'] ?? $user_assigned_branch_name;
 
                         <!-- Actions Dropdown Menu -->
                         <div class="dropdown">
-                            <button class="btn btn-sm btn-light rounded-pill border shadow-sm px-2.5 py-1 d-flex align-items-center gap-1" type="button" data-bs-toggle="dropdown" data-bs-boundary="window" aria-expanded="false" style="background: #f8fafc; border-color: #cbd5e1 !important; font-size: 0.78rem;" title="Actions">
-                                <i class="fas fa-ellipsis-h text-dark"></i> <span class="fw-semibold text-secondary" style="font-size:0.72rem;">Actions</span>
+                            <button class="btn employee-row-actions" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Actions for <?php echo e($emp['first_name'] . ' ' . $emp['last_name']); ?>" title="Actions">
+                                <i class="fas fa-ellipsis-h" aria-hidden="true"></i>
                             </button>
                             <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-1" style="border-radius: 12px; min-width: 170px; font-size: 0.85rem; z-index: 1095;">
                                 <li>

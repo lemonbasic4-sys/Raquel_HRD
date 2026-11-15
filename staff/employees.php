@@ -75,6 +75,9 @@ $statuses = ['OJT','Probationary','Project Based','Regular','Separated','Trainee
 ?>
 
 <style>
+    #empTable th:last-child,#empTable td:last-child{text-align:center}
+    .employee-row-actions{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;padding:0;border:1px solid #b7cfad;border-radius:50%;background:#edf5e9;color:#17451d;box-shadow:0 2px 5px rgba(8,46,6,.12);font-size:16px;transition:background .15s,color .15s,box-shadow .15s}
+    .employee-row-actions:hover,.employee-row-actions:focus-visible,.employee-row-actions[aria-expanded="true"]{background:#17451d;color:#fff;border-color:#17451d;box-shadow:0 3px 9px rgba(8,46,6,.22)}
     .job-badge { display:inline-block;padding:2px 9px;border-radius:12px;font-size:.72rem;font-weight:600;letter-spacing:.3px;white-space:normal;overflow-wrap:anywhere;word-break:break-word; }
     .job-badge-executive   { background:#fff3cd;color:#856404;border:1px solid #ffc107; }
     .job-badge-mgmt-team   { background:#ede7f6;color:#5e35b1;border:1px solid #9c77e0; }
@@ -249,7 +252,7 @@ $statuses = ['OJT','Probationary','Project Based','Regular','Separated','Trainee
                         <th>Branch</th>
                         <th>Status</th>
                         <th>Hire Date</th>
-                        <th style="min-width:130px;">Actions</th>
+                        <th style="width:70px;">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -291,21 +294,19 @@ $statuses = ['OJT','Probationary','Project Based','Regular','Separated','Trainee
                             </td>
                             <td><small><?php echo formatDate($emp['hire_date']); ?></small></td>
                             <td>
-                                <div class="d-flex gap-1 align-items-center flex-nowrap">
+                                <div class="dropdown">
+                                    <button class="btn employee-row-actions" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Actions for <?php echo e($emp['first_name'] . ' ' . $emp['last_name']); ?>" title="Actions"><i class="fas fa-ellipsis-h" aria-hidden="true"></i></button>
+                                    <ul class="dropdown-menu dropdown-menu-end shadow" aria-label="Employee actions" style="z-index:1095;">
+                                    <li>
                                     <a href="<?php echo BASE_URL; ?>/staff/view-employee.php?id=<?php echo $emp['employee_id']; ?>"
-                                        class="btn btn-sm btn-outline-info" title="View Details">
-                                        <i class="fas fa-eye"></i>
-                                    </a>
+                                        class="dropdown-item"><i class="fas fa-eye me-2 text-info" aria-hidden="true"></i>View Details</a></li>
                                     <?php if ($hasPending): ?>
-                                        <button class="btn btn-sm btn-outline-warning" title="Edit pending — awaiting manager review" disabled>
-                                            <i class="fas fa-clock"></i>
-                                        </button>
+                                        <li><span class="dropdown-item-text text-muted"><i class="fas fa-clock me-2" aria-hidden="true"></i>Edit pending manager review</span></li>
                                     <?php else: ?>
-                                        <a href="<?php echo BASE_URL; ?>/staff/edit-employee.php?id=<?php echo $emp['employee_id']; ?>"
-                                            class="btn btn-sm btn-outline-primary" title="Submit Edit Request">
-                                            <i class="fas fa-edit"></i>
-                                        </a>
+                                        <li><a href="<?php echo BASE_URL; ?>/staff/edit-employee.php?id=<?php echo $emp['employee_id']; ?>"
+                                            class="dropdown-item"><i class="fas fa-edit me-2 text-primary" aria-hidden="true"></i>Submit Edit Request</a></li>
                                     <?php endif; ?>
+                                    </ul>
                                 </div>
                             </td>
                         </tr>
@@ -344,13 +345,16 @@ $statuses = ['OJT','Probationary','Project Based','Regular','Separated','Trainee
                 </div>
                 <div class="d-flex flex-column gap-1 flex-shrink-0">
                     <span class="badge <?php echo $emp['is_active'] ? 'bg-success' : 'bg-danger'; ?> mb-1"><?php echo $emp['employment_status']; ?></span>
-                    <div class="d-flex gap-1">
-                        <a href="<?php echo BASE_URL; ?>/staff/view-employee.php?id=<?php echo $emp['employee_id']; ?>" class="btn btn-xs btn-outline-info"><i class="fas fa-eye"></i></a>
+                    <div class="dropdown">
+                        <button class="btn employee-row-actions" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Actions for <?php echo e($emp['first_name'] . ' ' . $emp['last_name']); ?>" title="Actions"><i class="fas fa-ellipsis-h" aria-hidden="true"></i></button>
+                        <ul class="dropdown-menu dropdown-menu-end shadow" aria-label="Employee actions" style="z-index:1095;">
+                        <li><a href="<?php echo BASE_URL; ?>/staff/view-employee.php?id=<?php echo $emp['employee_id']; ?>" class="dropdown-item"><i class="fas fa-eye me-2 text-info" aria-hidden="true"></i>View Details</a></li>
                         <?php if ($hasPending): ?>
-                            <button class="btn btn-xs btn-outline-warning" disabled title="Edit pending"><i class="fas fa-clock"></i></button>
+                            <li><span class="dropdown-item-text text-muted"><i class="fas fa-clock me-2" aria-hidden="true"></i>Edit pending manager review</span></li>
                         <?php else: ?>
-                            <a href="<?php echo BASE_URL; ?>/staff/edit-employee.php?id=<?php echo $emp['employee_id']; ?>" class="btn btn-xs btn-outline-primary"><i class="fas fa-edit"></i></a>
+                            <li><a href="<?php echo BASE_URL; ?>/staff/edit-employee.php?id=<?php echo $emp['employee_id']; ?>" class="dropdown-item"><i class="fas fa-edit me-2 text-primary" aria-hidden="true"></i>Submit Edit Request</a></li>
                         <?php endif; ?>
+                        </ul>
                     </div>
                 </div>
             </div>
@@ -415,6 +419,13 @@ $statuses = ['OJT','Probationary','Project Based','Regular','Separated','Trainee
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+    if (window.bootstrap?.Dropdown) {
+        document.querySelectorAll('.employee-row-actions').forEach(button => {
+            bootstrap.Dropdown.getOrCreateInstance(button, {
+                popperConfig: { strategy: 'fixed', modifiers: [{ name: 'preventOverflow', options: { boundary: 'viewport' } }] }
+            });
+        });
+    }
     const searchInput    = document.getElementById('customSearchEmp');
     const mobileSearch   = document.getElementById('mobileSearchEmp');
     const filterJobTitle = document.getElementById('filterJobTitle');
