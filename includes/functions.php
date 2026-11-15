@@ -272,6 +272,27 @@ function getEmployeeDisplayId($employee)
 
 function createNotification($conn, $user_id, $title, $message, $link = null, $category = null, $needs_action = null)
 {
+    if ($needs_action && in_array($title, ['Quarterly self-rating submitted', 'Quarterly 360 rating available'], true)
+        && is_string($link) && str_contains($link, '/employee/performance-evaluation.php')) {
+        $title = 'Quarterly review tasks';
+        $message = 'Employees submitted Quarterly self-ratings. Open Performance Evaluation to review pending KRA and 360 rating tasks.';
+        $link = explode('?', $link, 2)[0] . '?category=quarterly&view=peers';
+        $existing = $conn->prepare("SELECT notification_id FROM notifications
+            WHERE user_id = ? AND title IN ('Quarterly review tasks', 'Quarterly self-rating submitted', 'Quarterly 360 rating available')
+            ORDER BY notification_id DESC LIMIT 1");
+        $existing->bind_param('i', $user_id);
+        $existing->execute();
+        $notification_id = (int)($existing->get_result()->fetch_assoc()['notification_id'] ?? 0);
+        $existing->close();
+        if ($notification_id) {
+            $update = $conn->prepare('UPDATE notifications SET title = ?, message = ?, link = ?, category = ?, needs_action = 1, is_read = 0, created_at = NOW() WHERE notification_id = ?');
+            $category = 'evaluations';
+            $update->bind_param('ssssi', $title, $message, $link, $category, $notification_id);
+            $update->execute();
+            $update->close();
+            return;
+        }
+    }
     // Store role-specific inbox metadata when the optional columns are installed.
     $has_manager_fields = managerNotificationSchemaAvailable($conn);
     if ($has_manager_fields) {
@@ -1189,6 +1210,8 @@ function getRecentNotifications($conn, $user_id, $limit = 5, $context = null)
 
     while ($row = $result->fetch_assoc()) {
 
+        $row = normalizeQuarterlyReviewNotification($row);
+
         $notifications[] = $row;
 
     }
@@ -1197,6 +1220,17 @@ function getRecentNotifications($conn, $user_id, $limit = 5, $context = null)
 
     return $notifications;
 
+}
+
+function normalizeQuarterlyReviewNotification(array $row): array
+{
+    if (in_array($row['title'] ?? '', ['Quarterly self-rating submitted', 'Quarterly 360 rating available'], true)
+        && str_contains((string)($row['link'] ?? ''), '/employee/performance-evaluation.php')) {
+        $row['title'] = 'Quarterly review tasks';
+        $row['message'] = 'Employees submitted Quarterly self-ratings. Open Performance Evaluation to review pending KRA and 360 rating tasks.';
+        $row['link'] = explode('?', $row['link'], 2)[0] . '?category=quarterly&view=peers';
+    }
+    return $row;
 }
 
 /** Hide legacy duplicate notices previously emitted by repeated non-HR route repairs. */
@@ -1208,7 +1242,11 @@ function notificationRouteRepairDuplicateFilterSql(): string
             WHERE duplicate.user_id = notifications.user_id
               AND duplicate.title = notifications.title
               AND duplicate.message = notifications.message
-              AND duplicate.link <=> notifications.link))";
+              AND duplicate.link <=> notifications.link))
+        AND (title NOT IN ('Quarterly review tasks', 'Quarterly self-rating submitted', 'Quarterly 360 rating available')
+            OR notification_id = (SELECT MAX(quarterly_notice.notification_id) FROM notifications quarterly_notice
+                WHERE quarterly_notice.user_id = notifications.user_id
+                  AND quarterly_notice.title IN ('Quarterly review tasks', 'Quarterly self-rating submitted', 'Quarterly 360 rating available')))";
 }
 
 /**

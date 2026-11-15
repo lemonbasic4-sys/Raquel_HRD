@@ -34,7 +34,7 @@ $count_stmt->close();
 
 // 2. Fetch new unread notifications since last_seen_id (for live popups/banners)
 $new_notifications = [];
-$notif_sql = "SELECT notification_id, title, message, link, created_at FROM notifications WHERE user_id = ? AND is_read = 0";
+$notif_sql = "SELECT notification_id, title, message, link, needs_action, created_at FROM notifications WHERE user_id = ? AND is_read = 0";
 $notif_sql .= notificationRouteRepairDuplicateFilterSql();
 if ($last_seen_id > 0) {
     $notif_sql .= " AND notification_id > ?";
@@ -55,6 +55,7 @@ if ($last_seen_id > 0) {
 $notif_stmt->execute();
 $res = $notif_stmt->get_result();
 while ($row = $res->fetch_assoc()) {
+    $row = normalizeQuarterlyReviewNotification($row);
     $new_notifications[] = [
         'id' => (int) $row['notification_id'],
         'title' => $row['title'],
@@ -68,7 +69,7 @@ $notif_stmt->close();
 // 3. Fetch the recent 5 unread/read notifications for the dropdown list
 // (We fetch recent 5 notifications to update the dropdown list dynamically)
 $recent_notifications = [];
-$recent_sql = "SELECT notification_id, title, message, link, category, is_read, created_at FROM notifications WHERE user_id = ?";
+$recent_sql = "SELECT notification_id, title, message, link, category, needs_action, is_read, created_at FROM notifications WHERE user_id = ?";
 $recent_sql .= notificationRouteRepairDuplicateFilterSql();
 if ($context === 'employee') {
     $recent_sql .= " AND (link LIKE '%/employee/%' OR link IS NULL OR link = '')";
@@ -82,6 +83,7 @@ $recent_stmt->bind_param("i", $user_id);
 $recent_stmt->execute();
 $res_recent = $recent_stmt->get_result();
 while ($row = $res_recent->fetch_assoc()) {
+    $row = normalizeQuarterlyReviewNotification($row);
     $recent_notifications[] = [
         'id' => (int) $row['notification_id'],
         'title' => $row['title'],
