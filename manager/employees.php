@@ -212,6 +212,9 @@ $selected_branch = $_GET['branch'] ?? $user_assigned_branch_name;
         max-width: 155px;
         white-space: normal;
     }
+    #empTable th:last-child,#empTable td:last-child{text-align:center}
+    #empTable .employee-row-actions{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;padding:0;border:1px solid #b7cfad;border-radius:50%;background:#edf5e9;color:#17451d;box-shadow:0 2px 5px rgba(8,46,6,.12);font-size:16px;transition:background .15s,color .15s,box-shadow .15s}
+    #empTable .employee-row-actions:hover,#empTable .employee-row-actions:focus-visible,#empTable .employee-row-actions[aria-expanded="true"]{background:#17451d;color:#fff;border-color:#17451d;box-shadow:0 3px 9px rgba(8,46,6,.22)}
     .job-badge-executive   { background: #fff3cd; color: #856404; border: 1px solid #ffc107; }
     .job-badge-mgmt-team   { background: #ede7f6; color: #5e35b1; border: 1px solid #9c77e0; }
     .job-badge-manager     { background: #dbeafe; color: #1d4ed8; border: 1px solid #60a5fa; }
@@ -579,7 +582,7 @@ $selected_branch = $_GET['branch'] ?? $user_assigned_branch_name;
                         <th>Branch</th>
                         <th>Status</th>
                         <th>Hire Date</th>
-                        <th style="min-width: 170px;">Actions</th>
+                        <th style="width: 70px;">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -644,34 +647,32 @@ $selected_branch = $_GET['branch'] ?? $user_assigned_branch_name;
                             </td>
                             <td data-label="Hire Date"><small><?php echo formatDate($emp['hire_date']); ?></small></td>
                             <td data-label="Actions">
-                                <div class="d-flex gap-1 align-items-center flex-nowrap">
-                                    <a href="<?php echo BASE_URL; ?>/manager/view-employee.php?id=<?php echo $emp['employee_id']; ?>"
-                                        class="btn btn-sm btn-outline-info employee-view-link" data-base-href="<?php echo BASE_URL; ?>/manager/view-employee.php?id=<?php echo $emp['employee_id']; ?>" title="View Details">
-                                        <i class="fas fa-eye"></i>
-                                    </a>
-                                    <a href="<?php echo BASE_URL; ?>/manager/edit-employee.php?id=<?php echo $emp['employee_id']; ?>"
-                                        class="btn btn-sm btn-outline-primary employee-edit-link" data-base-href="<?php echo BASE_URL; ?>/manager/edit-employee.php?id=<?php echo $emp['employee_id']; ?>"
-                                        title="Edit">
-                                        <i class="fas fa-edit"></i>
-                                    </a>
+                                <div class="dropdown">
+                                    <button class="btn employee-row-actions" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Actions for <?php echo e($emp['first_name'] . ' ' . $emp['last_name']); ?>" title="Actions">
+                                        <i class="fas fa-ellipsis-h" aria-hidden="true"></i>
+                                    </button>
+                                    <ul class="dropdown-menu dropdown-menu-end shadow" aria-label="Employee actions" style="z-index:1095;">
+                                        <li><a href="<?php echo BASE_URL; ?>/manager/view-employee.php?id=<?php echo $emp['employee_id']; ?>"
+                                            class="dropdown-item employee-view-link" data-base-href="<?php echo BASE_URL; ?>/manager/view-employee.php?id=<?php echo $emp['employee_id']; ?>"><i class="fas fa-eye me-2 text-info" aria-hidden="true"></i>View Details</a></li>
+                                        <li><a href="<?php echo BASE_URL; ?>/manager/edit-employee.php?id=<?php echo $emp['employee_id']; ?>"
+                                            class="dropdown-item employee-edit-link" data-base-href="<?php echo BASE_URL; ?>/manager/edit-employee.php?id=<?php echo $emp['employee_id']; ?>"><i class="fas fa-edit me-2 text-primary" aria-hidden="true"></i>Edit Info</a></li>
+                                        <li><hr class="dropdown-divider"></li>
                                     <?php if ($emp['is_active']): ?>
-                                        <button type="button" class="btn btn-sm btn-outline-warning" title="Deactivate"
+                                        <li><button type="button" class="dropdown-item text-warning"
                                             onclick="setDeactivateTarget(<?php echo $emp['employee_id']; ?>, '<?php echo e(addslashes($emp['first_name'] . ' ' . $emp['last_name'])); ?>')"
                                             data-bs-toggle="modal" data-bs-target="#deactivateModal">
-                                            <i class="fas fa-user-slash"></i>
-                                        </button>
+                                            <i class="fas fa-user-slash me-2" aria-hidden="true"></i>Deactivate</button></li>
                                     <?php else: ?>
-                                        <button type="button" class="btn btn-sm btn-outline-success" title="Activate"
+                                        <li><button type="button" class="dropdown-item text-success"
                                             onclick="setActivateTarget(<?php echo $emp['employee_id']; ?>, '<?php echo e(addslashes($emp['first_name'] . ' ' . $emp['last_name'])); ?>')"
                                             data-bs-toggle="modal" data-bs-target="#activateModal">
-                                            <i class="fas fa-user-check"></i>
-                                        </button>
+                                            <i class="fas fa-user-check me-2" aria-hidden="true"></i>Activate</button></li>
                                     <?php endif; ?>
-                                    <button type="button" class="btn btn-sm btn-outline-danger" title="Delete Permanently"
+                                    <li><button type="button" class="dropdown-item text-danger"
                                         onclick="setDeleteTarget(<?php echo $emp['employee_id']; ?>, '<?php echo e(addslashes($emp['first_name'] . ' ' . $emp['last_name'])); ?>')"
                                         data-bs-toggle="modal" data-bs-target="#deleteModal">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
+                                        <i class="fas fa-trash me-2" aria-hidden="true"></i>Delete Permanently</button></li>
+                                    </ul>
                                 </div>
                             </td>
                         </tr>
@@ -1528,6 +1529,13 @@ $selected_branch = $_GET['branch'] ?? $user_assigned_branch_name;
 
     // Initial Render on Load
     document.addEventListener("DOMContentLoaded", function () {
+        if (window.bootstrap?.Dropdown) {
+            document.querySelectorAll('.employee-row-actions').forEach(button => {
+                bootstrap.Dropdown.getOrCreateInstance(button, {
+                    popperConfig: { strategy: 'fixed', modifiers: [{ name: 'preventOverflow', options: { boundary: 'viewport' } }] }
+                });
+            });
+        }
         initJobTitleSelectCache();
         applyFiltersFromUrl();
         updateEmployeeActionLinks();
