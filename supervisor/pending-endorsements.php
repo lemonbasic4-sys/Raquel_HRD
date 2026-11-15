@@ -1343,10 +1343,9 @@ foreach ($all_pending as $row):
                                             }
                                             if ($supervisor_override_score !== null) {
                                                 $effective_score = $supervisor_override_score;
-                                                $sup_name_q = $conn->query("SELECT full_name FROM users WHERE user_id = " . (int)($k['supervisor_override_by'] ?? 0))->fetch_assoc();
-                                                $sup_name = $sup_name_q['full_name'] ?? 'Supervisor';
+                                                $override_actor = getEvaluationOverrideActor($conn, (int)($k['supervisor_override_by'] ?? 0));
                                                 $formatted_date = formatDate($k['supervisor_override_at'] ?? '', 'M d, Y h:i A');
-                                                $badge_html .= '<span class="badge-audit ms-2" data-bs-toggle="tooltip" data-bs-html="true" title="<strong>Supervisor Override</strong><br>Edited by: ' . e($sup_name) . '<br>On: ' . $formatted_date . '<br>Original: ' . $k['score_value'] . '"><i class="fas fa-user-edit me-1"></i>Sup Override</span>';
+                                                $badge_html .= '<span class="badge-audit ms-2" data-bs-toggle="tooltip" data-bs-html="true" title="<strong>' . e($override_actor['label']) . '</strong><br>Edited by: ' . e($override_actor['name']) . '<br>On: ' . $formatted_date . '<br>Original: ' . $k['score_value'] . '"><i class="fas fa-user-edit me-1"></i>' . e($override_actor['short']) . '</span>';
                                             }
                                             ?>
                                             <?php if ($can_edit_scores): ?>
@@ -1406,10 +1405,9 @@ foreach ($all_pending as $row):
                                             }
                                             if ($supervisor_override_score !== null) {
                                                 $effective_score = $supervisor_override_score;
-                                                $sup_name_q = $conn->query("SELECT full_name FROM users WHERE user_id = " . (int)($b['supervisor_override_by'] ?? 0))->fetch_assoc();
-                                                $sup_name = $sup_name_q['full_name'] ?? 'Supervisor';
+                                                $override_actor = getEvaluationOverrideActor($conn, (int)($b['supervisor_override_by'] ?? 0));
                                                 $formatted_date = formatDate($b['supervisor_override_at'] ?? '', 'M d, Y h:i A');
-                                                $badge_html .= '<span class="badge-audit ms-2" data-bs-toggle="tooltip" data-bs-html="true" title="<strong>Supervisor Override</strong><br>Edited by: ' . e($sup_name) . '<br>On: ' . $formatted_date . '<br>Original: ' . $b['score_value'] . '"><i class="fas fa-user-edit me-1"></i>Sup Override</span>';
+                                                $badge_html .= '<span class="badge-audit ms-2" data-bs-toggle="tooltip" data-bs-html="true" title="<strong>' . e($override_actor['label']) . '</strong><br>Edited by: ' . e($override_actor['name']) . '<br>On: ' . $formatted_date . '<br>Original: ' . $b['score_value'] . '"><i class="fas fa-user-edit me-1"></i>' . e($override_actor['short']) . '</span>';
                                             }
                                             ?>
                                             <?php if ($can_edit_scores): ?>

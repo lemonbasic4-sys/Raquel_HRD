@@ -71,6 +71,23 @@ if (!$access_row) {
         $access_row = $peer_access_stmt->get_result()->fetch_assoc();
         $peer_access_stmt->close();
     }
+    if (!$access_row && ($peer_profile['role'] ?? '') === 'Employee'
+        && ($peer_profile['employment_status'] ?? '') === 'Regular'
+        && in_array($peer_rank, [3, 4], true) && $peer_department > 0) {
+        $department_history_stmt = $conn->prepare("SELECT 'Approved' AS action_status, ep.status AS package_status
+            FROM evaluation_packages ep
+            JOIN evaluation_package_members pm ON pm.package_id = ep.package_id
+            JOIN evaluations ev ON ev.evaluation_id = pm.evaluation_id
+            JOIN departments d ON d.department_id = ep.department_id
+            WHERE ep.package_id = ? AND pm.evaluation_id = ? AND ep.department_id = ?
+              AND ep.evaluation_type IN ('Initial', 'Final')
+              AND ep.status = 'Approved and Applied'
+              AND d.department_name <> 'Human Resources' AND ev.deleted_at IS NULL LIMIT 1");
+        $department_history_stmt->bind_param('iii', $package_id, $evaluation_id, $peer_department);
+        $department_history_stmt->execute();
+        $access_row = $department_history_stmt->get_result()->fetch_assoc();
+        $department_history_stmt->close();
+    }
     if (!$access_row) {
         redirectWith($package_back_url, 'danger', 'You are not a designated reviewer or same-level department peer for this package.');
     }
@@ -152,6 +169,17 @@ $devplan_count = count($view_dev_plans);
 
 require_once '../includes/header.php';
 ?>
+<style>
+.evaluation-packages .member-score-hero.page-hero{background:linear-gradient(135deg,#082e06 0%,#244509 55%,#173806 100%);color:#fff;border:1px solid #36571d;border-left:6px solid #bd9414;box-shadow:0 12px 26px rgba(8,46,6,.16);padding:0;border-radius:16px}
+.member-score-hero.page-hero::before{border-radius:inherit}
+.member-score-hero .package-card__body{position:relative;z-index:1}
+.evaluation-packages .member-score-hero .member-score-card{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.25);border-radius:12px;padding:1.1rem 1.25rem;color:#fff}
+.evaluation-packages .member-score-hero .member-score-card strong{color:#fff;font-size:1.6rem;line-height:1}
+.member-score-hero .member-score-card .member-score-label{color:#e2eddb;font-size:.85rem;font-weight:600}
+.member-score-hero .member-score-weight{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#f9e4a1;border-radius:999px;padding:.25rem .55rem;font-size:.75rem;font-weight:700}
+.member-score-hero .member-score-banner{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.24);border-radius:12px;padding:1rem 1.25rem;color:#fff}
+.member-score-hero .member-score-banner strong{color:#fff}
+</style>
 <main class="evaluation-packages container-fluid py-4">
     <section class="package-hero">
         <a class="history-back-link" href="<?php echo e($package_back_url); ?>">
@@ -171,39 +199,39 @@ require_once '../includes/header.php';
     </section>
 
     <!-- Score Summary Stats Card -->
-    <section class="package-card" aria-label="Score Summary Card">
+    <section class="package-card page-hero fadeup member-score-hero" aria-label="Score Summary Card">
         <div class="package-card__body">
             <div class="row g-3 mb-3">
                 <div class="col-sm-6 col-xl-4">
-                    <div class="package-stat h-100 d-flex flex-column justify-content-between" style="background:#FFF8EB;border:2px solid #FCD34D;border-radius:12px;padding:1.1rem 1.25rem;">
+                    <div class="member-score-card h-100 d-flex flex-column justify-content-between">
                         <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
-                            <strong class="tabular-nums text-warning-emphasis m-0" style="font-size:1.6rem;line-height:1;"><?php echo number_format($rev_kra_subtotal, 2); ?></strong>
-                            <span class="badge text-bg-warning px-2 py-1 small"><?php echo number_format($kra_w, 0); ?>%</span>
+                            <strong class="tabular-nums m-0"><?php echo number_format($rev_kra_subtotal, 2); ?></strong>
+                            <span class="member-score-weight"><?php echo number_format($kra_w, 0); ?>%</span>
                         </div>
-                        <div class="text-muted fw-semibold" style="font-size:0.85rem;">Individual KRA</div>
+                        <div class="member-score-label">Individual KRA</div>
                     </div>
                 </div>
                 <div class="col-sm-6 col-xl-4">
-                    <div class="package-stat h-100 d-flex flex-column justify-content-between" style="background: #F4FBF7; border: 2px solid #86EFAC; border-radius: 12px; padding: 1.1rem 1.25rem;">
+                    <div class="member-score-card h-100 d-flex flex-column justify-content-between">
                         <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
-                            <strong class="tabular-nums text-success m-0" style="font-size: 1.6rem; line-height: 1;"><?php echo $is_probationary ? number_format((float)$evaluation['behavior_average'], 2) : ($evaluation['shared_behavior_score'] !== null ? number_format((float) $evaluation['shared_behavior_score'], 2) : 'Pending'); ?></strong>
-                            <span class="badge bg-success-subtle text-success border border-success px-2 py-1 small"><?php echo $is_probationary ? '20%' : 'Department Shared'; ?></span>
+                            <strong class="tabular-nums m-0"><?php echo $is_probationary ? number_format((float)$evaluation['behavior_average'], 2) : ($evaluation['shared_behavior_score'] !== null ? number_format((float) $evaluation['shared_behavior_score'], 2) : 'Pending'); ?></strong>
+                            <span class="member-score-weight"><?php echo $is_probationary ? '20%' : 'Department Shared'; ?></span>
                         </div>
-                        <div class="text-muted fw-semibold" style="font-size: 0.85rem;"><?php echo $is_probationary ? 'Individual Core Values' : 'Shared Department Behavior'; ?></div>
+                        <div class="member-score-label"><?php echo $is_probationary ? 'Individual Core Values' : 'Shared Department Behavior'; ?></div>
                     </div>
                 </div>
                 <div class="col-sm-6 col-xl-4">
-                    <div class="package-stat h-100 d-flex flex-column justify-content-between" style="background: #FAF8F0; border: 2px solid var(--rp-primary-gold); border-radius: 12px; padding: 1.1rem 1.25rem;">
+                    <div class="member-score-card h-100 d-flex flex-column justify-content-between">
                         <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
-                            <strong class="tabular-nums text-primary m-0" style="font-size: 1.6rem; line-height: 1;"><?php echo number_format((float) $evaluation['total_score'], 2); ?></strong>
-                            <span class="badge bg-success px-2 py-1 small"><?php echo e(getPerformanceLevel((float)$evaluation['total_score'])); ?></span>
+                            <strong class="tabular-nums m-0"><?php echo number_format((float) $evaluation['total_score'], 2); ?></strong>
+                            <span class="member-score-weight"><?php echo e(getPerformanceLevel((float)$evaluation['total_score'])); ?></span>
                         </div>
-                        <div class="text-muted fw-semibold" style="font-size: 0.85rem;">Overall Total Score</div>
+                        <div class="member-score-label">Overall Total Score</div>
                     </div>
                 </div>
             </div>
 
-            <div class="shared-behavior-banner d-flex align-items-center justify-content-between flex-wrap gap-2 mb-0">
+            <div class="member-score-banner d-flex align-items-center justify-content-between flex-wrap gap-2 mb-0">
                 <div>
                     <i class="fas fa-users me-2"></i><?php echo $is_probationary ? 'Individual Core Values Score:' : 'Current Shared Core Behaviors &amp; Values Score:'; ?>
                     <strong><?php echo $is_probationary ? number_format((float)$evaluation['behavior_average'], 2) : ($evaluation['shared_behavior_score'] !== null ? number_format((float) $evaluation['shared_behavior_score'], 2) : 'Pending'); ?></strong>

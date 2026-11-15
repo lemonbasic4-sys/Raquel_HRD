@@ -3264,6 +3264,34 @@ function ensureOrganizationEvaluationPackageSchema($conn)
               AND ep.status NOT IN ('Approved and Applied', 'Cancelled')
               AND rs.action_status IN ('Pending', 'Waiting')
               AND rs.claimed_at IS NULL");
+        // Open staff probationary reviews are shared by active department managers
+        // and supervisors. A claimed review keeps its owner.
+        $conn->query("UPDATE evaluation_package_route_steps rs
+            JOIN evaluation_packages ep ON ep.package_id = rs.package_id
+            JOIN evaluation_package_members pm ON pm.package_id = ep.package_id
+            JOIN evaluations ev ON ev.evaluation_id = pm.evaluation_id
+            JOIN employees target ON target.employee_id = ev.employee_id
+            JOIN departments d ON d.department_id = ep.department_id
+            SET rs.eligible_rank_category_id = 4,
+                rs.eligible_role = NULL,
+                rs.reviewer_employee_id = NULL,
+                rs.reviewer_user_id = NULL,
+                rs.step_label = 'Department Manager or Supervisor - Probationary Review'
+            WHERE ep.evaluation_type IN ('Initial', 'Final')
+              AND d.department_name <> 'Human Resources'
+              AND target.rank_category_id = 5
+              AND EXISTS (SELECT 1 FROM employees reviewer
+                  JOIN users reviewer_user ON reviewer_user.employee_id = reviewer.employee_id
+                  WHERE reviewer.department_id = ep.department_id
+                    AND reviewer.rank_category_id IN (3, 4)
+                    AND reviewer.employment_status = 'Regular'
+                    AND reviewer.is_active = 1 AND reviewer.deleted_at IS NULL
+                    AND reviewer_user.role = 'Employee' AND reviewer_user.is_active = 1
+                    AND reviewer_user.deleted_at IS NULL
+                    AND COALESCE(reviewer_user.account_hold, 0) = 0)
+              AND ep.status NOT IN ('Approved and Applied', 'Cancelled')
+              AND rs.step_order = 1 AND rs.action_status = 'Pending'
+              AND rs.claimed_at IS NULL");
         // Ensure index on department_id exists before dropping uq_evaluation_package (as foreign key requires it)
         try {
             $conn->query("ALTER TABLE evaluation_packages ADD INDEX idx_package_dept (department_id)");
@@ -4607,6 +4635,24 @@ function organizationPackageReviewerMatchSql($alias = 'rs')
     return "({$alias}.reviewer_user_id = ? OR ({$alias}.reviewer_employee_id IS NOT NULL AND {$alias}.reviewer_employee_id = (SELECT employee_id FROM users WHERE user_id = ? LIMIT 1)))";
 }
 
+function getEvaluationOverrideActor($conn, $user_id)
+{
+    $stmt = $conn->prepare('SELECT u.full_name, u.role, e.rank_category_id
+        FROM users u LEFT JOIN employees e ON e.employee_id = u.employee_id
+        WHERE u.user_id = ? LIMIT 1');
+    $stmt->bind_param('i', $user_id);
+    $stmt->execute();
+    $actor = $stmt->get_result()->fetch_assoc() ?: [];
+    $stmt->close();
+    $role = (string)($actor['role'] ?? '');
+    $rank = (int)($actor['rank_category_id'] ?? 0);
+    if ($role === 'HR Manager') return ['name' => $actor['full_name'], 'label' => 'HR Manager Override', 'short' => 'Mgr Override'];
+    if ($role === 'HR Supervisor') return ['name' => $actor['full_name'], 'label' => 'HR Supervisor Override', 'short' => 'Sup Override'];
+    if ($role === 'Employee' && $rank === 3) return ['name' => $actor['full_name'], 'label' => 'Department Manager Override', 'short' => 'Mgr Override'];
+    if ($role === 'Employee' && $rank === 4) return ['name' => $actor['full_name'], 'label' => 'Department Supervisor Override', 'short' => 'Sup Override'];
+    return ['name' => $actor['full_name'] ?? 'Reviewer', 'label' => 'Reviewer Override', 'short' => 'Reviewer Override'];
+}
+
 function getOrganizationPackageReviewerDisplayName($conn, $user_id = 0, $employee_id = 0)
 {
     $user_id = (int) $user_id;
@@ -4709,12 +4755,23 @@ function notifyOrganizationPackageStepAssignees($conn, $package_id, $step_order,
         return count($notified_users);
     }
     if (!empty($step['eligible_rank_category_id']) && empty($step['claimed_at'])) {
+        $shared_probationary = in_array($step['evaluation_type'] ?? '', ['Initial', 'Final'], true)
+            && $step_order === 1 && (int)$step['eligible_rank_category_id'] === 4
+            && $conn->query("SELECT 1 FROM evaluation_package_members pm
+                JOIN evaluations ev ON ev.evaluation_id = pm.evaluation_id
+                JOIN employees target ON target.employee_id = ev.employee_id
+                WHERE pm.package_id = $package_id AND target.rank_category_id = 5 LIMIT 1")->fetch_assoc();
         $eligible_stmt = $conn->prepare("SELECT DISTINCT u.user_id
             FROM users u JOIN employees e ON e.employee_id = u.employee_id
             WHERE u.role = 'Employee' AND u.is_active = 1 AND COALESCE(u.account_hold, 0) = 0
-              AND u.deleted_at IS NULL AND e.department_id = ? AND e.rank_category_id = ?
+              AND u.deleted_at IS NULL AND e.department_id = ? AND " . ($shared_probationary
+                ? 'e.rank_category_id IN (3, 4)' : 'e.rank_category_id = ?') . "
               AND e.employment_status = 'Regular' AND e.is_active = 1 AND e.deleted_at IS NULL");
-        $eligible_stmt->bind_param('ii', $step['department_id'], $step['eligible_rank_category_id']);
+        if ($shared_probationary) {
+            $eligible_stmt->bind_param('i', $step['department_id']);
+        } else {
+            $eligible_stmt->bind_param('ii', $step['department_id'], $step['eligible_rank_category_id']);
+        }
         $eligible_stmt->execute();
         $eligible_users = $eligible_stmt->get_result();
         while ($eligible_user = $eligible_users->fetch_assoc()) {
@@ -4747,7 +4804,7 @@ function notifyOrganizationPackageStepAssignees($conn, $package_id, $step_order,
 function getOrganizationPackagePipelineLabel($conn, $package_id)
 {
     $package_id = (int) $package_id;
-    $stmt = $conn->prepare("SELECT ep.status, ep.current_step_order, rs.step_label, rs.step_type, rs.action_status, rs.reviewer_user_id, rs.reviewer_employee_id, rs.eligible_role, rs.eligible_rank_category_id, rs.claimed_at
+    $stmt = $conn->prepare("SELECT ep.status, ep.evaluation_type, ep.current_step_order, rs.step_label, rs.step_type, rs.action_status, rs.reviewer_user_id, rs.reviewer_employee_id, rs.eligible_role, rs.eligible_rank_category_id, rs.claimed_at
         FROM evaluation_packages ep
         LEFT JOIN evaluation_package_route_steps rs ON rs.package_id = ep.package_id
             AND rs.step_order = ep.current_step_order
@@ -4774,7 +4831,10 @@ function getOrganizationPackagePipelineLabel($conn, $package_id)
             if (empty($s1['claimed_at']) && !empty($s1['eligible_role'])) {
                 $s1_name = $s1['eligible_role'];
             } elseif (empty($s1['claimed_at']) && !empty($s1['eligible_rank_category_id'])) {
-                $s1_name = (int)$s1['eligible_rank_category_id'] === 4 ? 'Department Supervisor' : 'Department Manager';
+                $s1_name = in_array($row['evaluation_type'] ?? '', ['Initial', 'Final'], true)
+                    && (int)$s1['eligible_rank_category_id'] === 4
+                    ? 'Department Manager or Supervisor'
+                    : ((int)$s1['eligible_rank_category_id'] === 4 ? 'Department Supervisor' : 'Department Manager');
             } else {
                 $s1_name = getOrganizationPackageReviewerDisplayName($conn, (int)($s1['reviewer_user_id'] ?? 0), (int)($s1['reviewer_employee_id'] ?? 0));
             }
@@ -4789,7 +4849,10 @@ function getOrganizationPackagePipelineLabel($conn, $package_id)
         return 'Pending ' . $row['step_label'] . ' — Available to ' . $row['eligible_role'];
     }
     if (empty($row['claimed_at']) && !empty($row['eligible_rank_category_id'])) {
-        $group_name = (int)$row['eligible_rank_category_id'] === 4 ? 'Department Supervisors' : 'Department Managers';
+        $group_name = in_array($row['evaluation_type'] ?? '', ['Initial', 'Final'], true)
+            && (int)$row['eligible_rank_category_id'] === 4
+            ? 'Department Managers or Supervisors'
+            : ((int)$row['eligible_rank_category_id'] === 4 ? 'Department Supervisors' : 'Department Managers');
         return 'Pending ' . $row['step_label'] . ' — Available to ' . $group_name;
     }
     $name = getOrganizationPackageReviewerDisplayName($conn, (int) ($row['reviewer_user_id'] ?? 0), (int) ($row['reviewer_employee_id'] ?? 0));
@@ -5009,8 +5072,15 @@ function countPendingOrganizationPackagesForUser($conn, $user_id, $probationary_
         JOIN evaluation_package_route_steps rs ON rs.package_id = ep.package_id
         WHERE ($match OR (rs.eligible_role = (SELECT role FROM users WHERE user_id = ? LIMIT 1)
                            AND rs.claimed_at IS NULL AND rs.action_status = 'Pending')
-               OR (rs.eligible_rank_category_id = (SELECT e.rank_category_id FROM users u
+               OR ((rs.eligible_rank_category_id = (SELECT e.rank_category_id FROM users u
                        JOIN employees e ON e.employee_id = u.employee_id WHERE u.user_id = ? LIMIT 1)
+                    OR (ep.evaluation_type IN ('Initial', 'Final') AND rs.step_order = 1
+                        AND rs.eligible_rank_category_id = 4
+                        AND (SELECT e.rank_category_id FROM users u JOIN employees e ON e.employee_id = u.employee_id WHERE u.user_id = ? LIMIT 1) IN (3, 4)
+                        AND EXISTS (SELECT 1 FROM evaluation_package_members pm
+                            JOIN evaluations ev ON ev.evaluation_id = pm.evaluation_id
+                            JOIN employees target ON target.employee_id = ev.employee_id
+                            WHERE pm.package_id = ep.package_id AND target.rank_category_id = 5)))
                    AND ep.department_id = (SELECT e.department_id FROM users u
                        JOIN employees e ON e.employee_id = u.employee_id WHERE u.user_id = ? LIMIT 1)
                    AND (SELECT role FROM users WHERE user_id = ? LIMIT 1) = 'Employee'
@@ -5023,7 +5093,7 @@ function countPendingOrganizationPackagesForUser($conn, $user_id, $probationary_
               OR (rs.step_order > 1 AND rs.action_status = 'Pending')
           )
           AND ep.status NOT IN ('Approved and Applied', 'Cancelled') $type_filter");
-    $stmt->bind_param('iiiiiii', $user_id, $user_id, $user_id, $user_id, $user_id, $user_id, $user_id);
+    $stmt->bind_param('iiiiiiii', $user_id, $user_id, $user_id, $user_id, $user_id, $user_id, $user_id, $user_id);
     $stmt->execute();
     $total = (int) ($stmt->get_result()->fetch_assoc()['total'] ?? 0);
     $stmt->close();
@@ -5184,6 +5254,10 @@ function createOrganizationPackageRoute($conn, $package_id, $consolidator_employ
                 $steps = [['Immediate Head - Probationary Review', null, $manager_rank, 0, 0]];
             } else {
                 $steps = [['President and CEO - Immediate Head Review', 'President and CEO', null, 0, 0]];
+            }
+            if ($employee_rank === 5 && (hasOrganizationPackageRankReviewer($conn, $package_department_id, 3)
+                || hasOrganizationPackageRankReviewer($conn, $package_department_id, 4))) {
+                $steps = [['Department Manager or Supervisor - Probationary Review', null, 4, 0, 0]];
             }
         }
         $insert = $conn->prepare("INSERT INTO evaluation_package_route_steps
