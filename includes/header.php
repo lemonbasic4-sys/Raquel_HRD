@@ -527,12 +527,12 @@ if ($annual_nav_actor && $annual_nav_actor['employment_status'] === 'Regular'
         $sidebar_menus[$annual_nav_section][] = ['icon'=>'fas fa-layer-group', 'label'=>'Performance Evaluation',
             'url'=>BASE_URL.'/staff/performance-evaluation.php', 'page'=>'performance-evaluation.php',
             'badge'=>$staff_performance_count ?: null, 'badge_class'=>'bg-warning text-dark'];
-    } elseif (!isset($sidebar_menus['MY TEAM'])) {
+    } elseif (!isset($sidebar_menus['PERFORMANCE'])) {
         $sidebar_menus[$annual_nav_section][] = ['icon'=>'fas fa-layer-group', 'label'=>'Performance Evaluation',
             'url'=>BASE_URL.'/employee/performance-evaluation.php', 'page'=>'performance-evaluation.php',
             'badge'=>($annual_nav_count + quarterlyPendingCount($conn,$annual_nav_actor)) ?: null, 'badge_class'=>'bg-warning text-dark'];
     } else {
-        foreach ($sidebar_menus['MY TEAM'] as &$team_nav_item) {
+        foreach ($sidebar_menus['PERFORMANCE'] as &$team_nav_item) {
             if (($team_nav_item['page'] ?? '') === 'team-evaluation-packages.php') {
                 $team_nav_item['badge'] = (int)($team_nav_item['badge'] ?? 0) + $annual_nav_count;
                 break;
@@ -547,10 +547,10 @@ if ($annual_nav_actor && $annual_nav_actor['employment_status'] === 'Regular'
     $quarterly_nav_count = quarterlyPendingCount($conn, $annual_nav_actor);
     if ($annual_nav_actor['role'] === 'HR Staff') {
         // Quarterly work is included in Performance Evaluation above.
-    } elseif (!isset($sidebar_menus['MY TEAM'])) {
+    } elseif (!isset($sidebar_menus['PERFORMANCE'])) {
         // Both evaluation types share the Performance Evaluation item above.
     } else {
-        foreach ($sidebar_menus['MY TEAM'] as &$team_nav_item) {
+        foreach ($sidebar_menus['PERFORMANCE'] as &$team_nav_item) {
             if (($team_nav_item['page'] ?? '') === 'team-evaluation-packages.php') {
                 $team_nav_item['badge'] = (int)($team_nav_item['badge'] ?? 0) + $quarterly_nav_count;
                 break;
