@@ -106,3 +106,4 @@ misc/             Additional project documentation
 
 If the application cannot connect to the database, confirm MySQL is running and the credentials in `config/database.php` match the local installation.
 
+justine gaming
