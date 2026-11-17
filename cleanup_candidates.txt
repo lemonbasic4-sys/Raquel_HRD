@@ -1,0 +1,47 @@
+FILES PROPOSED FOR REMOVAL OR ARCHIVING
+No files have been deleted. This is a review list only.
+
+REMOVE OR ARCHIVE
+database/create_missing_employee_portal_accounts.sql
+database/AP_seed.sql
+database/Audit_seed.sql
+database/BD_seed.sql
+database/Compliance_seed.sql
+database/Finance_seed.sql
+database/GS_seed.sql
+database/HR_seed.sql
+database/IT_seed.sql
+database/Marketing_seed.sql
+database/OP_seed.sql
+database/Operations_seed.sql
+database/Purchasing_seed.sql
+database/analytics_demo_seed.sql
+database/5th_seed_sample_evaluation_templates.sql
+misc/departments.txt
+misc/Raquel_Pawnshop_HR_Workforce_Analytics_&_Evaluation _Platform-Computation.xlsx
+
+DUPLICATE - UPDATE GENERATOR BEFORE REMOVING
+evaluation/Batch_Import_Department_Evaluation_Seeds.md
+Identical to evaluation/README.md; scripts/build-department-fixtures.php currently generates both.
+
+DEVELOPMENT TESTS - KEEP IN DEVELOPMENT, OPTIONAL TO EXCLUDE FROM DEPLOYMENT
+scripts/test-session-storage.php
+scripts/test-seeded-account-binding.php
+scripts/test-department-fixtures.ps1
+
+DO NOT REMOVE YET
+main_office_probationary/
+scripts/build-department-fixtures.php still reads its SQL roster.
+
+KEEP
+database/1st_schema_tables.sql
+database/2nd_seed_organization.sql
+database/3rd_seed_HR_accounts_.sql
+database/4th_seed_executive_portal_accounts.sql
+Department seeds and READMEs under evaluation/
+config/session.php
+storage/.htaccess
+storage/sessions/
+includes/seeded-evaluation-forms.php
+found_bugs.txt
+Migration and repair scripts pending a separate dependency/database review.
