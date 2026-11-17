@@ -1,0 +1,35 @@
+# Information Technology Evaluation Dry Run
+
+Start MySQL in XAMPP. The organization, employee, and portal account seeds must already be imported.
+
+## Probationary Initial and Final: already ready
+
+Ethan Tan (`MO26-IT-P`) and Rina Chua (`MO26-IT-P2`) have active portal accounts. Both are currently Probationary, with **Initial** due **2027-01-01** and **2027-01-15**, respectively. The Main Office probationary seed already created active Technical Support Staff I forms `MO26-810-INITIAL` and `MO26-810-FINAL`; do not reimport that seed into an existing setup.
+
+They start in **Employee Portal → Self Rating → Initial**. Final becomes available after Initial approval. Regular Quarterly becomes available after the Final outcome and regularization.
+
+## Quarterly
+
+Copy and paste into PowerShell:
+
+```powershell
+cd C:\xampp\htdocs\Raquel_HRD
+C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 -u root -e "source evaluation/Information_Technology/seed_information_technology_quarterly_dry_run.sql"
+```
+
+The first cycle is **2026-11-15 to 2027-02-14** for all 18 IT positions. The same SQL adds a **Technical Support Staff I-V cycle, 2027-04-15 to 2027-07-14**, for employees who complete probation and become Regular.
+
+## Annual
+
+Copy and paste into PowerShell:
+
+```powershell
+cd C:\xampp\htdocs\Raquel_HRD
+C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 -u root -e "source evaluation/Information_Technology/seed_information_technology_annual_dry_run.sql"
+```
+
+The first Annual period is **2026-01-01 to 2026-12-31** for all 18 positions. The same SQL adds a **Technical Support Staff I-V Annual 2027** form. The portal starts the actual Annual period on the later of January 1 or regularization date. Annual self-rating requires an **Approved Quarterly evaluation in the same year**.
+
+Each SQL adds six role-specific templates (IT Manager I, IT Managers II-IV, IT Supervisors, Programmer, Technical Support, Helpdesk) and the later Technical Support form. Each has 8 KRAs totaling 100%, 8 Core Behaviors, and an 80% KRA / 20% Behavior overall split. No scores or approvals are seeded. Reimporting a template stops with an error.
+
+IT Manager I reports to the VP for Operations (`MO26-OP-V`), whose active portal account is required as form creator. Only that VP, IT Manager I, IT Supervisor I, and the two probationary Technical Support staff have accounts in the current Main Office sample; the other forms are position-ready.
