@@ -30,7 +30,7 @@ BEGIN
   SELECT MIN(u.user_id) INTO v_creator FROM users u JOIN employees e ON e.employee_id=u.employee_id
   WHERE e.employee_code='CEO-001' AND e.is_active=1 AND e.deleted_at IS NULL
     AND u.role='President and CEO' AND u.is_active=1 AND u.deleted_at IS NULL AND COALESCE(u.account_hold,0)=0;
-  IF v_creator IS NULL THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Required active reviewer account missing'; END IF;
+
   INSERT INTO evaluation_templates
     (template_name,description,target_department,target_department_id,target_job_title_id,
      behavior_framework_code,behavior_framework_version,evaluation_type,individual_workflow,
@@ -75,7 +75,7 @@ BEGIN
   SELECT MIN(u.user_id) INTO v_creator FROM users u JOIN employees e ON e.employee_id=u.employee_id
   WHERE e.employee_code='MO26-OP-V' AND e.is_active=1 AND e.deleted_at IS NULL
     AND u.role='Employee' AND u.is_active=1 AND u.deleted_at IS NULL AND COALESCE(u.account_hold,0)=0;
-  IF v_creator IS NULL THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Required active reviewer account missing'; END IF;
+
   INSERT INTO evaluation_templates
     (template_name,description,target_department,target_department_id,target_job_title_id,
      behavior_framework_code,behavior_framework_version,evaluation_type,individual_workflow,
@@ -120,7 +120,7 @@ BEGIN
   SELECT MIN(u.user_id) INTO v_creator FROM users u JOIN employees e ON e.employee_id=u.employee_id
   WHERE e.employee_code='MO26-OP-M' AND e.is_active=1 AND e.deleted_at IS NULL
     AND u.role='Employee' AND u.is_active=1 AND u.deleted_at IS NULL AND COALESCE(u.account_hold,0)=0;
-  IF v_creator IS NULL THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Required active reviewer account missing'; END IF;
+
   INSERT INTO evaluation_templates
     (template_name,description,target_department,target_department_id,target_job_title_id,
      behavior_framework_code,behavior_framework_version,evaluation_type,individual_workflow,
@@ -165,7 +165,7 @@ BEGIN
   SELECT MIN(u.user_id) INTO v_creator FROM users u JOIN employees e ON e.employee_id=u.employee_id
   WHERE e.employee_code='MO26-OP-H' AND e.is_active=1 AND e.deleted_at IS NULL
     AND u.role='Employee' AND u.is_active=1 AND u.deleted_at IS NULL AND COALESCE(u.account_hold,0)=0;
-  IF v_creator IS NULL THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Required active reviewer account missing'; END IF;
+
   INSERT INTO evaluation_templates
     (template_name,description,target_department,target_department_id,target_job_title_id,
      behavior_framework_code,behavior_framework_version,evaluation_type,individual_workflow,
@@ -211,7 +211,7 @@ BEGIN
   SELECT MIN(u.user_id) INTO v_creator FROM users u JOIN employees e ON e.employee_id=u.employee_id
   WHERE e.employee_code='MO26-OP-H' AND e.is_active=1 AND e.deleted_at IS NULL
     AND u.role='Employee' AND u.is_active=1 AND u.deleted_at IS NULL AND COALESCE(u.account_hold,0)=0;
-  IF v_creator IS NULL THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Required active reviewer account missing'; END IF;
+
   INSERT INTO evaluation_templates
     (template_name,description,target_department,target_department_id,target_job_title_id,
      behavior_framework_code,behavior_framework_version,evaluation_type,individual_workflow,
@@ -256,7 +256,7 @@ BEGIN
   SELECT MIN(u.user_id) INTO v_creator FROM users u JOIN employees e ON e.employee_id=u.employee_id
   WHERE e.employee_code='MO26-OP-H' AND e.is_active=1 AND e.deleted_at IS NULL
     AND u.role='Employee' AND u.is_active=1 AND u.deleted_at IS NULL AND COALESCE(u.account_hold,0)=0;
-  IF v_creator IS NULL THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Required active reviewer account missing'; END IF;
+
   INSERT INTO evaluation_templates
     (template_name,description,target_department,target_department_id,target_job_title_id,
      behavior_framework_code,behavior_framework_version,evaluation_type,individual_workflow,
@@ -282,6 +282,32 @@ BEGIN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Operations template validation failed';
   END IF;
   IF v_count<>6 THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Operations template count failed'; END IF;
+
+  -- BEGIN SEEDED OWNERS
+  INSERT INTO evaluation_seed_template_owners (form_code,employee_id,preferred_role)
+  SELECT 'OP-VP-Q-DRYRUN-20261115',employee_id,'President and CEO' FROM employees WHERE employee_code='CEO-001'
+  ON DUPLICATE KEY UPDATE form_code=VALUES(form_code);
+  INSERT INTO evaluation_seed_template_owners (form_code,employee_id,preferred_role)
+  SELECT 'OP-REG-Q-DRYRUN-20261115',employee_id,'Employee' FROM employees WHERE employee_code='MO26-OP-V'
+  ON DUPLICATE KEY UPDATE form_code=VALUES(form_code);
+  INSERT INTO evaluation_seed_template_owners (form_code,employee_id,preferred_role)
+  SELECT 'OP-AREA-Q-DRYRUN-20261115',employee_id,'Employee' FROM employees WHERE employee_code='MO26-OP-M'
+  ON DUPLICATE KEY UPDATE form_code=VALUES(form_code);
+  INSERT INTO evaluation_seed_template_owners (form_code,employee_id,preferred_role)
+  SELECT 'OP-FOCAL-Q-DRYRUN-20261115',employee_id,'Employee' FROM employees WHERE employee_code='MO26-OP-H'
+  ON DUPLICATE KEY UPDATE form_code=VALUES(form_code);
+  INSERT INTO evaluation_seed_template_owners (form_code,employee_id,preferred_role)
+  SELECT 'OP-STAFF-Q-DRYRUN-20261115',employee_id,'Employee' FROM employees WHERE employee_code='MO26-OP-H'
+  ON DUPLICATE KEY UPDATE form_code=VALUES(form_code);
+  INSERT INTO evaluation_seed_template_owners (form_code,employee_id,preferred_role)
+  SELECT 'OP-FOCAL-Q-DRYRUN-20270415',employee_id,'Employee' FROM employees WHERE employee_code='MO26-OP-H'
+  ON DUPLICATE KEY UPDATE form_code=VALUES(form_code);
+  UPDATE evaluation_templates t JOIN evaluation_seed_template_owners o ON o.form_code=t.form_code
+  SET t.created_by=(SELECT MIN(u.user_id) FROM users u WHERE u.employee_id=o.employee_id
+    AND (u.role=o.preferred_role OR (o.preferred_role='Employee' AND u.role IN ('HR Manager','HR Supervisor','HR Staff')))
+    AND u.is_active=1 AND u.deleted_at IS NULL AND COALESCE(u.account_hold,0)=0)
+  WHERE t.created_by IS NULL;
+  -- END SEEDED OWNERS
   COMMIT;
   SELECT 'Operations Quarterly forms imported' AS result,6 AS forms,16 AS covered_positions;
 END //

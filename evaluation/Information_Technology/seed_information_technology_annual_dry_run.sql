@@ -48,9 +48,7 @@ BEGIN
   SELECT MIN(u.user_id) INTO v_sup FROM users u JOIN employees e ON e.employee_id=u.employee_id
   WHERE e.employee_code='MO26-IT-H' AND e.department_id=8 AND e.job_title_id=804 AND e.employment_status='Regular'
     AND e.is_active=1 AND e.deleted_at IS NULL AND u.role='Employee' AND u.is_active=1 AND u.deleted_at IS NULL AND COALESCE(u.account_hold,0)=0;
-  IF v_ops IS NULL OR v_mgr IS NULL OR v_sup IS NULL THEN
-    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Active Operations VP, IT Manager, and IT Supervisor portal accounts are required';
-  END IF;
+
 
   START TRANSACTION;
   INSERT INTO evaluation_templates
@@ -210,6 +208,35 @@ BEGIN
         OR (SELECT COUNT(*) FROM evaluation_criteria c WHERE c.template_id=t.template_id AND c.section='Behavior')<>8)) THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='IT Annual position or criteria validation failed';
   END IF;
+
+  -- BEGIN SEEDED OWNERS
+  INSERT INTO evaluation_seed_template_owners (form_code,employee_id,preferred_role)
+  SELECT 'IT-LEAD-A-DRYRUN-2026',employee_id,'Employee' FROM employees WHERE employee_code='MO26-OP-V'
+  ON DUPLICATE KEY UPDATE form_code=VALUES(form_code);
+  INSERT INTO evaluation_seed_template_owners (form_code,employee_id,preferred_role)
+  SELECT 'IT-MGR-A-DRYRUN-2026',employee_id,'Employee' FROM employees WHERE employee_code='MO26-IT-M'
+  ON DUPLICATE KEY UPDATE form_code=VALUES(form_code);
+  INSERT INTO evaluation_seed_template_owners (form_code,employee_id,preferred_role)
+  SELECT 'IT-SUP-A-DRYRUN-2026',employee_id,'Employee' FROM employees WHERE employee_code='MO26-IT-M'
+  ON DUPLICATE KEY UPDATE form_code=VALUES(form_code);
+  INSERT INTO evaluation_seed_template_owners (form_code,employee_id,preferred_role)
+  SELECT 'IT-PROGRAMMER-A-DRYRUN-2026',employee_id,'Employee' FROM employees WHERE employee_code='MO26-IT-H'
+  ON DUPLICATE KEY UPDATE form_code=VALUES(form_code);
+  INSERT INTO evaluation_seed_template_owners (form_code,employee_id,preferred_role)
+  SELECT 'IT-TECH-A-DRYRUN-2026',employee_id,'Employee' FROM employees WHERE employee_code='MO26-IT-H'
+  ON DUPLICATE KEY UPDATE form_code=VALUES(form_code);
+  INSERT INTO evaluation_seed_template_owners (form_code,employee_id,preferred_role)
+  SELECT 'IT-HELP-A-DRYRUN-2026',employee_id,'Employee' FROM employees WHERE employee_code='MO26-IT-H'
+  ON DUPLICATE KEY UPDATE form_code=VALUES(form_code);
+  INSERT INTO evaluation_seed_template_owners (form_code,employee_id,preferred_role)
+  SELECT 'IT-TECH-A-DRYRUN-2027',employee_id,'Employee' FROM employees WHERE employee_code='MO26-IT-H'
+  ON DUPLICATE KEY UPDATE form_code=VALUES(form_code);
+  UPDATE evaluation_templates t JOIN evaluation_seed_template_owners o ON o.form_code=t.form_code
+  SET t.created_by=(SELECT MIN(u.user_id) FROM users u WHERE u.employee_id=o.employee_id
+    AND (u.role=o.preferred_role OR (o.preferred_role='Employee' AND u.role IN ('HR Manager','HR Supervisor','HR Staff')))
+    AND u.is_active=1 AND u.deleted_at IS NULL AND COALESCE(u.account_hold,0)=0)
+  WHERE t.created_by IS NULL;
+  -- END SEEDED OWNERS
   COMMIT;
   SELECT 'IT Annual forms imported' AS result,7 AS forms,18 AS covered_positions;
 END //

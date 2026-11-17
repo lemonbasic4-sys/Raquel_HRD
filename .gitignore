@@ -9,3 +9,7 @@ cloudflared.exe
 # IDE / Editor settings
 .vscode/
 .idea/
+
+# Private PHP session data
+/storage/sessions/*
+!/storage/sessions/.gitkeep

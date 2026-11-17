@@ -1,9 +1,9 @@
 -- AP DEPARTMENT QUARTERLY DRY RUN (fresh-setup bundle)
 -- Period: 2026-11-15 through 2027-02-14.
 -- Sections 01-04 create four Active templates: Staff, Supervisors, Managers, VP.
--- Section 05 assigns Adrian Reyes a blank Pending Self-Rating.
+-- Templates only. Optional assignment: seed_ap_supervisor_quarterly_evaluation.sql.
 -- No scores, submissions, or approvals are generated.
--- Run only after organization, employees, and portal accounts are seeded.
+-- Run only after organization, employees are seeded. Portal accounts are created manually later.
 -- The preflight below stops if ANY bundled template already exists.
 -- It is not a repair or reimport script for an existing dry run.
 USE raquel_hris;
@@ -44,9 +44,7 @@ BEGIN
   FROM users u JOIN employees e ON e.employee_id = u.employee_id
   WHERE u.username = 'MO26-AP-H' AND e.department_id = 1
     AND e.job_title_id = 105 AND u.is_active = 1 AND u.deleted_at IS NULL;
-  IF v_creator_id IS NULL THEN
-    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Active MO26-AP-H AP Supervisor I account is required';
-  END IF;
+
 
   SELECT COUNT(*) INTO v_position_count FROM job_titles
   WHERE department_id = 1 AND job_title_id BETWEEN 108 AND 112
@@ -100,6 +98,26 @@ BEGIN
      OR (SELECT COUNT(*) FROM evaluation_criteria WHERE template_id = v_template_id AND section = 'Behavior') <> 8 THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'AP Quarterly dry-run form validation failed';
   END IF;
+
+  -- BEGIN SEEDED OWNERS
+  INSERT INTO evaluation_seed_template_owners (form_code,employee_id,preferred_role)
+  SELECT 'AP-RF-Q-DRYRUN-20261115',employee_id,'Employee' FROM employees WHERE employee_code='MO26-AP-H'
+  ON DUPLICATE KEY UPDATE form_code=VALUES(form_code);
+  INSERT INTO evaluation_seed_template_owners (form_code,employee_id,preferred_role)
+  SELECT 'AP-HEAD-Q-DRYRUN-20261115',employee_id,'Employee' FROM employees WHERE employee_code='MO26-AP-M'
+  ON DUPLICATE KEY UPDATE form_code=VALUES(form_code);
+  INSERT INTO evaluation_seed_template_owners (form_code,employee_id,preferred_role)
+  SELECT 'AP-MGR-Q-DRYRUN-20261115',employee_id,'Employee' FROM employees WHERE employee_code='AP-001'
+  ON DUPLICATE KEY UPDATE form_code=VALUES(form_code);
+  INSERT INTO evaluation_seed_template_owners (form_code,employee_id,preferred_role)
+  SELECT 'AP-VP-Q-DRYRUN-20261115',employee_id,'President and CEO' FROM employees WHERE employee_code='CEO-001'
+  ON DUPLICATE KEY UPDATE form_code=VALUES(form_code);
+  UPDATE evaluation_templates t JOIN evaluation_seed_template_owners o ON o.form_code=t.form_code
+  SET t.created_by=(SELECT MIN(u.user_id) FROM users u WHERE u.employee_id=o.employee_id
+    AND (u.role=o.preferred_role OR (o.preferred_role='Employee' AND u.role IN ('HR Manager','HR Supervisor','HR Staff')))
+    AND u.is_active=1 AND u.deleted_at IS NULL AND COALESCE(u.account_hold,0)=0)
+  WHERE t.created_by IS NULL;
+  -- END SEEDED OWNERS
   COMMIT;
   SELECT v_template_id AS template_id, 'AP Quarterly R&F dry-run form imported' AS result;
 END //
@@ -133,9 +151,7 @@ BEGIN
     AND e.job_title_id = 101 AND e.employment_status = 'Regular'
     AND e.is_active = 1 AND e.deleted_at IS NULL
     AND u.is_active = 1 AND u.deleted_at IS NULL AND COALESCE(u.account_hold, 0) = 0;
-  IF v_creator_id IS NULL THEN
-    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Active MO26-AP-M AP Manager I account is required';
-  END IF;
+
 
   SELECT COUNT(*) INTO v_position_count FROM job_titles
   WHERE department_id = 1 AND job_title_id BETWEEN 105 AND 107
@@ -189,6 +205,26 @@ BEGIN
      OR (SELECT COUNT(*) FROM evaluation_criteria WHERE template_id = v_template_id AND section = 'Behavior') <> 8 THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'AP immediate-head Quarterly form validation failed';
   END IF;
+
+  -- BEGIN SEEDED OWNERS
+  INSERT INTO evaluation_seed_template_owners (form_code,employee_id,preferred_role)
+  SELECT 'AP-RF-Q-DRYRUN-20261115',employee_id,'Employee' FROM employees WHERE employee_code='MO26-AP-H'
+  ON DUPLICATE KEY UPDATE form_code=VALUES(form_code);
+  INSERT INTO evaluation_seed_template_owners (form_code,employee_id,preferred_role)
+  SELECT 'AP-HEAD-Q-DRYRUN-20261115',employee_id,'Employee' FROM employees WHERE employee_code='MO26-AP-M'
+  ON DUPLICATE KEY UPDATE form_code=VALUES(form_code);
+  INSERT INTO evaluation_seed_template_owners (form_code,employee_id,preferred_role)
+  SELECT 'AP-MGR-Q-DRYRUN-20261115',employee_id,'Employee' FROM employees WHERE employee_code='AP-001'
+  ON DUPLICATE KEY UPDATE form_code=VALUES(form_code);
+  INSERT INTO evaluation_seed_template_owners (form_code,employee_id,preferred_role)
+  SELECT 'AP-VP-Q-DRYRUN-20261115',employee_id,'President and CEO' FROM employees WHERE employee_code='CEO-001'
+  ON DUPLICATE KEY UPDATE form_code=VALUES(form_code);
+  UPDATE evaluation_templates t JOIN evaluation_seed_template_owners o ON o.form_code=t.form_code
+  SET t.created_by=(SELECT MIN(u.user_id) FROM users u WHERE u.employee_id=o.employee_id
+    AND (u.role=o.preferred_role OR (o.preferred_role='Employee' AND u.role IN ('HR Manager','HR Supervisor','HR Staff')))
+    AND u.is_active=1 AND u.deleted_at IS NULL AND COALESCE(u.account_hold,0)=0)
+  WHERE t.created_by IS NULL;
+  -- END SEEDED OWNERS
   COMMIT;
   SELECT v_template_id AS template_id, 'AP immediate-head Quarterly dry-run form imported' AS result;
 END //
@@ -227,11 +263,9 @@ BEGIN
   FROM users u JOIN employees e ON e.employee_id = u.employee_id
   WHERE e.employee_code = 'AP-001' AND e.job_title_id = 100 AND e.department_id = 1
     AND e.employment_status = 'Regular' AND e.is_active = 1 AND e.deleted_at IS NULL
-    AND u.username = 'AP-001' AND u.role = 'Employee'
+    AND u.role = 'Employee'
     AND u.is_active = 1 AND u.deleted_at IS NULL AND COALESCE(u.account_hold, 0) = 0;
-  IF v_creator_id IS NULL THEN
-    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Active AP-001 VP employee portal account is required';
-  END IF;
+
 
   START TRANSACTION;
   INSERT INTO evaluation_templates
@@ -278,6 +312,26 @@ BEGIN
      OR (SELECT COUNT(*) FROM evaluation_criteria WHERE template_id = v_template_id AND section = 'Behavior') <> 8 THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'AP Manager Quarterly form validation failed';
   END IF;
+
+  -- BEGIN SEEDED OWNERS
+  INSERT INTO evaluation_seed_template_owners (form_code,employee_id,preferred_role)
+  SELECT 'AP-RF-Q-DRYRUN-20261115',employee_id,'Employee' FROM employees WHERE employee_code='MO26-AP-H'
+  ON DUPLICATE KEY UPDATE form_code=VALUES(form_code);
+  INSERT INTO evaluation_seed_template_owners (form_code,employee_id,preferred_role)
+  SELECT 'AP-HEAD-Q-DRYRUN-20261115',employee_id,'Employee' FROM employees WHERE employee_code='MO26-AP-M'
+  ON DUPLICATE KEY UPDATE form_code=VALUES(form_code);
+  INSERT INTO evaluation_seed_template_owners (form_code,employee_id,preferred_role)
+  SELECT 'AP-MGR-Q-DRYRUN-20261115',employee_id,'Employee' FROM employees WHERE employee_code='AP-001'
+  ON DUPLICATE KEY UPDATE form_code=VALUES(form_code);
+  INSERT INTO evaluation_seed_template_owners (form_code,employee_id,preferred_role)
+  SELECT 'AP-VP-Q-DRYRUN-20261115',employee_id,'President and CEO' FROM employees WHERE employee_code='CEO-001'
+  ON DUPLICATE KEY UPDATE form_code=VALUES(form_code);
+  UPDATE evaluation_templates t JOIN evaluation_seed_template_owners o ON o.form_code=t.form_code
+  SET t.created_by=(SELECT MIN(u.user_id) FROM users u WHERE u.employee_id=o.employee_id
+    AND (u.role=o.preferred_role OR (o.preferred_role='Employee' AND u.role IN ('HR Manager','HR Supervisor','HR Staff')))
+    AND u.is_active=1 AND u.deleted_at IS NULL AND COALESCE(u.account_hold,0)=0)
+  WHERE t.created_by IS NULL;
+  -- END SEEDED OWNERS
   COMMIT;
   SELECT v_template_id AS template_id, 'AP Manager Quarterly dry-run form imported' AS result;
 END //
@@ -310,22 +364,14 @@ BEGIN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Active AP VP position reporting to the CEO is required';
   END IF;
 
-  IF NOT EXISTS (SELECT 1 FROM employees e JOIN users u ON u.employee_id = e.employee_id
-                 WHERE e.employee_code = 'AP-001' AND e.job_title_id = 100 AND e.department_id = 1
-                   AND e.employment_status = 'Regular' AND e.is_active = 1 AND e.deleted_at IS NULL
-                   AND u.username = 'AP-001' AND u.role = 'Employee'
-                   AND u.is_active = 1 AND u.deleted_at IS NULL AND COALESCE(u.account_hold, 0) = 0) THEN
-    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Active AP-001 VP employee portal account is required';
-  END IF;
+
 
   SELECT MIN(u.user_id) INTO v_creator_id
   FROM users u JOIN employees e ON e.employee_id = u.employee_id
   WHERE e.employee_code = 'CEO-001' AND e.job_title_id = 1100
     AND u.role = 'President and CEO' AND u.is_active = 1 AND u.deleted_at IS NULL
     AND COALESCE(u.account_hold, 0) = 0 AND e.is_active = 1 AND e.deleted_at IS NULL;
-  IF v_creator_id IS NULL THEN
-    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Active CEO-001 President and CEO account is required';
-  END IF;
+
 
   START TRANSACTION;
   INSERT INTO evaluation_templates
@@ -369,77 +415,29 @@ BEGIN
      OR (SELECT COUNT(*) FROM evaluation_criteria WHERE template_id = v_template_id AND section = 'Behavior') <> 8 THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'AP VP Quarterly form validation failed';
   END IF;
+
+  -- BEGIN SEEDED OWNERS
+  INSERT INTO evaluation_seed_template_owners (form_code,employee_id,preferred_role)
+  SELECT 'AP-RF-Q-DRYRUN-20261115',employee_id,'Employee' FROM employees WHERE employee_code='MO26-AP-H'
+  ON DUPLICATE KEY UPDATE form_code=VALUES(form_code);
+  INSERT INTO evaluation_seed_template_owners (form_code,employee_id,preferred_role)
+  SELECT 'AP-HEAD-Q-DRYRUN-20261115',employee_id,'Employee' FROM employees WHERE employee_code='MO26-AP-M'
+  ON DUPLICATE KEY UPDATE form_code=VALUES(form_code);
+  INSERT INTO evaluation_seed_template_owners (form_code,employee_id,preferred_role)
+  SELECT 'AP-MGR-Q-DRYRUN-20261115',employee_id,'Employee' FROM employees WHERE employee_code='AP-001'
+  ON DUPLICATE KEY UPDATE form_code=VALUES(form_code);
+  INSERT INTO evaluation_seed_template_owners (form_code,employee_id,preferred_role)
+  SELECT 'AP-VP-Q-DRYRUN-20261115',employee_id,'President and CEO' FROM employees WHERE employee_code='CEO-001'
+  ON DUPLICATE KEY UPDATE form_code=VALUES(form_code);
+  UPDATE evaluation_templates t JOIN evaluation_seed_template_owners o ON o.form_code=t.form_code
+  SET t.created_by=(SELECT MIN(u.user_id) FROM users u WHERE u.employee_id=o.employee_id
+    AND (u.role=o.preferred_role OR (o.preferred_role='Employee' AND u.role IN ('HR Manager','HR Supervisor','HR Staff')))
+    AND u.is_active=1 AND u.deleted_at IS NULL AND COALESCE(u.account_hold,0)=0)
+  WHERE t.created_by IS NULL;
+  -- END SEEDED OWNERS
   COMMIT;
   SELECT v_template_id AS template_id, 'AP VP Quarterly dry-run form imported' AS result;
 END //
 DELIMITER ;
 CALL seed_ap_vp_quarterly_dry_run();
 DROP PROCEDURE seed_ap_vp_quarterly_dry_run;
-
--- =====================================================================
--- 05  Assign Adrian Reyes (AP Supervisor I) a Pending Self-Rating
--- =====================================================================
-DROP PROCEDURE IF EXISTS seed_ap_supervisor_quarterly_evaluation;
-DELIMITER //
-CREATE PROCEDURE seed_ap_supervisor_quarterly_evaluation()
-BEGIN
-  DECLARE v_template_id INT DEFAULT NULL;
-  DECLARE v_employee_id INT DEFAULT NULL;
-  DECLARE v_assigner_id INT DEFAULT NULL;
-  DECLARE v_evaluation_id INT DEFAULT NULL;
-  DECLARE EXIT HANDLER FOR SQLEXCEPTION
-  BEGIN
-    ROLLBACK;
-    RESIGNAL;
-  END;
-
-  SELECT MIN(template_id) INTO v_template_id
-  FROM evaluation_templates
-  WHERE form_code = 'AP-HEAD-Q-DRYRUN-20261115'
-    AND evaluation_type = 'Quarterly' AND individual_workflow = 1
-    AND target_department_id = 1 AND status = 'Active' AND deleted_at IS NULL
-    AND assessment_from = '2026-11-15' AND assessment_to = '2027-02-14';
-  IF v_template_id IS NULL THEN
-    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Import the AP immediate-head Quarterly template first';
-  END IF;
-
-  SELECT MIN(e.employee_id) INTO v_employee_id
-  FROM employees e JOIN users u ON u.employee_id = e.employee_id
-  JOIN evaluation_template_positions p ON p.job_title_id = e.job_title_id AND p.template_id = v_template_id
-  WHERE e.employee_code = 'MO26-AP-H' AND u.username = 'MO26-AP-H'
-    AND e.department_id = 1 AND e.job_title_id = 105 AND e.employment_status = 'Regular'
-    AND e.is_active = 1 AND e.deleted_at IS NULL
-    AND u.role = 'Employee' AND u.is_active = 1 AND u.deleted_at IS NULL
-    AND COALESCE(u.account_hold, 0) = 0;
-  IF v_employee_id IS NULL THEN
-    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Active AP Supervisor I portal account is required';
-  END IF;
-
-  SELECT MIN(u.user_id) INTO v_assigner_id
-  FROM users u JOIN employees e ON e.employee_id = u.employee_id
-  WHERE u.username = 'MO26-AP-M' AND e.employee_code = 'MO26-AP-M'
-    AND e.department_id = 1 AND e.job_title_id = 101 AND e.employment_status = 'Regular'
-    AND e.is_active = 1 AND e.deleted_at IS NULL
-    AND u.is_active = 1 AND u.deleted_at IS NULL AND COALESCE(u.account_hold, 0) = 0;
-  IF v_assigner_id IS NULL THEN
-    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Active AP Manager I account is required to assign this evaluation';
-  END IF;
-
-  START TRANSACTION;
-  IF EXISTS (SELECT 1 FROM evaluations
-             WHERE employee_id = v_employee_id AND template_id = v_template_id AND deleted_at IS NULL) THEN
-    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Adrian already has an evaluation for this Quarterly template';
-  END IF;
-  INSERT INTO evaluations
-    (employee_id, template_id, evaluation_type, evaluation_period_start,
-     evaluation_period_end, assigned_by, assigned_at, status)
-  VALUES
-    (v_employee_id, v_template_id, 'Quarterly', '2026-11-15',
-     '2027-02-14', v_assigner_id, NOW(), 'Pending Self-Rating');
-  SET v_evaluation_id = LAST_INSERT_ID();
-  COMMIT;
-  SELECT v_evaluation_id AS evaluation_id, 'Adrian Reyes Quarterly self-rating assigned' AS result;
-END //
-DELIMITER ;
-CALL seed_ap_supervisor_quarterly_evaluation();
-DROP PROCEDURE seed_ap_supervisor_quarterly_evaluation;

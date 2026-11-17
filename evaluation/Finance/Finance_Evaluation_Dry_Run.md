@@ -1,12 +1,10 @@
 # Finance Evaluation Dry Run
 
-Start MySQL in XAMPP. The organization, employee, and portal account seeds must already be imported.
+For mock employee information and all four form types, use [README.md](README.md). Import base seeds 1-4 once, then this folder's import block. No user accounts are created or required for import. Create employee/reviewer accounts manually using Admin > Portal Accounts afterward.
 
-## Probationary Initial and Final: already ready
+## Probationary Initial and Final
 
-Carlo Dela Cruz (`MO26-FI-P`) and Alyssa Baring (`MO26-FI-P2`) have active portal accounts. Both are currently Probationary, with **Initial** due **2027-01-01** and **2027-01-15**, respectively. The Main Office probationary seed already created active Accounting Staff I forms `MO26-511-INITIAL` and `MO26-511-FINAL`; do not reimport that seed into an existing setup.
-
-They start in **Employee Portal → Self Rating → Initial**. Final becomes available after the Initial evaluation is approved. Regular Quarterly becomes available after the Final outcome and regularization.
+The employee seed supplies `MO26-FI-P`, `MO26-FI-P2`, their reporting heads, and regular staff sample `MO26-FI-R`. Shared forms `MO26-511-INITIAL` and `MO26-511-FINAL` each have 8 KRAs and 8 Core Behaviors. Initial due dates are January 1 and January 15, 2027. Once accounts exist, start at Employee Portal > Self Rating > Initial. Final follows full Initial approval; regular Quarterly follows Final approval and regularization. No scores, approvals, or regularization are seeded.
 
 ## Quarterly
 
@@ -14,7 +12,7 @@ Copy and paste into PowerShell:
 
 ```powershell
 cd C:\xampp\htdocs\Raquel_HRD
-C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 -u root -e "source evaluation/Finance/seed_finance_quarterly_dry_run.sql"
+C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 --abort-source-on-error -u root -e "source evaluation/Finance/seed_finance_quarterly_dry_run.sql"
 ```
 
 The first cycle is **2026-11-15 to 2027-02-14** for all 18 Finance positions. The same SQL adds an **Accounting Staff I-V cycle, 2027-04-15 to 2027-07-14**, for employees who complete probation and become Regular.
@@ -25,7 +23,7 @@ Copy and paste into PowerShell:
 
 ```powershell
 cd C:\xampp\htdocs\Raquel_HRD
-C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 -u root -e "source evaluation/Finance/seed_finance_annual_dry_run.sql"
+C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 --abort-source-on-error -u root -e "source evaluation/Finance/seed_finance_annual_dry_run.sql"
 ```
 
 The first Annual period is **2026-01-01 to 2026-12-31** for all 18 positions. The same SQL adds an **Accounting Staff I-V Annual 2027** form. The portal starts the actual Annual period on the later of January 1 or regularization date. Annual self-rating requires an **Approved Quarterly evaluation in the same year**.

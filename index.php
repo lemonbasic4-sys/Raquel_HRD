@@ -1,9 +1,4 @@
 ﻿<?php
-// Start session
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-
 // Load config early so BASE_URL is available for redirects and HTML
 require_once __DIR__ . '/config/database.php';
 require_once __DIR__ . '/includes/functions.php';

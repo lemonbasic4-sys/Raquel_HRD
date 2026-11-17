@@ -1,4 +1,7 @@
 <?php
+require_once __DIR__ . '/session.php';
+startAppSession();
+
 define('DB_HOST', '127.0.0.1');
 define('DB_USER', 'root');
 define('DB_PASS', '');
@@ -18,8 +21,3 @@ try {
     // If connection failed, provide a clean message or fallback
     die("Database Connection Error: Could not connect to MySQL server at " . DB_HOST . ". Please verify that MySQL is running in XAMPP. (" . htmlspecialchars($e->getMessage()) . ")");
 }
-
- if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-?>

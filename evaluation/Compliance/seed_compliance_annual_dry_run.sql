@@ -39,9 +39,7 @@ BEGIN
   SELECT MIN(u.user_id) INTO v_supervisor FROM users u JOIN employees e ON e.employee_id=u.employee_id
   WHERE e.employee_code='MO26-CO-S' AND e.department_id=4 AND e.job_title_id=401 AND e.employment_status='Regular'
     AND e.is_active=1 AND e.deleted_at IS NULL AND u.role='Employee' AND u.is_active=1 AND u.deleted_at IS NULL AND COALESCE(u.account_hold,0)=0;
-  IF v_ceo IS NULL OR v_head IS NULL OR v_supervisor IS NULL THEN
-    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Active CEO and Compliance supervisor portal accounts are required';
-  END IF;
+
 
   START TRANSACTION;
   INSERT INTO evaluation_templates
@@ -139,6 +137,26 @@ BEGIN
         OR (SELECT COUNT(*) FROM evaluation_criteria c WHERE c.template_id=t.template_id AND c.section='Behavior')<>8)) THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Compliance Annual position or criteria validation failed';
   END IF;
+
+  -- BEGIN SEEDED OWNERS
+  INSERT INTO evaluation_seed_template_owners (form_code,employee_id,preferred_role)
+  SELECT 'CO-HEAD-A-DRYRUN-2026',employee_id,'President and CEO' FROM employees WHERE employee_code='CEO-001'
+  ON DUPLICATE KEY UPDATE form_code=VALUES(form_code);
+  INSERT INTO evaluation_seed_template_owners (form_code,employee_id,preferred_role)
+  SELECT 'CO-SUP-A-DRYRUN-2026',employee_id,'Employee' FROM employees WHERE employee_code='MO26-CO-H'
+  ON DUPLICATE KEY UPDATE form_code=VALUES(form_code);
+  INSERT INTO evaluation_seed_template_owners (form_code,employee_id,preferred_role)
+  SELECT 'CO-STAFF-A-DRYRUN-2026',employee_id,'Employee' FROM employees WHERE employee_code='MO26-CO-S'
+  ON DUPLICATE KEY UPDATE form_code=VALUES(form_code);
+  INSERT INTO evaluation_seed_template_owners (form_code,employee_id,preferred_role)
+  SELECT 'CO-STAFF-A-DRYRUN-2027',employee_id,'Employee' FROM employees WHERE employee_code='MO26-CO-S'
+  ON DUPLICATE KEY UPDATE form_code=VALUES(form_code);
+  UPDATE evaluation_templates t JOIN evaluation_seed_template_owners o ON o.form_code=t.form_code
+  SET t.created_by=(SELECT MIN(u.user_id) FROM users u WHERE u.employee_id=o.employee_id
+    AND (u.role=o.preferred_role OR (o.preferred_role='Employee' AND u.role IN ('HR Manager','HR Supervisor','HR Staff')))
+    AND u.is_active=1 AND u.deleted_at IS NULL AND COALESCE(u.account_hold,0)=0)
+  WHERE t.created_by IS NULL;
+  -- END SEEDED OWNERS
   COMMIT;
   SELECT 'Compliance Annual forms imported' AS result,4 AS forms,6 AS covered_positions;
 END //

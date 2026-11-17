@@ -54,9 +54,7 @@ BEGIN
   SELECT MIN(u.user_id) INTO v_sup FROM users u JOIN employees e ON e.employee_id=u.employee_id
   WHERE e.employee_code='MO26-GS-H' AND e.job_title_id=605 AND e.is_active=1 AND e.deleted_at IS NULL
     AND u.role='Employee' AND u.is_active=1 AND u.deleted_at IS NULL AND COALESCE(u.account_hold,0)=0 AND e.department_id=6 AND e.employment_status='Regular';
-  IF v_ceo IS NULL OR v_vp IS NULL OR v_mgr IS NULL OR v_sup IS NULL THEN
-    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Active CEO, GS VP, Manager, and Supervisor portal accounts are required';
-  END IF;
+
 
   START TRANSACTION;
   -- Eight role-specific forms cover every active GS position.
@@ -251,6 +249,41 @@ BEGIN
         OR (SELECT COUNT(*) FROM evaluation_criteria c WHERE c.template_id=t.template_id AND c.section='Behavior')<>8)) THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='GS Quarterly position or criteria validation failed';
   END IF;
+
+  -- BEGIN SEEDED OWNERS
+  INSERT INTO evaluation_seed_template_owners (form_code,employee_id,preferred_role)
+  SELECT 'GS-VP-Q-DRYRUN-20261115',employee_id,'President and CEO' FROM employees WHERE employee_code='CEO-001'
+  ON DUPLICATE KEY UPDATE form_code=VALUES(form_code);
+  INSERT INTO evaluation_seed_template_owners (form_code,employee_id,preferred_role)
+  SELECT 'GS-MGR-Q-DRYRUN-20261115',employee_id,'Employee' FROM employees WHERE employee_code='MO26-GS-V'
+  ON DUPLICATE KEY UPDATE form_code=VALUES(form_code);
+  INSERT INTO evaluation_seed_template_owners (form_code,employee_id,preferred_role)
+  SELECT 'GS-SUP-Q-DRYRUN-20261115',employee_id,'Employee' FROM employees WHERE employee_code='MO26-GS-M'
+  ON DUPLICATE KEY UPDATE form_code=VALUES(form_code);
+  INSERT INTO evaluation_seed_template_owners (form_code,employee_id,preferred_role)
+  SELECT 'GS-DRIVER-Q-DRYRUN-20261115',employee_id,'Employee' FROM employees WHERE employee_code='MO26-GS-H'
+  ON DUPLICATE KEY UPDATE form_code=VALUES(form_code);
+  INSERT INTO evaluation_seed_template_owners (form_code,employee_id,preferred_role)
+  SELECT 'GS-SECURITY-Q-DRYRUN-20261115',employee_id,'Employee' FROM employees WHERE employee_code='MO26-GS-H'
+  ON DUPLICATE KEY UPDATE form_code=VALUES(form_code);
+  INSERT INTO evaluation_seed_template_owners (form_code,employee_id,preferred_role)
+  SELECT 'GS-FAC-Q-DRYRUN-20261115',employee_id,'Employee' FROM employees WHERE employee_code='MO26-GS-H'
+  ON DUPLICATE KEY UPDATE form_code=VALUES(form_code);
+  INSERT INTO evaluation_seed_template_owners (form_code,employee_id,preferred_role)
+  SELECT 'GS-WAREHOUSE-Q-DRYRUN-20261115',employee_id,'Employee' FROM employees WHERE employee_code='MO26-GS-H'
+  ON DUPLICATE KEY UPDATE form_code=VALUES(form_code);
+  INSERT INTO evaluation_seed_template_owners (form_code,employee_id,preferred_role)
+  SELECT 'GS-MESSENGER-Q-DRYRUN-20261115',employee_id,'Employee' FROM employees WHERE employee_code='MO26-GS-H'
+  ON DUPLICATE KEY UPDATE form_code=VALUES(form_code);
+  INSERT INTO evaluation_seed_template_owners (form_code,employee_id,preferred_role)
+  SELECT 'GS-FAC-Q-DRYRUN-20270415',employee_id,'Employee' FROM employees WHERE employee_code='MO26-GS-H'
+  ON DUPLICATE KEY UPDATE form_code=VALUES(form_code);
+  UPDATE evaluation_templates t JOIN evaluation_seed_template_owners o ON o.form_code=t.form_code
+  SET t.created_by=(SELECT MIN(u.user_id) FROM users u WHERE u.employee_id=o.employee_id
+    AND (u.role=o.preferred_role OR (o.preferred_role='Employee' AND u.role IN ('HR Manager','HR Supervisor','HR Staff')))
+    AND u.is_active=1 AND u.deleted_at IS NULL AND COALESCE(u.account_hold,0)=0)
+  WHERE t.created_by IS NULL;
+  -- END SEEDED OWNERS
   COMMIT;
   SELECT 'GS Quarterly forms imported' AS result,9 AS forms,24 AS covered_positions;
 END //

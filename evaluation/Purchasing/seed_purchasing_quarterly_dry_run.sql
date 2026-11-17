@@ -26,7 +26,7 @@ BEGIN
   SELECT MIN(u.user_id) INTO v_creator FROM users u JOIN employees e ON e.employee_id=u.employee_id
   WHERE e.employee_code='MO26-GS-M' AND e.employment_status='Regular' AND e.is_active=1 AND e.deleted_at IS NULL
     AND u.role='Employee' AND u.is_active=1 AND u.deleted_at IS NULL AND COALESCE(u.account_hold,0)=0;
-  IF v_creator IS NULL THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Required active reviewer account missing'; END IF;
+
   INSERT INTO evaluation_templates
     (template_name,description,target_department,target_department_id,target_job_title_id,
      behavior_framework_code,behavior_framework_version,evaluation_type,individual_workflow,
@@ -70,7 +70,7 @@ BEGIN
   SELECT MIN(u.user_id) INTO v_creator FROM users u JOIN employees e ON e.employee_id=u.employee_id
   WHERE e.employee_code='MO26-PU-H' AND e.employment_status='Regular' AND e.is_active=1 AND e.deleted_at IS NULL
     AND u.role='Employee' AND u.is_active=1 AND u.deleted_at IS NULL AND COALESCE(u.account_hold,0)=0;
-  IF v_creator IS NULL THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Required active reviewer account missing'; END IF;
+
   INSERT INTO evaluation_templates
     (template_name,description,target_department,target_department_id,target_job_title_id,
      behavior_framework_code,behavior_framework_version,evaluation_type,individual_workflow,
@@ -115,7 +115,7 @@ BEGIN
   SELECT MIN(u.user_id) INTO v_creator FROM users u JOIN employees e ON e.employee_id=u.employee_id
   WHERE e.employee_code='MO26-PU-H' AND e.employment_status='Regular' AND e.is_active=1 AND e.deleted_at IS NULL
     AND u.role='Employee' AND u.is_active=1 AND u.deleted_at IS NULL AND COALESCE(u.account_hold,0)=0;
-  IF v_creator IS NULL THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Required active reviewer account missing'; END IF;
+
   INSERT INTO evaluation_templates
     (template_name,description,target_department,target_department_id,target_job_title_id,
      behavior_framework_code,behavior_framework_version,evaluation_type,individual_workflow,
@@ -139,6 +139,23 @@ BEGIN
      OR (SELECT COUNT(*) FROM evaluation_criteria WHERE template_id=v_template AND section='Behavior')<>8 THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Purchasing template validation failed';
   END IF;
+
+  -- BEGIN SEEDED OWNERS
+  INSERT INTO evaluation_seed_template_owners (form_code,employee_id,preferred_role)
+  SELECT 'PU-SUP-Q-DRYRUN-20261115',employee_id,'Employee' FROM employees WHERE employee_code='MO26-GS-M'
+  ON DUPLICATE KEY UPDATE form_code=VALUES(form_code);
+  INSERT INTO evaluation_seed_template_owners (form_code,employee_id,preferred_role)
+  SELECT 'PU-STAFF-Q-DRYRUN-20261115',employee_id,'Employee' FROM employees WHERE employee_code='MO26-PU-H'
+  ON DUPLICATE KEY UPDATE form_code=VALUES(form_code);
+  INSERT INTO evaluation_seed_template_owners (form_code,employee_id,preferred_role)
+  SELECT 'PU-STAFF-Q-DRYRUN-20270415',employee_id,'Employee' FROM employees WHERE employee_code='MO26-PU-H'
+  ON DUPLICATE KEY UPDATE form_code=VALUES(form_code);
+  UPDATE evaluation_templates t JOIN evaluation_seed_template_owners o ON o.form_code=t.form_code
+  SET t.created_by=(SELECT MIN(u.user_id) FROM users u WHERE u.employee_id=o.employee_id
+    AND (u.role=o.preferred_role OR (o.preferred_role='Employee' AND u.role IN ('HR Manager','HR Supervisor','HR Staff')))
+    AND u.is_active=1 AND u.deleted_at IS NULL AND COALESCE(u.account_hold,0)=0)
+  WHERE t.created_by IS NULL;
+  -- END SEEDED OWNERS
   COMMIT;
   SELECT 'Purchasing Quarterly forms imported' AS result,3 AS forms,2 AS covered_positions;
 END //

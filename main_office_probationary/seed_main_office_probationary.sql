@@ -112,12 +112,7 @@ BEGIN
     '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi',
     CONCAT(e.first_name,' ',e.last_name),'President and CEO',102,1,1
   FROM employees e WHERE e.employee_code='CEO-001' AND NOT EXISTS (SELECT 1 FROM users u WHERE u.employee_id=e.employee_id);
-  INSERT INTO users (employee_id,username,email,password_hash,full_name,role,branch_id,is_active,must_change_password)
-  SELECT e.employee_id,e.employee_code,
-    CONCAT(LOWER(REPLACE(e.employee_code,'-','.')),'@example.com'),
-    '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi',
-    CONCAT(e.first_name,' ',e.last_name),'Employee',102,1,1
-  FROM employees e WHERE e.employee_code='AP-001' AND NOT EXISTS (SELECT 1 FROM users u WHERE u.employee_id=e.employee_id);
+  -- No executive Employee Portal accounts. The Admin creates these manually.
 
   -- Two position-specific forms per probationary employee. Eight KRAs total 100%.
   INSERT INTO evaluation_templates (template_name,description,target_department,target_department_id,target_job_title_id,behavior_framework_code,behavior_framework_version,evaluation_type,individual_workflow,kra_weight,behavior_weight,form_code,revision_date,effective_date_form,status,created_by)

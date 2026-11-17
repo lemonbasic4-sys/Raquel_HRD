@@ -1,5 +1,7 @@
 # Main Office probationary sample seed
 
+For imports by department, use [evaluation/README.md](../evaluation/README.md). Each department now has its own fictional employee/account seed and Initial, Final, Quarterly, and Annual import commands. This file remains the legacy all-department Initial/Final alternative; do not import it after department employee fixtures because its global duplicate guard will reject them.
+
 This fictional test seed adds two probationary employees in each of the 12 departments at Main Office (branch 102), their immediate-head reporting chains and portal accounts, plus one shared Initial and one shared Final sample template per probationary position. It does not create evaluations or Quarterly forms.
 
 ## Fresh database import
@@ -28,7 +30,7 @@ The command's final output should list 24 probationary employees across all 12 d
 
 For the new sample people's Employee Portal accounts, the username is the exact Company ID. Examples: `MO26-AP-P` and `MO26-AP-H`. The initial password is `password`, with a password change required at first login.
 
-The existing HR immediate head uses `patricia.gomez` and her existing password. The seed creates an Employee Portal account for `AP-001` only when it does not already have one, using `AP-001` as the username. A CEO HRIS account, if created, uses `ceo.001` to leave `CEO-001` available for a separate Employee Portal account.
+The existing HR immediate head uses `patricia.gomez` and her existing password. The seed does not create Employee Portal accounts for `AP-001` or `CEO-001`; create those manually using Admin > Portal Accounts. A CEO HRIS account, if created, uses `ceo.001` with role President and CEO, separate from the Employee Portal. Create the AP VP Employee Portal account manually before importing the separate AP Quarterly/Annual templates.
 
 These templates use sample criteria for workflow testing. Confirm the actual role measures before using them for real evaluations.
 

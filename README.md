@@ -47,15 +47,12 @@ Access depends on the account role, department, reporting relationships, and wor
 
 The system supports Initial and Final evaluations for probationary employees, plus separate Quarterly and Annual evaluations for regular employees. Department cycles coordinate form readiness, self-ratings, department 360 ratings, head reviews, cycle approval, and history.
 
-Use the department fixture instructions under [Evaluation_test](Evaluation_test/) for workflow dry runs. These are mock records intended for a disposable test database.
+Use [evaluation/README.md](evaluation/README.md) for workflow dry runs. Import base seeds 1-4 once, then open the selected department's README, for example [Acquired Properties](evaluation/Acquired_Properties/README.md), and copy its import block.
 
-Reusable test forms are documented in [Evaluation_test/templates/README.md](Evaluation_test/templates/README.md):
-
-- Import the selected department's employee fixture first.
-- Run `Evaluation_test/templates/01_seed_templates.sql` once after the fixture.
-- Run `Evaluation_test/templates/02_verify_templates.sql` and check that `invalid_forms` is `0`.
-- Seeded forms contain 12 KRAs totaling 100%, eight standard Core Behaviors & Values, and the 80% KRA / 20% behavior split.
-- Separate Initial, Final, Quarterly, and Annual forms are generated for the applicable test positions. The President/CEO has no self-evaluation form in this test setup.
+- Each department folder supplies fictional employee information, required reporting heads, and Initial, Final, Quarterly, and Annual templates. It creates no user accounts; create Employee Portal accounts manually through Admin after import.
+- Each has two probationary employees, one regular staff sample, and its reporting heads; forms can cover more positions than the sample employees occupy.
+- Seeded forms contain 8 KRAs totaling 100%, eight Core Behaviors, and an 80% KRA / 20% Behavior split. The President/CEO has no self-evaluation form.
+- Template imports reject duplicates. No scores, submissions, approvals, or automatic regularization are imported.
 
 These sample KRAs support workflow testing; use client-approved criteria for real evaluations.
 
@@ -89,7 +86,7 @@ employee/         Employee self-service portal
 includes/         Shared application logic and layouts
 config/           Database configuration
 database/         Schema, organization, and account seeds
-Evaluation_test/  Department fixtures and evaluation test templates
+evaluation/      Department employees, accounts, forms, and import READMEs
 assets/           CSS, JavaScript, images, and local libraries
 backups/          Database backups
 scripts/          Supporting scripts

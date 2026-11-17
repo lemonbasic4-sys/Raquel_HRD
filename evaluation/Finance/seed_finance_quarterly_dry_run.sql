@@ -49,9 +49,7 @@ BEGIN
   SELECT MIN(u.user_id) INTO v_acc_head FROM users u JOIN employees e ON e.employee_id=u.employee_id
   WHERE e.employee_code='MO26-FI-H' AND e.department_id=5 AND e.job_title_id=502 AND e.employment_status='Regular'
     AND e.is_active=1 AND e.deleted_at IS NULL AND u.role='Employee' AND u.is_active=1 AND u.deleted_at IS NULL AND COALESCE(u.account_hold,0)=0;
-  IF v_ceo IS NULL OR v_vp IS NULL OR v_manager IS NULL OR v_acc_head IS NULL THEN
-    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Active CEO, Finance VP, Manager, and Accounting Supervisor portal accounts are required';
-  END IF;
+
 
   START TRANSACTION;
   -- Six role groups cover every Finance position. Treasury Staff form is
@@ -196,6 +194,35 @@ BEGIN
         OR (SELECT COUNT(*) FROM evaluation_criteria c WHERE c.template_id=t.template_id AND c.section='Behavior')<>8)) THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Finance Quarterly position or criteria validation failed';
   END IF;
+
+  -- BEGIN SEEDED OWNERS
+  INSERT INTO evaluation_seed_template_owners (form_code,employee_id,preferred_role)
+  SELECT 'FI-VP-Q-DRYRUN-20261115',employee_id,'President and CEO' FROM employees WHERE employee_code='CEO-001'
+  ON DUPLICATE KEY UPDATE form_code=VALUES(form_code);
+  INSERT INTO evaluation_seed_template_owners (form_code,employee_id,preferred_role)
+  SELECT 'FI-MGR-Q-DRYRUN-20261115',employee_id,'Employee' FROM employees WHERE employee_code='MO26-FI-V'
+  ON DUPLICATE KEY UPDATE form_code=VALUES(form_code);
+  INSERT INTO evaluation_seed_template_owners (form_code,employee_id,preferred_role)
+  SELECT 'FI-ACC-SUP-Q-DRYRUN-20261115',employee_id,'Employee' FROM employees WHERE employee_code='MO26-FI-M'
+  ON DUPLICATE KEY UPDATE form_code=VALUES(form_code);
+  INSERT INTO evaluation_seed_template_owners (form_code,employee_id,preferred_role)
+  SELECT 'FI-TREAS-SUP-Q-DRYRUN-20261115',employee_id,'Employee' FROM employees WHERE employee_code='MO26-FI-V'
+  ON DUPLICATE KEY UPDATE form_code=VALUES(form_code);
+  INSERT INTO evaluation_seed_template_owners (form_code,employee_id,preferred_role)
+  SELECT 'FI-ACC-STAFF-Q-DRYRUN-20261115',employee_id,'Employee' FROM employees WHERE employee_code='MO26-FI-H'
+  ON DUPLICATE KEY UPDATE form_code=VALUES(form_code);
+  INSERT INTO evaluation_seed_template_owners (form_code,employee_id,preferred_role)
+  SELECT 'FI-TREAS-STAFF-Q-DRYRUN-20261115',employee_id,'Employee' FROM employees WHERE employee_code='MO26-FI-V'
+  ON DUPLICATE KEY UPDATE form_code=VALUES(form_code);
+  INSERT INTO evaluation_seed_template_owners (form_code,employee_id,preferred_role)
+  SELECT 'FI-ACC-STAFF-Q-DRYRUN-20270415',employee_id,'Employee' FROM employees WHERE employee_code='MO26-FI-H'
+  ON DUPLICATE KEY UPDATE form_code=VALUES(form_code);
+  UPDATE evaluation_templates t JOIN evaluation_seed_template_owners o ON o.form_code=t.form_code
+  SET t.created_by=(SELECT MIN(u.user_id) FROM users u WHERE u.employee_id=o.employee_id
+    AND (u.role=o.preferred_role OR (o.preferred_role='Employee' AND u.role IN ('HR Manager','HR Supervisor','HR Staff')))
+    AND u.is_active=1 AND u.deleted_at IS NULL AND COALESCE(u.account_hold,0)=0)
+  WHERE t.created_by IS NULL;
+  -- END SEEDED OWNERS
   COMMIT;
   SELECT 'Finance Quarterly forms imported' AS result,7 AS forms,18 AS covered_positions;
 END //

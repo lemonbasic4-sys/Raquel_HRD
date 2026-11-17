@@ -6,7 +6,7 @@
 -- employee's actual period on the later of Jan 1 or regularization date.
 -- Annual self-rating requires an Approved 2026 Quarterly evaluation.
 -- Templates only: no employee scores, submissions, or approvals are inserted.
--- Run after organization, employee, and portal-account seeds. Reimport fails.
+-- Run after organization and employee seeds; no portal accounts needed for import. Reimport fails.
 USE raquel_hris;
 DROP PROCEDURE IF EXISTS seed_ap_department_annual_dry_run;
 DELIMITER //
@@ -61,9 +61,7 @@ BEGIN
   WHERE e.employee_code='MO26-AP-H' AND e.department_id=1 AND e.job_title_id=105
     AND e.employment_status='Regular' AND e.is_active=1 AND e.deleted_at IS NULL
     AND u.role='Employee' AND u.is_active=1 AND u.deleted_at IS NULL AND COALESCE(u.account_hold,0)=0;
-  IF v_ceo IS NULL OR v_vp IS NULL OR v_manager IS NULL OR v_supervisor IS NULL THEN
-    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Active CEO, AP VP, Manager, and Supervisor portal accounts are required';
-  END IF;
+
 
   START TRANSACTION;
   -- 1. Five Annual forms share the year and 80/20 scoring split.
@@ -189,6 +187,29 @@ BEGIN
      ) THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'AP Annual position or criteria validation failed';
   END IF;
+
+  -- BEGIN SEEDED OWNERS
+  INSERT INTO evaluation_seed_template_owners (form_code,employee_id,preferred_role)
+  SELECT 'AP-VP-A-DRYRUN-2026',employee_id,'President and CEO' FROM employees WHERE employee_code='CEO-001'
+  ON DUPLICATE KEY UPDATE form_code=VALUES(form_code);
+  INSERT INTO evaluation_seed_template_owners (form_code,employee_id,preferred_role)
+  SELECT 'AP-MGR-A-DRYRUN-2026',employee_id,'Employee' FROM employees WHERE employee_code='AP-001'
+  ON DUPLICATE KEY UPDATE form_code=VALUES(form_code);
+  INSERT INTO evaluation_seed_template_owners (form_code,employee_id,preferred_role)
+  SELECT 'AP-SUP-A-DRYRUN-2026',employee_id,'Employee' FROM employees WHERE employee_code='MO26-AP-M'
+  ON DUPLICATE KEY UPDATE form_code=VALUES(form_code);
+  INSERT INTO evaluation_seed_template_owners (form_code,employee_id,preferred_role)
+  SELECT 'AP-STAFF-A-DRYRUN-2026',employee_id,'Employee' FROM employees WHERE employee_code='MO26-AP-H'
+  ON DUPLICATE KEY UPDATE form_code=VALUES(form_code);
+  INSERT INTO evaluation_seed_template_owners (form_code,employee_id,preferred_role)
+  SELECT 'AP-SALES-A-DRYRUN-2026',employee_id,'Employee' FROM employees WHERE employee_code='MO26-AP-H'
+  ON DUPLICATE KEY UPDATE form_code=VALUES(form_code);
+  UPDATE evaluation_templates t JOIN evaluation_seed_template_owners o ON o.form_code=t.form_code
+  SET t.created_by=(SELECT MIN(u.user_id) FROM users u WHERE u.employee_id=o.employee_id
+    AND (u.role=o.preferred_role OR (o.preferred_role='Employee' AND u.role IN ('HR Manager','HR Supervisor','HR Staff')))
+    AND u.is_active=1 AND u.deleted_at IS NULL AND COALESCE(u.account_hold,0)=0)
+  WHERE t.created_by IS NULL;
+  -- END SEEDED OWNERS
   COMMIT;
   SELECT 'AP Annual 2026 dry-run forms imported' AS result, 5 AS forms, 15 AS covered_positions;
 END //

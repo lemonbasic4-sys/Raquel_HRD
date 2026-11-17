@@ -49,9 +49,7 @@ BEGIN
   SELECT MIN(u.user_id) INTO v_supervisor FROM users u JOIN employees e ON e.employee_id=u.employee_id
   WHERE e.employee_code='MO26-AU-H' AND e.job_title_id=203 AND e.department_id=2 AND e.employment_status='Regular'
     AND e.is_active=1 AND e.deleted_at IS NULL AND u.role='Employee' AND u.is_active=1 AND u.deleted_at IS NULL AND COALESCE(u.account_hold,0)=0;
-  IF v_ceo IS NULL OR v_manager1 IS NULL OR v_manager2 IS NULL OR v_supervisor IS NULL THEN
-    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Active CEO and Audit head portal accounts are required';
-  END IF;
+
 
   START TRANSACTION;
   -- Audit Manager I; Audit Manager II-III; Supervisors I-III; Auditors I-V.
@@ -174,6 +172,29 @@ BEGIN
         OR (SELECT COUNT(*) FROM evaluation_criteria c WHERE c.template_id=t.template_id AND c.section='Behavior')<>8)) THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Audit Annual position or criteria validation failed';
   END IF;
+
+  -- BEGIN SEEDED OWNERS
+  INSERT INTO evaluation_seed_template_owners (form_code,employee_id,preferred_role)
+  SELECT 'AUD-LEAD-A-DRYRUN-2026',employee_id,'President and CEO' FROM employees WHERE employee_code='CEO-001'
+  ON DUPLICATE KEY UPDATE form_code=VALUES(form_code);
+  INSERT INTO evaluation_seed_template_owners (form_code,employee_id,preferred_role)
+  SELECT 'AUD-MGR-A-DRYRUN-2026',employee_id,'Employee' FROM employees WHERE employee_code='MO26-AU-M1'
+  ON DUPLICATE KEY UPDATE form_code=VALUES(form_code);
+  INSERT INTO evaluation_seed_template_owners (form_code,employee_id,preferred_role)
+  SELECT 'AUD-SUP-A-DRYRUN-2026',employee_id,'Employee' FROM employees WHERE employee_code='MO26-AU-M2'
+  ON DUPLICATE KEY UPDATE form_code=VALUES(form_code);
+  INSERT INTO evaluation_seed_template_owners (form_code,employee_id,preferred_role)
+  SELECT 'AUD-RF-A-DRYRUN-2026',employee_id,'Employee' FROM employees WHERE employee_code='MO26-AU-H'
+  ON DUPLICATE KEY UPDATE form_code=VALUES(form_code);
+  INSERT INTO evaluation_seed_template_owners (form_code,employee_id,preferred_role)
+  SELECT 'AUD-RF-A-DRYRUN-2027',employee_id,'Employee' FROM employees WHERE employee_code='MO26-AU-H'
+  ON DUPLICATE KEY UPDATE form_code=VALUES(form_code);
+  UPDATE evaluation_templates t JOIN evaluation_seed_template_owners o ON o.form_code=t.form_code
+  SET t.created_by=(SELECT MIN(u.user_id) FROM users u WHERE u.employee_id=o.employee_id
+    AND (u.role=o.preferred_role OR (o.preferred_role='Employee' AND u.role IN ('HR Manager','HR Supervisor','HR Staff')))
+    AND u.is_active=1 AND u.deleted_at IS NULL AND COALESCE(u.account_hold,0)=0)
+  WHERE t.created_by IS NULL;
+  -- END SEEDED OWNERS
   COMMIT;
   SELECT 'Audit Annual forms imported' AS result,5 AS forms,11 AS covered_positions;
 END //

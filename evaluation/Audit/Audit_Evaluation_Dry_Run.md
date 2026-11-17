@@ -1,12 +1,10 @@
-# Audit Department Evaluation Dry Run
+# Audit Evaluation Dry Run
 
-Start MySQL in XAMPP. Import the organization, employee, and portal account seeds first. The separate `main_office_probationary/seed_main_office_probationary.sql` seed already supplies Audit probationary employees and their Initial/Final templates; do not import that seed again into an existing setup.
+For mock employee information and all four form types, use [README.md](README.md). Import base seeds 1-4 once, then this folder's import block. No user accounts are created or required for import. Create employee/reviewer accounts manually using Admin > Portal Accounts afterward.
 
-## Probationary Initial and Final: already ready
+## Probationary Initial and Final
 
-Nico Bautista (`MO26-AU-P`, hired 2026-10-01) and Katrina Vergara (`MO26-AU-P2`, hired 2026-10-15) have active portal accounts. Both are currently **Probationary** with **Initial** as their next evaluation: due **2027-01-01** and **2027-01-15**, respectively. The active Auditor I templates are `MO26-206-INITIAL` and `MO26-206-FINAL`. They have 8 KRAs and 8 Core Behaviors each. Neither employee has submitted an evaluation yet.
-
-They start at **Employee Portal → Self Rating → Initial**. Final becomes available after the Initial evaluation is approved. Regularization follows the approved Final outcome; these templates do not regularize anyone by themselves.
+The employee seed supplies `MO26-AU-P`, `MO26-AU-P2`, their reporting heads, and regular staff sample `MO26-AU-R`. Shared forms `MO26-206-INITIAL` and `MO26-206-FINAL` each have 8 KRAs and 8 Core Behaviors. Initial due dates are January 1 and January 15, 2027. Once accounts exist, start at Employee Portal > Self Rating > Initial. Final follows full Initial approval; regular Quarterly follows Final approval and regularization. No scores, approvals, or regularization are seeded.
 
 ## Quarterly
 
@@ -14,7 +12,7 @@ Copy and paste into PowerShell:
 
 ```powershell
 cd C:\xampp\htdocs\Raquel_HRD
-C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 -u root -e "source evaluation/Audit/seed_audit_department_quarterly_dry_run.sql"
+C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 --abort-source-on-error -u root -e "source evaluation/Audit/seed_audit_department_quarterly_dry_run.sql"
 ```
 
 The first cycle is **2026-11-15 to 2027-02-14** for all 11 Audit positions. The same SQL also creates a later **Auditor I-V Quarterly cycle, 2027-04-15 to 2027-07-14**, for employees who have completed probation and become Regular.
@@ -25,7 +23,7 @@ Copy and paste into PowerShell:
 
 ```powershell
 cd C:\xampp\htdocs\Raquel_HRD
-C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 -u root -e "source evaluation/Audit/seed_audit_department_annual_dry_run.sql"
+C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 --abort-source-on-error -u root -e "source evaluation/Audit/seed_audit_department_annual_dry_run.sql"
 ```
 
 The first Annual period is **2026-01-01 to 2026-12-31** for all 11 Audit positions. The same SQL also creates an **Auditor I-V Annual 2027** form for the post-probation path. The portal starts the employee's actual Annual period on the later of January 1 or their regularization date. Annual self-rating requires an **Approved Quarterly evaluation in the same year**.

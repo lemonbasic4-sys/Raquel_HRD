@@ -1,0 +1,10 @@
+employee portal 
+view submitted review when click (mobile view) -- Key results or the kra shows table unlike core behaviors that uses card type.
+VP for Acquired Properties won't receieve any notification indicating that someone has rated its 360 - department peers 
+president/ceo on employee portal mobile view performance evaluation " review and approve" is not good because it was not an icon, it uses table similar to web view it was not
+optimized on mobile (kra only)
+
+
+additional features mobile view
+when the user rates someone and click the button " Review & Submit Ratings " the user should scroll all the way to buttom just to unlock the
+"Submit and lock ratings" just to make sure that the user reads everything before submitting the rating.
