@@ -897,6 +897,10 @@ function annualSubmitPeers($conn, array $actor, int $evaluationId, array $scores
         $revisionNotice=false;
         if ((int)$member['current_version']>0 && $member['evaluation_status']==='Approved') annualRefreshApprovedResult($conn,$member,(int)$actor['user_id']);
         logAudit($conn,(int)$actor['user_id'],'CREATE','Annual 360',$evaluationId,'Submitted locked peer rating. Approved Annual scores update automatically.');
+        if (strcasecmp((string)($member['position_name'] ?? ''), 'VP for Acquired Properties') === 0) {
+            annualNotifyEmployee($conn,(int)$member['employee_id'],'Annual 360 rating received',
+                'A department peer submitted a 360 rating for your Annual evaluation.', $evaluationId);
+        }
         $received=(int)annualQuery($conn,'SELECT COUNT(*) AS n FROM annual_peer_submissions s JOIN employees r ON r.employee_id=s.rater_employee_id JOIN annual_evaluation_cycles c ON c.cycle_id=s.cycle_id WHERE s.cycle_id=? AND s.target_employee_id=? AND r.department_id=c.department_id',[(int)$member['cycle_id'],(int)$member['employee_id']])[0]['n'];
         $expected=annualExpectedPeers($conn,(int)$member['cycle_id'],(int)$member['employee_id']);
         if ($received===$expected && $member['evaluation_status']!=='Approved') annualNotifyHeads($conn,$member,'Annual 360 summary ready','Review the updated 360 summary for '.$member['first_name'].' '.$member['last_name'].'.');

@@ -364,7 +364,7 @@ require_once __DIR__ . '/header.php';
                             <?php if (!empty($m['revision_pending'])): ?>
                                 <a class="btn btn-sm btn-outline-success" href="<?php echo annualUrl($actor,'?view=review&evaluation_id='.(int)$m['evaluation_id']); ?>" aria-label="Review revised result"><i class="fas fa-eye peer-mobile-eye" aria-hidden="true"></i><span class="peer-desktop-action">Review revised result</span></a>
                             <?php elseif (!empty($target['individual_evaluation_id']) && $m['evaluation_status']!=='Approved' && individualApprovalReady($conn,'annual',$target)): ?>
-                                <a class="btn btn-sm btn-success" href="<?php echo annualUrl($actor,'?view=review&evaluation_id='.(int)$m['evaluation_id']); ?>"><i class="fas fa-check-circle me-1" aria-hidden="true"></i>Review &amp; approve</a>
+                                <a class="btn btn-sm btn-success" href="<?php echo annualUrl($actor,'?view=review&evaluation_id='.(int)$m['evaluation_id']); ?>" aria-label="Review and approve"><i class="fas fa-check-circle peer-mobile-eye" aria-hidden="true"></i><span class="peer-desktop-action">Review &amp; approve</span></a>
                             <?php elseif (!empty($target['individual_evaluation_id']) && $m['evaluation_status']!=='Approved'): ?>
                                 <a class="btn btn-sm btn-outline-success" href="<?php echo annualUrl($actor,'?view=head-review&evaluation_id='.(int)$m['evaluation_id']); ?>" aria-label="View submitted review"><i class="fas fa-clipboard-check peer-mobile-eye" aria-hidden="true"></i><span class="peer-desktop-action">View submitted review</span></a>
                             <?php else: ?>
@@ -1130,12 +1130,13 @@ if (headReviewTabs) {
     else restoreHeadTab();
 }
 </script>
+<script src="<?php echo BASE_URL; ?>/assets/js/rating-summary-scroll-gate.js?v=<?php echo filemtime(__DIR__ . '/../assets/js/rating-summary-scroll-gate.js'); ?>"></script>
 <script src="<?php echo BASE_URL; ?>/assets/js/evaluation-cycle-filter.js?v=<?php echo filemtime(__DIR__ . '/../assets/js/evaluation-cycle-filter.js'); ?>"></script>
 <?php require_once __DIR__ . '/footer.php'; ?>
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    document.querySelectorAll('table.annual-core-score-table, #annualRatingForm table.annual-score-table:not(:has(tbody[id]))').forEach(function (table) {
+    document.querySelectorAll('table.annual-core-score-table, #annualRatingForm table.annual-score-table:not(:has(tbody[id])), #headKraPanel table, #annualKraPanel table').forEach(function (table) {
         const labels = Array.from(table.querySelectorAll('thead th')).map(function (th) { return th.textContent.trim(); });
         table.classList.add('mobile-peer-detail-table');
         table.querySelectorAll('tbody tr').forEach(function (row) {

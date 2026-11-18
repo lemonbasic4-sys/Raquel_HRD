@@ -295,6 +295,11 @@
 /* Compact history roster only; desktop and active rating tables stay unchanged. */
 .peer-mobile-eye,.peer-mobile-score { display:none; }
 @media(max-width:650px) {
+    .annual-page #headKraPanel .table-responsive,
+    .annual-page #annualKraPanel .table-responsive { overflow:visible; min-width:0; }
+    .annual-page #headKraPanel table.mobile-peer-detail-table,
+    .annual-page #annualKraPanel table.mobile-peer-detail-table { min-width:0!important; width:100%!important; }
+    .annual-page #headKraPanel table.mobile-peer-detail-table tbody td:first-child { width:100%!important; }
     table.peer-mobile-history { table-layout:fixed; width:100%; min-width:0!important; font-size:.7rem; }
     table.peer-mobile-history th,table.peer-mobile-history td { padding:.65rem .3rem; white-space:normal!important; overflow-wrap:anywhere; vertical-align:middle; }
     table.peer-mobile-history th:nth-child(3),table.peer-mobile-history td:nth-child(3),
