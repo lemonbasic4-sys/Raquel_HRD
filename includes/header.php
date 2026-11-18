@@ -776,9 +776,9 @@ if ($annual_nav_actor && $annual_nav_actor['employment_status'] === 'Regular'
                 style="width: 50px; height: 50px; border-radius: 12px; object-fit: cover; margin-bottom: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); background: white; border: 2px solid rgba(255,255,255,0.1);">
             <h2><?php echo e($sys_pawnshop_name); ?></h2>
             <?php if ($effective_role === 'Employee'): ?>
-                <small>Your HRIS Employee Portal</small>
+                <small>Your HRMS Employee Portal</small>
             <?php else: ?>
-                <small>HRIS &bull; <?php echo e($effective_role); ?></small>
+                <small>HRMS &bull; <?php echo e($effective_role); ?></small>
             <?php endif; ?>
         </div>
 
