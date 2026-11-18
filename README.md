@@ -1,4 +1,4 @@
-# Raquel Pawnshop HR Workforce Analytics & Evaluation Platform
+# Raquel Pawnshop Human Resource Management System: A PHP-Based Workforce Analytics and Performance Evaluation Platform
 
 A role-based Human Resource Information System for employee records, performance evaluations, approvals, career movements, reports, notifications, audit trails, and backups.
 
