@@ -16,6 +16,7 @@ $date_from     = $_GET['date_from']  ?? '';
 $date_to       = $_GET['date_to']    ?? '';
 $filter_branch = $_GET['branch']     ?? '';
 $filter_dept   = $_GET['department'] ?? '';
+$mobilityTabActive = ($_GET['tab'] ?? '') === 'mobility';
 $hiringTabActive = ($_GET['tab'] ?? 'hiring') === 'hiring';
 $cohort        = (($_GET['cohort'] ?? 'regular') === 'probationary') ? 'probationary' : 'regular';
 $evaluation_type_filter = $cohort === 'probationary'
@@ -696,7 +697,7 @@ $yoy_emp    = formatYoYData($yoy_emp_raw, $yoy_years);
     <summary class="analytics-filter-toggle"><span><i class="fas fa-filter me-2"></i>Filters</span><i class="fas fa-chevron-down analytics-filter-chevron" aria-hidden="true"></i></summary>
     <div class="analytics-filter-body">
     <form method="GET" action="" class="row align-items-end g-3 analytics-filter-form">
-        <input type="hidden" name="tab" id="analytics-active-tab" value="hiring"<?php echo $hiringTabActive ? '' : ' disabled'; ?>>
+        <input type="hidden" name="tab" id="analytics-active-tab" value="<?php echo $mobilityTabActive ? 'mobility' : 'hiring'; ?>"<?php echo $hiringTabActive || $mobilityTabActive ? '' : ' disabled'; ?>>
         <div class="col-md-2 col-6">
             <label class="form-label fw-semibold" style="font-size:.78rem;">Evaluation Group</label>
             <select class="form-select form-select-sm" name="cohort">
@@ -940,7 +941,7 @@ $yoy_emp    = formatYoYData($yoy_emp_raw, $yoy_years);
         </button>
     </li>
     <li class="nav-item">
-        <button class="nav-link<?php echo $hiringTabActive ? '' : ' active'; ?>" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview" type="button" role="tab" aria-selected="<?php echo $hiringTabActive ? 'false' : 'true'; ?>">
+        <button class="nav-link<?php echo !$hiringTabActive && !$mobilityTabActive ? ' active' : ''; ?>" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview" type="button" role="tab" aria-selected="<?php echo !$hiringTabActive && !$mobilityTabActive ? 'true' : 'false'; ?>">
             <i class="fas fa-eye me-2"></i>Performance Overview
         </button>
     </li>
@@ -950,7 +951,7 @@ $yoy_emp    = formatYoYData($yoy_emp_raw, $yoy_years);
         </button>
     </li>
     <li class="nav-item">
-        <button class="nav-link" id="mobility-tab" data-bs-toggle="tab" data-bs-target="#mobility" type="button" role="tab">
+        <button class="nav-link<?php echo $mobilityTabActive ? ' active' : ''; ?>" id="mobility-tab" data-bs-toggle="tab" data-bs-target="#mobility" type="button" role="tab" aria-selected="<?php echo $mobilityTabActive ? 'true' : 'false'; ?>">
             <i class="fas fa-route me-2"></i>Talent Mobility & Progress
         </button>
     </li>
@@ -971,7 +972,7 @@ $yoy_emp    = formatYoYData($yoy_emp_raw, $yoy_years);
         <?php require __DIR__ . '/../includes/manager-hiring-analytics.php'; ?>
     </div>
     <!-- ═══════════════════════ TAB 1: OVERVIEW ═══════════════════════ -->
-    <div class="tab-pane fade<?php echo $hiringTabActive ? '' : ' show active'; ?>" id="overview" role="tabpanel">
+    <div class="tab-pane fade<?php echo !$hiringTabActive && !$mobilityTabActive ? ' show active' : ''; ?>" id="overview" role="tabpanel">
         <div class="row g-3 mb-3">
             <!-- Performance Distribution -->
             <div class="col-lg-5">
@@ -1173,7 +1174,8 @@ $yoy_emp    = formatYoYData($yoy_emp_raw, $yoy_years);
     </div>
 
     <!-- ═══════════════════════ TAB 3: TALENT MOBILITY & PROGRESS ═══════════════════════ -->
-    <div class="tab-pane fade" id="mobility" role="tabpanel">
+    <div class="tab-pane fade<?php echo $mobilityTabActive ? ' show active' : ''; ?>" id="mobility" role="tabpanel">
+        <?php require __DIR__ . '/../includes/analytics-employee-movements.php'; ?>
         <div class="row g-3 mb-3">
             <!-- Evaluation Status Process Progress -->
             <div class="col-lg-5">
@@ -1715,9 +1717,13 @@ document.addEventListener('DOMContentLoaded', function () {
     analyticsNav?.addEventListener('shown.bs.tab', function (event) {
         const hiringOpen = event.target.id === 'hiring-tab';
         const activeTabInput = document.getElementById('analytics-active-tab');
-        if (activeTabInput) activeTabInput.disabled = !hiringOpen;
+        if (activeTabInput) {
+            activeTabInput.disabled = !hiringOpen && event.target.id !== 'mobility-tab';
+            activeTabInput.value = event.target.id === 'mobility-tab' ? 'mobility' : 'hiring';
+        }
         const url = new URL(window.location.href);
         if (hiringOpen) url.searchParams.set('tab', 'hiring');
+        else if (event.target.id === 'mobility-tab') url.searchParams.set('tab', 'mobility');
         else url.searchParams.delete('tab');
         url.hash = '';
         window.history.replaceState(null, '', url);

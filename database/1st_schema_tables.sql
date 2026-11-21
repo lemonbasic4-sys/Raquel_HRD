@@ -596,6 +596,8 @@ CREATE TABLE career_movements (
     new_position VARCHAR(100) NOT NULL,
     previous_branch_id INT NULL,
     new_branch_id INT NULL,
+    previous_department_name VARCHAR(150) NULL,
+    new_department_name VARCHAR(150) NULL,
     effective_date DATE NOT NULL,
     reason TEXT NULL,
     logged_by INT NULL,

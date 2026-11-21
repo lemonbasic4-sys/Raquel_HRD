@@ -1676,6 +1676,10 @@ function ensureCareerProgressionMovements($conn)
 
             'request_source' => "ALTER TABLE career_movements ADD COLUMN request_source ENUM('HR Portal','Employee Portal') DEFAULT 'HR Portal' AFTER initiated_via",
 
+            'previous_department_name' => "ALTER TABLE career_movements ADD COLUMN previous_department_name VARCHAR(150) NULL AFTER new_branch_id",
+
+            'new_department_name' => "ALTER TABLE career_movements ADD COLUMN new_department_name VARCHAR(150) NULL AFTER previous_department_name",
+
         ];
 
 
@@ -2011,6 +2015,9 @@ function resolveRoleFromJobTitle(string $job_title): string
  */
 function executeCareerMovementApplication($conn, array $movement, int $movement_id): void
 {
+    if (!ensureCareerProgressionMovements($conn)) {
+        throw new RuntimeException('Career movement history could not be initialized.');
+    }
     ensureUserAccountSecuritySchema($conn);
     $eid          = (int)$movement['employee_id'];
     $new_position = trim((string)($movement['new_position'] ?? ''));
@@ -2077,6 +2084,18 @@ function executeCareerMovementApplication($conn, array $movement, int $movement_
         $eu->bind_param("ii", $new_bid, $eid);
         $eu->execute(); $eu->close();
     }
+
+    $after_stmt = $conn->prepare('SELECT d.department_name FROM employees e LEFT JOIN departments d ON d.department_id = e.department_id WHERE e.employee_id = ? LIMIT 1');
+    $after_stmt->bind_param('i', $eid);
+    $after_stmt->execute();
+    $after = $after_stmt->get_result()->fetch_assoc() ?: [];
+    $after_stmt->close();
+    $department_snapshot = $conn->prepare('UPDATE career_movements SET previous_department_name = ?, new_department_name = ? WHERE movement_id = ?');
+    $previous_department = $before['department_name'] ?? null;
+    $new_department = $after['department_name'] ?? null;
+    $department_snapshot->bind_param('ssi', $previous_department, $new_department, $movement_id);
+    $department_snapshot->execute();
+    $department_snapshot->close();
 
     // ── 2. RBAC: Update users.role and users.branch_id ─────────────────────
     if (($movement['movement_type'] ?? '') === 'Transfer') {
