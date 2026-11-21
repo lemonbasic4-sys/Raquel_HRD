@@ -47,6 +47,8 @@ Access depends on the account role, department, reporting relationships, and wor
 
 The system supports Initial and Final evaluations for probationary employees, plus separate Quarterly and Annual evaluations for regular employees. Department cycles coordinate form readiness, self-ratings, department 360 ratings, head reviews, cycle approval, and history.
 
+Quarterly is optional for an individual Annual evaluation. An eligible regular employee can complete an Annual form without a Quarterly record for that year. If a Quarterly evaluation exists for the same year, at least one must be approved before Annual submission.
+
 Use [evaluation/README.md](evaluation/README.md) for workflow dry runs. Import base seeds 1-4 once, then open the selected department's README, for example [Acquired Properties](evaluation/Acquired_Properties/README.md), and copy its import block.
 
 - Each department folder supplies fictional employee information, required reporting heads, and Initial, Final, Quarterly, and Annual templates. It creates no user accounts; create Employee Portal accounts manually through Admin after import.

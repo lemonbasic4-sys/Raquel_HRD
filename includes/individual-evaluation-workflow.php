@@ -31,13 +31,15 @@ function ensureIndividualEvaluationSchema($conn, string $kind): void
     $ready[$key]=true;
 }
 
-/** Annual unlocks after an Approved Quarterly whose period starts in the Annual year. */
+/** Quarterly is optional; if started for this year, it must be approved before Annual. */
 function individualAssertAnnualPrerequisite($conn,array $employee,array $template): void
 {
     if (($template['evaluation_type'] ?? '') !== 'Annual') return;
     $year=(int)substr((string)($template['assessment_from'] ?? ''),0,4);
-    $approved=annualQuery($conn,"SELECT 1 FROM evaluations WHERE employee_id=? AND evaluation_type='Quarterly' AND status='Approved' AND deleted_at IS NULL AND evaluation_period_start>=? AND evaluation_period_start<? LIMIT 1",[(int)$employee['employee_id'],$year.'-01-01',($year+1).'-01-01']);
-    if (!$approved) throw new DomainException('Complete at least one approved Quarterly evaluation in this Annual year before answering the Annual form.');
+    $quarterly=annualQuery($conn,"SELECT COUNT(*) AS total, COALESCE(MAX(status='Approved'),0) AS approved FROM evaluations WHERE employee_id=? AND evaluation_type='Quarterly' AND deleted_at IS NULL AND evaluation_period_start>=? AND evaluation_period_start<?",[(int)$employee['employee_id'],$year.'-01-01',($year+1).'-01-01'])[0];
+    if ((int)$quarterly['total'] > 0 && !(int)$quarterly['approved']) {
+        throw new DomainException('Complete the existing Quarterly evaluation for this Annual year before answering the Annual form.');
+    }
 }
 
 function individualAssessmentDates(array $employee,array $template): array
@@ -144,7 +146,7 @@ function individualNotifyTemplateAvailability($conn,int $templateId=0,int $emplo
 function individualTemplateEligibilitySql(string $alias,int $employeeId): string
 {
     if(!preg_match('/^[a-z_]+$/i',$alias)) throw new InvalidArgumentException('Invalid template alias');
-    $annualReady="($alias.evaluation_type<>'Annual' OR EXISTS(SELECT 1 FROM evaluations aq WHERE aq.employee_id=$employeeId AND aq.evaluation_type='Quarterly' AND aq.status='Approved' AND aq.deleted_at IS NULL AND YEAR(aq.evaluation_period_start)=YEAR($alias.assessment_from)))";
+    $annualReady="($alias.evaluation_type<>'Annual' OR NOT EXISTS(SELECT 1 FROM evaluations aq WHERE aq.employee_id=$employeeId AND aq.evaluation_type='Quarterly' AND aq.deleted_at IS NULL AND YEAR(aq.evaluation_period_start)=YEAR($alias.assessment_from)) OR EXISTS(SELECT 1 FROM evaluations aq WHERE aq.employee_id=$employeeId AND aq.evaluation_type='Quarterly' AND aq.status='Approved' AND aq.deleted_at IS NULL AND YEAR(aq.evaluation_period_start)=YEAR($alias.assessment_from)))";
     return "$annualReady AND ($alias.individual_workflow=0 OR ($alias.assessment_from IS NOT NULL AND $alias.assessment_to IS NOT NULL AND $alias.assessment_from<=$alias.assessment_to AND EXISTS(SELECT 1 FROM employees ie WHERE ie.employee_id=$employeeId AND ie.is_active=1 AND ie.deleted_at IS NULL AND ie.employment_status='Regular' AND ie.department_id=$alias.target_department_id AND ($alias.evaluation_type<>'Annual' OR (ie.regularization_effective_date IS NOT NULL AND ie.regularization_effective_date<=$alias.assessment_to)))))";
 }
 
