@@ -286,7 +286,42 @@ $positions_res= $conn->query("SELECT DISTINCT job_title FROM employees WHERE job
     text-align: center;
     padding: .5rem .5rem 1rem;
     border-bottom: 1px solid var(--succession-line);
+    min-width: 0;
+    overflow: hidden;
 }
+.succession-avatar {
+    width: var(--avatar-size);
+    height: var(--avatar-size);
+    flex: 0 0 var(--avatar-size);
+    border-radius: 50%;
+    overflow: hidden;
+    display: inline-grid;
+    place-items: center;
+    background: rgba(255, 255, 255, .2);
+    color: #fff;
+    font-weight: 800;
+}
+.succession-avatar img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.succession-avatar img[hidden] { display: none; }
+.succession-avatar .avatar-fallback { display: grid; width: 100%; height: 100%; place-items: center; }
+.succession-avatar .avatar-fallback[hidden] { display: none; }
+.succession-table .succession-avatar { background: var(--succession-primary); }
+.succession-avatar .avatar-fallback i { font-size: calc(var(--avatar-size) * .38); }
+.succession-detail-panel.page-hero { padding: 0; background: linear-gradient(135deg, var(--hero-from), var(--hero-mid), var(--hero-to)); }
+.succession-detail-panel .succession-panel-header { background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.18); }
+.succession-detail-panel .succession-panel-title,
+.succession-detail-panel .succession-detail-name,
+.succession-detail-panel .succession-metric strong { color: #fff; }
+.succession-detail-panel .succession-panel-title i { color: #efcf6b; }
+.succession-detail-panel .succession-detail-body { position: relative; }
+.succession-detail-panel .succession-detail-profile { border-color: rgba(255,255,255,.18); }
+.succession-detail-panel .succession-detail-profile .badge,
+.succession-detail-panel .succession-metric { background: rgba(255,255,255,.12) !important; border-color: rgba(255,255,255,.18) !important; color: #fff !important; }
+.succession-detail-panel .succession-metric span { color: rgba(255,255,255,.72); }
+.succession-detail-panel .succession-metric.score strong { color: #fff; }
+.succession-detail-panel .succession-empty { color: rgba(255,255,255,.78); }
+.succession-detail-panel .succession-detail-actions .btn-outline-primary { color: #fff; border-color: rgba(255,255,255,.65); }
+.succession-detail-panel .succession-detail-actions .btn-outline-primary:hover { background: rgba(255,255,255,.18); }
 .succession-detail-name {
     color: var(--succession-ink);
     font-size: 1.05rem;
@@ -333,7 +368,7 @@ $positions_res= $conn->query("SELECT DISTINCT job_title FROM employees WHERE job
     }
     .succession-detail-panel:not(.is-empty) .succession-detail-body {
         display: grid;
-        grid-template-columns: minmax(240px, .65fr) minmax(420px, 1.35fr) minmax(240px, .55fr);
+        grid-template-columns: minmax(0, .75fr) minmax(0, 1.35fr) minmax(0, .8fr);
         gap: 1rem;
         align-items: stretch;
     }
@@ -356,7 +391,7 @@ $positions_res= $conn->query("SELECT DISTINCT job_title FROM employees WHERE job
 
 <div class="succession-workspace">
     <!-- Candidate Breakdown & Recommendation Panel -->
-    <div class="succession-panel succession-detail-panel is-empty" id="candidateDetailPanel">
+    <div class="succession-panel succession-detail-panel page-hero fadeup is-empty" id="candidateDetailPanel">
             <div class="succession-panel-header">
                 <h6 class="succession-panel-title"><i class="fas fa-user-check"></i>Candidate Details</h6>
             </div>
@@ -415,23 +450,13 @@ document.addEventListener('DOMContentLoaded', function() {
     const detailCard = document.getElementById('candidateDetailCard');
     const detailPanel = document.getElementById('candidateDetailPanel');
 
-    function getInitials(name) {
-        if (!name) return 'U';
-        const parts = name.trim().split(/\s+/);
-        if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-        return parts[0].substr(0, 2).toUpperCase();
-    }
-
     function getAvatarHtml(c, size = 34) {
-        const name = c ? (c.full_name || '') : '';
-        const initials = getInitials(name);
-        const fontSize = size <= 40 ? '0.78rem' : '1.2rem';
         const avatarUrl = c ? (c.avatar_url || '') : '';
-        
+        const fallback = `<span class="avatar-fallback"${avatarUrl && !avatarUrl.includes('/logo/logo.png') ? ' hidden' : ''}><i class="fas fa-user" aria-hidden="true"></i></span>`;
         if (avatarUrl && !avatarUrl.includes('/logo/logo.png')) {
-            return `<img src="${avatarUrl}" class="rounded-circle flex-shrink-0" style="width:${size}px;height:${size}px;object-fit:cover;" onerror="this.onerror=null; this.outerHTML='<div class=\\'rounded-circle d-flex align-items-center justify-content-center fw-bold bg-primary text-white flex-shrink-0\\' style=\\'width:${size}px;height:${size}px;font-size:${fontSize};\\'>${initials}</div>';">`;
+            return `<span class="succession-avatar" style="--avatar-size:${size}px"><img src="${escapeHtml(avatarUrl)}" alt="" onerror="this.hidden=true;this.nextElementSibling.hidden=false">${fallback}</span>`;
         }
-        return `<div class="rounded-circle d-flex align-items-center justify-content-center fw-bold bg-primary text-white flex-shrink-0" style="width:${size}px;height:${size}px;font-size:${fontSize};">${initials}</div>`;
+        return `<span class="succession-avatar" style="--avatar-size:${size}px">${fallback}</span>`;
     }
 
     scopeSelect.addEventListener('change', function() {
@@ -569,31 +594,32 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div class="d-flex justify-content-center mb-2">
                     ${detailAvatarHtml}
                 </div>
+                ${!c.avatar_url || c.avatar_url.includes('/logo/logo.png') ? '<div class="small text-white-50">No profile photo uploaded</div>' : ''}
                 <h6 class="succession-detail-name">${escapeHtml(c.full_name)}</h6>
                 <span class="badge bg-light text-dark border small mt-1">${escapeHtml(c.job_title || 'N/A')}</span>
             </div>
 
             <div class="succession-metric-grid">
                 <div class="succession-metric">
-                    <span>Department</span>
+                    <span><i class="fas fa-sitemap me-1" aria-hidden="true"></i>Department</span>
                     <strong>${escapeHtml(c.department_name || 'N/A')}</strong>
                 </div>
                 <div class="succession-metric">
-                    <span>Branch</span>
+                    <span><i class="fas fa-building me-1" aria-hidden="true"></i>Branch</span>
                     <strong>${escapeHtml(c.branch_name || 'N/A')}</strong>
                 </div>
                 <div class="succession-metric">
-                    <span>Service</span>
+                    <span><i class="fas fa-calendar-alt me-1" aria-hidden="true"></i>Service</span>
                     <strong>${c.years_of_service} Years</strong>
                 </div>
                 <div class="succession-metric score">
-                    <span>Average Rating</span>
+                    <span><i class="fas fa-star me-1" aria-hidden="true"></i>Average Rating</span>
                     <strong>${c.avg_score.toFixed(2)} / 4.00</strong>
                 </div>
             </div>
 
             <div class="succession-metric mb-3">
-                <span>Performance Classification</span>
+                <span><i class="fas fa-award me-1" aria-hidden="true"></i>Performance Classification</span>
                 <strong>${escapeHtml(c.performance_level || 'N/A')}</strong>
             </div>
 

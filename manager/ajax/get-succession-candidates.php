@@ -38,6 +38,11 @@ $sql = "
         CONCAT(e.first_name, ' ', e.last_name) AS short_name,
         e.job_title,
         e.profile_picture,
+        (SELECT u.profile_picture FROM users u
+         WHERE u.employee_id = e.employee_id
+           AND u.profile_picture IS NOT NULL AND u.profile_picture <> ''
+         ORDER BY CASE WHEN u.role = 'Employee' THEN 0 ELSE 1 END, u.user_id
+         LIMIT 1) AS user_profile_picture,
         b.branch_name,
         d.department_name,
         TIMESTAMPDIFF(YEAR, e.hire_date, CURDATE()) AS years_of_service,
@@ -101,12 +106,17 @@ while ($row = $result->fetch_assoc()) {
         elseif ($diff <= -0.15) $trend = 'declining';
     }
 
+    $employee_avatar = getEmployeeAvatar($row['profile_picture']);
+    $avatar_url = !str_ends_with($employee_avatar, '/logo/logo.png')
+        ? $employee_avatar
+        : getUserAvatar($row['user_profile_picture'], $row['profile_picture']);
+
     $candidates[] = [
         'employee_id'     => (int)$row['employee_id'],
         'full_name'       => $row['short_name'],
         'job_title'       => $row['job_title'],
         'profile_picture' => $row['profile_picture'],
-        'avatar_url'      => getEmployeeAvatar($row['profile_picture']),
+        'avatar_url'      => $avatar_url,
         'branch_name'     => $row['branch_name'],
         'department_name' => $row['department_name'],
         'years_of_service'=> (int)$row['years_of_service'],
