@@ -50,7 +50,7 @@ function ensureQuarterlyEvaluationSchema($conn): void
     static $ready = [];
     $key = spl_object_id($conn);
     if (isset($ready[$key])) return;
-    $sql = file_get_contents(__DIR__ . '/../database/zLAST_quarterly_peer_evaluations.sql');
+    $sql = file_get_contents(__DIR__ . '/../database/quarterly_peer_evaluations_schema.sql');
     $sql = preg_replace('/^--.*$/m', '', $sql);
     foreach (explode(';', $sql) as $statement) {
         if (trim($statement) !== '') $conn->query($statement);
