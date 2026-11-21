@@ -526,12 +526,14 @@ require_once __DIR__ . '/header.php';
                 $annualDisplayCore=$selfSummary['core'];
                 $annualDisplayTotal=$selfSummary['total'];
                 $annualTier='meets';
+                $annualResultTitle='Submitted self-rating score';
             ?>
                 <section class="mb-4" aria-label="Employee submitted self-rating summary">
                     <h3 class="h6 fw-bold mb-2">Employee self-rating</h3>
                     <p class="small text-muted mb-3">Submitted scores for reference. Your review changes and department peer ratings are not included here.</p>
                     <?php require __DIR__.'/annual-result-cards.php'; ?>
                 </section>
+                <?php unset($annualResultTitle); ?>
             <?php endif; ?>
             <?php if ($submitted): ?><div class="alert alert-success">Submitted and locked. These ratings cannot be edited.</div><?php endif; ?>
             <form method="post" id="annualRatingForm" data-draft-key="annual-rating-overrides-v3-<?php echo (int)$actor['user_id']; ?>-<?php echo $evaluationId; ?>-<?php echo substr(hash('sha256',json_encode([$member['employee_id'],$member['evaluation_created_at'],$member['evaluation_submitted_at'],$member['period_start'],$member['period_end']])),0,24); ?>" data-resume-tab="<?php echo $_SERVER['REQUEST_METHOD']==='POST' ? '1' : '0'; ?>" data-submitted="<?php echo $submitted ? '1' : '0'; ?>" data-override-only="<?php echo !$submitted ? '1' : '0'; ?>">
