@@ -48,14 +48,20 @@ if ($adminCheck->get_result()->num_rows > 0) {
 }
 $adminCheck->close();
 
-$missingHrisAccount = false;
-if (strcasecmp((string)($emp['department_name'] ?? ''), 'Human Resources') === 0) {
-    $hrisCheck = $conn->prepare("SELECT 1 FROM users WHERE employee_id = ? AND role IN ('HR Manager', 'HR Supervisor', 'HR Staff') AND deleted_at IS NULL LIMIT 1");
-    $hrisCheck->bind_param('i', $eid);
-    $hrisCheck->execute();
-    $missingHrisAccount = $hrisCheck->get_result()->num_rows === 0;
-    $hrisCheck->close();
+$isHrEmployee = strcasecmp((string)($emp['department_name'] ?? ''), 'Human Resources') === 0;
+$hasHrisAccount = false;
+$hasPortalAccount = false;
+$accountCheck = $conn->prepare("SELECT role FROM users WHERE employee_id = ? AND deleted_at IS NULL");
+$accountCheck->bind_param('i', $eid);
+$accountCheck->execute();
+foreach ($accountCheck->get_result()->fetch_all(MYSQLI_ASSOC) as $account) {
+    if (in_array($account['role'], ['HR Manager', 'HR Supervisor', 'HR Staff'], true)) {
+        $hasHrisAccount = true;
+    } elseif ($account['role'] === 'Employee') {
+        $hasPortalAccount = true;
+    }
 }
+$accountCheck->close();
 
 // Map contacts/email to legacy fields for UI compatibility
 $emp['email'] = $emp['personal_email'];
@@ -209,20 +215,6 @@ $discList = [
         font-size: 1.65rem;
         font-weight: 700;
         color: var(--text-dark);
-    }
-
-    .ep-hris-missing {
-        display: inline-flex;
-        align-items: center;
-        gap: .4rem;
-        padding: .35rem .65rem;
-        border: 1px solid #f2c468;
-        border-radius: 999px;
-        background: #fff3d7;
-        color: #805100;
-        font-size: .76rem;
-        font-weight: 700;
-        line-height: 1.2;
     }
 
     .employee-reference-hero {
@@ -2007,9 +1999,6 @@ foreach ($completionSections as $k => $done) {
                     <span class="badge ep-badge-status <?php echo $emp['is_active'] ? 'ep-status-active' : 'ep-status-inactive'; ?>" tabindex="0" data-status-help="<?php echo $emp['is_active'] ? 'Active employee record. This does not indicate login or attendance.' : 'Inactive employee record. This does not indicate login or attendance.'; ?>" aria-label="<?php echo $emp['is_active'] ? 'Active employee record; login and attendance are not shown.' : 'Inactive employee record; login and attendance are not shown.'; ?>">
                         <span class="ep-presence-dot" aria-hidden="true"></span><?php echo $emp['is_active'] ? 'Active' : 'Inactive'; ?>
                     </span>
-                    <?php if ($missingHrisAccount): ?>
-                        <span class="ep-hris-missing" role="status" tabindex="0" data-status-help="This employee does not have an HRIS portal account yet. Their employment status is separate." aria-label="No HRIS account. This employee does not have an HRIS portal account yet."><i class="fas fa-user-lock" aria-hidden="true"></i> No HRIS account</span>
-                    <?php endif; ?>
                 </div>
             </div>
             <div class="ep-hero-role mt-1">
@@ -2025,6 +2014,8 @@ foreach ($completionSections as $k => $done) {
                 <?php if (($emp['employment_status'] ?? '') === 'Probationary' && !empty($emp['probationary_regularization_eligible'])): ?><span class="ep-pill" style="background:#dcfce7;color:#166534;"><i class="fas fa-check-circle me-1"></i>Eligible for regularization</span><?php endif; ?>
                 <span class="ep-pill ep-pill-blue"><?php echo e($emp['employment_type'] ?: 'Full-Time'); ?></span>
                 <span class="ep-pill ep-pill-gray"><i class="fas fa-building me-1"></i><?php echo e($emp['branch_name'] ?: 'Head Office'); ?></span>
+                <?php if ($isHrEmployee && !$hasHrisAccount): ?><span class="ep-pill ep-pill-account-missing"><i class="fas fa-user-lock me-1" aria-hidden="true"></i>No HRIS account</span><?php endif; ?>
+                <?php if (!$hasPortalAccount): ?><span class="ep-pill ep-pill-account-missing"><i class="fas fa-user-lock me-1" aria-hidden="true"></i>No Employee Portal account</span><?php endif; ?>
             </div>
         </div>
     </div>

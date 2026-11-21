@@ -7825,8 +7825,13 @@ label {
 }
 
 /* Employee profile employment status, distinct from online presence. */
-.employee-profile-page .ep-badge-status,
-.employee-profile-page .ep-hris-missing {
+.employee-profile-page .ep-pill-account-missing {
+    border-color: #f2c468;
+    background: #fff3d7;
+    color: #805100;
+}
+
+.employee-profile-page .ep-badge-status {
     position: relative;
     display: inline-flex;
     align-items: center;
@@ -7841,14 +7846,6 @@ label {
     transform: translateY(-2px);
     box-shadow: 0 5px 14px rgba(15, 83, 36, .18);
     outline: 2px solid #147d4b;
-    outline-offset: 2px;
-}
-
-.employee-profile-page .ep-hris-missing:hover,
-.employee-profile-page .ep-hris-missing:focus-visible {
-    transform: translateY(-2px);
-    box-shadow: 0 5px 14px rgba(128, 81, 0, .2);
-    outline: 2px solid #b77a05;
     outline-offset: 2px;
 }
 
@@ -7868,8 +7865,7 @@ label {
     animation: none;
 }
 
-.employee-profile-page .ep-badge-status::after,
-.employee-profile-page .ep-hris-missing::after {
+.employee-profile-page .ep-badge-status::after {
     content: attr(data-status-help);
     position: absolute;
     left: 50%;
@@ -7900,17 +7896,6 @@ label {
     transform: translate(-50%, 0);
 }
 
-.employee-profile-page .ep-hris-missing::after {
-    background: #664500;
-}
-
-.employee-profile-page .ep-hris-missing:hover::after,
-.employee-profile-page .ep-hris-missing:focus-visible::after {
-    opacity: 1;
-    visibility: visible;
-    transform: translate(-50%, 0);
-}
-
 @keyframes ep-status-pulse {
     50% { box-shadow: 0 0 0 5px rgba(19, 166, 93, .12); }
 }
@@ -7918,7 +7903,5 @@ label {
 @media (prefers-reduced-motion: reduce) {
     .employee-profile-page .ep-presence-dot { animation: none; }
     .employee-profile-page .ep-badge-status,
-    .employee-profile-page .ep-badge-status::after,
-    .employee-profile-page .ep-hris-missing,
-    .employee-profile-page .ep-hris-missing::after { transition: none; }
+    .employee-profile-page .ep-badge-status::after { transition: none; }
 }

@@ -47,6 +47,21 @@ if ($adminCheck->get_result()->num_rows > 0) {
 }
 $adminCheck->close();
 
+$isHrEmployee = strcasecmp((string)($emp['department_name'] ?? ''), 'Human Resources') === 0;
+$hasHrisAccount = false;
+$hasPortalAccount = false;
+$accountCheck = $conn->prepare("SELECT role FROM users WHERE employee_id = ? AND deleted_at IS NULL");
+$accountCheck->bind_param('i', $eid);
+$accountCheck->execute();
+foreach ($accountCheck->get_result()->fetch_all(MYSQLI_ASSOC) as $account) {
+    if (in_array($account['role'], ['HR Manager', 'HR Supervisor', 'HR Staff'], true)) {
+        $hasHrisAccount = true;
+    } elseif ($account['role'] === 'Employee') {
+        $hasPortalAccount = true;
+    }
+}
+$accountCheck->close();
+
 // Map contacts/email to legacy fields for UI compatibility
 $emp['email'] = $emp['personal_email'];
 $emp['contact_number'] = $emp['mobile_number'];
@@ -1519,6 +1534,8 @@ foreach ($completionSections as $k => $done) {
                 <span class="ep-pill ep-pill-purple"><i class="fas fa-user-check me-1"></i><?php echo e($emp['employment_status']); ?></span>
                 <span class="ep-pill ep-pill-blue"><?php echo e($emp['employment_type'] ?: 'Full-Time'); ?></span>
                 <span class="ep-pill ep-pill-gray"><i class="fas fa-building me-1"></i><?php echo e($emp['branch_name'] ?: 'Head Office'); ?></span>
+                <?php if ($isHrEmployee && !$hasHrisAccount): ?><span class="ep-pill ep-pill-account-missing"><i class="fas fa-user-lock me-1" aria-hidden="true"></i>No HRIS account</span><?php endif; ?>
+                <?php if (!$hasPortalAccount): ?><span class="ep-pill ep-pill-account-missing"><i class="fas fa-user-lock me-1" aria-hidden="true"></i>No Employee Portal account</span><?php endif; ?>
             </div>
         </div>
     </div>
