@@ -989,7 +989,7 @@ if ($annual_nav_actor && $annual_nav_actor['employment_status'] === 'Regular'
                         </li>
                         <?php
                         // Add other currently authorized sidebar tools to the existing mobile gear menu.
-                        $_mobile_gear_skip_pages = ['dashboard.php', 'my-employment.php', 'self-rating.php',
+                        $_mobile_gear_skip_pages = ['dashboard.php', 'my-employment.php', 'self-rating.php', 'team-evaluation-packages.php', 'performance-evaluation.php',
                             'evaluation-history.php', 'notifications.php', 'profile-settings.php',
                             'my-performance.php'];
                         $_mobile_gear_has_extra_items = false;

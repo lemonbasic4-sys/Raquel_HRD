@@ -5,8 +5,17 @@
 <?php
 if (isset($_SESSION['role']) && $_SESSION['role'] === 'Employee'): 
     $curr_p = $current_page ?? basename($_SERVER['PHP_SELF']);
+    $employeePerformanceNavItem = null;
+    foreach (($sidebar_menus ?? []) as $sectionItems) {
+        foreach ($sectionItems as $item) {
+            if (in_array($item['page'] ?? '', ['team-evaluation-packages.php', 'performance-evaluation.php'], true)) {
+                $employeePerformanceNavItem = $item;
+                break 2;
+            }
+        }
+    }
 ?>
-    <!-- Mobile bottom navigation keeps the four primary shortcuts; role-enabled extras live in the gear menu. -->
+    <!-- Mobile bottom navigation keeps the primary employee shortcuts visible. -->
     <nav class="employee-bottom-nav d-md-none" aria-label="Employee Portal Navigation">
         <a href="<?php echo BASE_URL; ?>/employee/dashboard.php" class="nav-item <?php echo ($curr_p === 'dashboard.php') ? 'active' : ''; ?>">
             <i class="fas fa-home nav-icon"></i>
@@ -28,6 +37,17 @@ if (isset($_SESSION['role']) && $_SESSION['role'] === 'Employee'):
             </div>
             <span class="nav-label">Self Rating</span>
         </a>
+        <?php if ($employeePerformanceNavItem): ?>
+        <a href="<?php echo e($employeePerformanceNavItem['url']); ?>" class="nav-item <?php echo ($curr_p === $employeePerformanceNavItem['page'] || in_array($curr_p, ['annual-evaluations.php', 'quarterly-evaluations.php'], true)) ? 'active' : ''; ?>">
+            <div class="position-relative">
+                <i class="fas fa-layer-group nav-icon"></i>
+                <?php if (($employeePerformanceNavItem['badge'] ?? 0) > 0): ?>
+                    <span class="mobile-notif-badge"><?php echo $employeePerformanceNavItem['badge'] > 9 ? '9+' : $employeePerformanceNavItem['badge']; ?></span>
+                <?php endif; ?>
+            </div>
+            <span class="nav-label">Evaluations</span>
+        </a>
+        <?php endif; ?>
         <a href="<?php echo BASE_URL; ?>/employee/evaluation-history.php" class="nav-item <?php echo ($curr_p === 'evaluation-history.php') ? 'active' : ''; ?>">
             <div class="position-relative">
                 <i class="fas fa-history nav-icon"></i>
