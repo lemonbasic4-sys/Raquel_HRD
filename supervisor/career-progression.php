@@ -176,7 +176,33 @@ require_once '../includes/header.php';
     </div>
 </div>
 
-<div class="chart-card fadeup">
+<!-- Type breakdown mini-chart card -->
+<div class="chart-card fadeup mt-4">
+    <div class="cc-header"><h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Movement Breakdown</h5></div>
+    <div class="cc-body">
+        <div class="row g-3 text-center">
+            <?php
+            $breakdown = [
+                ['Promotion',  $counts['Promotion'],  'bg-success', 'fas fa-arrow-trend-up'],
+                ['Transfer',   $counts['Transfer'],   'bg-info text-dark', 'fas fa-arrows-left-right'],
+                ['Demotion',   $counts['Demotion'],   'bg-danger',  'fas fa-arrow-trend-down'],
+                ['Role Change',$counts['Role Change'],'bg-primary', 'fas fa-user-pen'],
+            ];
+            foreach ($breakdown as [$label, $val, $cls, $ico]):
+            ?>
+            <div class="col-6 col-md-3">
+                <div class="p-3 rounded-3 border h-100" style="background:#fafafa;">
+                    <div class="mb-2"><span class="badge <?php echo $cls; ?> px-3 py-2" style="font-size:.8rem;"><i class="<?php echo $ico; ?> me-1"></i><?php echo $label; ?></span></div>
+                    <div style="font-size:1.8rem;font-weight:800;color:#212529;"><?php echo number_format($val); ?></div>
+                    <div class="text-muted" style="font-size:.75rem;"><?php echo $counts['total'] > 0 ? round($val / $counts['total'] * 100) : 0; ?>% of applied movements</div>
+                </div>
+            </div>
+            <?php endforeach; ?>
+        </div>
+    </div>
+</div>
+
+<div class="chart-card fadeup mt-4">
     <div class="cc-header d-flex flex-wrap align-items-center justify-content-between gap-3">
         <h5 class="mb-0"><i class="fas fa-chart-line me-2"></i>Employee Career Roadmaps</h5>
         <span class="badge bg-secondary-subtle text-secondary border"><?php echo count($employees); ?> employee<?php echo count($employees) === 1 ? '' : 's'; ?></span>
@@ -401,32 +427,6 @@ require_once '../includes/header.php';
 
     </div><!-- /.cc-body -->
 </div><!-- /.chart-card -->
-
-<!-- Type breakdown mini-chart card -->
-<div class="chart-card fadeup mt-4">
-    <div class="cc-header"><h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Movement Breakdown</h5></div>
-    <div class="cc-body">
-        <div class="row g-3 text-center">
-            <?php
-            $breakdown = [
-                ['Promotion',  $counts['Promotion'],  'bg-success', 'fas fa-arrow-trend-up'],
-                ['Transfer',   $counts['Transfer'],   'bg-info text-dark', 'fas fa-arrows-left-right'],
-                ['Demotion',   $counts['Demotion'],   'bg-danger',  'fas fa-arrow-trend-down'],
-                ['Role Change',$counts['Role Change'],'bg-primary', 'fas fa-user-pen'],
-            ];
-            foreach ($breakdown as [$label, $val, $cls, $ico]):
-            ?>
-            <div class="col-6 col-md-3">
-                <div class="p-3 rounded-3 border h-100" style="background:#fafafa;">
-                    <div class="mb-2"><span class="badge <?php echo $cls; ?> px-3 py-2" style="font-size:.8rem;"><i class="<?php echo $ico; ?> me-1"></i><?php echo $label; ?></span></div>
-                    <div style="font-size:1.8rem;font-weight:800;color:#212529;"><?php echo number_format($val); ?></div>
-                    <div class="text-muted" style="font-size:.75rem;"><?php echo $counts['total'] > 0 ? round($val / $counts['total'] * 100) : 0; ?>% of applied movements</div>
-                </div>
-            </div>
-            <?php endforeach; ?>
-        </div>
-    </div>
-</div>
 
 <script>
 // Rotate chevron on collapse toggle
