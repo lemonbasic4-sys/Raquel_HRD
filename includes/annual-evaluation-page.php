@@ -45,7 +45,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (!empty($_POST['kra'])) throw new DomainException('Only the immediate head may adjust KRA ratings.');
                 annualSubmitPeers($conn,$actor,$evaluationId,(array)($_POST['scores'] ?? []));
             }
-            redirectWith(annualUrl($actor,'?view=peers&cycle_id='.(int)$_POST['cycle_id']),'success',$withKra ? ((int)$actor['department_id']!==(int)$ratingTarget['department_id'] ? 'Your KRA review was saved. No cross-department 360 rating was submitted. Open Review & approve once all required department peer ratings are complete.' : 'Your KRA review and 360 rating were saved. Open Review & approve once all required peer ratings are complete.') : 'Your 360 ratings were submitted and locked.');
+            $peersReturnQuery=!empty($ratingTarget['individual_evaluation_id'])
+                ? '?view=peers&department_id='.(int)$ratingTarget['department_id']
+                : '?view=peers&cycle_id='.(int)$_POST['cycle_id'];
+            redirectWith(annualUrl($actor,$peersReturnQuery),'success',$withKra ? ((int)$actor['department_id']!==(int)$ratingTarget['department_id'] ? 'Your KRA review was saved. No cross-department 360 rating was submitted. Open Review & approve once all required department peer ratings are complete.' : 'Your KRA review and 360 rating were saved. Open Review & approve once all required peer ratings are complete.') : 'Your 360 ratings were submitted and locked.');
         } elseif (($_POST['action'] ?? '') === 'cancel_cycle') {
             $cancelCycleId=(int)($_POST['cycle_id'] ?? 0);
             $conn->begin_transaction();
@@ -87,6 +90,15 @@ $cycles = annualQuery($conn,"SELECT DISTINCT c.*,d.department_name,(SELECT CONCA
     WHERE m.employee_id=? OR ($reviewerSql)=? OR (c.individual_evaluation_id>0 AND c.department_id=".(int)$actor['department_id']." AND EXISTS(SELECT 1 FROM annual_required_raters rr WHERE rr.cycle_id=c.cycle_id AND rr.rater_employee_id=".(int)$actor['employee_id']."))
     ORDER BY c.period_end DESC,c.cycle_id DESC",[(int)$actor['employee_id'],(int)$actor['job_title_id']]);
 $cycleOptions=array_values(array_filter($cycles,static fn($c)=>$historyView ? (!empty($c['completed_at']) || !empty($c['cancelled_at'])) : (empty($c['completed_at']) && empty($c['cancelled_at']))));
+if (!$cycleId && $view==='peers') {
+    $requestedDepartmentId=(int)($_GET['department_id'] ?? 0);
+    foreach ($cycleOptions as $option) {
+        if (!empty($option['individual_evaluation_id'])
+            && (!$requestedDepartmentId || (int)$option['department_id']===$requestedDepartmentId)) {
+            $cycleId=(int)$option['cycle_id']; break;
+        }
+    }
+}
 if (!$cycleId && $cycleOptions) $cycleId=(int)$cycleOptions[0]['cycle_id'];
 $member=null; $named=false; $canFinalize=false;
 if ($evaluationId) {
@@ -281,6 +293,7 @@ require_once __DIR__ . '/header.php';
         <form class="content-card annual-cycle-filter p-3 mb-4 d-flex gap-2 flex-wrap" method="get">
             <?php if ($annual_in_performance_page): ?><input type="hidden" name="category" value="regular"><?php endif; ?>
             <input type="hidden" name="view" value="<?php echo $historyView ? 'history' : e($view); ?>">
+            <?php if ($individualRosterOptions): ?><input type="hidden" name="department_id" value="<?php echo (int)$cycle['department_id']; ?>"><?php endif; ?>
             <label for="annualCycle" class="align-self-center">Department / period</label>
             <select id="annualCycle" name="cycle_id" class="form-select annual-cycle" data-cycle-filter="annual">
             <?php if ($individualRosterOptions): ?><option value="0" <?php echo $showAllIndividual ? 'selected' : ''; ?>>All individual evaluations in this department</option><?php endif; ?>
