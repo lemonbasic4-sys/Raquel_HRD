@@ -26,14 +26,16 @@ $notificationActionLabel = in_array($notification_center_role, ['HR Staff', 'Emp
 .admin-notice-mark-all { margin:0 0 14px; }
 .admin-notice-mark-all .btn { font-size:.75rem; }
 .admin-notice-tabs .btn.active { background:#234d08; color:#fff; border-color:#234d08; }
-.admin-notice-categories { margin-bottom:10px !important; }
-.admin-notice-category-list { display:flex; align-items:center; gap:7px; overflow-x:auto; padding:2px 1px 7px; scrollbar-width:thin; -webkit-overflow-scrolling:touch; }
-.admin-notice-category { display:inline-flex; align-items:center; gap:7px; flex:0 0 auto; padding:7px 12px; border:1px solid #dce5eb; border-radius:999px; background:#f6f8fa; color:#334155; font-size:.78rem; font-weight:600; text-decoration:none; white-space:nowrap; transition:background .2s ease,color .2s ease,border-color .2s ease; }
-.admin-notice-category:hover { border-color:#294306; color:#294306; }
-.admin-notice-category.active { background:#082e06; border-color:#082e06; color:#fff; }
-.admin-notice-filter { background:#fff; border:1px solid #e1e8e4; border-radius:12px; padding:9px 12px; margin-bottom:15px !important; box-shadow:0 2px 9px rgba(8,46,6,.04); }
+.admin-notice-filter { background:#fff; border:1px solid #e1e8e4; border-radius:12px; margin-bottom:15px !important; box-shadow:0 2px 9px rgba(8,46,6,.04); }
+.admin-notice-filter summary { display:flex; justify-content:space-between; align-items:center; padding:14px 16px; cursor:pointer; list-style:none; font-weight:700; color:#17391d; }
+.admin-notice-filter summary::-webkit-details-marker { display:none; }
+.admin-notice-filter summary .fa-chevron-down { transition:transform .2s ease; }
+.admin-notice-filter[open] summary .fa-chevron-down { transform:rotate(180deg); }
+.admin-notice-filter form { padding:0 16px 16px; }
 .admin-notice-filter .form-label { display:none; }
 .admin-notice-filter .form-control,.admin-notice-filter .form-select { min-height:36px; }
+.admin-notice-activity.page-hero { padding:18px 22px; margin-bottom:16px; color:#fff; }
+.admin-notice-activity .activity-subtitle,.admin-notice-activity .activity-help { color:#e1ebdb; }
 .admin-notice-event { position:relative; background:#fff; border:1px solid #dfe9df; border-radius:11px; margin-bottom:8px; overflow:hidden; box-shadow:0 2px 10px rgba(8,46,6,.04); }
 .admin-notice-event.is-action { border-left:4px solid #649a27; background:linear-gradient(90deg,#f7fbf5 0%,#fff 60%); }
 .admin-notice-event[open] { border-color:#649457; }
@@ -81,24 +83,18 @@ $notificationActionLabel = in_array($notification_center_role, ['HR Staff', 'Emp
     <nav class="admin-notice-tabs d-flex flex-wrap gap-2 mb-3" aria-label="Notification status">
         <?php foreach (['all' => 'All', 'unread' => 'Unread', 'read' => 'Read', 'action' => $notificationActionLabel] as $key => $label): ?><a class="btn btn-sm <?php echo $filter === $key ? 'active' : 'btn-outline-success'; ?>" href="<?php echo $adminNotificationUrl(['filter' => $key]); ?>"><?php echo e($label); ?></a><?php endforeach; ?>
     </nav>
-    <nav class="admin-notice-categories mb-3" aria-label="Notification categories">
-        <div class="admin-notice-category-list">
-            <?php foreach ($categories as $key => $meta): ?>
-                <a class="admin-notice-category <?php echo $category === $key ? 'active' : ''; ?>" <?php echo $category === $key ? 'aria-current="page"' : ''; ?> href="<?php echo $adminNotificationUrl(['category' => $key]); ?>"><i class="<?php echo e($meta[1]); ?>" aria-hidden="true"></i><?php echo e($meta[0]); ?></a>
-            <?php endforeach; ?>
-        </div>
-    </nav>
-    <div class="admin-notice-filter mb-4">
+    <details class="admin-notice-filter mb-4" <?php echo $search !== '' || $date_filter !== 'all' || $category !== 'all' ? 'open' : ''; ?>>
+        <summary><span><i class="fas fa-filter me-2" aria-hidden="true"></i>Filters<?php if ($search !== '' || $date_filter !== 'all' || $category !== 'all'): ?><span class="small fw-normal ms-2">Active</span><?php endif; ?></span><i class="fas fa-chevron-down" aria-hidden="true"></i></summary>
         <form method="get" class="row g-2 align-items-end">
             <input type="hidden" name="filter" value="<?php echo e($filter); ?>">
-            <input type="hidden" name="category" value="<?php echo e($category); ?>">
-            <div class="col-12 col-lg-8"><label class="form-label small mb-1" for="noticeSearch">Search notifications</label><input class="form-control form-control-sm" id="noticeSearch" name="search" value="<?php echo e($search); ?>" placeholder="Search notifications (title or message)"></div>
+            <div class="col-12 col-lg-6"><label class="form-label small mb-1" for="noticeSearch">Search notifications</label><input class="form-control form-control-sm" id="noticeSearch" name="search" value="<?php echo e($search); ?>" placeholder="Search notifications (title or message)"></div>
+            <div class="col-12 col-sm-6 col-lg-2"><label class="form-label small mb-1" for="noticeCategory">Category</label><select class="form-select form-select-sm" id="noticeCategory" name="category" aria-label="Notification category"><?php foreach ($categories as $key => $meta): ?><option value="<?php echo e($key); ?>" <?php echo $category === $key ? 'selected' : ''; ?>><?php echo e($meta[0]); ?></option><?php endforeach; ?></select></div>
             <div class="col-6 col-lg-2"><label class="form-label small mb-1">Date</label><select class="form-select form-select-sm" name="date"><?php foreach (['all' => 'All time', 'today' => 'Today', '7' => 'Last 7 days', '30' => 'Last 30 days'] as $key => $label): ?><option value="<?php echo $key; ?>" <?php echo $date_filter === $key ? 'selected' : ''; ?>><?php echo $label; ?></option><?php endforeach; ?></select></div>
             <div class="col-6 col-lg-1"><button class="btn btn-sm btn-success w-100" type="submit">Apply</button></div>
             <div class="col-6 col-lg-1"><a class="btn btn-sm btn-outline-secondary w-100" href="<?php echo e(BASE_URL . '/' . $notification_center_portal . '/notifications.php'); ?>">Clear</a></div>
         </form>
-    </div>
-    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3"><div><h2 class="h5 mb-0">Notification activity</h2><small class="text-muted">Showing <?php echo $total_filtered ? number_format($offset + 1) . '–' . number_format($offset + count($manager_notif_items)) : '0'; ?> of <?php echo number_format($total_filtered); ?> matching notifications</small></div><span class="small text-muted"><i class="fas fa-circle-info me-1"></i>Expand a notice to view details and actions</span></div>
+    </details>
+    <div class="admin-notice-activity page-hero fadeup d-flex flex-wrap justify-content-between align-items-center gap-2"><div><h2 class="h5 mb-0">Notification activity</h2><small class="activity-subtitle">Showing <?php echo $total_filtered ? number_format($offset + 1) . '–' . number_format($offset + count($manager_notif_items)) : '0'; ?> of <?php echo number_format($total_filtered); ?> matching notifications</small></div><span class="activity-help small"><i class="fas fa-circle-info me-1"></i>Expand a notice to view details and actions</span></div>
     <?php if ($manager_notif_items): ?>
         <form method="post" id="noticeBulkForm" class="d-flex flex-wrap align-items-center gap-2 mb-3">
             <?php echo csrfField(); ?>
@@ -127,11 +123,6 @@ $notificationActionLabel = in_array($notification_center_role, ['HR Staff', 'Emp
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     document.querySelectorAll('.notice-open-details').forEach(button => button.addEventListener('click', function () { this.closest('details').open = true; }));
-    const categoryList = document.querySelector('.admin-notice-category-list');
-    const activeCategory = categoryList?.querySelector('.admin-notice-category.active');
-    if (categoryList && activeCategory) {
-        categoryList.scrollLeft = activeCategory.offsetLeft - categoryList.offsetLeft - 12;
-    }
     const boxes = [...document.querySelectorAll('.notice-select-item')];
     const all = document.getElementById('noticeSelectAll');
     const count = document.getElementById('noticeSelectionCount');
