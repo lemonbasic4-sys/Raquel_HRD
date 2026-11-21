@@ -76,6 +76,11 @@
 .annual-summary .bg-light { background:#f4f7ef !important; border:1px solid var(--annual-border); border-radius:12px !important; height:100%; }
 .annual-summary strong { display:block; font-size:1.8rem; color:#294306; }
 .annual-summary small { display:block; }
+.annual-page .annual-review-overview.page-hero { background:linear-gradient(135deg,var(--hero-from,#082e06) 0%,var(--hero-mid,#294306) 50%,var(--hero-to,#183a03) 100%); color:#fff; border:0; box-shadow:0 8px 24px rgba(8,46,6,.16); }
+.annual-page .annual-review-overview.page-hero h2,.annual-page .annual-review-overview.page-hero p { color:#fff; }
+.annual-page .annual-review-overview .annual-summary .bg-light { background:rgba(255,255,255,.14) !important; border-color:rgba(255,255,255,.24); color:#fff; }
+.annual-page .annual-review-overview .annual-summary strong { color:#fff; }
+.annual-page .annual-review-overview .annual-summary small { color:#e1ebdb; }
 .annual-head-review-score { display:grid; grid-template-columns:58px minmax(0,1fr) auto; align-items:center; gap:16px; background:linear-gradient(115deg,#f2f6ec 0%,#fbfcf8 58%,#f8f2da 100%); border:1px solid #d5dfc8; box-shadow:0 5px 16px rgba(22,55,12,.08); color:#193b0b; }
 .annual-head-review-score-icon { display:grid; place-items:center; width:58px; height:58px; border-radius:15px; background:#174c18; color:#e5bd36; font-size:1.4rem; box-shadow:inset 0 0 0 1px rgba(255,255,255,.16); }
 .annual-head-review-score-kicker { color:#9a7510; font-size:.7rem; font-weight:800; letter-spacing:.09em; text-transform:uppercase; }
@@ -112,6 +117,8 @@
 .annual-review-tabs button:focus-visible { outline:3px solid #bd9414; outline-offset:-3px; }
 .annual-review-tabs button span { display:inline-block; padding:2px 8px; margin-left:5px; border-radius:10px; background:#e2e8f0; color:#64748b; font-size:12px; }
 .annual-review-tabs button.active span { background:rgba(255,255,255,.25); color:#fff; }
+.annual-page .annual-review-tabs button.annual-next-step:not(.active) { color:#123f1c; animation:annual-next-step-breathe 1.5s ease-in-out infinite !important; transform-origin:center; }
+@keyframes annual-next-step-breathe { 0%,100% { background:#e5f3df; box-shadow:0 0 0 0 rgba(35,120,54,.25); transform:scale(1); } 50% { background:#bce8ae; box-shadow:0 0 0 9px rgba(35,120,54,.2); transform:scale(1.09); } }
 .annual-rating-step-actions { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:20px; padding-top:16px; border-top:1px solid #e2e8f0; }
 .annual-rating-step-actions .btn { display:inline-flex; align-items:center; }
 .annual-review-summary-group { padding:16px; border:1px solid #d4ddcd; border-radius:12px; background:#fbfcf9; }

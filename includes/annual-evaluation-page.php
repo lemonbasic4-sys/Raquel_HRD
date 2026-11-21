@@ -669,10 +669,7 @@ require_once __DIR__ . '/header.php';
             </tbody><tfoot><tr><th colspan="<?php echo 2+count($peers); ?>">Core Behaviors &amp; Values total</th><td class="text-end"><strong><?php echo number_format($candidate['core'],2); ?></strong><small>Weight: 20%</small></td></tr></tfoot></table></div>
         </section>
         <?php else: ?>
-        <section class="content-card p-4 mb-4" id="annualOverview">
-            <?php if ((int)$member['current_version']>0): $scoreComplete=count($peers)>=annualExpectedPeers($conn,$cycleId,(int)$member['employee_id']); ?>
-            <div class="alert <?php echo $scoreComplete ? 'alert-success' : 'alert-info'; ?>" role="status"><strong>Approved · <?php echo $scoreComplete ? 'Score complete' : 'Score provisional'; ?></strong><p class="mb-0"><?php echo $scoreComplete ? 'All required department ratings have been received. Your score is complete.' : 'Your immediate head has approved your evaluation. Your overall score may change as remaining department members submit their 360 ratings. You will be notified when your score changes.'; ?></p></div>
-            <?php endif; ?>
+        <section class="content-card page-hero fadeup annual-review-overview p-4 mb-4" id="annualOverview">
             <h2 class="h4"><?php echo e($member['first_name'].' '.$member['last_name']); ?></h2>
             <p><?php echo e($member['position_name'].' · '.$member['template_name'].' · '.$member['period_start'].' to '.$member['period_end']); ?></p>
             <p class="small">Finalized by the immediate-head position: <strong><?php echo e($member['reviewer_position_name'] ?? 'Not configured'); ?></strong></p>
@@ -694,7 +691,7 @@ require_once __DIR__ . '/header.php';
             <div class="annual-review-tabs" role="tablist" aria-label="Evaluation sections">
                 <button class="active" id="annualKraTab" type="button" role="tab" data-bs-toggle="tab" data-bs-target="#annualKraPanel" aria-controls="annualKraPanel" aria-selected="true"><i class="fas fa-chart-pie me-2"></i>Key Result Areas (KRA) <span><?php echo count($kra); ?></span></button>
                 <button id="annualCoreTab" type="button" role="tab" data-bs-toggle="tab" data-bs-target="#annualCorePanel" aria-controls="annualCorePanel" aria-selected="false"><i class="fas fa-users me-2"></i>Core Behaviors &amp; Values <span>8</span></button>
-                <button id="annualDecisionTab" type="button" role="tab" data-bs-toggle="tab" data-bs-target="#annualDecisionPanel" aria-controls="annualDecisionPanel" aria-selected="false"><i class="fas fa-file-signature me-2"></i>Consolidation &amp; Final Score</button>
+                <button id="annualDecisionTab" class="<?php echo $editable && count($peers) >= $expected ? 'annual-next-step' : ''; ?>" type="button" role="tab" data-bs-toggle="tab" data-bs-target="#annualDecisionPanel" aria-controls="annualDecisionPanel" aria-selected="false"><i class="fas fa-file-signature me-2"></i>Consolidation &amp; Final Score</button>
             </div>
             <div class="tab-content p-4">
             <div class="tab-pane show active" id="annualKraPanel" role="tabpanel" aria-labelledby="annualKraTab" tabindex="0">
@@ -741,6 +738,7 @@ require_once __DIR__ . '/header.php';
                 <textarea id="annualRemarks" class="form-control mb-3" name="remarks" rows="3" placeholder="Explain adjustments, missing participation, or late revisions."><?php echo e($_POST['remarks'] ?? ''); ?></textarea>
                 <?php if (count($peers)<$expected): ?><p class="text-warning-emphasis" id="annualParticipationNotice">Some raters have not submitted. Finalization is unavailable until all <?php echo $expected; ?> expected raters have submitted their 360 ratings (<?php echo count($peers); ?> received). Refresh this review after they submit.</p><?php endif; ?>
                 <button class="btn btn-success" type="submit" <?php echo count($peers)<$expected ? 'disabled aria-disabled="true" aria-describedby="annualParticipationNotice"' : ''; ?>><?php echo $member['current_version'] ? 'Approve &amp; finalize revised Annual result' : 'Approve &amp; finalize Annual evaluation'; ?></button>
+                <button class="btn btn-outline-danger mt-2 mt-sm-0 ms-sm-2" type="button" data-bs-toggle="modal" data-bs-target="#annualReturnModal" data-return-id="<?php echo $evaluationId; ?>" data-return-name="<?php echo e($member['first_name'].' '.$member['last_name']); ?>"><i class="fas fa-undo-alt me-2" aria-hidden="true"></i>Return evaluation</button>
             <?php endif; ?>
             </div></div>
         <?php if ($editable): ?></form><?php else: ?></section><?php endif; ?>
