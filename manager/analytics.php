@@ -643,7 +643,7 @@ $yoy_emp    = formatYoYData($yoy_emp_raw, $yoy_years);
     </div>
 
     <!-- Stat Cards -->
-    <div class="row g-3">
+    <div class="row g-3 analytics-stats">
         <div class="col-6 col-md-3">
             <div class="stat-card">
                 <div class="d-flex justify-content-between align-items-start">
@@ -692,8 +692,10 @@ $yoy_emp    = formatYoYData($yoy_emp_raw, $yoy_years);
 </div>
 
 <!-- ═══════════════════════  FILTERS  ═══════════════════════ -->
-<div class="filter-card fadeup fadeup-1">
-    <form method="GET" action="" class="row align-items-end g-3">
+<details class="filter-card analytics-filter-card fadeup fadeup-1">
+    <summary class="analytics-filter-toggle"><span><i class="fas fa-filter me-2"></i>Filters</span><i class="fas fa-chevron-down analytics-filter-chevron" aria-hidden="true"></i></summary>
+    <div class="analytics-filter-body">
+    <form method="GET" action="" class="row align-items-end g-3 analytics-filter-form">
         <input type="hidden" name="tab" id="analytics-active-tab" value="hiring"<?php echo $hiringTabActive ? '' : ' disabled'; ?>>
         <div class="col-md-2 col-6">
             <label class="form-label fw-semibold" style="font-size:.78rem;">Evaluation Group</label>
@@ -741,7 +743,8 @@ $yoy_emp    = formatYoYData($yoy_emp_raw, $yoy_years);
         <i class="fas fa-circle-info me-1"></i>
         Evaluation charts use only <?php echo $cohort === 'probationary' ? 'Initial and Final probationary evaluations' : 'Annual and Quarterly regular-employee evaluations'; ?>. Workforce demographics and career-movement charts remain organization-wide.
     </div>
-</div>
+    </div>
+</details>
 
 <style>
 /* Compact, horizontally scrollable section navigation. */
@@ -1330,7 +1333,8 @@ $yoy_emp    = formatYoYData($yoy_emp_raw, $yoy_years);
         </div>
 
         <!-- ── KPI Cards ── -->
-        <div class="row g-2 mb-4">
+        <div class="page-hero fadeup demographics-hero">
+        <div class="row g-2 demographics-kpis">
             <div class="col-6 col-md-4 col-xl-2">
                 <div class="demo-kpi-card demo-kpi-active">
                     <div class="demo-kpi-icon"><i class="fas fa-users"></i></div>
@@ -1393,6 +1397,7 @@ $yoy_emp    = formatYoYData($yoy_emp_raw, $yoy_years);
             </div>
         </div>
 
+        </div>
         <!-- ── Row 1: Gender | Civil Status | Age Distribution ── -->
         <div class="row g-3 mb-3">
             <!-- Gender Distribution -->
