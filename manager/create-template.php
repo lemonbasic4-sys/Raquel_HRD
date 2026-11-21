@@ -1710,7 +1710,6 @@ function collectDraft() {
         target_department: document.querySelector('[name="target_department"]')?.value || '',
         evaluation_type: document.querySelector('[name="evaluation_type"]')?.value || '',
         probationary_template: document.getElementById('probationaryTemplateToggle')?.checked || false,
-        assessment_year: document.getElementById('assessmentYear')?.value || '',
         assessment_from: document.getElementById('assessmentFrom')?.value || '',
         assessment_to: document.getElementById('assessmentTo')?.value || '',
         kra_weight: document.getElementById('kraWeight')?.value || '80',
@@ -1749,7 +1748,7 @@ function restoreDraft(draft) {
     setVal('[name="target_department"]', draft.target_department);
     setVal('[name="evaluation_type"]', draft.evaluation_type);
     const probationToggle = document.getElementById('probationaryTemplateToggle');
-    for(const [key,id] of Object.entries({assessment_year:'assessmentYear',assessment_from:'assessmentFrom',assessment_to:'assessmentTo'})) { if(draft[key]!==undefined && document.getElementById(id)) document.getElementById(id).value=draft[key]; }
+    for(const [key,id] of Object.entries({assessment_from:'assessmentFrom',assessment_to:'assessmentTo'})) { if(draft[key]!==undefined && document.getElementById(id)) document.getElementById(id).value=draft[key]; }
     if (probationToggle) probationToggle.checked = draft.probationary_template !== undefined
         ? !!draft.probationary_template
         : ['Initial', 'Final'].includes(draft.evaluation_type);

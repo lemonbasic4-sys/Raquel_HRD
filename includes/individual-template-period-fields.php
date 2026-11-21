@@ -1,9 +1,8 @@
 <?php $periodTemplate=$tmpl ?? []; ?>
 <div class="row g-3 mb-3" id="individualTemplatePeriod">
     <div class="col-12"><strong>Employee evaluation period</strong><p class="form-text mb-0">Publishing this form makes it available to eligible employees. No department Start Cycle is required. Revision and Effective Date are separate document dates.</p></div>
-    <div class="col-md-6" data-individual-type="Annual"><label for="assessmentYear" class="form-label">Annual year</label><input id="assessmentYear" class="form-control" name="assessment_year" type="number" min="1900" max="2200" value="<?php echo e(substr($periodTemplate['assessment_from'] ?? date('Y'),0,4)); ?>"><div class="form-text">January 1 or the employee's regularization date (whichever is later), through December 31.</div></div>
-    <div class="col-md-6" data-individual-type="Quarterly"><label for="assessmentFrom" class="form-label">Period From</label><input id="assessmentFrom" class="form-control" name="assessment_from" type="date" value="<?php echo e($periodTemplate['assessment_from'] ?? ''); ?>"></div>
-    <div class="col-md-6" data-individual-type="Quarterly"><label for="assessmentTo" class="form-label">Period To</label><input id="assessmentTo" class="form-control" name="assessment_to" type="date" value="<?php echo e($periodTemplate['assessment_to'] ?? ''); ?>"><div class="form-text">Choose the actual period; calendar quarters are not enforced.</div></div>
+    <div class="col-md-6" data-individual-type="Annual"><label for="assessmentFrom" class="form-label">Period From</label><input id="assessmentFrom" class="form-control" name="assessment_from" type="date" value="<?php echo e($periodTemplate['assessment_from'] ?? date('Y').'-01-01'); ?>"></div>
+    <div class="col-md-6" data-individual-type="Annual"><label for="assessmentTo" class="form-label">Period To</label><input id="assessmentTo" class="form-control" name="assessment_to" type="date" value="<?php echo e($periodTemplate['assessment_to'] ?? date('Y').'-12-31'); ?>"><div class="form-text">This period is used for every targeted Regular employee.</div></div>
 </div>
 <script>
 (function(){

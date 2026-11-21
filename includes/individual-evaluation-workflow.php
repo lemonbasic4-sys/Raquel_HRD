@@ -40,31 +40,18 @@ function individualAssessmentDates(array $employee,array $template): array
     }
     if($from>$to) throw new DomainException('Period From must be on or before Period To.');
     if(($employee['employment_status']??'')!=='Regular') throw new DomainException('Only Regular employees can use this form.');
-    if(($template['evaluation_type']??'')==='Annual') {
-        $regular=$employee['regularization_effective_date']??'';
-        $date=DateTimeImmutable::createFromFormat('!Y-m-d',(string)$regular);
-        if(!$date || $date->format('Y-m-d')!==$regular) throw new DomainException('Ask HR to record your actual regularization date before opening the Annual form.');
-        $from=max(substr($from,0,4).'-01-01',$regular);
-        $to=substr($to,0,4).'-12-31';
-        if($from>$to) throw new DomainException('Your regularization date falls after this Annual period.');
-    }
     return [$from,$to];
 }
 
 function individualTemplateDates(array $input,string $type): array
 {
     if(!in_array($type,['Annual','Quarterly'],true)) return [null,null];
-    if($type==='Annual') {
-        $year=filter_var($input['assessment_year']??null,FILTER_VALIDATE_INT,['options'=>['min_range'=>1900,'max_range'=>2200]]);
-        if(!$year) throw new DomainException('Select a valid Annual evaluation year.');
-        return ["$year-01-01","$year-12-31"];
-    }
     $from=(string)($input['assessment_from']??'');$to=(string)($input['assessment_to']??'');
     foreach([$from,$to] as $value) {
         $d=DateTimeImmutable::createFromFormat('!Y-m-d',$value);
-        if(!$d || $d->format('Y-m-d')!==$value) throw new DomainException('Enter both Quarterly Period From and Period To.');
+        if(!$d || $d->format('Y-m-d')!==$value) throw new DomainException('Enter both Period From and Period To for the '.$type.' template.');
     }
-    if($from>$to) throw new DomainException('Quarterly Period From must be on or before Period To.');
+    if($from>$to) throw new DomainException('Period From must be on or before Period To.');
     return [$from,$to];
 }
 
@@ -132,11 +119,11 @@ function individualNotifyTemplateAvailability($conn,int $templateId=0,int $emplo
     return $count;
 }
 
-/** Reused by template lists/counts; never manufacture a missing regularization date. */
+/** Reused by template lists/counts; Annual availability follows the template period. */
 function individualTemplateEligibilitySql(string $alias,int $employeeId): string
 {
     if(!preg_match('/^[a-z_]+$/i',$alias)) throw new InvalidArgumentException('Invalid template alias');
-    return "($alias.individual_workflow=0 OR ($alias.assessment_from IS NOT NULL AND $alias.assessment_to IS NOT NULL AND $alias.assessment_from<=$alias.assessment_to AND EXISTS(SELECT 1 FROM employees ie WHERE ie.employee_id=$employeeId AND ie.is_active=1 AND ie.deleted_at IS NULL AND ie.employment_status='Regular' AND ie.department_id=$alias.target_department_id AND ($alias.evaluation_type<>'Annual' OR (ie.regularization_effective_date IS NOT NULL AND ie.regularization_effective_date<=$alias.assessment_to)))))";
+    return "($alias.individual_workflow=0 OR ($alias.assessment_from IS NOT NULL AND $alias.assessment_to IS NOT NULL AND $alias.assessment_from<=$alias.assessment_to AND EXISTS(SELECT 1 FROM employees ie WHERE ie.employee_id=$employeeId AND ie.is_active=1 AND ie.deleted_at IS NULL AND ie.employment_status='Regular' AND ie.department_id=$alias.target_department_id)))";
 }
 
 /** Count a combined head-review/peer-rating task only once per evaluation. */
