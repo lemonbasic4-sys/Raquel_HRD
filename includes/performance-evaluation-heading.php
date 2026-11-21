@@ -8,7 +8,6 @@ $performance_user_id = (int)($_SESSION['user_id'] ?? 0);
 $performance_actor = annualActor($conn, $performance_user_id);
 $probationary_pending = countPendingOrganizationPackagesForUser($conn, $performance_user_id, true);
 $regular_pending = $performance_actor ? annualPendingCount($conn, $performance_actor) : 0;
-$quarterly_pending = $performance_actor ? quarterlyPendingCount($conn, $performance_actor) : 0;
 ?>
 <section class="package-hero">
     <?php if ($regular_category && !empty($member) && in_array($view ?? '', ['review','results'],true)): ?>
@@ -57,10 +56,6 @@ $quarterly_pending = $performance_actor ? quarterlyPendingCount($conn, $performa
         <?php if ($probationary_pending > 0): ?><span class="performance-category-count" aria-label="<?php echo $probationary_pending; ?> pending probationary reviews"><?php echo $probationary_pending; ?></span><?php endif; ?>
     </a>
     <?php endif; ?>
-    <a class="performance-category-tab <?php echo $quarterly_category ? 'active' : ''; ?> <?php echo $quarterly_pending > 0 ? 'has-pending' : ''; ?>" <?php echo $quarterly_category ? 'aria-current="page"' : ''; ?> href="<?php echo $performance_category_url; ?>?category=quarterly">
-        <span class="performance-category-icon"><i class="fas fa-calendar-alt" aria-hidden="true"></i></span><span class="performance-category-copy"><strong>Quarterly Evaluation</strong><small>Quarterly cycles &amp; 360 ratings</small></span>
-        <?php if ($quarterly_pending > 0): ?><span class="performance-category-count" aria-label="<?php echo $quarterly_pending; ?> pending quarterly reviews"><?php echo $quarterly_pending; ?></span><?php endif; ?>
-    </a>
     <a class="performance-category-tab <?php echo $regular_category ? 'active' : ''; ?> <?php echo $regular_pending > 0 ? 'has-pending' : ''; ?>" <?php echo $regular_category ? 'aria-current="page"' : ''; ?> href="<?php echo $performance_category_url; ?>?category=regular">
         <span class="performance-category-icon"><i class="fas fa-user" aria-hidden="true"></i></span><span class="performance-category-copy"><strong>Regular Employee</strong><small>Annual evaluations &amp; 360 ratings</small></span>
         <?php if ($regular_pending > 0): ?><span class="performance-category-count" aria-label="<?php echo $regular_pending; ?> pending annual reviews"><?php echo $regular_pending; ?></span><?php endif; ?>

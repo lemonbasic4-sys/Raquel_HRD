@@ -40,6 +40,9 @@ if (!$tmpl) {
 if (!canManageEvaluationTemplate($conn, $template_id, $current_user_id)) {
     redirectWith($template_list_url, 'danger', 'You can only edit templates you own or are authorized to manage as a same-level department peer.');
 }
+if (($tmpl['evaluation_type'] ?? '') === 'Quarterly') {
+    redirectWith($template_list_url, 'info', 'Quarterly templates are retained for history but can no longer be edited.');
+}
 if (in_array($tmpl['evaluation_type'] ?? '', ['Annual','Quarterly'], true)
     && annualQuery($conn, 'SELECT evaluation_id FROM evaluations WHERE template_id=? LIMIT 1', [$template_id])) {
     redirectWith($template_list_url, 'info', 'This template already has evaluation records. Publish a new template to change its criteria without altering existing results.');
@@ -53,6 +56,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $behavior_framework_code = '';
     $behavior_framework_version = '';
     $evaluation_type = $_POST['evaluation_type'] ?? 'Annual';
+    if ($evaluation_type === 'Quarterly') {
+        redirectWith($template_edit_url . '?id=' . $template_id, 'danger', 'New Quarterly evaluations are disabled.');
+    }
     if (in_array($evaluation_type, ['Annual','Quarterly'], true) && annualQuery($conn, 'SELECT evaluation_id FROM evaluations WHERE template_id=? LIMIT 1', [$template_id])) {
         redirectWith($template_list_url, 'info', 'Publish a new template to preserve this template\'s existing evaluation records.');
     }
@@ -622,7 +628,7 @@ require_once '../includes/header.php';
                 <div class="col-md-3 mb-3">
                     <label class="form-label fw-semibold">Evaluation Type</label>
                     <select class="form-select" name="evaluation_type" id="inputEvalType">
-                        <?php foreach (['Annual', 'Quarterly', 'Initial', 'Final'] as $t): ?>
+                        <?php foreach (['Annual', 'Initial', 'Final'] as $t): ?>
                             <option value="<?php echo $t; ?>" <?php echo ($tmpl['evaluation_type'] ?? 'Annual') === $t ? 'selected' : ''; ?>><?php echo $t; ?></option>
                         <?php endforeach; ?>
                     </select>
@@ -745,7 +751,6 @@ require_once '../includes/header.php';
                             <h6 class="fw-bold text-dark mb-0"><i class="fas fa-calculator text-primary me-2"></i>Evaluation Score Formula</h6>
                             <select id="formulaEvalTypeSelect" class="form-select form-select-sm w-auto" style="min-width:140px;" onchange="renderFormulaBox()">
                                 <option value="Annual">Annual</option>
-                                <option value="Quarterly">Quarterly</option>
                                 <option value="Initial">Initial (Probationary)</option>
                                 <option value="Final">Final (Probationary)</option>
                             </select>

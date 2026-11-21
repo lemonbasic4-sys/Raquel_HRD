@@ -1,7 +1,6 @@
 -- OPERATIONS ANNUAL DRY RUN
 -- Base: 2026-01-01 to 2026-12-31; all 16 active Operations positions.
 -- Post-probation Focal Persons: 2027-01-01 to 2027-12-31.
--- Annual self-rating requires an Approved Quarterly evaluation in the same year.
 -- Templates only; no ratings, submissions, or approvals.
 USE raquel_hris;
 DROP PROCEDURE IF EXISTS seed_operations_annual_dry_run;

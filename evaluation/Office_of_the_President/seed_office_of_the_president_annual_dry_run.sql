@@ -2,7 +2,6 @@
 -- Executive Assistant I-III only. The CEO has no configured reporting head.
 -- Base period: 2026-01-01 to 2026-12-31.
 -- Post-probation period: 2027-01-01 to 2027-12-31.
--- Annual self-rating requires an Approved Quarterly evaluation in the same year.
 -- Templates only. No scores, submissions, approvals, or assignments.
 USE raquel_hris;
 DROP PROCEDURE IF EXISTS seed_office_of_the_president_annual_dry_run;

@@ -1,21 +1,10 @@
 # Audit Evaluation Dry Run
 
-For mock employee information and all four form types, use [README.md](README.md). Import base seeds 1-4 once, then this folder's import block. No user accounts are created or required for import. Create employee/reviewer accounts manually using Admin > Portal Accounts afterward.
+For mock employee information and all three form types, use [README.md](README.md). Import base seeds 1-4 once, then this folder's import block. No user accounts are created or required for import. Create employee/reviewer accounts manually using Admin > Portal Accounts afterward.
 
 ## Probationary Initial and Final
 
-The employee seed supplies `MO26-AU-P`, `MO26-AU-P2`, their reporting heads, and regular staff sample `MO26-AU-R`. Shared forms `MO26-206-INITIAL` and `MO26-206-FINAL` each have 8 KRAs and 8 Core Behaviors. Initial due dates are January 1 and January 15, 2027. Once accounts exist, start at Employee Portal > Self Rating > Initial. Final follows full Initial approval; regular Quarterly follows Final approval and regularization. No scores, approvals, or regularization are seeded.
-
-## Quarterly
-
-Copy and paste into PowerShell:
-
-```powershell
-cd C:\xampp\htdocs\Raquel_HRD
-C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 --abort-source-on-error -u root -e "source evaluation/Audit/seed_audit_department_quarterly_dry_run.sql"
-```
-
-The first cycle is **2026-11-15 to 2027-02-14** for all 11 Audit positions. The same SQL also creates a later **Auditor I-V Quarterly cycle, 2027-04-15 to 2027-07-14**, for employees who have completed probation and become Regular.
+The employee seed supplies `MO26-AU-P`, `MO26-AU-P2`, their reporting heads, and regular staff sample `MO26-AU-R`. Shared forms `MO26-206-INITIAL` and `MO26-206-FINAL` each have 8 KRAs and 8 Core Behaviors. Initial due dates are January 1 and January 15, 2027. Once accounts exist, start at Employee Portal > Self Rating > Initial. Final follows full Initial approval; Annual eligibility follows regularization. No scores, approvals, or regularization are seeded.
 
 ## Annual
 
@@ -26,8 +15,8 @@ cd C:\xampp\htdocs\Raquel_HRD
 C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 --abort-source-on-error -u root -e "source evaluation/Audit/seed_audit_department_annual_dry_run.sql"
 ```
 
-The first Annual period is **2026-01-01 to 2026-12-31** for all 11 Audit positions. The same SQL also creates an **Auditor I-V Annual 2027** form for the post-probation path. The portal starts the employee's actual Annual period on the later of January 1 or their regularization date. Annual self-rating requires an **Approved Quarterly evaluation in the same year**.
+The first Annual period is **2026-01-01 to 2026-12-31** for all 11 Audit positions. The same SQL also creates an **Auditor I-V Annual 2027** form for the post-probation path. The portal starts the employee's actual Annual period on the later of January 1 or their regularization date. Annual self-rating follows regular employee eligibility.
 
 Each SQL creates five templates: four covering all **11 Audit positions** (Audit Manager I; Audit Manager II-III; Audit Supervisor I-III; Auditor I-V), plus the later Auditor I-V form. Each template has 8 KRAs totaling 100%, 8 Core Behaviors, and an 80% KRA / 20% Behavior overall split. The imports create no scores or approvals. Reimporting a template stops with an error.
 
-The two current Auditor I employees become eligible for Regular Quarterly only after regularization. Their Annual 2027 form unlocks after an Approved 2027 Quarterly evaluation.
+The two current Auditor I employees become eligible for Annual after regularization. Their Annual 2027 form follows regularization.

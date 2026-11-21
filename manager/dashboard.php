@@ -5,7 +5,7 @@ checkRole(['HR Manager']);
 require_once '../includes/header.php';
 
 // Keep dashboard performance analytics separate from the probationary Initial/Final pathway.
-$dashboard_regular_eval_filter = "evaluation_type IN ('Annual','Quarterly')";
+$dashboard_regular_eval_filter = "evaluation_type = 'Annual'";
 
 // Fetch stats
 $branch_id = $_SESSION['branch_id'];
@@ -50,7 +50,7 @@ $recent_evaluations = $conn->query("SELECT ev.evaluation_id, ev.evaluation_type,
     FROM evaluations ev
     JOIN employees e ON e.employee_id = ev.employee_id
     LEFT JOIN departments d ON d.department_id = e.department_id
-    WHERE ev.evaluation_type IN ('Annual','Quarterly')
+    WHERE ev.evaluation_type = 'Annual'
     ORDER BY COALESCE(ev.submitted_date, ev.created_at) DESC, ev.evaluation_id DESC
     LIMIT 5")->fetch_all(MYSQLI_ASSOC);
 
@@ -152,7 +152,7 @@ $top_performers = $conn->query("
     FROM evaluations ev
     JOIN employees e ON ev.employee_id = e.employee_id
     LEFT JOIN departments d ON e.department_id = d.department_id
-    WHERE ev.status = 'Approved' AND ev.evaluation_type IN ('Annual','Quarterly')
+    WHERE ev.status = 'Approved' AND ev.evaluation_type = 'Annual'
     ORDER BY ev.total_score DESC, ev.submitted_date DESC
     LIMIT 5
 ");
@@ -174,7 +174,7 @@ $branch_q = $conn->query("SELECT b.branch_name, AVG(ev.total_score) as avg_score
     FROM evaluations ev
     LEFT JOIN employees e ON ev.employee_id = e.employee_id
     LEFT JOIN branches b ON e.branch_id = b.branch_id
-    WHERE ev.status = 'Approved' AND ev.evaluation_type IN ('Annual','Quarterly') AND b.branch_name IS NOT NULL
+    WHERE ev.status = 'Approved' AND ev.evaluation_type = 'Annual' AND b.branch_name IS NOT NULL
     GROUP BY b.branch_id, b.branch_name
     ORDER BY avg_score DESC LIMIT 10");
 while ($row = $branch_q->fetch_assoc()) {
@@ -867,7 +867,7 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
                             <div class="p-3 rounded-3 text-center bg-white bg-opacity-10 border border-white border-opacity-10 text-white hover-zoom hub-link-card" style="transition: all 0.2s;">
                                 <i class="fas fa-chart-bar fa-2x mb-2 text-success"></i>
                                 <div class="fw-bold small hub-link-title">Regular Analytics</div>
-                                <div class="text-white-50 hub-link-subtitle" style="font-size:0.68rem;">Annual &amp; Quarterly</div>
+                                <div class="text-white-50 hub-link-subtitle" style="font-size:0.68rem;">Annual Evaluations</div>
                             </div>
                         </a>
                     </div>

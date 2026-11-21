@@ -45,13 +45,13 @@ Access depends on the account role, department, reporting relationships, and wor
 
 ## Evaluation workflows and test data
 
-The system supports Initial and Final evaluations for probationary employees, plus separate Quarterly and Annual evaluations for regular employees. Department cycles coordinate form readiness, self-ratings, department 360 ratings, head reviews, cycle approval, and history.
+The active workflow supports Initial and Final evaluations for probationary employees and Annual evaluations for regular employees. Department reviews coordinate form readiness, self-ratings, department 360 ratings, head reviews, approval, and history.
 
-Quarterly is optional for an individual Annual evaluation. An eligible regular employee can complete an Annual form without a Quarterly record for that year. If a Quarterly evaluation exists for the same year, at least one must be approved before Annual submission.
+Annual evaluations are independent of Quarterly records. New Quarterly templates, cycles, and submissions are disabled to match the client-confirmed evaluation process; existing Quarterly results remain in history.
 
 Use [evaluation/README.md](evaluation/README.md) for workflow dry runs. Import base seeds 1-4 once, then open the selected department's README, for example [Acquired Properties](evaluation/Acquired_Properties/README.md), and copy its import block.
 
-- Each department folder supplies fictional employee information, required reporting heads, and Initial, Final, Quarterly, and Annual templates. It creates no user accounts; create Employee Portal accounts manually through Admin after import.
+- Each department folder supplies fictional employee information, required reporting heads, and Initial, Final, and Annual templates. It creates no user accounts; create Employee Portal accounts manually through Admin after import.
 - Each has two probationary employees, one regular staff sample, and its reporting heads; forms can cover more positions than the sample employees occupy.
 - Seeded forms contain 8 KRAs totaling 100%, eight Core Behaviors, and an 80% KRA / 20% Behavior split. The President/CEO has no self-evaluation form.
 - Template imports reject duplicates. No scores, submissions, approvals, or automatic regularization are imported.

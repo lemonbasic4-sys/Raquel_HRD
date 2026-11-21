@@ -3987,7 +3987,7 @@ function getAllowedEvaluationTypesForEmploymentStatus($employment_status)
     $non_regular_statuses = ['OJT', 'Trainee', 'Probationary', 'Project Based', 'Project-Based'];
     return in_array((string)$employment_status, $non_regular_statuses, true)
         ? ['Initial', 'Final']
-        : ['Annual', 'Quarterly'];
+        : ['Annual'];
 }
 
 function saveEvaluationTemplateTargetPositionIds($conn, $template_id, array $position_ids)

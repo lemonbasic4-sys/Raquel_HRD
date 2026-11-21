@@ -1,9 +1,7 @@
 -- AUDIT ANNUAL DRY RUN
 -- Period: 2026-01-01 to 2026-12-31 for all 11 Audit positions.
--- An additional 2027 Auditor I-V form supports employees who complete
--- probation in April 2027 and then finish a 2027 Quarterly evaluation.
+-- An additional 2027 Auditor I-V form supports employees after regularization.
 -- Templates only: no scores, submissions, approvals, or employee assignments.
--- Annual self-rating requires an Approved 2026 Quarterly evaluation.
 -- The portal starts the annual period at the later of Jan 1 or regularization.
 -- Regular employees with active portal accounts can start self-rating.
 USE raquel_hris;
@@ -143,7 +141,7 @@ BEGIN
   WHERE c.template_id=v_lead_form AND c.section='Behavior';
 
   -- Post-probation Auditor Annual form. The portal still requires an
-  -- Approved 2027 Quarterly result and starts from regularization date.
+  -- starts from regularization date.
   INSERT INTO evaluation_templates
     (template_name,description,target_department,target_department_id,target_job_title_id,
      behavior_framework_code,behavior_framework_version,evaluation_type,individual_workflow,
@@ -151,7 +149,7 @@ BEGIN
      revision_date,effective_date_form,status,created_by)
   VALUES
     ('[DRY RUN] Annual - Auditors - Post-Probation 2027',
-     'Annual Auditor I-V review after regularization and an Approved 2027 Quarterly evaluation.',
+     'Annual Auditor I-V review after regularization.',
      'Audit',2,206,'ANNUAL-CORE','1','Annual',1,'2027-01-01','2027-12-31',80,20,
      'AUD-RF-A-DRYRUN-2027','2026-11-17','2027-01-01','Active',v_supervisor);
   SET v_auditor_2027_form=LAST_INSERT_ID();

@@ -155,7 +155,7 @@ function supervisorPendingRenderEvaluationRow(array $row, string $rowLayout = 'f
     include __DIR__ . '/partials/pending-evaluation-row.php';
 }
 
-$allowed_eval_types = ['Initial', 'Final', 'Quarterly', 'Annual'];
+$allowed_eval_types = ['Initial', 'Final', 'Annual'];
 $attention_filters = [
     'low_score' => 'Low Score',
     'overdue' => 'Overdue 7+ Days',
@@ -417,6 +417,7 @@ $template_options = supervisorPendingRows(
 );
 
 $pendingWhere = "WHERE ev.status IN ('Pending Supervisor', 'Pending HR Consolidation')
+    AND ev.evaluation_type <> 'Quarterly'
     AND e.is_active = 1
     AND e.employee_id NOT IN (SELECT employee_id FROM users WHERE role = 'Admin' AND employee_id IS NOT NULL)";
 $pendingTypes = "";

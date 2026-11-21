@@ -687,7 +687,6 @@ function annualRegisterSubmission($conn, int $evaluationId): void
     $values = json_encode(annualValidateScores(array_column($criteria, 'score_value')));
     $individualTemplate=annualQuery($conn,'SELECT * FROM evaluation_templates WHERE template_id=? AND individual_workflow=1',[(int)$ev['template_id']])[0]??null;
     if ($individualTemplate) {
-        individualAssertAnnualPrerequisite($conn,$ev,$individualTemplate);
         if(!annualQuery($conn,'SELECT 1 FROM annual_evaluation_members WHERE evaluation_id=?',[$evaluationId])) {
             [$expectedStart,$expectedEnd]=individualAssessmentDates($ev,$individualTemplate);
             if($start!==$expectedStart || $end!==$expectedEnd) throw new DomainException('The evaluation period does not match the authoritative employee/form period.');

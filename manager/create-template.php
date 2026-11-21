@@ -36,6 +36,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $behavior_framework_code = '';
     $behavior_framework_version = '';
     $evaluation_type = $_POST['evaluation_type'] ?? 'Annual';
+    if ($evaluation_type === 'Quarterly') {
+        redirectWith($template_create_url, 'danger', 'New Quarterly evaluation templates are disabled. Use Annual, Initial, or Final.');
+    }
     $is_probationary_template = isset($_POST['probationary_template']) || in_array($evaluation_type, ['Initial', 'Final'], true);
     if (!in_array($evaluation_type, ['Initial', 'Final', 'Quarterly', 'Annual'], true)) $evaluation_type = 'Annual';
     if ($is_probationary_template && !in_array($evaluation_type, ['Initial', 'Final'], true)) $evaluation_type = 'Initial';
@@ -581,7 +584,6 @@ require_once '../includes/header.php';
                     <label class="form-label fw-semibold">Evaluation Type</label>
                     <select class="form-select" name="evaluation_type" id="inputEvalType">
                         <option value="Annual" selected>Annual</option>
-                        <option value="Quarterly">Quarterly</option>
                         <option value="Initial">Initial</option>
                         <option value="Final">Final</option>
                     </select>
@@ -704,7 +706,6 @@ require_once '../includes/header.php';
                             <h6 class="fw-bold text-dark mb-0"><i class="fas fa-calculator text-primary me-2"></i>Evaluation Score Formula</h6>
                             <select id="formulaEvalTypeSelect" class="form-select form-select-sm w-auto" style="min-width:140px;" onchange="renderFormulaBox()">
                                 <option value="Annual">Annual</option>
-                                <option value="Quarterly">Quarterly</option>
                                 <option value="Initial">Initial (Probationary)</option>
                                 <option value="Final">Final (Probationary)</option>
                             </select>

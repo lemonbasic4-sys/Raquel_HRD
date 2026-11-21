@@ -2,7 +2,6 @@
 -- Base period: 2026-01-01 to 2026-12-31; all 15 HR positions.
 -- HR Staff post-probation period: 2027-01-01 to 2027-12-31.
 -- Templates only. No scores, submissions, approvals, or assignments.
--- Annual self-rating requires an Approved Quarterly in the same year.
 -- The employee must have an actual regularization effective date recorded.
 USE raquel_hris;
 DROP PROCEDURE IF EXISTS seed_human_resources_annual_dry_run;

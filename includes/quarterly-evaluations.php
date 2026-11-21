@@ -663,6 +663,7 @@ function quarterlyReviewToken($conn, array $member): string
 /** Snapshot a department roster using active regular employees with applicable Quarterly forms. */
 function quarterlyRegisterSubmission($conn, int $evaluationId): void
 {
+    throw new DomainException('New Quarterly evaluation submissions are disabled.');
     $ev = quarterlyQuery($conn, "SELECT ev.*, e.department_id, e.job_title_id, e.employment_status, e.regularization_effective_date, e.job_title, jt.reports_to
         FROM evaluations ev JOIN employees e ON e.employee_id=ev.employee_id
         LEFT JOIN job_titles jt ON jt.job_title_id=e.job_title_id

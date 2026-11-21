@@ -2,7 +2,6 @@
 -- Base period: 2026-01-01 to 2026-12-31; all six positions.
 -- Marketing Staff post-probation period: 2027-01-01 to 2027-12-31.
 -- Templates only. No scores, submissions, approvals, or assignments.
--- Annual self-rating requires an Approved Quarterly in the same year.
 -- Actual period starts on the later of Jan 1 or regularization date.
 USE raquel_hris;
 DROP PROCEDURE IF EXISTS seed_marketing_annual_dry_run;

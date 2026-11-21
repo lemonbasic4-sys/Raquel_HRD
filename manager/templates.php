@@ -219,6 +219,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $stmt->close();
     
     if ($template) {
+        if ($template['evaluation_type'] === 'Quarterly') {
+            redirectWith($template_list_url, 'info', 'Quarterly evaluation notifications are disabled.');
+        }
         $target_dept = $template['target_department'];
         $target_position_ids = getEvaluationTemplateTargetPositionIds($conn, $tid);
         $eval_type = $template['evaluation_type'];
@@ -298,7 +301,7 @@ $selected_department = trim($_GET['department'] ?? '');
 if (strlen($selected_department) > 100) {
     $selected_department = substr($selected_department, 0, 100);
 }
-$allowed_eval_types = ['Initial', 'Final', 'Quarterly', 'Annual'];
+$allowed_eval_types = ['Initial', 'Final', 'Annual'];
 $requested_type = $_GET['evaluation_type'] ?? '';
 $filter_type = is_string($requested_type) && in_array($requested_type, $allowed_eval_types, true)
     ? $requested_type
@@ -314,7 +317,7 @@ $department_options = $conn->query("
     ORDER BY department_name
 ");
 
-$template_where = "WHERE et.status = 'Active' AND ($template_scope_sql)";
+$template_where = "WHERE et.status = 'Active' AND et.evaluation_type <> 'Quarterly' AND ($template_scope_sql)";
 if ($selected_department !== '') {
     $safe_department = $conn->real_escape_string($selected_department);
     $template_where .= " AND (et.target_department = '$safe_department' OR et.target_department = 'All Departments')";
@@ -347,9 +350,9 @@ $templates = $conn->query("SELECT et.*,
     $template_where
     ORDER BY et.updated_at DESC");
 $filtered_template_count = $templates->num_rows;
-$active_template_count = (int) $conn->query("SELECT COUNT(*) as cnt FROM evaluation_templates et WHERE status = 'Active' AND ($template_scope_sql)")->fetch_assoc()['cnt'];
-$archived_template_count = (int) $conn->query("SELECT COUNT(*) as cnt FROM evaluation_templates et WHERE status = 'Archived' AND ($template_scope_sql)")->fetch_assoc()['cnt'];
-$used_template_count = (int) $conn->query("SELECT COUNT(DISTINCT ev.template_id) as cnt FROM evaluations ev JOIN evaluation_templates et ON et.template_id = ev.template_id WHERE ev.template_id IS NOT NULL AND ev.deleted_at IS NULL AND ($template_scope_sql)")->fetch_assoc()['cnt'];
+$active_template_count = (int) $conn->query("SELECT COUNT(*) as cnt FROM evaluation_templates et WHERE status = 'Active' AND et.evaluation_type <> 'Quarterly' AND ($template_scope_sql)")->fetch_assoc()['cnt'];
+$archived_template_count = (int) $conn->query("SELECT COUNT(*) as cnt FROM evaluation_templates et WHERE status = 'Archived' AND et.evaluation_type <> 'Quarterly' AND ($template_scope_sql)")->fetch_assoc()['cnt'];
+$used_template_count = (int) $conn->query("SELECT COUNT(DISTINCT ev.template_id) as cnt FROM evaluations ev JOIN evaluation_templates et ON et.template_id = ev.template_id WHERE ev.template_id IS NOT NULL AND ev.deleted_at IS NULL AND et.evaluation_type <> 'Quarterly' AND ($template_scope_sql)")->fetch_assoc()['cnt'];
 ?>
 
 <div class="template-library-page">

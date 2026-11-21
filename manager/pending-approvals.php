@@ -348,7 +348,7 @@ $res2 = $conn->query("SELECT DISTINCT u.user_id, u.full_name
 while ($r = $res2->fetch_assoc()) { $all_eval_staff_options[] = $r; }
 
 // Filter parameters mapping
-$allowed_eval_types = ['Initial', 'Final', 'Quarterly', 'Annual'];
+$allowed_eval_types = ['Initial', 'Final', 'Annual'];
 $attention_filters = [
     'low_score' => 'Low Score',
     'overdue' => 'Overdue 7+ Days',
@@ -371,7 +371,7 @@ $score_min = (isset($_GET['score_min']) && $_GET['score_min'] !== '') ? max(0, m
 $score_max = (isset($_GET['score_max']) && $_GET['score_max'] !== '') ? max(0, min(4, (float)$_GET['score_max'])) : null;
 
 // Construct SQL filters
-$pendingWhere = "WHERE ev.status = 'Pending Manager' AND e.is_active = 1";
+$pendingWhere = "WHERE ev.status = 'Pending Manager' AND ev.evaluation_type <> 'Quarterly' AND e.is_active = 1";
 $pendingTypes = "";
 $pendingParams = [];
 

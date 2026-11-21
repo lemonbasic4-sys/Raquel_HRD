@@ -4,7 +4,6 @@
 -- AP Staff: 108-112 | Sales Associates: 113-114
 -- Annual assessment: 2026-01-01 to 2026-12-31. The portal starts each
 -- employee's actual period on the later of Jan 1 or regularization date.
--- Annual self-rating requires an Approved 2026 Quarterly evaluation.
 -- Templates only: no employee scores, submissions, or approvals are inserted.
 -- Run after organization and employee seeds; no portal accounts needed for import. Reimport fails.
 USE raquel_hris;

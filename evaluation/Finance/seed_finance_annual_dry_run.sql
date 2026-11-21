@@ -2,7 +2,6 @@
 -- Base period: 2026-01-01 to 2026-12-31; all 18 Finance positions.
 -- Accounting Staff post-probation period: 2027-01-01 to 2027-12-31.
 -- Templates only. No scores, submissions, approvals, or assignments.
--- Annual self-rating requires an Approved Quarterly in the same year.
 -- Actual period starts on the later of Jan 1 or regularization date.
 USE raquel_hris;
 DROP PROCEDURE IF EXISTS seed_finance_annual_dry_run;
@@ -167,7 +166,7 @@ BEGIN
      UNION ALL SELECT v_acc_staff_form UNION ALL SELECT v_treas_staff_form) target
   WHERE c.template_id=v_vp_form AND c.section='Behavior';
 
-  -- Post-probation Accounting Staff Annual form after approved 2027 Quarterly.
+  -- Post-probation Accounting Staff Annual form after regularization.
   INSERT INTO evaluation_templates
     (template_name,description,target_department,target_department_id,target_job_title_id,
      behavior_framework_code,behavior_framework_version,evaluation_type,individual_workflow,

@@ -372,9 +372,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     $individualTemplate=annualQuery($conn,'SELECT * FROM evaluation_templates WHERE template_id=?',[$template_id])[0]??[];
+    if (($individualTemplate['evaluation_type'] ?? '') === 'Quarterly') {
+        $errors[] = 'Quarterly evaluations are disabled. Please use an available Annual, Initial, or Final form.';
+    }
     $individualPeriodError=false;
-    try { individualAssertAnnualPrerequisite($conn,$employee,$individualTemplate); }
-    catch (DomainException $error) { $errors[]=$error->getMessage(); $individualPeriodError=true; }
     if(!empty($individualTemplate['individual_workflow'])) {
         try {
             $savedPeriod=$editing_id>0 && $is_valid_existing_edit ? annualQuery($conn,'SELECT evaluation_period_start,evaluation_period_end FROM evaluations WHERE evaluation_id=? AND employee_id=?',[$editing_id,$employee_id])[0]??null : null;
@@ -736,6 +737,7 @@ $templates_stmt = $conn->prepare("
     SELECT template_id, template_name, kra_weight, behavior_weight, evaluation_type, target_department
     FROM evaluation_templates et
     WHERE et.status = 'Active' 
+      AND et.evaluation_type <> 'Quarterly'
       AND (target_department IS NULL OR target_department = '' OR target_department = 'All Departments' OR target_department = ?)
       AND ((EXISTS (SELECT 1 FROM evaluation_template_positions etp WHERE etp.template_id = et.template_id)
             AND EXISTS (SELECT 1 FROM evaluation_template_positions etp WHERE etp.template_id = et.template_id AND etp.job_title_id = ?))
@@ -784,7 +786,7 @@ if ($selected_template_id > 0) {
         $sel_template_stmt = $conn->prepare("
             SELECT template_id, template_name, evaluation_type, target_department, form_code, revision_date, effective_date_form, individual_workflow, assessment_from, assessment_to
             FROM evaluation_templates
-            WHERE template_id = ?
+            WHERE template_id = ? AND evaluation_type <> 'Quarterly'
             LIMIT 1
         ");
         $sel_template_stmt->bind_param("i", $selected_template_id);
@@ -792,7 +794,7 @@ if ($selected_template_id > 0) {
         $sel_template_stmt = $conn->prepare("
             SELECT template_id, template_name, evaluation_type, target_department, form_code, revision_date, effective_date_form, individual_workflow, assessment_from, assessment_to
             FROM evaluation_templates 
-            WHERE template_id = ? 
+            WHERE template_id = ? AND evaluation_type <> 'Quarterly'
               AND (target_department IS NULL OR target_department = '' OR target_department = 'All Departments' OR target_department = ?)
               AND ((EXISTS (SELECT 1 FROM evaluation_template_positions etp WHERE etp.template_id = evaluation_templates.template_id)
                       AND EXISTS (SELECT 1 FROM evaluation_template_positions etp WHERE etp.template_id = evaluation_templates.template_id AND etp.job_title_id = ?))

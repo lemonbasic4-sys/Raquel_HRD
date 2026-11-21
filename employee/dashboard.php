@@ -9,7 +9,6 @@ if (!ensureHierarchicalEvaluationSchema($conn)) {
 }
 
 ensureAnnualEvaluationSchema($conn);
-ensureQuarterlyEvaluationSchema($conn);
 $employee_id = (int)($_SESSION['employee_id'] ?? 0);
 $user_id     = (int)($_SESSION['user_id']     ?? 0);
 

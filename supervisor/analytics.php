@@ -7,7 +7,6 @@ require_once '../includes/functions.php';
 require_once '../includes/employee-performance-analysis.php';
 // finalizedPerformanceSql references both cycle tables, including on a fresh database.
 ensureAnnualEvaluationSchema($conn);
-ensureQuarterlyEvaluationSchema($conn);
 $finalized_eval_filter = finalizedPerformanceSql('ev');
 $finalized_eval_filter_unaliased = finalizedPerformanceSql('evaluations');
 require_once '../includes/header.php';
@@ -22,10 +21,10 @@ $hiringTabActive = ($_GET['tab'] ?? 'hiring') === 'hiring';
 $cohort        = (($_GET['cohort'] ?? 'regular') === 'probationary') ? 'probationary' : 'regular';
 $evaluation_type_filter = $cohort === 'probationary'
     ? "ev.evaluation_type IN ('Initial','Final')"
-    : "ev.evaluation_type IN ('Annual','Quarterly')";
+    : "ev.evaluation_type = 'Annual'";
 $evaluation_type_filter_unaliased = $cohort === 'probationary'
     ? "evaluation_type IN ('Initial','Final')"
-    : "evaluation_type IN ('Annual','Quarterly')";
+    : "evaluation_type = 'Annual'";
 
 $where  = "WHERE ev.status = 'Approved' AND $finalized_eval_filter AND $evaluation_type_filter";
 $params = [];  $types = '';
@@ -637,7 +636,7 @@ $yoy_emp    = formatYoYData($yoy_emp_raw, $yoy_years);
         <div>
             <div style="font-size:.72rem;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,.55);">HR Supervisor · Analytics · <?php echo $cohort === 'probationary' ? 'Probationary pathway' : 'Regular employees'; ?></div>
             <h4 class="text-white fw-bold mb-0 mt-1"><i class="fas fa-chart-bar me-2" style="color:#BD9414;"></i><?php echo $cohort === 'probationary' ? 'Probationary → Regularization Analytics' : 'Regular Employee Analytics'; ?></h4>
-            <p class="text-white-50 small mb-0 mt-2"><?php echo $cohort === 'probationary' ? 'Initial and Final evaluation results are shown separately from annual and quarterly employee performance.' : 'Annual and quarterly evaluations are shown separately from the probationary regularization pathway.'; ?></p>
+            <p class="text-white-50 small mb-0 mt-2"><?php echo $cohort === 'probationary' ? 'Initial and Final evaluation results are shown separately from annual employee performance.' : 'Annual evaluations are shown separately from the probationary regularization pathway.'; ?></p>
         </div>
         <div style="color:rgba(255,255,255,.6);font-size:.8rem;">
             <i class="fas fa-sync-alt me-1"></i>Data as of <?php echo date('F d, Y'); ?>
@@ -743,7 +742,7 @@ $yoy_emp    = formatYoYData($yoy_emp_raw, $yoy_years);
     </form>
     <div class="small text-muted mt-3">
         <i class="fas fa-circle-info me-1"></i>
-        Evaluation charts use only <?php echo $cohort === 'probationary' ? 'Initial and Final probationary evaluations' : 'Annual and Quarterly regular-employee evaluations'; ?>. Workforce demographics and career-movement charts remain organization-wide.
+        Evaluation charts use only <?php echo $cohort === 'probationary' ? 'Initial and Final probationary evaluations' : 'Annual regular-employee evaluations'; ?>. Workforce demographics and career-movement charts remain organization-wide.
     </div>
     </div>
 </details>

@@ -2,7 +2,6 @@
 -- Period: 2026-01-01 to 2026-12-31 for all three BD positions.
 -- An additional 2027 Staff I-II form supports employees after probation.
 -- Templates only: no scores, submissions, approvals, or assignments.
--- Annual self-rating requires an Approved 2026 Quarterly evaluation.
 -- Actual period starts on the later of Jan 1 or regularization date.
 USE raquel_hris;
 DROP PROCEDURE IF EXISTS seed_business_development_annual_dry_run;
@@ -99,7 +98,7 @@ BEGIN
   SELECT v_staff_form,c.section,c.criterion_name,c.description,c.kpi_description,c.weight,c.scoring_method,c.sort_order
   FROM evaluation_criteria c WHERE c.template_id=v_officer_form AND c.section='Behavior';
 
-  -- Post-probation Annual form; portal requires an Approved 2027 Quarterly.
+  -- Post-probation Annual form; portal requires regularization.
   INSERT INTO evaluation_templates
     (template_name,description,target_department,target_department_id,target_job_title_id,
      behavior_framework_code,behavior_framework_version,evaluation_type,individual_workflow,
@@ -107,7 +106,7 @@ BEGIN
      revision_date,effective_date_form,status,created_by)
   VALUES
     ('[DRY RUN] Annual - BD Staff - Post-Probation 2027',
-     'Annual Business Development Staff I-II review after regularization and an Approved 2027 Quarterly evaluation.',
+     'Annual Business Development Staff I-II review after regularization.',
      'Business Development',3,302,'ANNUAL-CORE','1','Annual',1,
      '2027-01-01','2027-12-31',80,20,'BD-STAFF-A-DRYRUN-2027',
      '2026-11-17','2027-01-01','Active',v_officer);

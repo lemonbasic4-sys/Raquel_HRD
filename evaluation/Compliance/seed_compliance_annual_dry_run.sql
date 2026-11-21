@@ -2,7 +2,6 @@
 -- Base period: 2026-01-01 to 2026-12-31; covers all six positions.
 -- Later Staff I-III period: 2027-01-01 to 2027-12-31 after probation.
 -- Templates only: no scores, submissions, approvals, or assignments.
--- Annual self-rating requires an Approved Quarterly in the same year.
 -- Actual period starts on the later of Jan 1 or regularization date.
 USE raquel_hris;
 DROP PROCEDURE IF EXISTS seed_compliance_annual_dry_run;
@@ -111,7 +110,7 @@ BEGIN
   FROM evaluation_criteria c CROSS JOIN (SELECT v_supervisor_form AS template_id UNION ALL SELECT v_staff_form) target
   WHERE c.template_id=v_head_form AND c.section='Behavior';
 
-  -- Additional 2027 Annual form for staff after regularization and Approved 2027 Quarterly.
+  -- Additional 2027 Annual form for staff after regularization.
   INSERT INTO evaluation_templates
     (template_name,description,target_department,target_department_id,target_job_title_id,
      behavior_framework_code,behavior_framework_version,evaluation_type,individual_workflow,
