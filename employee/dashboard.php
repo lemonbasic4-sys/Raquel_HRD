@@ -534,11 +534,12 @@ function movementIcon(string $type): string {
                 </div>
 
                 <?php
-                // Workflow Progress Bar (dynamic: HRD vs full-chain)
+                // Show the route actually used by this evaluation.
                 $current_status = $active_eval['status'] ?? '';
                 $hr_role = $employee_hr_role;
 
                 $package_workflow = !empty($active_eval['package_id']);
+                $annual_workflow = false;
                 if ($package_workflow) {
                     // Organization packages use their configured department route.
                     $workflow_labels = ['Team Self-Ratings'];
@@ -565,6 +566,26 @@ function movementIcon(string $type): string {
                         $step_index = min($package_step, count($workflow_labels) - 2);
                     }
                     $status_step_map = [];
+                } elseif (($active_eval['evaluation_type'] ?? '') === 'Annual') {
+                    $annual_workflow = true;
+                    $annual_member = annualMember($conn, (int)$active_eval['evaluation_id']);
+                    $individual_annual = $annual_member && !empty($annual_member['individual_evaluation_id']);
+                    $workflow_labels = $individual_annual
+                        ? ['Self-Rating', 'Head Review & 360', 'Final Approval', 'Approved']
+                        : ['Self-Rating', 'Head Review & 360', 'Approved', 'Score Complete'];
+                    $workflow_steps = $workflow_labels;
+                    if (in_array($current_status, ['Draft', 'Pending Self-Rating', 'Returned', 'Rejected'], true)) {
+                        $step_index = 0;
+                    } elseif ($current_status === 'Approved') {
+                        $peers_complete = !$annual_member || count(annualPeers($conn, $annual_member)) >= annualExpectedPeers($conn, (int)$annual_member['cycle_id'], (int)$annual_member['employee_id']);
+                        $step_index = $individual_annual || $peers_complete ? 3 : 2;
+                    } elseif ($individual_annual) {
+                        $head_reviewed = (bool) annualQuery($conn, 'SELECT 1 FROM annual_kra_approvals WHERE member_id=? LIMIT 1', [(int)$annual_member['member_id']]);
+                        $peers_complete = count(annualPeers($conn, $annual_member)) >= annualExpectedPeers($conn, (int)$annual_member['cycle_id'], (int)$annual_member['employee_id']);
+                        $step_index = $head_reviewed && $peers_complete ? 2 : 1;
+                    } else {
+                        $step_index = 1;
+                    }
                 } elseif ($hr_role === 'HR Manager') {
                     $workflow_steps  = ['Pending Self-Rating', 'Pending Supervisor', 'Approved'];
                     $workflow_labels = ['Self-Rating', 'HR Supervisor', 'Approved'];
@@ -674,7 +695,7 @@ function movementIcon(string $type): string {
                     }
                 }
 
-                if (!$package_workflow) {
+                if (!$package_workflow && !$annual_workflow) {
                     $step_index = $status_step_map[$current_status] ?? null;
                     if ($step_index === null) {
                         $step_index = array_search($current_status, $workflow_steps, true);
@@ -685,7 +706,7 @@ function movementIcon(string $type): string {
                 }
                 $total_steps  = count($workflow_steps) - 1;
                 $progress_pct = $total_steps > 0 ? round(($step_index / $total_steps) * 100) : 100;
-                $is_approved  = ($current_status === 'Approved');
+                $is_approved  = ($current_status === 'Approved' && $step_index === count($workflow_labels) - 1);
                 $is_rejected  = ($current_status === 'Rejected');
                 ?>
                 <div class="eval-workflow-wrap">

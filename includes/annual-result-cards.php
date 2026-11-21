@@ -4,7 +4,7 @@
                     <div class="annual-result-card-head"><span class="annual-result-icon"><i class="fas fa-chart-pie" aria-hidden="true"></i></span><span class="annual-result-weight">80% weight</span></div>
                     <h3>Key Result Areas</h3>
                     <div class="annual-result-number"><?php echo number_format($annualDisplayKra,2); ?><span>/ 4.00</span></div>
-                    <p><?php echo $annualScoresApproved ? 'Approved KRA score' : 'Submitted KRA score'; ?></p>
+                    <p><?php echo e($annualKraCaption ?? ($annualScoresApproved ? 'Approved KRA score' : 'Submitted KRA score')); ?></p>
                 </section>
                 <section class="annual-result-card annual-result-card--behavior page-hero fadeup">
                     <div class="annual-result-card-head"><span class="annual-result-icon"><i class="fas fa-handshake" aria-hidden="true"></i></span><span class="annual-result-weight">20% weight</span></div>

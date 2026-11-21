@@ -70,6 +70,7 @@ $is_package_completed = ($evaluation['package_status'] === 'Approved and Applied
 $show_reviewed_scores = $is_package_completed || ($is_probationary_evaluation
     && ($evaluation['probationary_head_step_status'] ?? '') === 'Approved'
     && !empty($evaluation['immediate_head_signature_data']));
+$show_kra_review = $show_reviewed_scores || $annualPeerBreakdown !== null;
 
 // Calculate original self totals vs reviewed totals
 $orig_kra_subtotal = 0.0;
@@ -82,11 +83,11 @@ $annualBehaviorIndex=0;
 foreach ($criteria as &$c) {
     $val = (float)$c['score_value'];
     if ($c['section']!=='KRA' && $annualBehaviorAverages) $c['reviewed_score']=$annualBehaviorAverages[$annualBehaviorIndex++];
-    if (!$show_reviewed_scores) {
+    if (!$show_reviewed_scores && !($show_kra_review && $c['section'] === 'KRA')) {
         $c['reviewed_score'] = $val;
     }
     $rev = (float)$c['reviewed_score'];
-    if ($show_reviewed_scores && abs($rev - $val) > 0.001) {
+    if (($c['section'] === 'KRA' ? $show_kra_review : $show_reviewed_scores) && abs($rev - $val) > 0.001) {
         $has_any_adjustment = true;
     }
     if ($c['section'] === 'KRA') {
@@ -173,7 +174,7 @@ require_once '../includes/header.php';
                         <?php if ($is_probationary_evaluation): ?>
                             <strong>Probationary evaluation in progress:</strong> The evaluation is moving through its immediate-head and final approval steps. This is an individual review; it does not use a shared department behavior score.
                         <?php elseif ($is_annual_peer_evaluation): ?>
-                            <strong><?php echo e($evaluation['evaluation_type']); ?> evaluation in progress:</strong> Your self-ratings and submitted department 360 ratings are shown here. The combined score is provisional until your immediate head approves the KRA and all required 360 ratings are received.
+                            <strong><?php echo e($evaluation['evaluation_type']); ?> evaluation in progress:</strong> Your self-ratings, current reviewed KRA ratings, and submitted department 360 ratings are shown here. The combined score is provisional until your immediate head approves the KRA and all required 360 ratings are received.
                         <?php else: ?>
                             <strong>Consolidation &amp; Management Review in Progress:</strong> Your self-evaluation is currently undergoing departmental consolidation and governance routing. Official final scores, shared behavior metrics, and officer endorsements will be unlocked here once the Board of Directors approves the cycle.
                         <?php endif; ?>
@@ -185,13 +186,15 @@ require_once '../includes/header.php';
                 $annualScoresApproved=$show_reviewed_scores && (int)($annualResultMember['current_version'] ?? 0)>0;
                 $annualResultProvisional=!$annualScoresApproved || !$annualResultComplete;
                 $annualShowLive360=!empty($annualReceivedPeers);
-                $annualDisplayKra=$annualScoresApproved ? (float)$evaluation['kra_subtotal'] : $orig_kra_subtotal;
+                $annualDisplayKra=$annualScoresApproved ? (float)$evaluation['kra_subtotal'] : (float)($annualPeerBreakdown['kra'] ?? $orig_kra_subtotal);
+                $annualKraCaption=$annualScoresApproved ? null : 'Current reviewed KRA score';
                 $annualDisplayCore=$annualScoresApproved ? (float)$evaluation['behavior_average'] : (float)($annualPeerBreakdown['core'] ?? $orig_beh_average);
                 $annualDisplayTotal=$annualScoresApproved && $evaluation['total_score']!==null
                     ? (float)$evaluation['total_score'] : (float)($annualPeerBreakdown['total'] ?? $orig_total_score);
                 $annualTier=$annualDisplayTotal>=3.6 ? 'outstanding' : ($annualDisplayTotal>=2.6 ? 'exceeds' : ($annualDisplayTotal>=2 ? 'meets' : 'needs'));
             ?>
             <?php require __DIR__.'/../includes/annual-result-cards.php'; ?>
+            <?php unset($annualKraCaption); ?>
             <?php else: ?>
             <div class="row g-3">
                 <?php if ($is_annual_peer_evaluation): ?>
@@ -472,12 +475,12 @@ require_once '../includes/header.php';
                 <table class="package-table table align-middle mb-0">
                     <thead>
                         <tr>
-                            <th style="<?php echo $show_reviewed_scores ? 'width:40%;' : 'width:60%;'; ?>">Criterion</th>
-                            <th class="text-end" style="<?php echo $show_reviewed_scores ? 'width:10%;' : 'width:20%;'; ?>">Weight</th>
-                            <th class="text-end" style="<?php echo $show_reviewed_scores ? 'width:18%;' : 'width:20%;'; ?>">
-                                <?php echo $is_historical_import ? 'Historical rating' : ($show_reviewed_scores ? 'Original Self-Rating' : 'Submitted Rating'); ?>
+                            <th style="<?php echo $show_kra_review ? 'width:40%;' : 'width:60%;'; ?>">Criterion</th>
+                            <th class="text-end" style="<?php echo $show_kra_review ? 'width:10%;' : 'width:20%;'; ?>">Weight</th>
+                            <th class="text-end" style="<?php echo $show_kra_review ? 'width:18%;' : 'width:20%;'; ?>">
+                                <?php echo $is_historical_import ? 'Historical rating' : ($show_kra_review ? 'Original Self-Rating' : 'Submitted Rating'); ?>
                             </th>
-                            <?php if ($show_reviewed_scores && !$is_historical_import): ?>
+                            <?php if ($show_kra_review && !$is_historical_import): ?>
                                 <th class="text-end" style="width:18%;">Reviewed / Adjusted</th>
                                 <th class="text-center" style="width:14%;">Variance</th>
                             <?php endif; ?>
@@ -499,8 +502,8 @@ require_once '../includes/header.php';
                                 <?php endif; ?>
                             </td>
                             <td data-label="Weight" class="text-end tabular-nums fw-bold text-muted"><?php echo number_format((float)$criterion['weight'], 2); ?>%</td>
-                            <td data-label="<?php echo $is_historical_import ? 'Historical rating' : ($show_reviewed_scores ? 'Original Self-Rating' : 'Submitted Rating'); ?>" class="text-end tabular-nums fw-semibold" style="font-size:1.05rem;"><?php echo number_format($orig, 2); ?></td>
-                            <?php if ($show_reviewed_scores && !$is_historical_import): ?>
+                            <td data-label="<?php echo $is_historical_import ? 'Historical rating' : ($show_kra_review ? 'Original Self-Rating' : 'Submitted Rating'); ?>" class="text-end tabular-nums fw-semibold" style="font-size:1.05rem;"><?php echo number_format($orig, 2); ?></td>
+                            <?php if ($show_kra_review && !$is_historical_import): ?>
                                 <td data-label="Reviewed / Adjusted" class="text-end tabular-nums fw-bold text-dark" style="font-size:1.1rem;"><?php echo number_format($rev, 2); ?></td>
                                 <td data-label="Variance" class="text-center">
                                     <?php if ($is_adj): ?>
@@ -520,8 +523,9 @@ require_once '../includes/header.php';
             <div class="d-flex justify-content-end align-items-center gap-3 mt-3 pt-3 border-top">
                 <span class="text-muted small text-uppercase fw-bold">Key Result Areas (KRA) Total:</span>
                 <span class="fw-bold tabular-nums" style="font-size:1.15rem;">
-                    <?php echo number_format($show_reviewed_scores ? (float)$evaluation['kra_subtotal'] : $orig_kra_subtotal, 2); ?>
-                    <?php if ($show_reviewed_scores && abs((float)$evaluation['kra_subtotal'] - $orig_kra_subtotal) > 0.001): ?>
+                    <?php $displayKraTotal = $show_reviewed_scores ? (float)$evaluation['kra_subtotal'] : (float)($annualPeerBreakdown['kra'] ?? $orig_kra_subtotal); ?>
+                    <?php echo number_format($displayKraTotal, 2); ?>
+                    <?php if ($show_kra_review && abs($displayKraTotal - $orig_kra_subtotal) > 0.001): ?>
                         <span class="badge bg-warning text-dark ms-1" title="Original: <?php echo number_format($orig_kra_subtotal, 2); ?>">Self: <?php echo number_format($orig_kra_subtotal, 2); ?></span>
                     <?php endif; ?>
                 </span>
