@@ -36,7 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_movement'])) {
     $new_branch_id     = ($_POST['new_branch_id'] ?? '') !== '' ? (int) $_POST['new_branch_id'] : null;
     $effective_date    = trim(  $_POST['effective_date']      ?? '');
     $reason            = trim(  $_POST['reason']              ?? '');
-    $allowed_types     = ['Promotion', 'Transfer', 'Demotion', 'Role Change'];
+    $allowed_types     = ['Transfer', 'Role Change'];
 
     // Basic validation
     if ($employee_id <= 0 || !in_array($movement_type, $allowed_types, true) || $effective_date === '' || $reason === '') {
@@ -377,7 +377,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_movement'])) {
     $new_branch_id     = ($_POST['new_branch_id'] ?? '') !== '' ? (int) $_POST['new_branch_id'] : null;
     $effective_date    = trim(  $_POST['effective_date']      ?? '');
     $reason            = trim(  $_POST['reason']              ?? '');
-    $allowed_types     = ['Promotion', 'Transfer', 'Demotion', 'Role Change'];
+    $allowed_types     = ['Transfer', 'Role Change'];
 
     if ($movement_id <= 0 || !in_array($movement_type, $allowed_types, true) || $effective_date === '' || $reason === '') {
         redirectWith(BASE_URL . '/supervisor/career-movements.php', 'danger', 'Please complete all required fields for the edit.');
@@ -610,6 +610,31 @@ function supCmStatusClass($s){return match($s){'Approved'=>'bg-success','Rejecte
     background: #f8fbf7 !important;
     border-color: rgba(8, 46, 6, .16) !important;
 }
+.career-movements-page .cc-header-tabs { gap: .5rem; }
+.career-movements-page .cc-header-tabs .nav-link { border-radius: 10px !important; }
+.career-movements-page .cm-list-tools { padding: 1rem 1.25rem; border-bottom: 1px solid #e7ece5; background: #fff; }
+.career-movements-page .cm-list-tools .search-box { max-width: 380px; }
+.career-movements-page .sup-form-section { padding: 1.25rem !important; border-radius: 14px !important; margin-bottom: 1rem !important; }
+.career-movements-page .sup-form-section h6 { font-size: 1rem; }
+.career-movements-page #supCreateForm { max-width: 1100px; margin: 0 auto; }
+.career-movements-page #supCreateForm .sup-form-section { padding: 1.5rem !important; background: #fff !important; border: 1px solid #e1e8dd !important; box-shadow: 0 5px 18px rgba(8,46,6,.04); }
+.career-movements-page #supCreateForm .form-label { display: block; margin-bottom: .45rem; color: #344534 !important; font-weight: 700; }
+.career-movements-page #supCreateForm .form-select,
+.career-movements-page #supCreateForm .form-control { min-height: 46px; border-radius: 9px !important; box-shadow: none !important; }
+.career-movements-page #supCreateForm textarea.form-control { min-height: 110px; }
+.career-movements-page #supCreateForm .form-text { line-height: 1.35; }
+.career-movements-page #supAssignmentPreview > div { background: #f6faf4 !important; border: 1px solid #dce8d7 !important; box-shadow: none !important; }
+.career-movements-page #supAssignmentPreview .text-white { color: #17351a !important; }
+.career-movements-page #supAssignmentPreview [style*="rgba(255,255,255,0.6)"],
+.career-movements-page #supAssignmentPreview [style*="rgba(255,255,255,0.7)"] { color: #62715f !important; }
+.career-movements-page #supAssignmentPreview [style*="border-top:1px solid rgba(255,255,255"] { border-top-color: #dce8d7 !important; }
+.career-movements-page #supEmpAvatar { background: #e7f0e3 !important; color: #17351a !important; border: 1px solid #b8ceb2 !important; box-shadow: none !important; }
+.career-movements-page #supImpactPreview > div { box-shadow: none !important; border-color: #dce8d7 !important; }
+.career-movements-page #supImpactPreview .flex-grow-1 { padding: 1.25rem !important; }
+.career-movements-page #supImpactPreview #supImpactNewPos { color: #165a2d !important; }
+.career-movements-page #supCreateForm .cm-form-actions { gap: 1rem; padding-bottom: 1rem !important; }
+.career-movements-page #supMovTable tbody tr.cm-movement-row { border-top: 1px solid #e4ebe1; }
+.career-movements-page #supMovTable tbody tr.cm-detail-row td { padding: .25rem 1rem 1rem !important; }
 @media (max-width: 767.98px) {
     .career-movements-page .cc-header {
         padding: 1rem !important;
@@ -620,6 +645,33 @@ function supCmStatusClass($s){return match($s){'Approved'=>'bg-success','Rejecte
     .career-movements-page .page-hero {
         padding: 1.25rem !important;
     }
+    .career-movements-page .cc-header-tabs { width: 100%; display: grid; grid-template-columns: 1fr 1fr; }
+    .career-movements-page .cc-header-tabs .nav-link { width: 100%; min-height: 48px; padding: .65rem .35rem !important; font-size: .75rem !important; }
+    .career-movements-page .cc-header-tabs .nav-link .badge { display: none; }
+    .career-movements-page .cm-list-tools { padding: .85rem 1rem; }
+    .career-movements-page .cm-list-tools .search-box { max-width: none; }
+    .career-movements-page #supMovTable, .career-movements-page #supMovTable tbody { display: block; width: 100%; }
+    .career-movements-page #supMovTable thead { display: none; }
+    .career-movements-page #supMovTable tbody { padding: .75rem; }
+    .career-movements-page #supMovTable tbody tr.cm-movement-row { display: grid; grid-template-columns: 1fr 1fr; gap: .8rem; padding: 1rem; background: #fff !important; border: 1px solid #dce6d8; border-radius: 14px 14px 0 0; box-shadow: 0 5px 16px rgba(8,46,6,.06); }
+    .career-movements-page #supMovTable tbody tr.cm-movement-row td { display: block; padding: 0 !important; min-width: 0; }
+    .career-movements-page #supMovTable tbody tr.cm-movement-row td:nth-child(1),
+    .career-movements-page #supMovTable tbody tr.cm-movement-row td:nth-child(2) { grid-column: 1 / -1; }
+    .career-movements-page #supMovTable tbody tr.cm-movement-row td:nth-child(3)::before,
+    .career-movements-page #supMovTable tbody tr.cm-movement-row td:nth-child(4)::before { display: block; margin-bottom: .35rem; color: #687567; font-size: .66rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+    .career-movements-page #supMovTable tbody tr.cm-movement-row td:nth-child(3)::before { content: 'Effective date'; }
+    .career-movements-page #supMovTable tbody tr.cm-movement-row td:nth-child(4)::before { content: 'Status'; }
+    .career-movements-page #supMovTable tbody tr.cm-movement-row td:nth-child(5) { grid-column: 1 / -1; text-align: left !important; padding-top: .7rem !important; border-top: 1px solid #e8eee5; }
+    .career-movements-page #supMovTable tbody tr.cm-movement-row td:nth-child(5) .d-inline-flex { display: flex !important; flex-wrap: wrap; }
+    .career-movements-page #supMovTable tbody tr.cm-movement-row td:nth-child(5) .btn { min-height: 38px; }
+    .career-movements-page #supMovTable tbody tr.cm-detail-row { display: block; margin-bottom: .85rem; }
+    .career-movements-page #supMovTable tbody tr.cm-detail-row td { display: block; padding: 0 .75rem .75rem !important; background: #fff; border: 1px solid #dce6d8; border-top: 0; border-radius: 0 0 14px 14px; }
+    .career-movements-page #supMovTable tbody tr.cm-detail-row td > div { box-shadow: none !important; }
+    .career-movements-page .sup-form-section { padding: 1rem !important; }
+    .career-movements-page #supCreateTab > .p-4 { padding: 1rem !important; }
+    .career-movements-page #supCreateForm .sup-form-section { padding: 1rem !important; }
+    .career-movements-page #supCreateForm .cm-form-actions { align-items: stretch !important; flex-direction: column; }
+    .career-movements-page #supCreateForm .cm-form-actions .btn { width: 100%; min-height: 48px; }
 }
 </style>
 
@@ -629,7 +681,7 @@ function supCmStatusClass($s){return match($s){'Approved'=>'bg-success','Rejecte
         <div>
             <div style="font-size:.72rem;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,.55);">HR Supervisor &middot; Career</div>
             <h4 class="text-white fw-bold mb-0 mt-1"><i class="fas fa-route me-2" style="color:#BD9414;"></i>Career Movements</h4>
-            <p class="text-white-50 small mb-0 mt-2">Submit and monitor employee promotion, transfer, and role-change requests for managerial review.</p>
+            <p class="text-white-50 small mb-0 mt-2">Submit and monitor employee transfer and role-change requests through the approval process.</p>
         </div>
     </div>
     <div class="row g-3">
@@ -659,10 +711,6 @@ function supCmStatusClass($s){return match($s){'Approved'=>'bg-success','Rejecte
                 </button>
             </li>
         </ul>
-        <div class="search-box position-relative" style="min-width:260px;">
-            <i class="fas fa-search search-icon text-muted" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:.82rem;"></i>
-            <input type="text" class="form-control form-control-sm ps-4" id="supMovSearch" placeholder="Search employee, position, status..." style="border-radius:20px;border-color:rgba(203,161,53,0.4);font-size:.82rem;">
-        </div>
     </div>
 
     <div class="cc-body p-0">
@@ -670,6 +718,12 @@ function supCmStatusClass($s){return match($s){'Approved'=>'bg-success','Rejecte
 
             <!-- LIST TAB -->
             <div class="tab-pane fade show active" id="supListTab" role="tabpanel">
+                <div class="cm-list-tools">
+                    <div class="search-box position-relative">
+                        <i class="fas fa-search search-icon text-muted" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:.82rem;"></i>
+                        <input type="search" class="form-control ps-4" id="supMovSearch" placeholder="Search employee, position, status..." aria-label="Search career movements">
+                    </div>
+                </div>
                 <div class="table-responsive" style="overflow-x:auto;">
                     <table class="table align-middle mb-0" id="supMovTable" style="font-size:.84rem;width:100%;table-layout:auto;">
                         <thead>
@@ -727,7 +781,7 @@ function supCmStatusClass($s){return match($s){'Approved'=>'bg-success','Rejecte
                                         default       => 'fa-exchange-alt',
                                     };
                                 ?>
-                                <tr class="border-bottom" style="background:#ffffff;transition:background 0.15s ease-in-out;">
+                                <tr class="cm-movement-row border-bottom" style="background:#ffffff;transition:background 0.15s ease-in-out;">
                                     <!-- Column 1: Employee & Source -->
                                     <td class="py-3 ps-3">
                                         <div class="d-flex align-items-center gap-2.5">
@@ -889,7 +943,7 @@ function supCmStatusClass($s){return match($s){'Approved'=>'bg-success','Rejecte
                                 </tr>
 
                                 <!-- Sub-row: Justification & Visual Approval Timeline Stepper -->
-                                <tr style="background:#fafdfa;border-bottom:1px solid rgba(8,46,6,0.08);">
+                                <tr class="cm-detail-row" style="background:#fafdfa;border-bottom:1px solid rgba(8,46,6,0.08);">
                                     <td colspan="5" class="p-2.5 ps-3 pe-3">
                                         <div class="p-2.5 rounded-3 shadow-sm" style="background:#ffffff;border:1px solid rgba(8,46,6,0.1);">
                                             <div class="row g-2 align-items-center">
@@ -1054,19 +1108,17 @@ function supCmStatusClass($s){return match($s){'Approved'=>'bg-success','Rejecte
                             </div>
                             <div class="row g-3">
                                 <!-- Movement Type -->
-                                <div class="col-md-3">
+                                <div class="col-md-6">
                                     <label class="form-label fw-semibold text-secondary small">Movement Type <span class="text-danger">*</span></label>
                                     <select class="form-select shadow-sm" name="movement_type" id="supMovTypeSelect" required <?php echo !$movement_ready ? 'disabled' : ''; ?> style="border-radius:10px;border-color:#d0d7ce;">
                                         <option value="">-- Select type --</option>
                                         <option value="Transfer">Transfer</option>
-                                        <option value="Promotion">Promotion</option>
-                                        <option value="Demotion">Demotion</option>
                                         <option value="Role Change">Role Change</option>
                                     </select>
                                 </div>
 
                                 <!-- Target / New Department -->
-                                <div class="col-md-3">
+                                <div class="col-md-6">
                                     <label class="form-label fw-semibold text-secondary small">Target Department <span class="text-danger">*</span></label>
                                     <select class="form-select shadow-sm" name="new_department_id" id="supNewDeptSelect" required <?php echo !$movement_ready ? 'disabled' : ''; ?> style="border-radius:10px;border-color:#d0d7ce;">
                                         <option value="">-- Target Department --</option>
@@ -1080,7 +1132,7 @@ function supCmStatusClass($s){return match($s){'Approved'=>'bg-success','Rejecte
                                 </div>
 
                                 <!-- New Position (dynamic dropdown) -->
-                                <div class="col-md-3" id="supPositionWrapper">
+                                <div class="col-md-6" id="supPositionWrapper">
                                     <label class="form-label fw-semibold text-secondary small" id="supPositionLabel">New Position <span class="text-danger" id="supPositionAsterisk">*</span></label>
                                     <select class="form-select shadow-sm" name="new_position" id="supPositionSelect" required disabled <?php echo !$movement_ready ? 'disabled' : ''; ?> style="border-radius:10px;border-color:#d0d7ce;">
                                         <option value="">-- Select Target Dept First --</option>
@@ -1089,7 +1141,7 @@ function supCmStatusClass($s){return match($s){'Approved'=>'bg-success','Rejecte
                                 </div>
 
                                 <!-- New Branch -->
-                                <div class="col-md-3">
+                                <div class="col-md-6">
                                     <label class="form-label fw-semibold text-secondary small" id="supBranchLabel">New Branch</label>
                                     <select class="form-select shadow-sm" name="new_branch_id" id="supBranchSelect" <?php echo !$movement_ready ? 'disabled' : ''; ?> style="border-radius:10px;border-color:#d0d7ce;">
                                         <option value="">No branch change</option>
@@ -1141,7 +1193,7 @@ function supCmStatusClass($s){return match($s){'Approved'=>'bg-success','Rejecte
                         </div>
 
                         <!-- Step 3: Justification & Schedule -->
-                        <div class="mb-4 p-3 rounded-3" style="background:#fafdfa;border:1px solid rgba(8,46,6,0.08);">
+                        <div class="mb-4 p-3 rounded-3 sup-form-section" style="background:#fafdfa;border:1px solid rgba(8,46,6,0.08);">
                             <div class="d-flex align-items-center gap-2 mb-3">
                                 <span class="badge rounded-circle d-inline-flex align-items-center justify-content-center shadow-sm" style="width:26px;height:26px;background:#082E06;color:#CBA135;font-size:.8rem;font-weight:700;">3</span>
                                 <h6 class="fw-bold mb-0 text-dark" style="letter-spacing:-0.2px;">Schedule & Justification</h6>
@@ -1161,7 +1213,7 @@ function supCmStatusClass($s){return match($s){'Approved'=>'bg-success','Rejecte
                             </div>
                         </div>
 
-                        <div class="d-flex align-items-center justify-content-between pt-3 border-top pb-5">
+                        <div class="cm-form-actions d-flex align-items-center justify-content-between pt-3 border-top pb-5">
                             <span class="text-muted small"><i class="fas fa-shield-alt text-success me-1"></i>Submits request for HR Manager review.</span>
                             <button type="submit" class="btn px-4 py-2.5 fw-semibold shadow-sm text-white" <?php echo !$movement_ready ? 'disabled' : ''; ?> style="background:linear-gradient(135deg, #082E06 0%, #163e12 100%);border:1px solid #CBA135;border-radius:10px;">
                                 <i class="fas fa-paper-plane me-2" style="color:#CBA135;"></i>Submit for Review
@@ -1257,9 +1309,8 @@ function supCmStatusClass($s){return match($s){'Approved'=>'bg-success','Rejecte
                         <div class="col-md-6">
                             <label class="form-label fw-semibold text-secondary small">Movement Type <span class="text-danger">*</span></label>
                             <select class="form-select" name="movement_type" id="supEditMovType" required style="border-radius:8px;border-color:#c8d3c5;">
+                                <option value="">Select movement type</option>
                                 <option value="Transfer">Transfer</option>
-                                <option value="Promotion">Promotion</option>
-                                <option value="Demotion">Demotion</option>
                                 <option value="Role Change">Role Change</option>
                             </select>
                         </div>
@@ -1632,11 +1683,16 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // ── Search ────────────────────────────────────────────────────────────────
     const searchInput = document.getElementById('supMovSearch');
-    const tableRows   = document.querySelectorAll('#supMovTable tbody tr');
+    const tableRows   = document.querySelectorAll('#supMovTable tbody tr.cm-movement-row');
     if (searchInput) {
         searchInput.addEventListener('input', function () {
             const term = this.value.trim().toLowerCase();
-            tableRows.forEach(r => { r.style.display = r.textContent.toLowerCase().includes(term) ? '' : 'none'; });
+            tableRows.forEach(r => {
+                const detail = r.nextElementSibling;
+                const matches = (r.textContent + ' ' + (detail?.textContent || '')).toLowerCase().includes(term);
+                r.style.display = matches ? '' : 'none';
+                if (detail?.classList.contains('cm-detail-row')) detail.style.display = matches ? '' : 'none';
+            });
             if (typeof applyZebraStriping === 'function') applyZebraStriping('#supMovTable');
         });
     }

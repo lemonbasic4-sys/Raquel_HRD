@@ -10,27 +10,19 @@ $current_user_id   = (int) ($_SESSION['user_id'] ?? 0);
 $sup_branch_id     = (int) ($_SESSION['branch_id'] ?? 0);
 
 // ── Summary counts ────────────────────────────────────────────────────────────
-$counts = ['total' => 0, 'Promotion' => 0, 'Transfer' => 0, 'Demotion' => 0, 'Role Change' => 0, 'Pending' => 0, 'Approved' => 0];
-if ($movement_ready) {
-    $cnt_res = $conn->query("SELECT movement_type, approval_status, COUNT(*) AS c FROM career_movements GROUP BY movement_type, approval_status");
-    while ($r = $cnt_res->fetch_assoc()) {
-        $counts['total'] += (int)$r['c'];
-        if (isset($counts[$r['movement_type']])) $counts[$r['movement_type']] += (int)$r['c'];
-        if (isset($counts[$r['approval_status']])) $counts[$r['approval_status']] += (int)$r['c'];
-    }
-}
+$counts = ['total' => 0, 'Promotion' => 0, 'Transfer' => 0, 'Demotion' => 0, 'Role Change' => 0, 'Pending' => 0];
 
 // ── Employees with their movement history ─────────────────────────────────────
 $branch_filter = $sup_branch_id > 0 ? "AND e.branch_id = {$sup_branch_id}" : '';
 $emp_sql = "
-    SELECT e.employee_id, e.employee_code, e.first_name, e.last_name,
+    SELECT e.employee_id, e.employee_code, e.first_name, e.last_name, e.department_id,
            e.job_title, e.hire_date, e.profile_picture,
            d.department_name, b.branch_name, rc.rank_name
     FROM employees e
     LEFT JOIN departments d ON e.department_id = d.department_id
     LEFT JOIN branches b    ON e.branch_id = b.branch_id
     LEFT JOIN rank_categories rc ON e.rank_category_id = rc.rank_category_id
-    WHERE e.is_active = 1
+    WHERE e.is_active = 1 AND e.deleted_at IS NULL
       AND e.employee_id NOT IN (SELECT employee_id FROM users WHERE role='Admin' AND employee_id IS NOT NULL)
       {$branch_filter}
     ORDER BY e.last_name, e.first_name
@@ -57,7 +49,12 @@ if ($movement_ready && !empty($employees)) {
     while ($mv = $mv_res->fetch_assoc()) {
         $eid = (int)$mv['employee_id'];
         if (isset($employees[$eid])) {
-            $employees[$eid]['movements'][] = $mv;
+            if ($mv['approval_status'] === 'Pending') $counts['Pending']++;
+            if ($mv['approval_status'] === 'Approved' && (int)$mv['is_applied'] === 1) {
+                $employees[$eid]['movements'][] = $mv;
+                $counts['total']++;
+                if (isset($counts[$mv['movement_type']])) $counts[$mv['movement_type']]++;
+            }
         }
     }
 }
@@ -74,7 +71,7 @@ if (!empty($employees)) {
         INNER JOIN (
             SELECT employee_id, MAX(evaluation_id) AS max_id
             FROM evaluations
-            WHERE employee_id IN ({$ids}) AND status='Approved'
+            WHERE employee_id IN ({$ids}) AND status='Approved' AND deleted_at IS NULL
             GROUP BY employee_id
         ) latest ON ev.evaluation_id = latest.max_id
     ");
@@ -108,17 +105,12 @@ function tenureText($hire_date): string {
     return $out;
 }
 
-// ── Helper: readiness badge ───────────────────────────────────────────────────
-function readinessBadge($employee): array {
-    $months = (int) floor((time() - strtotime($employee['hire_date'] ?? '')) / (30.44 * 86400));
-    $mvCount = count($employee['movements'] ?? []);
+// ── Helper: indication recorded in the latest approved evaluation ────────────
+function careerIndicationBadge($employee): array {
     $eg = $employee['eval_growth'] ?? null;
-    $suited = $eg ? (int)($eg['career_growth_suited'] ?? 0) : 0;
-    $score  = $eg ? (float)($eg['total_score'] ?? 0) : 0;
-    if ($suited && $score >= 2.6 && $months >= 12) return ['Ready', 'bg-success'];
-    if ($months >= 6 && $score >= 2.0)             return ['Developing', 'bg-info text-dark'];
-    if ($months < 6)                               return ['New Hire', 'bg-secondary'];
-    return ['Monitoring', 'bg-warning text-dark'];
+    if (!$eg) return ['No approved evaluation', 'bg-secondary'];
+    if (!empty($eg['career_growth_suited']) || trim((string)($eg['desired_position'] ?? '')) !== '') return ['Role fit suggested', 'bg-success'];
+    return ['No role suggestion', 'bg-light text-dark border'];
 }
 
 require_once '../includes/header.php';
@@ -170,15 +162,15 @@ require_once '../includes/header.php';
         <div>
             <div style="font-size:.72rem;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,.55);">HR Supervisor &middot; Career</div>
             <h4 class="text-white fw-bold mb-0 mt-1"><i class="fas fa-chart-line me-2" style="color:#BD9414;"></i>Career Progression</h4>
-            <p class="text-white-50 small mb-0 mt-2">Employee growth roadmaps, movement histories, and career readiness across your workforce.</p>
+            <p class="text-white-50 small mb-0 mt-2">Applied career movements and career-growth indications from approved evaluations.</p>
         </div>
         <a href="career-movements.php" class="btn btn-sm px-3 fw-semibold" style="background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.25);border-radius:20px;font-size:.78rem;backdrop-filter:blur(4px);">
             <i class="fas fa-route me-1"></i>Manage Movements
         </a>
     </div>
     <div class="row g-3">
-        <div class="col-6 col-md-3"><div class="stat-card"><div class="stat-value"><?php echo number_format($counts['total']); ?></div><div class="stat-label">Total Movements</div></div></div>
-        <div class="col-6 col-md-3"><div class="stat-card"><div class="stat-value" style="color:#ffc107;"><?php echo number_format($counts['Pending']); ?></div><div class="stat-label">Pending</div></div></div>
+        <div class="col-6 col-md-3"><div class="stat-card"><div class="stat-value"><?php echo number_format($counts['total']); ?></div><div class="stat-label">Applied Movements</div></div></div>
+        <div class="col-6 col-md-3"><div class="stat-card"><div class="stat-value" style="color:#ffc107;"><?php echo number_format($counts['Pending']); ?></div><div class="stat-label">Pending Requests</div></div></div>
         <div class="col-6 col-md-3"><div class="stat-card"><div class="stat-value" style="color:#28a745;"><?php echo number_format($counts['Promotion']); ?></div><div class="stat-label">Promotions</div></div></div>
         <div class="col-6 col-md-3"><div class="stat-card"><div class="stat-value" style="color:#0dcaf0;"><?php echo number_format($counts['Transfer']); ?></div><div class="stat-label">Transfers</div></div></div>
     </div>
@@ -210,8 +202,8 @@ require_once '../includes/header.php';
                 <?php endforeach; ?>
             </select>
             <select name="ready" class="form-select" style="max-width:160px;">
-                <option value="">All Readiness</option>
-                <?php foreach (['Ready','Developing','Monitoring','New Hire'] as $r): ?>
+                <option value="">All Career Indications</option>
+                <?php foreach (['Role fit suggested','No role suggestion','No approved evaluation'] as $r): ?>
                     <option value="<?php echo $r; ?>" <?php echo $filter_ready === $r ? 'selected' : ''; ?>><?php echo $r; ?></option>
                 <?php endforeach; ?>
             </select>
@@ -237,17 +229,10 @@ require_once '../includes/header.php';
                 if (!$has) continue;
             }
             // Dept filter
-            if ($filter_dept) {
-                // department_id on employee row
-                // We re-query or match via departments array — get dept id from name
-                // Already stored department_name; get id by matching
-                $matched_dept_name = '';
-                foreach ($departments as $d) { if ((string)$d['department_id'] === $filter_dept) { $matched_dept_name = $d['department_name']; break; } }
-                if ($emp['department_name'] !== $matched_dept_name) continue;
-            }
-            // Readiness filter
+            if ($filter_dept && (string)$emp['department_id'] !== $filter_dept) continue;
+            // Career indication filter
             if ($filter_ready) {
-                [$badge_label] = readinessBadge($emp);
+                [$badge_label] = careerIndicationBadge($emp);
                 if ($badge_label !== $filter_ready) continue;
             }
             $visible[] = $emp;
@@ -266,15 +251,15 @@ require_once '../includes/header.php';
                 $eid        = (int)$emp['employee_id'];
                 $movements  = $emp['movements'];
                 $eg         = $emp['eval_growth'];
-                [$ready_label, $ready_class] = readinessBadge($emp);
+                [$ready_label, $ready_class] = careerIndicationBadge($emp);
                 $name_parts = preg_split('/\s+/', trim($emp['first_name'] . ' ' . $emp['last_name']));
                 $initials   = strtoupper(substr($name_parts[0] ?? 'U', 0, 1) . substr($name_parts[1] ?? '', 0, 1));
                 $collapseId = 'cpTimeline' . $eid;
 
                 // Normalise eval data so every card renders the same fields
-                $score_txt      = ($eg && !empty($eg['total_score']))    ? number_format((float)$eg['total_score'], 2) . ' / 4.0' : '—';
+                $score_txt      = ($eg && $eg['total_score'] !== null) ? number_format((float)$eg['total_score'], 2) . ' / 4.0' : '—';
                 $desired_txt    = ($eg && !empty($eg['desired_position'])) ? $eg['desired_position'] : null;
-                $endorsed       = ($eg && (int)($eg['career_growth_suited'] ?? 0) === 1);
+                $endorsed       = $ready_label === 'Role fit suggested';
                 $growth_notes   = ($eg && !empty($eg['career_growth_details'])) ? mb_substr($eg['career_growth_details'], 0, 140) . (mb_strlen($eg['career_growth_details']) > 140 ? '…' : '') : null;
             ?>
             <div class="col-md-6 col-xl-4">
@@ -308,30 +293,30 @@ require_once '../includes/header.php';
                         <!-- Stats row — always 3 pills -->
                         <div class="d-flex gap-2 mb-3" style="flex-wrap:nowrap;overflow:hidden;">
                             <span class="cp-stat-pill flex-shrink-0"><i class="fas fa-calendar-alt"></i><?php echo e(tenureText($emp['hire_date'] ?? '')); ?></span>
-                            <span class="cp-stat-pill flex-shrink-0"><i class="fas fa-route"></i><?php echo count($movements); ?> move<?php echo count($movements) === 1 ? '' : 's'; ?></span>
+                            <span class="cp-stat-pill flex-shrink-0"><i class="fas fa-route"></i><?php echo count($movements); ?> applied move<?php echo count($movements) === 1 ? '' : 's'; ?></span>
                             <span class="cp-stat-pill flex-shrink-0"><i class="fas fa-star"></i><?php echo $score_txt; ?></span>
                         </div>
 
                         <!-- Aspires-to row — always present, placeholder when empty -->
                         <div class="cp-aspires mb-3">
-                            <span class="cp-aspires-label">Aspires to</span>
+                            <span class="cp-aspires-label">Suggested role</span>
                             <?php if ($desired_txt): ?>
                                 <span class="desired-tag" title="<?php echo e($desired_txt); ?>"><i class="fas fa-arrow-up me-1"></i><?php echo e($desired_txt); ?></span>
                                 <?php if ($endorsed): ?>
-                                    <span class="badge bg-success-subtle text-success border border-success-subtle" style="font-size:.65rem;"><i class="fas fa-check me-1"></i>Endorsed</span>
+                                    <span class="badge bg-success-subtle text-success border border-success-subtle" style="font-size:.65rem;"><i class="fas fa-check me-1"></i>Suggested</span>
                                 <?php endif; ?>
                             <?php else: ?>
-                                <span class="text-muted" style="font-size:.78rem;font-style:italic;">No eval data yet</span>
+                                <span class="text-muted" style="font-size:.78rem;font-style:italic;"><?php echo $eg ? 'No target role recorded' : 'No approved evaluation'; ?></span>
                             <?php endif; ?>
                         </div>
 
                         <!-- Growth notes — fixed height, always present -->
                         <div class="cp-notes mb-3">
                             <?php if ($growth_notes): ?>
-                                <div class="cp-notes-label">HR Notes</div>
+                                <div class="cp-notes-label">Evaluation Notes</div>
                                 <div class="cp-notes-text"><?php echo nl2br(e($growth_notes)); ?></div>
                             <?php else: ?>
-                                <div class="cp-notes-empty"><i class="fas fa-sticky-note me-1"></i>No growth notes on record</div>
+                                <div class="cp-notes-empty"><i class="fas fa-sticky-note me-1"></i>No career-growth notes recorded</div>
                             <?php endif; ?>
                         </div>
 
@@ -340,7 +325,7 @@ require_once '../includes/header.php';
                             <button class="btn btn-sm btn-outline-secondary w-100" style="font-size:.78rem;border-radius:8px;"
                                 data-bs-toggle="collapse" data-bs-target="#<?php echo $collapseId; ?>" aria-expanded="false">
                                 <i class="fas fa-project-diagram me-1"></i>
-                                <?php echo count($movements) > 0 ? count($movements) . ' movement' . (count($movements) === 1 ? '' : 's') . ' — view timeline' : 'No movements yet'; ?>
+                                <?php echo count($movements) > 0 ? count($movements) . ' applied movement' . (count($movements) === 1 ? '' : 's') . ' — view timeline' : 'No applied movements yet'; ?>
                                 <i class="fas fa-chevron-down ms-1" style="font-size:.68rem;transition:transform .2s;"></i>
                             </button>
                             <div class="collapse" id="<?php echo $collapseId; ?>">
@@ -356,24 +341,18 @@ require_once '../includes/header.php';
                                     <?php if (empty($movements)): ?>
                                         <div class="cp-node">
                                             <div class="cp-dot dot-current"></div>
-                                            <div style="font-size:.78rem;color:#6c757d;font-style:italic;">No movements recorded.</div>
+                                            <div style="font-size:.78rem;color:#6c757d;font-style:italic;">No applied movements recorded.</div>
                                         </div>
                                     <?php else: ?>
                                         <?php foreach ($movements as $mv):
                                             $dotClass  = 'dot-' . str_replace(' ', '', $mv['movement_type']);
-                                            $isApplied = (int)($mv['is_applied'] ?? 0) === 1;
-                                            $isPending = $mv['approval_status'] === 'Pending';
                                         ?>
                                         <div class="cp-node">
-                                            <div class="cp-dot <?php echo $dotClass; ?>" <?php echo $isPending ? 'style="opacity:.5;"' : ''; ?>></div>
+                                            <div class="cp-dot <?php echo $dotClass; ?>"></div>
                                             <div>
                                                 <div class="d-flex flex-wrap align-items-center gap-1">
                                                     <span class="fw-semibold" style="font-size:.8rem;"><?php echo e($mv['movement_type']); ?></span>
-                                                    <?php if ($isPending): ?><span class="badge bg-warning text-dark" style="font-size:.62rem;">Pending</span>
-                                                    <?php elseif ($mv['approval_status'] === 'Rejected'): ?><span class="badge bg-danger" style="font-size:.62rem;">Rejected</span>
-                                                    <?php elseif ($isApplied): ?><span class="badge bg-success" style="font-size:.62rem;">Applied</span>
-                                                    <?php else: ?><span class="badge bg-secondary" style="font-size:.62rem;">Scheduled</span>
-                                                    <?php endif; ?>
+                                                    <span class="badge bg-success" style="font-size:.62rem;">Applied</span>
                                                 </div>
                                                 <div style="font-size:.73rem;color:#495057;">
                                                     <?php if (!empty($mv['new_position'])): ?>
@@ -381,6 +360,9 @@ require_once '../includes/header.php';
                                                     <?php endif; ?>
                                                     <?php if (!empty($mv['new_branch'])): ?>
                                                         <div class="text-muted"><?php echo e($mv['prev_branch'] ?? '—'); ?> → <?php echo e($mv['new_branch']); ?></div>
+                                                    <?php endif; ?>
+                                                    <?php if (!empty($mv['new_department_name']) && $mv['new_department_name'] !== $mv['previous_department_name']): ?>
+                                                        <div class="text-muted">Department: <?php echo e($mv['previous_department_name'] ?: '—'); ?> → <?php echo e($mv['new_department_name']); ?></div>
                                                     <?php endif; ?>
                                                     <div class="text-muted"><?php echo formatDate($mv['effective_date']); ?></div>
                                                 </div>
@@ -438,7 +420,7 @@ require_once '../includes/header.php';
                 <div class="p-3 rounded-3 border h-100" style="background:#fafafa;">
                     <div class="mb-2"><span class="badge <?php echo $cls; ?> px-3 py-2" style="font-size:.8rem;"><i class="<?php echo $ico; ?> me-1"></i><?php echo $label; ?></span></div>
                     <div style="font-size:1.8rem;font-weight:800;color:#212529;"><?php echo number_format($val); ?></div>
-                    <div class="text-muted" style="font-size:.75rem;"><?php echo $counts['total'] > 0 ? round($val / $counts['total'] * 100) : 0; ?>% of total</div>
+                    <div class="text-muted" style="font-size:.75rem;"><?php echo $counts['total'] > 0 ? round($val / $counts['total'] * 100) : 0; ?>% of applied movements</div>
                 </div>
             </div>
             <?php endforeach; ?>

@@ -82,10 +82,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $new_department_id = !empty($_POST['new_department_id']) ? (int) $_POST['new_department_id'] : null;
         $effective_date    = trim(    $_POST['effective_date']      ?? '');
         $reason            = trim(    $_POST['reason']              ?? '');
-        $allowed_types     = ['Promotion', 'Transfer', 'Demotion', 'Role Change'];
+        $allowed_types     = ['Transfer', 'Role Change'];
 
         if (!in_array($movement_type, $allowed_types, true)) {
-            $movement_type = 'Transfer';
+            $errors[] = 'Select a valid movement type.';
         }
 
         if ($movement_type === 'Transfer') {
@@ -572,8 +572,6 @@ require_once '../includes/header.php';
                                     <label for="movement_type" class="form-label fw-semibold text-secondary small">Movement Type <span class="text-danger">*</span></label>
                                     <select name="movement_type" id="movement_type" class="form-select shadow-sm" required style="border-radius:10px;border-color:#d0d7ce;">
                                         <option value="Transfer" <?php echo (($_POST['movement_type'] ?? '') === 'Transfer') ? 'selected' : ''; ?>>Transfer</option>
-                                        <option value="Promotion" <?php echo (($_POST['movement_type'] ?? '') === 'Promotion') ? 'selected' : ''; ?>>Promotion</option>
-                                        <option value="Demotion" <?php echo (($_POST['movement_type'] ?? '') === 'Demotion') ? 'selected' : ''; ?>>Demotion</option>
                                         <option value="Role Change" <?php echo (($_POST['movement_type'] ?? '') === 'Role Change') ? 'selected' : ''; ?>>Role Change</option>
                                     </select>
                                 </div>
