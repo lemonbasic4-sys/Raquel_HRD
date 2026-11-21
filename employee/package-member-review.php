@@ -495,6 +495,9 @@ $devplan_count = count($existing_dev_plans);
     flex-wrap: wrap;
     gap: 8px;
 }
+.review-decision-details { border:1px solid #cbdfe5; border-radius:8px; background:#f3f9fb; color:#285260; padding:10px 12px; }
+.review-decision-details summary { cursor:pointer; font-weight:700; }
+.review-decision-details p { padding-top:8px; }
 </style>
 
     <?php if ($is_peer_read_only): ?><div class="alert alert-info" role="status"><i class="fas fa-lock me-2"></i>This probationary self-rating was accepted by <strong><?php echo e($claimed_reviewer_name); ?></strong>. This form is read only; only that reviewer can change ratings or approve it.</div><?php endif; ?>
@@ -762,7 +765,16 @@ $devplan_count = count($existing_dev_plans);
                     <?php endif; ?>
                     <div class="col-12"><label class="form-label fw-semibold" for="headSignatureCanvas">Immediate head signature</label><div class="border rounded bg-white p-2" style="max-width:620px;"><canvas id="headSignatureCanvas" width="560" height="120" style="display:block;width:100%;height:120px;touch-action:none;border:1px dashed #94a3b8;border-radius:6px;"></canvas><input type="hidden" name="immediate_head_signature_data" id="headSignatureData" value="<?php echo e($evaluation['immediate_head_signature_data'] ?? ''); ?>"><button class="btn btn-sm btn-outline-secondary mt-2" type="button" id="clearHeadSignature">Clear signature</button></div><div class="small text-muted mt-1">Ratings, developmental plan, and signature are saved together when you approve. The employee’s original self-rating signature remains on file.</div></div>
                     <?php if ($show_probationary_decision): ?>
-                    <div class="col-12"><button class="btn btn-success fw-semibold" type="submit" name="package_action" value="approve" formaction="<?php echo e($package_back_url); ?>" formnovalidate><i class="fas fa-check-circle me-1"></i>Approve Evaluation</button></div>
+                    <div class="col-12 border-top pt-3 mt-3">
+                        <div class="alert alert-warning small mb-3"><i class="fas fa-lock me-1" aria-hidden="true"></i>Complete the recommendation, reason, and signature before approving.</div>
+                        <details class="review-decision-details mb-3"><summary>What happens on final approval</summary><p class="mb-0 small">Approval records the individual KRA and Core Values score, applies the probationary outcome, and completes this evaluation. HR personnel receive an informational notification.</p></details>
+                        <label class="form-label fw-semibold" for="evaluatorComments">Evaluator's Comments <span class="text-muted fw-normal">(optional)</span></label>
+                        <textarea class="form-control mb-3" id="evaluatorComments" name="comments" rows="3" placeholder="Add feedback for the printed evaluation form"><?php echo e($evaluation['supervisor_comments'] ?? ''); ?></textarea>
+                        <div class="d-flex flex-wrap gap-2">
+                            <button class="btn btn-success fw-semibold" type="submit" name="package_action" value="approve" formaction="<?php echo e($package_back_url); ?>" formnovalidate><i class="fas fa-check-circle me-1"></i>Approve Evaluation</button>
+                            <button class="btn btn-outline-danger fw-semibold" type="button" data-bs-toggle="modal" data-bs-target="#returnRevisionModal"><i class="fas fa-undo me-1"></i>Return for Revision</button>
+                        </div>
+                    </div>
                     <?php else: ?>
                     <div class="col-12 border-top pt-3 mt-3">
                         <h5 class="fw-bold mb-2">Review decision</h5>
@@ -786,11 +798,32 @@ $devplan_count = count($existing_dev_plans);
             </div><?php endif; ?>
         </div>
     </form>
+    <?php if ($show_probationary_decision && !$is_peer_read_only): ?>
+    <div class="modal fade" id="returnRevisionModal" tabindex="-1" aria-labelledby="returnRevisionTitle" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
+            <form method="post" action="<?php echo e($package_back_url); ?>">
+                <?php echo csrfField(); ?>
+                <input type="hidden" name="package_id" value="<?php echo $package_id; ?>">
+                <input type="hidden" name="member_evaluation_id" value="<?php echo $evaluation_id; ?>">
+                <input type="hidden" name="package_action" value="return_member">
+                <div class="modal-header"><h2 class="modal-title fs-5" id="returnRevisionTitle">Return for Revision</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                <div class="modal-body">
+                    <p class="small text-muted">Tell <?php echo e($evaluation['first_name'].' '.$evaluation['last_name']); ?> what needs to be revised. The employee will be notified and can resubmit the evaluation.</p>
+                    <label class="form-label fw-semibold" for="returnRevisionReason">Return reason <span class="text-danger">*</span></label>
+                    <textarea class="form-control" id="returnRevisionReason" name="comments" rows="3" required placeholder="Explain the changes needed"></textarea>
+                </div>
+                <div class="modal-footer"><button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">Cancel</button><button class="btn btn-outline-danger fw-semibold" type="submit">Confirm Return</button></div>
+            </form>
+        </div></div>
+    </div>
+    <?php endif; ?>
 </main>
 
 <script>
 function switchReviewTab(event, tabId) {
     if (event) event.preventDefault();
+    const activeContent = document.getElementById(tabId);
+    if (!activeContent || !activeContent.classList.contains('eval-tab-content')) return;
     const contents = document.querySelectorAll('.eval-tab-content');
     const buttons = document.querySelectorAll('.eval-tab-btn');
 
@@ -802,13 +835,13 @@ function switchReviewTab(event, tabId) {
         btn.setAttribute('aria-selected', 'false');
     });
 
-    const activeContent = document.getElementById(tabId);
-    if (activeContent) activeContent.classList.add('active');
+    activeContent.classList.add('active');
     const activeButton = document.querySelector('.eval-tab-btn[aria-controls="' + tabId + '"]');
     if (activeButton) {
         activeButton.classList.add('active');
         activeButton.setAttribute('aria-selected', 'true');
     }
+    if (window.location.hash !== '#' + tabId) window.history.replaceState(null, '', '#' + tabId);
 }
 
 document.addEventListener('DOMContentLoaded', function () {
@@ -882,14 +915,16 @@ document.addEventListener('DOMContentLoaded', function () {
                 return;
             }
         });
-        if (window.location.hash === '#tab-decision') {
-            switchReviewTab(null, 'tab-decision');
-            document.getElementById('tab-decision')?.scrollIntoView({block: 'start'});
-            if (new URLSearchParams(window.location.search).get('attention') === 'decision') {
-                const recommendation = document.getElementById('headRecommendation');
-                const reason = document.getElementById('headRecommendationReason');
-                (recommendation && !recommendation.value ? recommendation : reason && !reason.value.trim() ? reason : recommendation)?.focus({preventScroll: true});
-            }
+    }
+    const savedTab = window.location.hash.slice(1);
+    if (['tab-kra', 'tab-behaviors', 'tab-devplan', 'tab-decision'].includes(savedTab)
+        && document.getElementById(savedTab)) {
+        switchReviewTab(null, savedTab);
+        if (savedTab === 'tab-decision' && new URLSearchParams(window.location.search).get('attention') === 'decision') {
+            document.getElementById(savedTab).scrollIntoView({block: 'start'});
+            const recommendation = document.getElementById('headRecommendation');
+            const reason = document.getElementById('headRecommendationReason');
+            (recommendation && !recommendation.value ? recommendation : reason && !reason.value.trim() ? reason : recommendation)?.focus({preventScroll: true});
         }
     }
     const kraWeightPct = <?php echo $kra_w; ?>;

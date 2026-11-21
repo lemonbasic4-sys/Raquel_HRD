@@ -1312,7 +1312,7 @@ $open_package_id = max(0, (int)($_GET['open_package'] ?? 0));
 
 
                 <!-- Action Panel with descriptive hand-off copy & F3 Pre-Submission Modal -->
-                <form method="post" class="package-action-panel<?php echo $is_probationary_package ? ' package-action-panel--probationary' : ''; ?><?php echo $is_shared_probationary_peer || ($is_probationary_package && !empty($members) && ($is_unclaimed_group_step || (($package['evaluation_type'] ?? '') === 'Initial' && (int)$package['current_step_order'] === 1))) ? ' d-none' : ''; ?>" id="pkgForm-<?php echo (int)$package['package_id']; ?>">
+                <form method="post" class="package-action-panel<?php echo $is_probationary_package ? ' package-action-panel--probationary' : ''; ?><?php echo $is_shared_probationary_peer || ($is_probationary_package && !empty($members) && ($is_unclaimed_group_step || ($requires_probationary_decision_signature && count($members) === 1))) ? ' d-none' : ''; ?>" id="pkgForm-<?php echo (int)$package['package_id']; ?>">
                     <input type="hidden" name="package_id" value="<?php echo (int)$package['package_id']; ?>">
                     <input type="hidden" name="package_action" id="actionInput-<?php echo (int)$package['package_id']; ?>" value="<?php echo $is_unclaimed_group_step ? 'claim' : 'approve'; ?>">
                     <?php if ($is_probationary_package && (int)$package['current_step_order'] === 1 && count($members) === 1): ?>
