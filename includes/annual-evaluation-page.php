@@ -440,7 +440,7 @@ require_once __DIR__ . '/header.php';
                     <div class="tab-pane show active" id="headKraPanel" role="tabpanel" aria-labelledby="headKraTab" tabindex="0">
             <h3 class="h5 annual-review-section"><span>Key Result Areas · Immediate-head review</span><small>80% KRA</small></h3>
             <div class="table-responsive annual-score-table-wrap mb-4"><table class="table annual-score-table"><thead><tr><th>Criterion</th><th class="text-end">Weight</th><th class="text-end">Employee self-rating</th><th class="text-end">Reviewed / Adjusted</th><th class="text-center">Variance</th></tr></thead><tbody>
-                <?php foreach ($headReviewKra as $row): ?><tr><td><strong><?php echo e($row['criterion_name']); ?></strong><?php if (!empty($row['kpi_description'])): ?><small><?php echo e($row['kpi_description']); ?></small><?php endif; ?></td><td class="text-end"><?php echo number_format((float)$row['weight'],2); ?>%</td><td class="text-end"><?php echo number_format((float)$row['self_rating'],2); ?></td><td class="text-end"><strong><?php echo number_format((float)$row['rating'],2); ?></strong></td><td class="text-center"><?php $difference=round((float)$row['rating']-(float)$row['self_rating'],2); ?><span class="annual-review-variance <?php echo $difference>0 ? 'is-positive' : ($difference<0 ? 'is-negative' : 'is-neutral'); ?>"><?php echo $difference==0 ? '—' : ($difference>0 ? '+' : '').number_format($difference,2); ?></span></td></tr><?php endforeach; ?>
+                <?php foreach ($headReviewKra as $row): ?><tr><td><strong><?php echo e($row['criterion_name']); ?></strong><?php if (!empty($row['kpi_description'])): ?><small class="d-block text-muted mt-1"><?php echo e($row['kpi_description']); ?></small><?php endif; ?></td><td class="text-end"><?php echo number_format((float)$row['weight'],2); ?>%</td><td class="text-end"><?php echo number_format((float)$row['self_rating'],2); ?></td><td class="text-end"><strong><?php echo number_format((float)$row['rating'],2); ?></strong></td><td class="text-center"><?php $difference=round((float)$row['rating']-(float)$row['self_rating'],2); ?><span class="annual-review-variance <?php echo $difference>0 ? 'is-positive' : ($difference<0 ? 'is-negative' : 'is-neutral'); ?>"><?php echo $difference==0 ? '—' : ($difference>0 ? '+' : '').number_format($difference,2); ?></span></td></tr><?php endforeach; ?>
             </tbody></table></div>
 
                     </div>
@@ -533,13 +533,8 @@ require_once __DIR__ . '/header.php';
                     <?php require __DIR__.'/annual-result-cards.php'; ?>
                 </section>
             <?php endif; ?>
-            <?php if (!empty($member['individual_evaluation_id']) && $canFinalize): ?>
-            <div class="alert alert-info" data-persistent-alert><strong>Individual evaluation.</strong> Save your KRA review and rating below. Final approval occurs only after all assigned department peers have rated this employee.<?php if (!individualApprovalReady($conn,'annual',$member,(int)$actor['employee_id'])): ?> Other peer ratings are still pending. Your review will be saved now. Return to Review &amp; approve after all required ratings are complete.<?php endif; ?></div>
-            <?php endif; ?>
-            <p id="annualRatingProgress" class="small fw-bold" aria-live="polite"></p>
             <?php if ($submitted): ?><div class="alert alert-success">Submitted and locked. These ratings cannot be edited.</div><?php endif; ?>
             <form method="post" id="annualRatingForm" data-draft-key="annual-rating-overrides-v3-<?php echo (int)$actor['user_id']; ?>-<?php echo $evaluationId; ?>-<?php echo substr(hash('sha256',json_encode([$member['employee_id'],$member['evaluation_created_at'],$member['evaluation_submitted_at'],$member['period_start'],$member['period_end']])),0,24); ?>" data-resume-tab="<?php echo $_SERVER['REQUEST_METHOD']==='POST' ? '1' : '0'; ?>" data-submitted="<?php echo $submitted ? '1' : '0'; ?>" data-override-only="<?php echo !$submitted ? '1' : '0'; ?>">
-                <p class="small text-muted">Use ratings from 1.00 to 4.00. Decimals are allowed, up to two decimal places (for example, 3.25).</p>
                 <p id="annualRatingScaleNotice" class="alert alert-warning" role="status" hidden></p>
                 <?php if ($canFinalize && !$submitted): ?><p id="annualHeadOverallPreview" class="alert alert-success" aria-live="polite"></p><?php endif; ?>
                 <?php echo csrfField(); ?><input type="hidden" name="action" value="rate"><input type="hidden" name="cycle_id" value="<?php echo $cycleId; ?>"><input type="hidden" name="confirmed" id="annualConfirmed" value="0">
@@ -556,7 +551,7 @@ require_once __DIR__ . '/header.php';
                     <div class="tab-pane show active annual-probation-section" id="annualRateKraPanel" role="tabpanel" aria-labelledby="annualRateKraTab" tabindex="0">
                     <h3 class="h5 annual-review-section"><span><i class="fas fa-chart-pie me-2" aria-hidden="true"></i>Key Result Areas · Immediate-head review</span><small>KRA Weight: 80%</small></h3>
                     <div class="table-responsive annual-score-table-wrap mb-3"><table class="table annual-score-table"><thead><tr><th>Criterion</th><th class="text-end">Weight</th><th class="text-end">Employee Self-Rating</th><th>Evaluator Adjusted Rating</th></tr></thead><tbody>
-                    <?php foreach ($rateKras as $r): ?><tr><td><strong><?php echo e($r['criterion_name']); ?></strong><?php if (!empty($r['kpi_description'])): ?><small><?php echo e($r['kpi_description']); ?></small><?php endif; ?></td><td class="text-end"><?php echo number_format((float)$r['weight'],2); ?>%</td><td class="text-end"><?php echo number_format((float)$r['self_rating'],2); ?></td><td><input class="form-control annual-number annual-rate-kra" type="number" inputmode="decimal" min="1" max="4" step="0.01" data-weight="<?php echo e($r['weight']); ?>" data-submitted-rating="<?php echo e($r['self_rating']); ?>" name="kra[<?php echo (int)$r['score_id']; ?>]" aria-label="Reviewed KRA: <?php echo e($r['criterion_name']); ?>" data-label="KRA · <?php echo e($r['criterion_name']); ?>" placeholder="Unchanged" value="<?php echo e($_POST['kra'][$r['score_id']] ?? ''); ?>"><span class="annual-rating-unit">/ 4.00</span></td></tr><?php endforeach; ?>
+                    <?php foreach ($rateKras as $r): ?><tr><td><strong><?php echo e($r['criterion_name']); ?></strong><?php if (!empty($r['kpi_description'])): ?><small class="d-block text-muted mt-1"><?php echo e($r['kpi_description']); ?></small><?php endif; ?></td><td class="text-end"><?php echo number_format((float)$r['weight'],2); ?>%</td><td class="text-end"><?php echo number_format((float)$r['self_rating'],2); ?></td><td><input class="form-control annual-number annual-rate-kra" type="number" inputmode="decimal" min="1" max="4" step="0.01" data-weight="<?php echo e($r['weight']); ?>" data-submitted-rating="<?php echo e($r['self_rating']); ?>" name="kra[<?php echo (int)$r['score_id']; ?>]" aria-label="Reviewed KRA: <?php echo e($r['criterion_name']); ?>" data-label="KRA · <?php echo e($r['criterion_name']); ?>" placeholder="Unchanged" value="<?php echo e($_POST['kra'][$r['score_id']] ?? ''); ?>"><span class="annual-rating-unit">/ 4.00</span></td></tr><?php endforeach; ?>
                     </tbody><tfoot><tr><th colspan="2">Key Result Areas (KRA) total</th><td class="text-end"><?php echo number_format(round(array_sum(array_map(static fn($r)=>(float)$r['weight']*(float)$r['self_rating']/100,$rateKras)),2),2); ?></td><td class="text-end"><strong id="annualRateKraTotal">—</strong><small>Weight: 80%</small></td></tr></tfoot></table></div>
                     <div class="annual-rating-step-actions"><span></span><button class="btn btn-success" type="button" id="annualRateKraNext" data-annual-tab="#annualRateCorePanel" aria-controls="annualRateCorePanel">Next: Core Behaviors <i class="fas fa-arrow-right ms-2" aria-hidden="true"></i></button></div>
                     </div><div class="tab-pane annual-probation-section" id="annualRateCorePanel" role="tabpanel" aria-labelledby="annualRateCoreTab" tabindex="0">
@@ -704,7 +699,7 @@ require_once __DIR__ . '/header.php';
             <?php if ($editable): ?><div class="alert alert-info"><strong>How to Adjust Ratings:</strong> Enter the evaluator adjusted rating between 1.00 and 4.00. The proposed final score recalculates automatically.</div><?php endif; ?>
             <h3 class="h5 annual-review-section" id="annualKra"><span><i class="fas fa-chart-pie me-2"></i>Key Result Areas (KRA)</span><small>KRA Weight: 80%</small></h3>
             <div class="table-responsive annual-score-table-wrap"><table class="table align-middle annual-score-table"><thead><tr><th>Criterion</th><th class="text-end">Weight</th><th class="text-end">Submitted rating</th><th class="text-end"><?php echo $editable ? 'Reviewed rating' : 'Final rating'; ?></th></tr></thead><tbody>
-            <?php foreach ($kra as $row): ?><tr><td><strong><?php echo e($row['criterion_name']); ?></strong><?php if (!empty($row['kpi_description'])): ?><small><?php echo e($row['kpi_description']); ?></small><?php endif; ?></td><td class="text-end"><?php echo number_format((float)$row['weight'],2); ?>%</td><td class="text-end"><?php echo number_format((float)$row['self_rating'],2); ?></td><td class="text-end">
+            <?php foreach ($kra as $row): ?><tr><td><strong><?php echo e($row['criterion_name']); ?></strong><?php if (!empty($row['kpi_description'])): ?><small class="d-block text-muted mt-1"><?php echo e($row['kpi_description']); ?></small><?php endif; ?></td><td class="text-end"><?php echo number_format((float)$row['weight'],2); ?>%</td><td class="text-end"><?php echo number_format((float)$row['self_rating'],2); ?></td><td class="text-end">
                 <?php if ($editable): ?><input class="form-control annual-number" type="number" inputmode="decimal" min="1" max="4" step="0.01" required data-weight="<?php echo e($row['weight']); ?>" name="kra[<?php echo (int)$row['score_id']; ?>]" aria-label="Reviewed rating for <?php echo e($row['criterion_name']); ?>" value="<?php echo e($_POST['kra'][$row['score_id']] ?? $row['rating']); ?>">
                 <?php else: echo number_format((float)$row['rating'],2); endif; ?></td></tr><?php endforeach; ?></tbody>
                 <tfoot><tr><th colspan="2">Key Result Areas (KRA) total</th><td class="text-end"><?php echo number_format($submittedKraTotal,2); ?></td><td class="text-end"><strong id="annualReviewedKraTotal"><?php echo number_format($candidate['kra'],2); ?></strong><small>Weight: 80%</small></td></tr></tfoot></table></div>
@@ -781,7 +776,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <?php if ($executiveKraOnly && $view==='rate'): ?>
 // Executives approve KRAs; department coworkers provide behavior ratings.
 ['annualRateCoreTab','annualRatePlanTab','annualRateCorePanel','annualRatePlanPanel'].forEach(id=>document.getElementById(id)?.remove());
-['annualRatingProgress','annualHeadOverallPreview'].forEach(id=>document.getElementById(id)?.remove());
+document.getElementById('annualHeadOverallPreview')?.remove();
 const executiveNext=document.getElementById('annualRateKraNext');
 if (executiveNext) { executiveNext.dataset.annualTab='#annualRateReviewPanel'; executiveNext.setAttribute('aria-controls','annualRateReviewPanel'); executiveNext.textContent='Next: Review & Submit'; }
 const executiveBack=document.getElementById('annualRateReviewBack');
@@ -810,12 +805,7 @@ function annualEffectiveRating(input) {
 }
 function updateAnnualProgress() {
     const inputs=[...document.querySelectorAll('#annualRatingForm input[name^="scores["]')];
-    const progress=document.getElementById('annualRatingProgress');
     const rated=inputs.filter(input=>annualEffectiveRating(input)!==null);
-    if (progress) {
-        progress.textContent=rated.length+' of 8 values rated';
-        if (rated.length===8) progress.textContent+=' · Your 360 average: '+(rated.reduce((sum,input)=>sum+annualEffectiveRating(input),0)/8).toFixed(2);
-    }
     const coreAverage=document.getElementById('annualPeerRatingAverage');
     if (coreAverage) coreAverage.textContent=rated.length===8 ? (rated.reduce((sum,input)=>sum+annualEffectiveRating(input),0)/8).toFixed(2) : '—';
     const kraInputs=[...document.querySelectorAll('#annualRatingForm input.annual-rate-kra')];

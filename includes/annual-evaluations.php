@@ -619,7 +619,9 @@ function annualCalculate(array $kraRows, array $self, array $peers): array
 
 function annualKraRows($conn, int $evaluationId): array
 {
-    return annualQuery($conn, "SELECT es.score_id, ec.criterion_name, ec.kpi_description, ec.weight, es.score_value AS self_rating,
+    return annualQuery($conn, "SELECT es.score_id, ec.criterion_name,
+            COALESCE(NULLIF(TRIM(ec.description), ''), NULLIF(TRIM(ec.kpi_description), '')) AS kpi_description,
+            ec.weight, es.score_value AS self_rating,
             COALESCE(es.supervisor_override_score,es.score_value) AS rating
         FROM evaluation_scores es JOIN evaluation_criteria ec ON ec.criterion_id=es.criterion_id
         WHERE es.evaluation_id=? AND ec.section='KRA' ORDER BY ec.sort_order, ec.criterion_id", [$evaluationId]);
