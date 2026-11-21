@@ -44,11 +44,17 @@ After import, use **Admin > Portal Accounts** to create the employee and reviewe
 ## Forms and workflow
 
 - `seed_initial_final.sql`: two shared Active forms for the sample probationary position. Each has 8 KRAs (total 100%) and 8 Core Behaviors, with an 80% KRA / 20% Behavior split.
-- Annual SQL files: role-specific templates and criteria for this department. See the [detailed department guide](AP_Evaluation_Dry_Run.md) for role coverage and any later 2027 post-probation forms.
+- Annual SQL files: role-specific templates and criteria for this department.
 - No ratings, submissions, approvals, or automatic regularization are imported.
 - Probationary employee: Employee Portal > Self Rating > Initial. Final follows full Initial approval. The sample Initial due dates are January 1 and January 15, 2027.
 - Regular staff sample (`MO26-AP-R`) and eligible regular heads can use Annual. The Annual period begins on the later of January 1 or the employee's regularization date.
 
 Base Annual period: **January 1-December 31, 2026**. Importing a form does not bypass employee eligibility or approval rules.
 
-To import every department instead, use the separate [compiled all-department import](../Batch_Import_Department_Evaluation_Seeds.md).
+To import every department instead, use the separate [compiled all-department import](../README.md).
+
+## Annual form coverage
+
+Period: **2026-01-01 to 2026-12-31**. This creates five templates covering every AP position, including Sales Associate I-II. The portal starts each employee's Annual period on the later of January 1 or their regularization date. Annual self-rating follows regular employee eligibility.
+
+Each template has 8 KRAs totaling 100%, 8 Core Behaviors, and an overall score split of 80% KRA / 20% Behavior. The seeds do not add scores or approvals. Reimporting a template stops with an error.

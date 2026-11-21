@@ -42,11 +42,17 @@ After import, use **Admin > Portal Accounts** to create the employee and reviewe
 ## Forms and workflow
 
 - `seed_initial_final.sql`: two shared Active forms for the sample probationary position. Each has 8 KRAs (total 100%) and 8 Core Behaviors, with an 80% KRA / 20% Behavior split.
-- Annual SQL files: role-specific templates and criteria for this department. See the [detailed department guide](Office_of_the_President_Evaluation_Dry_Run.md) for role coverage and any later 2027 post-probation forms.
+- Annual SQL files: role-specific templates and criteria for this department.
 - No ratings, submissions, approvals, or automatic regularization are imported.
 - Probationary employee: Employee Portal > Self Rating > Initial. Final follows full Initial approval. The sample Initial due dates are January 1 and January 15, 2027.
 - Regular staff sample (`MO26-EX-R`) and eligible regular heads can use Annual. The Annual period begins on the later of January 1 or the employee's regularization date.
 
 Base Annual period: **January 1-December 31, 2026**. Importing a form does not bypass employee eligibility or approval rules.
 
-To import every department instead, use the separate [compiled all-department import](../Batch_Import_Department_Evaluation_Seeds.md).
+To import every department instead, use the separate [compiled all-department import](../README.md).
+
+## Annual form coverage
+
+The base period is **2026-01-01 to 2026-12-31**. The same SQL adds a **2027 Annual** cycle for the Executive Assistants after regularization. The portal starts an individual's Annual period on the later of January 1 or their regularization date. Annual self-rating follows regular employee eligibility.
+
+Both scripts cover **Executive Assistant I, II, and III**. President and CEO is excluded because that position has no configured reporting head to review a self-rating. Each template has 8 executive-support KRAs totaling 100%, 8 Core Behaviors, and an 80% KRA / 20% Behavior overall split. The scripts add forms only: no scores, submissions, or approvals. A second import stops if the forms already exist.

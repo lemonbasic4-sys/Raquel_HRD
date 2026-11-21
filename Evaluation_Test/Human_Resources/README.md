@@ -42,11 +42,19 @@ After import, use **Admin > Portal Accounts** to create the employee and reviewe
 ## Forms and workflow
 
 - `seed_initial_final.sql`: two shared Active forms for the sample probationary position. Each has 8 KRAs (total 100%) and 8 Core Behaviors, with an 80% KRA / 20% Behavior split.
-- Annual SQL files: role-specific templates and criteria for this department. See the [detailed department guide](Human_Resources_Evaluation_Dry_Run.md) for role coverage and any later 2027 post-probation forms.
+- Annual SQL files: role-specific templates and criteria for this department.
 - No ratings, submissions, approvals, or automatic regularization are imported.
 - Probationary employee: Employee Portal > Self Rating > Initial. Final follows full Initial approval. The sample Initial due dates are January 1 and January 15, 2027.
 - Regular staff sample (`MO26-HR-R`) and eligible regular heads can use Annual. The Annual period begins on the later of January 1 or the employee's regularization date.
 
 Base Annual period: **January 1-December 31, 2026**. Importing a form does not bypass employee eligibility or approval rules.
 
-To import every department instead, use the separate [compiled all-department import](../Batch_Import_Department_Evaluation_Seeds.md).
+To import every department instead, use the separate [compiled all-department import](../README.md).
+
+## Annual form coverage
+
+The first Annual period is **2026-01-01 to 2026-12-31** for all 15 positions. The same SQL adds an **HR Staff I-V Annual 2027** form. Annual self-rating requires the employee's **regularization effective date**. The portal starts the Annual period on the later of January 1 or that date.
+
+Each SQL adds three role-specific templates (HR Manager I-V, HR Supervisor I-V, HR Staff I-V) and the later HR Staff form. Each has 8 KRAs totaling 100%, 8 Core Behaviors, and an 80% KRA / 20% Behavior overall split. No scores or approvals are seeded. Reimporting a template stops with an error.
+
+The current Regular HR employee records (`HRD-001`, `HRD-002`, `HRD-003`) have **no regularization effective dates recorded**. Record their true dates in HR before testing their Annual self-ratings. This seed does not invent or overwrite those dates.
