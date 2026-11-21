@@ -476,6 +476,39 @@ function formatDateTimeString(dateStr) {
 function startNotificationPolling() {
     const baseUrl = (typeof window !== 'undefined' && window.APP_BASE_URL) ? window.APP_BASE_URL : '';
     const context = (typeof window !== 'undefined' && window.NOTIF_CONTEXT) ? window.NOTIF_CONTEXT : 'hr';
+    let previousUnreadCount = null;
+
+    function refreshNavigationBadges() {
+        const portal = window.IS_HR_MANAGER ? 'manager' : window.IS_HR_SUPERVISOR ? 'supervisor'
+            : window.IS_HR_STAFF ? 'staff' : window.IS_ADMIN_CENTER ? 'admin'
+            : window.location.pathname.split('/').filter(Boolean).at(-2);
+        if (!['employee', 'manager', 'supervisor', 'staff', 'admin'].includes(portal)) return;
+        fetch(`${baseUrl}/${portal}/dashboard.php`, { credentials: 'same-origin', cache: 'no-store' })
+            .then(response => response.ok ? response.text() : Promise.reject(new Error('Navigation refresh failed')))
+            .then(html => {
+                const freshPage = new DOMParser().parseFromString(html, 'text/html');
+                for (const selector of ['#sidebar-nav', '.employee-bottom-nav', '.hr-bottom-nav']) {
+                    const currentNav = document.querySelector(selector);
+                    const freshNav = freshPage.querySelector(selector);
+                    if (!currentNav || !freshNav) continue;
+                    currentNav.querySelectorAll('a[href]').forEach(link => {
+                        const path = new URL(link.href).pathname;
+                        const freshLink = [...freshNav.querySelectorAll('a[href]')]
+                            .find(candidate => new URL(candidate.href, window.location.origin).pathname === path);
+                        if (!freshLink) return;
+                        const badgeSelector = selector === '#sidebar-nav' ? '.badge' : '.mobile-notif-badge, .hr-mobile-badge';
+                        link.querySelector(badgeSelector)?.remove();
+                        const freshBadge = freshLink.querySelector(badgeSelector);
+                        if (freshBadge) {
+                            const badge = document.importNode(freshBadge, true);
+                            const iconWrapper = link.querySelector('.position-relative');
+                            (iconWrapper || link).appendChild(badge);
+                        }
+                    });
+                }
+            })
+            .catch(err => console.error('Error refreshing navigation badges:', err));
+    }
     
     function checkNotifications() {
         const url = `${baseUrl}/includes/ajax/get-unread-notifications.php?context=${context}&last_seen_id=${window.lastSeenNotifId || 0}`;
@@ -501,6 +534,11 @@ function startNotificationPolling() {
                 }
                 
                 updateNotificationDOM(data.unread_count, data.recent_notifications);
+                if (previousUnreadCount === null || previousUnreadCount !== data.unread_count
+                    || (data.new_notifications && data.new_notifications.length > 0 && !isFirstRun)) {
+                    refreshNavigationBadges();
+                }
+                previousUnreadCount = data.unread_count;
             }
         })
         .catch(err => console.error('Error polling notifications:', err));
