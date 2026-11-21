@@ -1,0 +1,87 @@
+-- Quarterly workflow only. Safe to import repeatedly; existing evaluations are preserved.
+CREATE TABLE IF NOT EXISTS quarterly_cycle_department_owners (
+    department_id INT NOT NULL PRIMARY KEY,
+    owner_position_id INT NOT NULL,
+    CONSTRAINT fk_quarterly_cycle_owner_department FOREIGN KEY (department_id) REFERENCES departments(department_id),
+    CONSTRAINT fk_quarterly_cycle_owner_position FOREIGN KEY (owner_position_id) REFERENCES job_titles(job_title_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS quarterly_evaluation_cycles (
+    cycle_id INT AUTO_INCREMENT PRIMARY KEY,
+    department_id INT NOT NULL,
+    period_start DATE NOT NULL,
+    period_end DATE NOT NULL,
+    started_at DATETIME NULL,
+    started_by INT NULL,
+    self_rating_deadline DATE NULL,
+    first_finalized_at DATETIME NULL,
+    completed_at DATETIME NULL,
+    first_completed_at DATETIME NULL,
+    ready_for_approval_at DATETIME NULL,
+    cycle_approved_by INT NULL,
+    cancelled_at DATETIME NULL,
+    cancelled_by INT NULL,
+    cancellation_reason TEXT NULL,
+    active_period_key TINYINT GENERATED ALWAYS AS (IF(cancelled_at IS NULL, 1, NULL)) STORED,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY quarterly_department_active_period (department_id, period_start, period_end, active_period_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS quarterly_kra_approvals (
+    approval_id INT AUTO_INCREMENT PRIMARY KEY,
+    member_id INT NOT NULL,
+    approved_by INT NOT NULL,
+    approved_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    remarks TEXT NOT NULL,
+    ratings_json LONGTEXT NOT NULL,
+    rater_signature_data LONGTEXT NULL,
+    rater_signed_at DATETIME NULL,
+    INDEX quarterly_kra_member (member_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS quarterly_evaluation_members (
+    member_id INT AUTO_INCREMENT PRIMARY KEY,
+    cycle_id INT NOT NULL,
+    employee_id INT NOT NULL,
+    evaluation_id INT NULL,
+    position_id INT NOT NULL,
+    reviewer_position_id INT NULL,
+    position_name VARCHAR(150) NOT NULL,
+    self_values_json TEXT NULL,
+    current_version INT NOT NULL DEFAULT 0,
+    revision_pending TINYINT NOT NULL DEFAULT 0,
+    finalized_at DATETIME NULL,
+    is_late_participant TINYINT NOT NULL DEFAULT 0,
+    UNIQUE KEY quarterly_member (cycle_id, employee_id),
+    UNIQUE KEY quarterly_evaluation (evaluation_id),
+    CONSTRAINT quarterly_member_cycle FOREIGN KEY (cycle_id) REFERENCES quarterly_evaluation_cycles(cycle_id),
+    INDEX quarterly_employee (employee_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS quarterly_peer_submissions (
+    submission_id INT AUTO_INCREMENT PRIMARY KEY,
+    cycle_id INT NOT NULL,
+    rater_employee_id INT NOT NULL,
+    target_employee_id INT NOT NULL,
+    submitted_by INT NOT NULL,
+    scores_json TEXT NOT NULL,
+    rater_signature_data LONGTEXT NULL,
+    rater_signed_at DATETIME NULL,
+    is_late TINYINT NOT NULL DEFAULT 0,
+    submitted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY quarterly_peer_once (cycle_id, rater_employee_id, target_employee_id),
+    CONSTRAINT quarterly_peer_cycle FOREIGN KEY (cycle_id) REFERENCES quarterly_evaluation_cycles(cycle_id),
+    INDEX quarterly_peer_target (cycle_id, target_employee_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS quarterly_evaluation_versions (
+    version_id INT AUTO_INCREMENT PRIMARY KEY,
+    member_id INT NOT NULL,
+    version_number INT NOT NULL,
+    finalized_by INT NOT NULL,
+    finalized_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    remarks TEXT NOT NULL,
+    snapshot_json LONGTEXT NOT NULL,
+    UNIQUE KEY quarterly_version (member_id, version_number),
+    CONSTRAINT quarterly_version_member FOREIGN KEY (member_id) REFERENCES quarterly_evaluation_members(member_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
