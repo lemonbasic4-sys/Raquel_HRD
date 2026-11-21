@@ -12,7 +12,7 @@ Copy and paste into PowerShell:
 
 ```powershell
 cd C:\xampp\htdocs\Raquel_HRD
-C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 --abort-source-on-error -u root -e "source evaluation/Human_Resources/seed_human_resources_annual_dry_run.sql"
+C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 --abort-source-on-error -u root -e "source Evaluation_Test/Human_Resources/seed_human_resources_annual_dry_run.sql"
 ```
 
 The first Annual period is **2026-01-01 to 2026-12-31** for all 15 positions. The same SQL adds an **HR Staff I-V Annual 2027** form. Annual self-rating requires the employee's **regularization effective date**. The portal starts the Annual period on the later of January 1 or that date.

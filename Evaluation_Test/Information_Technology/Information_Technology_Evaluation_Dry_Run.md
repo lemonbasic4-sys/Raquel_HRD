@@ -12,7 +12,7 @@ Copy and paste into PowerShell:
 
 ```powershell
 cd C:\xampp\htdocs\Raquel_HRD
-C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 --abort-source-on-error -u root -e "source evaluation/Information_Technology/seed_information_technology_annual_dry_run.sql"
+C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 --abort-source-on-error -u root -e "source Evaluation_Test/Information_Technology/seed_information_technology_annual_dry_run.sql"
 ```
 
 The first Annual period is **2026-01-01 to 2026-12-31** for all 18 positions. The same SQL adds a **Technical Support Staff I-V Annual 2027** form. The portal starts the actual Annual period on the later of January 1 or regularization date. Annual self-rating follows regular employee eligibility.

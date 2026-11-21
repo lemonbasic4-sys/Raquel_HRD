@@ -13,14 +13,14 @@ Paste this block into PowerShell. It imports employee information first, then In
 ```powershell
 cd C:\xampp\htdocs\raquel_hrd
 
-C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 --abort-source-on-error -u root -e "source evaluation/Finance/seed_employees.sql"
+C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 --abort-source-on-error -u root -e "source Evaluation_Test/Finance/seed_employees.sql"
 if ($LASTEXITCODE -ne 0) { throw 'Finance import stopped: seed_employees.sql' }
 
-C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 --abort-source-on-error -u root -e "source evaluation/Finance/seed_initial_final.sql"
+C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 --abort-source-on-error -u root -e "source Evaluation_Test/Finance/seed_initial_final.sql"
 if ($LASTEXITCODE -ne 0) { throw 'Finance import stopped: seed_initial_final.sql' }
 
 
-C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 --abort-source-on-error -u root -e "source evaluation/Finance/seed_finance_annual_dry_run.sql"
+C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 --abort-source-on-error -u root -e "source Evaluation_Test/Finance/seed_finance_annual_dry_run.sql"
 if ($LASTEXITCODE -ne 0) { throw 'Finance import stopped: seed_finance_annual_dry_run.sql' }
 ```
 

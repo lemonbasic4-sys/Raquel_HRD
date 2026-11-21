@@ -12,7 +12,7 @@ Copy and paste into PowerShell:
 
 ```powershell
 cd C:\xampp\htdocs\Raquel_HRD
-C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 --abort-source-on-error -u root -e "source evaluation/Office_of_the_President/seed_office_of_the_president_annual_dry_run.sql"
+C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 --abort-source-on-error -u root -e "source Evaluation_Test/Office_of_the_President/seed_office_of_the_president_annual_dry_run.sql"
 ```
 
 The base period is **2026-01-01 to 2026-12-31**. The same SQL adds a **2027 Annual** cycle for the Executive Assistants after regularization. The portal starts an individual's Annual period on the later of January 1 or their regularization date. Annual self-rating follows regular employee eligibility.

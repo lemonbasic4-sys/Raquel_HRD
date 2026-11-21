@@ -12,7 +12,7 @@ Copy and paste into PowerShell:
 
 ```powershell
 cd C:\xampp\htdocs\Raquel_HRD
-C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 --abort-source-on-error -u root -e "source evaluation/Marketing/seed_marketing_annual_dry_run.sql"
+C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 --abort-source-on-error -u root -e "source Evaluation_Test/Marketing/seed_marketing_annual_dry_run.sql"
 ```
 
 The first Annual period is **2026-01-01 to 2026-12-31** for all six positions. The same SQL adds a **Marketing Staff I-II Annual 2027** form. The portal starts the actual Annual period on the later of January 1 or regularization date. Annual self-rating follows regular employee eligibility.

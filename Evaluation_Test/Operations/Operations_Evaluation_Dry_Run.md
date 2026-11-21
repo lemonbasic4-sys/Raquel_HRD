@@ -12,7 +12,7 @@ Copy and paste into PowerShell:
 
 ```powershell
 cd C:\xampp\htdocs\Raquel_HRD
-C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 --abort-source-on-error -u root -e "source evaluation/Operations/seed_operations_annual_dry_run.sql"
+C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 --abort-source-on-error -u root -e "source Evaluation_Test/Operations/seed_operations_annual_dry_run.sql"
 ```
 
 The base Annual period is **2026-01-01 to 2026-12-31**. The same SQL adds a **2027 Annual** Focal Person I-V form for employees after regularization. The portal starts an individual's Annual period on the later of January 1 or the regularization date. Annual self-rating follows regular employee eligibility.

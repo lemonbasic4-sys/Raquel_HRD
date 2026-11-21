@@ -49,7 +49,7 @@ The active workflow supports Initial and Final evaluations for probationary empl
 
 Annual evaluations are independent of Quarterly records. New Quarterly templates, cycles, and submissions are disabled to match the client-confirmed evaluation process; existing Quarterly results remain in history.
 
-Use [evaluation/README.md](evaluation/README.md) for workflow dry runs. Import base seeds 1-4 once, then open the selected department's README, for example [Acquired Properties](evaluation/Acquired_Properties/README.md), and copy its import block.
+Use [Evaluation_Test/README.md](Evaluation_Test/README.md) for workflow dry runs. Import base seeds 1-4 once, then open the selected department's README, for example [Acquired Properties](Evaluation_Test/Acquired_Properties/README.md), and copy its import block.
 
 - Each department folder supplies fictional employee information, required reporting heads, and Initial, Final, and Annual templates. It creates no user accounts; create Employee Portal accounts manually through Admin after import.
 - Each has two probationary employees, one regular staff sample, and its reporting heads; forms can cover more positions than the sample employees occupy.
@@ -88,7 +88,7 @@ employee/         Employee self-service portal
 includes/         Shared application logic and layouts
 config/           Database configuration
 database/         Schema, organization, and account seeds
-evaluation/      Department employees, accounts, forms, and import READMEs
+Evaluation_Test/      Department employees, accounts, forms, and import READMEs
 assets/           CSS, JavaScript, images, and local libraries
 backups/          Database backups
 scripts/          Supporting scripts

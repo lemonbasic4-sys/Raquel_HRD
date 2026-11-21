@@ -13,14 +13,14 @@ Paste this block into PowerShell. It imports employee information first, then In
 ```powershell
 cd C:\xampp\htdocs\raquel_hrd
 
-C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 --abort-source-on-error -u root -e "source evaluation/Compliance/seed_employees.sql"
+C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 --abort-source-on-error -u root -e "source Evaluation_Test/Compliance/seed_employees.sql"
 if ($LASTEXITCODE -ne 0) { throw 'Compliance import stopped: seed_employees.sql' }
 
-C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 --abort-source-on-error -u root -e "source evaluation/Compliance/seed_initial_final.sql"
+C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 --abort-source-on-error -u root -e "source Evaluation_Test/Compliance/seed_initial_final.sql"
 if ($LASTEXITCODE -ne 0) { throw 'Compliance import stopped: seed_initial_final.sql' }
 
 
-C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 --abort-source-on-error -u root -e "source evaluation/Compliance/seed_compliance_annual_dry_run.sql"
+C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 --abort-source-on-error -u root -e "source Evaluation_Test/Compliance/seed_compliance_annual_dry_run.sql"
 if ($LASTEXITCODE -ne 0) { throw 'Compliance import stopped: seed_compliance_annual_dry_run.sql' }
 ```
 

@@ -11,8 +11,8 @@ C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 -u root -e "source 
 C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 -u root -e "source database/4th_seed_executive_portal_accounts.sql"
 ```
 
-After all four imports succeed, open the selected department's `README.md`, starting with [Acquired Properties](evaluation/Acquired_Properties/README.md). Its commands import mock employee information and Initial, Final, and Annual evaluation forms. They do not create user accounts; you create Employee Portal accounts yourself through Admin > Portal Accounts after import.
+After all four imports succeed, open the selected department's `README.md`, starting with [Acquired Properties](Evaluation_Test/Acquired_Properties/README.md). Its commands import mock employee information and Initial, Final, and Annual evaluation forms. They do not create user accounts; you create Employee Portal accounts yourself through Admin > Portal Accounts after import.
 
-For the optional compiled import of **all departments at once**, use [evaluation/README.md](evaluation/README.md). That compiled block is separate from the department-by-department workflow.
+For the optional compiled import of **all departments at once**, use [Evaluation_Test/README.md](Evaluation_Test/README.md). That compiled block is separate from the department-by-department workflow.
 
 Run the base setup once per fresh database. To add another department afterward, use that department's README directly.

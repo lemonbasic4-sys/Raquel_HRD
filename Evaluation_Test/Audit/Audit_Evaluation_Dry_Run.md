@@ -12,7 +12,7 @@ Copy and paste into PowerShell:
 
 ```powershell
 cd C:\xampp\htdocs\Raquel_HRD
-C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 --abort-source-on-error -u root -e "source evaluation/Audit/seed_audit_department_annual_dry_run.sql"
+C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 --abort-source-on-error -u root -e "source Evaluation_Test/Audit/seed_audit_department_annual_dry_run.sql"
 ```
 
 The first Annual period is **2026-01-01 to 2026-12-31** for all 11 Audit positions. The same SQL also creates an **Auditor I-V Annual 2027** form for the post-probation path. The portal starts the employee's actual Annual period on the later of January 1 or their regularization date. Annual self-rating follows regular employee eligibility.
