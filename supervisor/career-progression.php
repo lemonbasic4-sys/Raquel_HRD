@@ -129,31 +129,76 @@ require_once '../includes/header.php';
 .cp-dot.dot-RoleChange{ background:#0d6efd; }
 .cp-dot.dot-current   { background:#BD9414; }
 /* ── Employee card ───────────────────────────────────────── */
-.cp-card { border:1px solid #e8ecf0; border-radius:14px; overflow:hidden; transition:box-shadow .2s; }
-.cp-card:hover { box-shadow:0 4px 20px rgba(0,0,0,.08); }
-.cp-card-header { padding:14px 16px; background:linear-gradient(135deg,#f8faf5 0%,#f0f4eb 100%); border-bottom:1px solid #e8ecf0; display:flex; gap:12px; align-items:flex-start; }
 .cp-avatar { width:42px; height:42px; border-radius:10px; object-fit:cover; flex-shrink:0; }
 .cp-avatar-initials { width:42px; height:42px; border-radius:10px; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:.95rem; color:#fff; background:var(--primary-blue,#294306); }
-.cp-card-body { padding:16px; }
 /* ── Stat pills ──────────────────────────────────────────── */
-.cp-stat-pill { display:inline-flex; align-items:center; gap:5px; padding:4px 10px; border-radius:20px; font-size:.74rem; font-weight:600; background:#f1f3f5; color:#495057; white-space:nowrap; }
-.cp-stat-pill i { font-size:.78rem; color:#adb5bd; }
 /* ── Aspires row — fixed single line ────────────────────── */
-.cp-aspires { display:flex; align-items:center; gap:6px; flex-wrap:nowrap; overflow:hidden; min-height:26px; }
-.cp-aspires-label { font-size:.68rem; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:#adb5bd; white-space:nowrap; flex-shrink:0; }
 /* ── Notes block — fixed height ─────────────────────────── */
-.cp-notes { background:#f8faf5; border:1px solid #e8ecf0; border-radius:8px; padding:8px 10px; min-height:58px; max-height:58px; overflow:hidden; position:relative; }
-.cp-notes-label { font-size:.67rem; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:#adb5bd; margin-bottom:3px; }
-.cp-notes-text { font-size:.76rem; color:#495057; line-height:1.4; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
-.cp-notes-empty { font-size:.76rem; color:#adb5bd; font-style:italic; line-height:1.4; padding-top:4px; }
 /* ── Desired position tag ────────────────────────────────── */
-.desired-tag { background:linear-gradient(135deg,#fff7e0,#fff0b3); border:1px solid #ffe066; color:#856404; font-size:.72rem; font-weight:600; padding:2px 8px; border-radius:10px; display:inline-block; max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; vertical-align:middle; flex-shrink:0; }
 /* ── Filter bar ──────────────────────────────────────────── */
 .cp-filter-bar { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:18px; }
 .cp-filter-bar select, .cp-filter-bar input { font-size:.85rem; }
 /* ── Empty state ─────────────────────────────────────────── */
 .cp-empty { padding:52px 20px; text-align:center; color:#adb5bd; }
 .cp-empty i { display:block; font-size:3rem; margin-bottom:14px; opacity:.2; }
+.career-progression-page .page-hero { padding: 1.5rem !important; }
+.career-progression-page .page-hero .stat-card { min-height: 84px; }
+.career-progression-page .cp-breakdown .cc-body { padding: .85rem 1.25rem; }
+.career-progression-page .cp-breakdown-item { display:flex; align-items:center; gap:.75rem; padding:.6rem .85rem; border:1px solid #e2e9df; border-radius:9px; background:#fafcf9; }
+.career-progression-page .cp-breakdown-item .cp-breakdown-count { margin-left:auto; font-size:1.1rem; font-weight:800; color:#18371a; }
+.career-progression-page .cp-breakdown-item small { display:block; color:#6b786b; font-size:.7rem; }
+.career-progression-page .cp-filter-bar { display:grid; grid-template-columns:minmax(170px,1.4fr) repeat(3,minmax(130px,1fr)) auto auto; gap:.6rem; margin-bottom:1rem; }
+.career-progression-page .cp-filter-bar > * { width:100%; max-width:none !important; min-width:0; }
+.career-progression-page .cp-filter-bar .btn { white-space:nowrap; }
+.career-progression-page .cp-table-wrap { border:1px solid #e0e8dd; border-radius:10px; overflow:visible; }
+.career-progression-page .cp-table { width:100%; table-layout:fixed; font-size:.78rem; }
+.career-progression-page .cp-table thead th { padding:.75rem .65rem; background:#f2f6f0; color:#546754; font-size:.66rem; text-transform:uppercase; letter-spacing:.045em; border-bottom:1px solid #dce5d9; }
+.career-progression-page .cp-table thead th:nth-child(1) { width:19%; }
+.career-progression-page .cp-table thead th:nth-child(2) { width:18%; }
+.career-progression-page .cp-table thead th:nth-child(3) { width:10%; }
+.career-progression-page .cp-table thead th:nth-child(4) { width:12%; }
+.career-progression-page .cp-table thead th:nth-child(5) { width:11%; }
+.career-progression-page .cp-table thead th:nth-child(6) { width:17%; }
+.career-progression-page .cp-table thead th:nth-child(7) { width:13%; }
+.career-progression-page .cp-table td { padding:.75rem .65rem; vertical-align:middle; border-color:#e8ede6; overflow-wrap:anywhere; }
+.career-progression-page .cp-table td strong { color:#193b1b; font-weight:700; }
+.career-progression-page .cp-table td small { display:block; color:#687768; line-height:1.3; }
+.career-progression-page .cp-employee-cell { display:flex; align-items:center; gap:.6rem; }
+.career-progression-page .cp-avatar, .career-progression-page .cp-avatar-initials { width:34px; height:34px; border-radius:50%; font-size:.7rem; }
+.career-progression-page .cp-score { display:flex; align-items:center; gap:.5rem; }
+.career-progression-page .cp-score-track { height:5px; flex:1; min-width:24px; border-radius:5px; background:#e5ece3; overflow:hidden; }
+.career-progression-page .cp-score-track span { display:block; height:100%; background:#2b8b47; }
+.career-progression-page .cp-move-count { display:inline-block; padding:.2rem .45rem; border:1px solid #dce6d8; border-radius:6px; color:#435843; white-space:nowrap; }
+.career-progression-page .cp-actions { display:flex; justify-content:flex-end; }
+.career-progression-page .cp-actions .btn { width:34px; height:34px; display:inline-flex; align-items:center; justify-content:center; border-radius:8px; }
+.career-progression-page .cp-actions .dropdown-menu { min-width:180px; border-color:#dce6d8; box-shadow:0 10px 28px rgba(8,46,6,.14); }
+.career-progression-page .cp-actions .dropdown-item { font-size:.8rem; padding:.5rem .8rem; }
+.career-progression-page .cp-actions .dropdown-item i { width:18px; color:#476a48; }
+.career-progression-page .cp-detail-row { background:#f8fbf7; }
+.career-progression-page .cp-detail-content { padding:1rem 1.25rem; border-bottom:1px solid #dce6d8; }
+.career-progression-page .cp-detail-grid { display:grid; grid-template-columns:1fr 1.5fr; gap:1.5rem; }
+.career-progression-page .cp-detail-grid h6 { color:#244825; font-size:.78rem; font-weight:700; }
+.career-progression-page .cp-table-footer { padding:.65rem 1rem; background:#f8faf7; color:#687768; font-size:.74rem; }
+@media (max-width:1100px) {
+    .career-progression-page .cp-filter-bar { grid-template-columns:repeat(3,minmax(0,1fr)); }
+    .career-progression-page .cp-table { font-size:.72rem; }
+}
+@media (max-width:767.98px) {
+    .career-progression-page .cp-filter-bar { grid-template-columns:1fr 1fr; }
+    .career-progression-page .cp-filter-bar .input-group { grid-column:1 / -1; }
+    .career-progression-page .cp-table { min-width:0; }
+    .career-progression-page .cp-table thead { display:none; }
+    .career-progression-page .cp-table, .career-progression-page .cp-table tbody, .career-progression-page .cp-table tr, .career-progression-page .cp-table td { display:block; width:100%; }
+    .career-progression-page .cp-table tr.cp-employee-row { padding:.75rem; border-bottom:1px solid #dce6d8; }
+    .career-progression-page .cp-table tr.cp-employee-row td { display:flex; justify-content:space-between; gap:1rem; padding:.45rem .25rem; border:0; text-align:right; }
+    .career-progression-page .cp-table tr.cp-employee-row td::before { content:attr(data-label); color:#647464; font-size:.7rem; font-weight:700; text-align:left; }
+    .career-progression-page .cp-table tr.cp-employee-row td:first-child { display:block; text-align:left; }
+    .career-progression-page .cp-table tr.cp-employee-row td:first-child::before { display:none; }
+    .career-progression-page .cp-table tr.cp-employee-row td:last-child { display:block; text-align:left; }
+    .career-progression-page .cp-table tr.cp-employee-row td:last-child::before { display:none; }
+    .career-progression-page .cp-actions { justify-content:flex-start; }
+    .career-progression-page .cp-detail-grid { grid-template-columns:1fr; }
+}
 </style>
 
 <div class="career-progression-page">
@@ -177,10 +222,10 @@ require_once '../includes/header.php';
 </div>
 
 <!-- Type breakdown mini-chart card -->
-<div class="chart-card fadeup mt-4">
+<div class="chart-card cp-breakdown fadeup mt-4">
     <div class="cc-header"><h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Movement Breakdown</h5></div>
     <div class="cc-body">
-        <div class="row g-3 text-center">
+        <div class="row g-2">
             <?php
             $breakdown = [
                 ['Promotion',  $counts['Promotion'],  'bg-success', 'fas fa-arrow-trend-up'],
@@ -191,10 +236,9 @@ require_once '../includes/header.php';
             foreach ($breakdown as [$label, $val, $cls, $ico]):
             ?>
             <div class="col-6 col-md-3">
-                <div class="p-3 rounded-3 border h-100" style="background:#fafafa;">
-                    <div class="mb-2"><span class="badge <?php echo $cls; ?> px-3 py-2" style="font-size:.8rem;"><i class="<?php echo $ico; ?> me-1"></i><?php echo $label; ?></span></div>
-                    <div style="font-size:1.8rem;font-weight:800;color:#212529;"><?php echo number_format($val); ?></div>
-                    <div class="text-muted" style="font-size:.75rem;"><?php echo $counts['total'] > 0 ? round($val / $counts['total'] * 100) : 0; ?>% of applied movements</div>
+                <div class="cp-breakdown-item h-100">
+                    <span class="badge <?php echo $cls; ?>"><i class="<?php echo $ico; ?> me-1"></i><?php echo $label; ?></span>
+                    <span class="cp-breakdown-count"><?php echo number_format($val); ?><small><?php echo $counts['total'] > 0 ? round($val / $counts['total'] * 100) : 0; ?>% of applied movements</small></span>
                 </div>
             </div>
             <?php endforeach; ?>
@@ -202,7 +246,7 @@ require_once '../includes/header.php';
     </div>
 </div>
 
-<div class="chart-card fadeup mt-4">
+<div class="chart-card allow-overflow fadeup mt-4">
     <div class="cc-header d-flex flex-wrap align-items-center justify-content-between gap-3">
         <h5 class="mb-0"><i class="fas fa-chart-line me-2"></i>Employee Career Roadmaps</h5>
         <span class="badge bg-secondary-subtle text-secondary border"><?php echo count($employees); ?> employee<?php echo count($employees) === 1 ? '' : 's'; ?></span>
@@ -272,156 +316,64 @@ require_once '../includes/header.php';
                 <a href="career-progression.php" class="btn btn-sm btn-outline-secondary px-4">Clear Filters</a>
             </div>
         <?php else: ?>
-        <div class="row g-3" id="cpGrid">
-            <?php foreach ($visible as $emp):
-                $eid        = (int)$emp['employee_id'];
-                $movements  = $emp['movements'];
-                $eg         = $emp['eval_growth'];
-                [$ready_label, $ready_class] = careerIndicationBadge($emp);
-                $name_parts = preg_split('/\s+/', trim($emp['first_name'] . ' ' . $emp['last_name']));
-                $initials   = strtoupper(substr($name_parts[0] ?? 'U', 0, 1) . substr($name_parts[1] ?? '', 0, 1));
-                $collapseId = 'cpTimeline' . $eid;
-
-                // Normalise eval data so every card renders the same fields
-                $score_txt      = ($eg && $eg['total_score'] !== null) ? number_format((float)$eg['total_score'], 2) . ' / 4.0' : '—';
-                $desired_txt    = ($eg && !empty($eg['desired_position'])) ? $eg['desired_position'] : null;
-                $endorsed       = $ready_label === 'Role fit suggested';
-                $growth_notes   = ($eg && !empty($eg['career_growth_details'])) ? mb_substr($eg['career_growth_details'], 0, 140) . (mb_strlen($eg['career_growth_details']) > 140 ? '…' : '') : null;
-            ?>
-            <div class="col-md-6 col-xl-4">
-                <div class="cp-card d-flex flex-column h-100">
-
-                    <!-- ── Header ── -->
-                    <div class="cp-card-header">
+        <div class="cp-table-wrap">
+            <table class="table cp-table mb-0">
+                <thead><tr>
+                    <th>Employee</th><th>Department / Location</th><th>Tenure</th><th>Evaluation</th><th>Applied Moves</th><th>Suggested Role</th><th class="text-end">Actions</th>
+                </tr></thead>
+                <tbody>
+                <?php foreach ($visible as $emp):
+                    $eid = (int)$emp['employee_id'];
+                    $movements = $emp['movements'];
+                    $eg = $emp['eval_growth'];
+                    $name_parts = preg_split('/\s+/', trim($emp['first_name'] . ' ' . $emp['last_name']));
+                    $initials = strtoupper(substr($name_parts[0] ?? 'U', 0, 1) . substr($name_parts[1] ?? '', 0, 1));
+                    $collapseId = 'cpTimeline' . $eid;
+                    $score = ($eg && $eg['total_score'] !== null) ? (float)$eg['total_score'] : null;
+                    $desired = trim((string)($eg['desired_position'] ?? ''));
+                ?>
+                <tr class="cp-employee-row">
+                    <td data-label="Employee"><div class="cp-employee-cell">
                         <?php if (!empty($emp['profile_picture'])): ?>
                             <img src="<?php echo e(getEmployeeAvatar($emp['profile_picture'])); ?>" alt="" class="cp-avatar">
-                        <?php else: ?>
-                            <div class="cp-avatar-initials"><?php echo e($initials); ?></div>
-                        <?php endif; ?>
-                        <div class="flex-grow-1" style="min-width:0;">
-                            <div class="fw-bold text-truncate" style="font-size:.93rem;"><?php echo e($emp['last_name'] . ', ' . $emp['first_name']); ?></div>
-                            <div class="text-muted text-truncate" style="font-size:.78rem;"><?php echo e($emp['job_title'] ?? 'No Position'); ?></div>
-                            <div class="d-flex flex-wrap gap-1 mt-1">
-                                <?php if (!empty($emp['department_name'])): ?>
-                                    <span class="badge bg-light text-dark border" style="font-size:.65rem;"><?php echo e($emp['department_name']); ?></span>
-                                <?php endif; ?>
-                                <?php if (!empty($emp['branch_name'])): ?>
-                                    <span class="badge bg-light text-dark border" style="font-size:.65rem;"><i class="fas fa-map-marker-alt me-1" style="color:#BD9414;"></i><?php echo e($emp['branch_name']); ?></span>
-                                <?php endif; ?>
-                                <span class="badge <?php echo $ready_class; ?>" style="font-size:.65rem;"><?php echo $ready_label; ?></span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- ── Body (flex-grow fills remaining height) ── -->
-                    <div class="cp-card-body d-flex flex-column flex-grow-1">
-
-                        <!-- Stats row — always 3 pills -->
-                        <div class="d-flex gap-2 mb-3" style="flex-wrap:nowrap;overflow:hidden;">
-                            <span class="cp-stat-pill flex-shrink-0"><i class="fas fa-calendar-alt"></i><?php echo e(tenureText($emp['hire_date'] ?? '')); ?></span>
-                            <span class="cp-stat-pill flex-shrink-0"><i class="fas fa-route"></i><?php echo count($movements); ?> applied move<?php echo count($movements) === 1 ? '' : 's'; ?></span>
-                            <span class="cp-stat-pill flex-shrink-0"><i class="fas fa-star"></i><?php echo $score_txt; ?></span>
-                        </div>
-
-                        <!-- Aspires-to row — always present, placeholder when empty -->
-                        <div class="cp-aspires mb-3">
-                            <span class="cp-aspires-label">Suggested role</span>
-                            <?php if ($desired_txt): ?>
-                                <span class="desired-tag" title="<?php echo e($desired_txt); ?>"><i class="fas fa-arrow-up me-1"></i><?php echo e($desired_txt); ?></span>
-                                <?php if ($endorsed): ?>
-                                    <span class="badge bg-success-subtle text-success border border-success-subtle" style="font-size:.65rem;"><i class="fas fa-check me-1"></i>Suggested</span>
-                                <?php endif; ?>
-                            <?php else: ?>
-                                <span class="text-muted" style="font-size:.78rem;font-style:italic;"><?php echo $eg ? 'No target role recorded' : 'No approved evaluation'; ?></span>
-                            <?php endif; ?>
-                        </div>
-
-                        <!-- Growth notes — fixed height, always present -->
-                        <div class="cp-notes mb-3">
-                            <?php if ($growth_notes): ?>
-                                <div class="cp-notes-label">Evaluation Notes</div>
-                                <div class="cp-notes-text"><?php echo nl2br(e($growth_notes)); ?></div>
-                            <?php else: ?>
-                                <div class="cp-notes-empty"><i class="fas fa-sticky-note me-1"></i>No career-growth notes recorded</div>
-                            <?php endif; ?>
-                        </div>
-
-                        <!-- Timeline — always same height toggle button -->
-                        <div class="mb-3">
-                            <button class="btn btn-sm btn-outline-secondary w-100" style="font-size:.78rem;border-radius:8px;"
-                                data-bs-toggle="collapse" data-bs-target="#<?php echo $collapseId; ?>" aria-expanded="false">
-                                <i class="fas fa-project-diagram me-1"></i>
-                                <?php echo count($movements) > 0 ? count($movements) . ' applied movement' . (count($movements) === 1 ? '' : 's') . ' — view timeline' : 'No applied movements yet'; ?>
-                                <i class="fas fa-chevron-down ms-1" style="font-size:.68rem;transition:transform .2s;"></i>
-                            </button>
-                            <div class="collapse" id="<?php echo $collapseId; ?>">
-                                <div class="cp-timeline mt-2">
-                                    <!-- Hire -->
-                                    <div class="cp-node">
-                                        <div class="cp-dot dot-hire"></div>
-                                        <div>
-                                            <div class="fw-semibold" style="font-size:.8rem;">Hired</div>
-                                            <div class="text-muted" style="font-size:.73rem;"><?php echo formatDate($emp['hire_date'] ?? ''); ?></div>
-                                        </div>
-                                    </div>
-                                    <?php if (empty($movements)): ?>
-                                        <div class="cp-node">
-                                            <div class="cp-dot dot-current"></div>
-                                            <div style="font-size:.78rem;color:#6c757d;font-style:italic;">No applied movements recorded.</div>
-                                        </div>
-                                    <?php else: ?>
-                                        <?php foreach ($movements as $mv):
-                                            $dotClass  = 'dot-' . str_replace(' ', '', $mv['movement_type']);
-                                        ?>
-                                        <div class="cp-node">
-                                            <div class="cp-dot <?php echo $dotClass; ?>"></div>
-                                            <div>
-                                                <div class="d-flex flex-wrap align-items-center gap-1">
-                                                    <span class="fw-semibold" style="font-size:.8rem;"><?php echo e($mv['movement_type']); ?></span>
-                                                    <span class="badge bg-success" style="font-size:.62rem;">Applied</span>
-                                                </div>
-                                                <div style="font-size:.73rem;color:#495057;">
-                                                    <?php if (!empty($mv['new_position'])): ?>
-                                                        <?php echo e($mv['previous_position'] ?: '—'); ?> <i class="fas fa-arrow-right mx-1" style="color:#BD9414;font-size:.68rem;"></i><?php echo e($mv['new_position']); ?>
-                                                    <?php endif; ?>
-                                                    <?php if (!empty($mv['new_branch'])): ?>
-                                                        <div class="text-muted"><?php echo e($mv['prev_branch'] ?? '—'); ?> → <?php echo e($mv['new_branch']); ?></div>
-                                                    <?php endif; ?>
-                                                    <?php if (!empty($mv['new_department_name']) && $mv['new_department_name'] !== $mv['previous_department_name']): ?>
-                                                        <div class="text-muted">Department: <?php echo e($mv['previous_department_name'] ?: '—'); ?> → <?php echo e($mv['new_department_name']); ?></div>
-                                                    <?php endif; ?>
-                                                    <div class="text-muted"><?php echo formatDate($mv['effective_date']); ?></div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <?php endforeach; ?>
-                                        <!-- Current -->
-                                        <div class="cp-node">
-                                            <div class="cp-dot dot-current"></div>
-                                            <div>
-                                                <div class="fw-semibold" style="font-size:.8rem;color:#BD9414;">Current</div>
-                                                <div class="text-muted" style="font-size:.73rem;"><?php echo e($emp['job_title'] ?? 'No position'); ?></div>
-                                            </div>
-                                        </div>
-                                    <?php endif; ?>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Actions — always pinned at bottom -->
-                        <div class="mt-auto pt-2 border-top d-flex gap-2">
-                            <a href="career-movements.php?new_movement=1&emp_id=<?php echo $eid; ?>" class="btn btn-sm btn-primary flex-grow-1" style="font-size:.78rem;border-radius:8px;">
-                                <i class="fas fa-plus me-1"></i>Add Movement
-                            </a>
-                            <a href="view-employee.php?id=<?php echo $eid; ?>" class="btn btn-sm btn-outline-secondary" style="font-size:.78rem;border-radius:8px;" title="View Profile">
-                                <i class="fas fa-user"></i>
-                            </a>
-                        </div>
-
-                    </div><!-- /.cp-card-body -->
-                </div><!-- /.cp-card -->
-            </div>
-            <?php endforeach; ?>
+                        <?php else: ?><span class="cp-avatar-initials"><?php echo e($initials); ?></span><?php endif; ?>
+                        <span><strong><?php echo e($emp['last_name'] . ', ' . $emp['first_name']); ?></strong><small><?php echo e($emp['job_title'] ?: 'No position'); ?></small></span>
+                    </div></td>
+                    <td data-label="Department / Location"><strong><?php echo e($emp['department_name'] ?: 'No department'); ?></strong><small><?php echo e($emp['branch_name'] ?: 'No branch'); ?></small></td>
+                    <td data-label="Tenure"><?php echo e(tenureText($emp['hire_date'] ?? '')); ?></td>
+                    <td data-label="Evaluation">
+                        <?php if ($score !== null): ?><div class="cp-score"><strong><?php echo number_format($score, 2); ?></strong><span class="cp-score-track"><span style="width:<?php echo min(100, max(0, $score / 4 * 100)); ?>%"></span></span></div>
+                        <?php else: ?><span class="text-muted">No approved score</span><?php endif; ?>
+                    </td>
+                    <td data-label="Applied Moves"><span class="cp-move-count"><?php echo count($movements); ?> applied</span></td>
+                    <td data-label="Suggested Role"><?php if ($desired !== ''): ?><strong><?php echo e($desired); ?></strong><?php else: ?><span class="text-muted fst-italic"><?php echo $eg ? 'No target role recorded' : 'No approved evaluation'; ?></span><?php endif; ?></td>
+                    <td data-label="Actions"><div class="cp-actions dropdown">
+                        <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Actions for <?php echo e($emp['first_name'] . ' ' . $emp['last_name']); ?>"><i class="fas fa-ellipsis-v"></i></button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="career-movements.php?new_movement=1&amp;emp_id=<?php echo $eid; ?>"><i class="fas fa-plus"></i>Add Movement</a></li>
+                            <li><a class="dropdown-item" href="view-employee.php?id=<?php echo $eid; ?>"><i class="fas fa-user"></i>View Profile</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><button class="dropdown-item" type="button" data-bs-toggle="collapse" data-bs-target="#<?php echo $collapseId; ?>" aria-expanded="false" aria-controls="<?php echo $collapseId; ?>"><i class="fas fa-history"></i>View Timeline</button></li>
+                        </ul>
+                    </div></td>
+                </tr>
+                <tr class="cp-detail-row"><td colspan="7" class="p-0 border-0"><div class="collapse" id="<?php echo $collapseId; ?>"><div class="cp-detail-content">
+                    <div class="cp-detail-grid"><div><h6>Career indication</h6><?php [$indication, $indicationClass] = careerIndicationBadge($emp); ?><span class="badge <?php echo $indicationClass; ?>"><?php echo e($indication); ?></span>
+                        <?php if (!empty($eg['career_growth_details'])): ?><p class="mb-0 mt-2 small"><?php echo nl2br(e($eg['career_growth_details'])); ?></p><?php endif; ?>
+                    </div><div><h6>Movement timeline</h6><div class="cp-timeline">
+                        <div class="cp-node"><div class="cp-dot dot-hire"></div><strong>Hired</strong> <span class="text-muted small"><?php echo formatDate($emp['hire_date'] ?? ''); ?></span></div>
+                        <?php foreach ($movements as $mv): ?><div class="cp-node"><div class="cp-dot dot-<?php echo e(str_replace(' ', '', $mv['movement_type'])); ?>"></div><strong><?php echo e($mv['movement_type']); ?></strong> <span class="text-muted small"><?php echo formatDate($mv['effective_date']); ?></span>
+                            <div class="small"><?php echo e($mv['previous_position'] ?: '—'); ?> → <?php echo e($mv['new_position'] ?: '—'); ?></div>
+                            <?php if (!empty($mv['new_department_name']) && $mv['new_department_name'] !== $mv['previous_department_name']): ?><div class="small text-muted">Department: <?php echo e($mv['previous_department_name'] ?: '—'); ?> → <?php echo e($mv['new_department_name']); ?></div><?php endif; ?>
+                            <?php if (!empty($mv['new_branch'])): ?><div class="small text-muted">Branch: <?php echo e($mv['prev_branch'] ?: '—'); ?> → <?php echo e($mv['new_branch']); ?></div><?php endif; ?>
+                        </div><?php endforeach; ?>
+                        <?php if (!$movements): ?><div class="cp-node"><div class="cp-dot dot-current"></div><span class="text-muted small">No applied movements recorded.</span></div><?php endif; ?>
+                    </div></div></div>
+                </div></div></td></tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+            <div class="cp-table-footer">Showing <?php echo count($visible); ?> of <?php echo count($employees); ?> employees</div>
         </div>
         <?php endif; ?>
 
