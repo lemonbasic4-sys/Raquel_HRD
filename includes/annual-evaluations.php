@@ -829,6 +829,27 @@ function annualNotifyEmployee($conn, int $employeeId, string $title, string $mes
     }
 }
 
+/** Inform active HRIS personnel when an immediate head approves an Annual result. */
+function annualNotifyHrOfApprovedResult($conn, array $member, int $version, float $score, int $approverUserId): void
+{
+    $recipients = annualQuery($conn, "SELECT u.user_id,u.role FROM users u
+        JOIN employees e ON e.employee_id=u.employee_id
+        JOIN departments d ON d.department_id=e.department_id
+        WHERE d.department_name='Human Resources'
+          AND u.role IN ('HR Manager','HR Supervisor','HR Staff')
+          AND u.is_active=1 AND u.deleted_at IS NULL AND COALESCE(u.account_hold,0)=0
+          AND e.is_active=1 AND e.deleted_at IS NULL");
+    $name=trim($member['first_name'].' '.$member['last_name']);
+    $message=$name.' has an approved Annual evaluation (version '.$version.'). Final score: '
+        .number_format($score,2).'. The result is available in Evaluation History. No further HR approval is required.';
+    foreach ($recipients as $recipient) {
+        if ((int)$recipient['user_id']===$approverUserId) continue;
+        $portal=['HR Manager'=>'manager','HR Supervisor'=>'supervisor','HR Staff'=>'staff'][$recipient['role']];
+        createNotification($conn,(int)$recipient['user_id'],'Annual evaluation approved by immediate head',
+            $message,BASE_URL.'/'.$portal.'/evaluation-history.php','evaluations',false);
+    }
+}
+
 function annualNotifyHeads($conn, array $member, string $title, string $message): void
 {
     $users = annualQuery($conn, "SELECT u.user_id FROM users u JOIN employees e ON e.employee_id=u.employee_id
@@ -1044,6 +1065,7 @@ function annualRefreshApprovedResult($conn, array $member, int $actorUserId, boo
         $approve ? 'Annual evaluation approved' : ($complete ? 'Annual score complete' : 'Annual score updated'),
         ($approve ? 'Current overall score: '.number_format($candidate['total'],2).'. ' : 'Overall score: '.number_format((float)$member['official_score'],2).' → '.number_format($candidate['total'],2).'. ').$notice,(int)$member['evaluation_id']);
     if ($approve) {
+        annualNotifyHrOfApprovedResult($conn,$member,$version,(float)$candidate['total'],$actorUserId);
         $head=annualActor($conn,$actorUserId);
         annualQuery($conn,'UPDATE notifications SET needs_action=0 WHERE user_id=? AND link IN (?,?)',[$actorUserId,annualUrl($head,'?view=review&evaluation_id='.(int)$member['evaluation_id']),annualUrl($head,'?view=rate&evaluation_id='.(int)$member['evaluation_id'])]);
     }
@@ -1236,6 +1258,7 @@ function annualFinalize($conn, array $actor, int $evaluationId, array $ratings, 
         annualQuery($conn,'UPDATE notifications SET needs_action=0 WHERE link LIKE ?', ['%/annual-evaluations.php?view=review&evaluation_id='.$evaluationId]);
         logAudit($conn,(int)$actor['user_id'],'APPROVE','Annual Evaluation',$evaluationId,'Finalized version '.$version.'. Score: '.$candidate['total'].'. '.$remarks);
         annualNotifyEmployee($conn,(int)$member['employee_id'],'Annual evaluation finalized','Your immediate head finalized Annual result version '.$version.'. Final score: '.number_format($candidate['total'],2).'.', $evaluationId);
+        annualNotifyHrOfApprovedResult($conn,$member,$version,(float)$candidate['total'],(int)$actor['user_id']);
         if(!empty($member['individual_evaluation_id'])) annualUpdateCycleCompletion($conn,(int)$member['cycle_id'],(int)$actor['user_id']);
         $conn->commit();
     } catch (Throwable $e) { $conn->rollback(); throw $e; }
