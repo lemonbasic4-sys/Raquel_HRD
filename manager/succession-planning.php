@@ -267,7 +267,7 @@ $positions_res= $conn->query("SELECT DISTINCT job_title FROM employees WHERE job
     position: relative;
 }
 .succession-detail-body {
-    padding: 1.1rem;
+    padding: 1.25rem;
 }
 .succession-empty {
     display: grid;
@@ -283,12 +283,14 @@ $positions_res= $conn->query("SELECT DISTINCT job_title FROM employees WHERE job
     min-height: 110px;
 }
 .succession-detail-profile {
-    text-align: center;
-    padding: .5rem .5rem 1rem;
-    border-bottom: 1px solid var(--succession-line);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0 0 1.15rem;
+    border-bottom: 1px solid rgba(255,255,255,.18);
     min-width: 0;
-    overflow: hidden;
 }
+.succession-detail-info { flex: 1; min-width: 0; }
 .succession-avatar {
     width: var(--avatar-size);
     height: var(--avatar-size);
@@ -314,7 +316,6 @@ $positions_res= $conn->query("SELECT DISTINCT job_title FROM employees WHERE job
 .succession-detail-panel .succession-metric strong { color: #fff; }
 .succession-detail-panel .succession-panel-title i { color: #efcf6b; }
 .succession-detail-panel .succession-detail-body { position: relative; }
-.succession-detail-panel .succession-detail-profile { border-color: rgba(255,255,255,.18); }
 .succession-detail-panel .succession-detail-profile .badge,
 .succession-detail-panel .succession-metric { background: rgba(255,255,255,.12) !important; border-color: rgba(255,255,255,.18) !important; color: #fff !important; }
 .succession-detail-panel .succession-metric span { color: rgba(255,255,255,.72); }
@@ -324,21 +325,22 @@ $positions_res= $conn->query("SELECT DISTINCT job_title FROM employees WHERE job
 .succession-detail-panel .succession-detail-actions .btn-outline-primary:hover { background: rgba(255,255,255,.18); }
 .succession-detail-name {
     color: var(--succession-ink);
-    font-size: 1.05rem;
+    font-size: 1.15rem;
     font-weight: 850;
-    margin: .65rem 0 .25rem;
+    margin: 0 0 .25rem;
 }
 .succession-metric-grid {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: .75rem;
-    margin: 1rem 0;
+    margin-top: 1rem;
 }
 .succession-metric {
     background: var(--succession-soft);
     border: 1px solid var(--succession-line);
     border-radius: 12px;
-    padding: .8rem;
+    padding: .85rem;
+    min-width: 0;
 }
 .succession-metric span {
     color: var(--succession-muted);
@@ -360,32 +362,25 @@ $positions_res= $conn->query("SELECT DISTINCT job_title FROM employees WHERE job
 }
 .succession-detail-actions .btn {
     min-height: 42px;
+    white-space: nowrap;
 }
-
-@media (min-width: 1200px) {
+.succession-detail-panel:not(.is-empty) .succession-detail-body { min-height: 0; }
+@media (max-width: 1199.98px) {
     .succession-panel.leaderboard {
         min-height: 560px;
     }
-    .succession-detail-panel:not(.is-empty) .succession-detail-body {
-        display: grid;
-        grid-template-columns: minmax(0, .75fr) minmax(0, 1.35fr) minmax(0, .8fr);
-        gap: 1rem;
-        align-items: stretch;
-    }
-    .succession-detail-panel:not(.is-empty) .succession-detail-profile {
-        border-bottom: 0;
-        border-right: 1px solid var(--succession-line);
-        padding: .4rem 1rem .4rem .25rem;
-    }
-    .succession-detail-panel:not(.is-empty) .succession-metric-grid {
-        margin: 0;
-    }
-    .succession-detail-panel:not(.is-empty) .succession-metric.mb-3 {
-        margin-bottom: 0 !important;
-    }
-    .succession-detail-panel:not(.is-empty) .succession-detail-actions {
-        align-content: center;
-    }
+    .succession-metric-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 767.98px) {
+    .succession-detail-profile { flex-wrap: wrap; }
+    .succession-detail-actions { width: 100%; }
+    .succession-detail-actions .btn { width: 100%; }
+    .succession-metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .succession-metric:last-child { grid-column: 1 / -1; }
+}
+@media (max-width: 420px) {
+    .succession-metric-grid { grid-template-columns: 1fr; }
+    .succession-metric:last-child { grid-column: auto; }
 }
 </style>
 
@@ -399,7 +394,7 @@ $positions_res= $conn->query("SELECT DISTINCT job_title FROM employees WHERE job
                 <div class="succession-empty">
                     <div>
                     <i class="fas fa-hand-pointer fa-2x mb-2 opacity-50"></i>
-                    <p class="small mb-0">Select any candidate from the table to inspect their evaluation summary and initiate career movement.</p>
+                    <p class="small mb-0">Select a candidate from the table to inspect their evaluation summary.</p>
                     </div>
                 </div>
             </div>
@@ -591,12 +586,16 @@ document.addEventListener('DOMContentLoaded', function() {
         const detailAvatarHtml = getAvatarHtml(c, 65);
         detailCard.innerHTML = `
             <div class="succession-detail-profile">
-                <div class="d-flex justify-content-center mb-2">
-                    ${detailAvatarHtml}
+                ${detailAvatarHtml}
+                <div class="succession-detail-info">
+                    <h6 class="succession-detail-name">${escapeHtml(c.full_name)}</h6>
+                    <span class="badge bg-light text-dark border small">${escapeHtml(c.job_title || 'N/A')}</span>
                 </div>
-                ${!c.avatar_url || c.avatar_url.includes('/logo/logo.png') ? '<div class="small text-white-50">No profile photo uploaded</div>' : ''}
-                <h6 class="succession-detail-name">${escapeHtml(c.full_name)}</h6>
-                <span class="badge bg-light text-dark border small mt-1">${escapeHtml(c.job_title || 'N/A')}</span>
+                <div class="succession-detail-actions">
+                    <a href="view-employee.php?id=${c.employee_id}" class="btn btn-outline-primary btn-sm rounded-3">
+                        <i class="fas fa-user me-1"></i> View Full Employee Profile
+                    </a>
+                </div>
             </div>
 
             <div class="succession-metric-grid">
@@ -616,20 +615,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     <span><i class="fas fa-star me-1" aria-hidden="true"></i>Average Rating</span>
                     <strong>${c.avg_score.toFixed(2)} / 4.00</strong>
                 </div>
-            </div>
-
-            <div class="succession-metric mb-3">
-                <span><i class="fas fa-award me-1" aria-hidden="true"></i>Performance Classification</span>
-                <strong>${escapeHtml(c.performance_level || 'N/A')}</strong>
-            </div>
-
-            <div class="succession-detail-actions d-grid gap-2">
-                <a href="view-employee.php?id=${c.employee_id}" class="btn btn-outline-primary btn-sm rounded-3">
-                    <i class="fas fa-user me-1"></i> View Full Employee Profile
-                </a>
-                <a href="career-movements.php?action=create&emp_id=${c.employee_id}" class="btn btn-success btn-sm rounded-3 fw-bold">
-                    <i class="fas fa-level-up-alt me-1"></i> Initiate Promotion / Transfer
-                </a>
+                <div class="succession-metric">
+                    <span><i class="fas fa-award me-1" aria-hidden="true"></i>Performance Classification</span>
+                    <strong>${escapeHtml(c.performance_level || 'N/A')}</strong>
+                </div>
             </div>`;
     };
 
