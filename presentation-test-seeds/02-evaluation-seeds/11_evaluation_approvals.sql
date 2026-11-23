@@ -53,7 +53,7 @@ WHERE ev.legacy_reference LIKE 'PRES-%'
 
 -- Annual head approval follows complete required peer submissions.
 UPDATE annual_evaluation_members m
-JOIN evaluations ev ON ev.evaluation_id=m.evaluation_id AND ev.legacy_reference LIKE 'PRES-ANNUAL-%'
+JOIN evaluations ev ON ev.evaluation_id=m.evaluation_id AND ev.legacy_reference LIKE 'PRES-ANNUAL-%' AND YEAR(ev.evaluation_period_end)<=2025
 JOIN employees e ON e.employee_id=m.employee_id
 SET m.head_approved_by=(SELECT u.user_id FROM users u WHERE u.employee_id=e.reports_to AND u.is_active=1 AND u.deleted_at IS NULL ORDER BY (u.role='Employee') DESC,u.user_id LIMIT 1),
  m.head_approved_at=DATE_SUB(ev.evaluation_period_end,INTERVAL 1 DAY);

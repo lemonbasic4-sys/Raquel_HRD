@@ -155,6 +155,9 @@ if ($LASTEXITCODE -ne 0) { throw "11_evaluation_approvals.sql failed." }
 
 C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 -u root -D raquel_hris -e "source presentation-test-seeds/02-evaluation-seeds/12_evaluation_results.sql"
 if ($LASTEXITCODE -ne 0) { throw "12_evaluation_results.sql failed." }
+
+C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 -u root -D raquel_hris -e "source presentation-test-seeds/02-evaluation-seeds/13_annual_2026_demo_assignments.sql"
+if ($LASTEXITCODE -ne 0) { throw "13_annual_2026_demo_assignments.sql failed." }
 ```
 
 Phase 2 expected results:
@@ -166,8 +169,9 @@ Phase 2 expected results:
 | Annual templates | 21 with 15 KRAs each |
 | Initial evaluations | 45: 33 approved, 12 pending |
 | Final evaluations | 21 approved |
-| Annual evaluations/cycles/versions | 63 approved |
-| Required/submitted Annual 360 ratings | 69 / 69 |
+| Historical Annual evaluations/cycles/versions | 101 approved |
+| 2026 Annual demonstration assignments | 21 Pending Self-Rating |
+| Required/submitted historical Annual 360 ratings | 107 / 107 |
 | Quarterly presentation records | 0 |
 
 Compare the three protected-record result sets with the saved pre-import output. Any difference is a stop condition.
@@ -217,7 +221,7 @@ C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 -u root -D raquel_h
 if ($LASTEXITCODE -ne 0) { throw "Complete presentation-seed validation failed." }
 ```
 
-Every Phase 4 result labeled `failures` must be `0`. Aggregate result sets are expected to contain 45 presentation employees, 12 departments, 129 evaluations, 21 complete regularization histories, 6 transfers, and 4 promotion endorsements.
+Every Phase 4 result labeled `failures` must be `0`. Aggregate result sets are expected to contain 45 presentation employees, 12 departments, 188 evaluations (167 completed or probationary-workflow records plus 21 open 2026 Annual assignments), 21 complete regularization histories, 6 transfers, and 4 promotion endorsements.
 
 ## Safe re-import behavior
 

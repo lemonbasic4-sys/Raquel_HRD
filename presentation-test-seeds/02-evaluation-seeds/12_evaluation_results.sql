@@ -41,7 +41,7 @@ LEFT JOIN (
   SUM(CAST(JSON_UNQUOTE(JSON_EXTRACT(ps.scores_json,'$[0]')) AS DECIMAL(5,2))) peer_sum
  FROM annual_peer_submissions ps GROUP BY ps.cycle_id,ps.target_employee_id
 ) p ON p.cycle_id=c.cycle_id AND p.target_employee_id=ev.employee_id
-WHERE ev.legacy_reference LIKE 'PRES-ANNUAL-%';
+WHERE ev.legacy_reference LIKE 'PRES-ANNUAL-%' AND YEAR(ev.evaluation_period_end)<=2025;
 
 UPDATE evaluations ev JOIN tmp_annual_results r ON r.evaluation_id=ev.evaluation_id
 JOIN employees e ON e.employee_id=ev.employee_id

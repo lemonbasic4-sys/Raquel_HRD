@@ -56,11 +56,11 @@ Phase 4 — final SQL validation and analytics-readiness checks completed
 - Live profile-completeness validation: **passed**; all 45 presentation employees have 12/12 sections (100%)
 - Phase 2 disposable database: `raquel_hris_presentation_phase2_test`
 - Phase 2 templates: **passed**; 12 Initial, 12 Final, 21 Annual
-- Phase 2 evaluations: **passed**; 45 Initial, 21 Final, 63 Annual
-- Annual 360: **passed**; 69 required and 69 submitted ratings
+- Phase 2 evaluations expanded on 2026-11-24: **passed**; 45 Initial, 21 Final, 101 completed Annual, and 21 open 2026 Annual assignments
+- Historical Annual 360: **passed**; 107 required and 107 submitted ratings
 - Annual formula validation: **passed**; 0 stored-result mismatches
 - Evaluator/timeline validation: **passed**; 0 invalid relationships and 0 invalid timelines
-- Phase 2 idempotency: **passed**; counts remained 45 employees / 45 templates / 129 evaluations / 2,769 scores / 69 peer ratings / 63 versions
+- Expanded Phase 2 idempotency: **passed twice** in `raquel_hris_evalhistory_test_20261124c`; counts remained 188 evaluations / 3,643 scores / 107 peer ratings / 101 versions, with 21 untouched 2026 assignments
 - Quarterly presentation records: **0**, per user instruction
 - Live Phase 2 import: **performed and passed** in `raquel_hris` on 2026-11-23
 - Phase 3 disposable database: **passed** in `raquel_hris_phase3_test_20261123`
@@ -68,9 +68,9 @@ Phase 4 — final SQL validation and analytics-readiness checks completed
 - Live Phase 3 import: **performed and passed** in `raquel_hris` on 2026-11-23
 - Phase 3 consistency validation: **passed**; 0 assignment, applied-status, chronology, protected-record, and duplicate-regularization failures
 - Phase 4 initially detected 0 live evaluations; the live database had been reinitialized after the earlier Phase 2 import
-- Approved Phase 2 seeds were restored to live `raquel_hris`: **passed**; 129 evaluations, 2,769 scores, 69/69 peer ratings
+- Expanded Phase 2 seeds imported into live `raquel_hris`: **passed** on 2026-11-24; 188 evaluations, 3,643 scores, 107/107 historical peer ratings, and 21 Pending Self-Rating assignments for 2026
 - Phase 4 analytics-readiness validation: **passed** on live `raquel_hris`; all 10 failure checks returned 0
-- Analytics coverage: **passed**; 45 employees, 12 departments, 3 branches, Annual comparisons for 2023–2025, 6 transfers, and 4 promotion endorsements
+- Analytics coverage: **passed**; 45 employees, 12 departments, 3 branches, complete eligible Annual history through 2025, 6 transfers, and 4 promotion endorsements
 - Protected HR own evaluations: **0 before / 0 after**; protected employee timestamps unchanged
 - Browser login/UI test: not part of SQL validation and not performed
 

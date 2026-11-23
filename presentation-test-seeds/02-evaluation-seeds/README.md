@@ -1,6 +1,6 @@
 # Phase 2 — Initial, Final, and Annual
 
-This phase is complete and excludes Quarterly by explicit user direction because Quarterly is temporarily disabled.
+This phase excludes Quarterly by explicit user direction because Quarterly is temporarily disabled. Every seeded Regular employee has completed Initial and Final histories, completed Annual records from the calendar year after regularization through 2025, and one open 2026 Annual assignment for the live demonstration.
 
 Import order:
 
@@ -12,5 +12,6 @@ Import order:
 6. `10_supervisor_evaluations.sql`
 7. `11_evaluation_approvals.sql`
 8. `12_evaluation_results.sql`
+9. `13_annual_2026_demo_assignments.sql`
 
 Run `../04-validation/validate_all_seeds.sql` afterward. All files are deterministic and passed a complete rerun in `raquel_hris_presentation_phase2_test`.

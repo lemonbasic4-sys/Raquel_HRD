@@ -41,7 +41,7 @@ FROM employees e JOIN evaluation_templates t ON t.target_department_id=e.departm
 WHERE e.employee_code LIKE 'DEMO-%-P__' AND e.employment_status='Probationary'
  AND NOT EXISTS(SELECT 1 FROM evaluations x WHERE x.legacy_reference=CONCAT('PRES-INITIAL-',e.employee_code));
 
--- Three completed Annual periods (2023-2025) for every Regular presentation employee.
+-- Complete Annual history from the calendar year after regularization through 2025.
 INSERT INTO evaluations
  (employee_id,template_id,evaluation_type,evaluation_period_start,evaluation_period_end,
   submitted_by,assigned_by,assigned_at,status,submitted_date,staff_comments,current_position,
@@ -57,9 +57,12 @@ SELECT e.employee_id,t.template_id,'Annual',MAKEDATE(y.eval_year,1),STR_TO_DATE(
 FROM employees e
 JOIN evaluation_templates t ON t.target_department_id=e.department_id AND t.evaluation_type='Annual'
  AND t.form_code LIKE 'PRES-%-ANNUAL' AND t.target_job_title_id=e.job_title_id AND t.deleted_at IS NULL
-CROSS JOIN(SELECT 2023 eval_year UNION ALL SELECT 2024 UNION ALL SELECT 2025) y
+CROSS JOIN(
+ SELECT 2016 eval_year UNION ALL SELECT 2017 UNION ALL SELECT 2018 UNION ALL SELECT 2019 UNION ALL SELECT 2020
+ UNION ALL SELECT 2021 UNION ALL SELECT 2022 UNION ALL SELECT 2023 UNION ALL SELECT 2024 UNION ALL SELECT 2025
+) y
 WHERE e.employee_code LIKE 'DEMO-%-REG%'
- AND e.regularization_effective_date<=MAKEDATE(y.eval_year,1)
+ AND YEAR(e.regularization_effective_date)<y.eval_year
  AND NOT EXISTS(SELECT 1 FROM evaluations x WHERE x.legacy_reference=CONCAT('PRES-ANNUAL-',e.employee_code,'-',y.eval_year));
 
 -- One individual Annual cycle and member per Annual evaluation.
@@ -69,7 +72,7 @@ INSERT INTO annual_evaluation_cycles
 SELECT e.department_id,ev.evaluation_period_start,ev.evaluation_period_end,ev.assigned_at,
  DATE_SUB(ev.evaluation_period_end,INTERVAL 10 DAY),NULL,NULL,NULL,NULL,NULL,ev.evaluation_id
 FROM evaluations ev JOIN employees e ON e.employee_id=ev.employee_id
-WHERE ev.legacy_reference LIKE 'PRES-ANNUAL-%'
+WHERE ev.legacy_reference LIKE 'PRES-ANNUAL-%' AND YEAR(ev.evaluation_period_end)<=2025
  AND NOT EXISTS(SELECT 1 FROM annual_evaluation_cycles c WHERE c.individual_evaluation_id=ev.evaluation_id);
 
 INSERT INTO annual_evaluation_members
@@ -79,7 +82,7 @@ SELECT c.cycle_id,e.employee_id,ev.evaluation_id,e.job_title_id,manager.job_titl
 FROM evaluations ev JOIN employees e ON e.employee_id=ev.employee_id
 JOIN employees manager ON manager.employee_id=e.reports_to
 JOIN annual_evaluation_cycles c ON c.individual_evaluation_id=ev.evaluation_id
-WHERE ev.legacy_reference LIKE 'PRES-ANNUAL-%'
+WHERE ev.legacy_reference LIKE 'PRES-ANNUAL-%' AND YEAR(ev.evaluation_period_end)<=2025
  AND NOT EXISTS(SELECT 1 FROM annual_evaluation_members m WHERE m.evaluation_id=ev.evaluation_id);
 
 -- A package preserves the approval trail for every Initial/Final evaluation.

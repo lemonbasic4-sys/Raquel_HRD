@@ -37,21 +37,39 @@ WHERE e.employee_code LIKE 'DEMO-%-P__' AND ev.evaluation_type='Initial' AND ev.
 GROUP BY ev.status;
 
 SELECT 'ANNUAL_WORKFLOW_COUNTS' check_name,
- (SELECT COUNT(*) FROM evaluations WHERE legacy_reference LIKE 'PRES-ANNUAL-%') annual_evaluations,
- (SELECT COUNT(*) FROM annual_evaluation_cycles c JOIN evaluations ev ON ev.evaluation_id=c.individual_evaluation_id WHERE ev.legacy_reference LIKE 'PRES-ANNUAL-%') annual_cycles,
- (SELECT COUNT(*) FROM annual_evaluation_members m JOIN evaluations ev ON ev.evaluation_id=m.evaluation_id WHERE ev.legacy_reference LIKE 'PRES-ANNUAL-%') annual_members,
- (SELECT COUNT(*) FROM annual_evaluation_versions v JOIN annual_evaluation_members m ON m.member_id=v.member_id JOIN evaluations ev ON ev.evaluation_id=m.evaluation_id WHERE ev.legacy_reference LIKE 'PRES-ANNUAL-%') result_versions,
- 63 expected_each;
+ (SELECT COUNT(*) FROM evaluations WHERE legacy_reference LIKE 'PRES-ANNUAL-%' AND YEAR(evaluation_period_end)<=2025) completed_annual_evaluations,
+ (SELECT COUNT(*) FROM evaluations WHERE legacy_reference LIKE 'PRES-ANNUAL-%-2026' AND status='Pending Self-Rating') open_2026_assignments,
+ (SELECT COUNT(*) FROM annual_evaluation_cycles c JOIN evaluations ev ON ev.evaluation_id=c.individual_evaluation_id WHERE ev.legacy_reference LIKE 'PRES-ANNUAL-%' AND YEAR(ev.evaluation_period_end)<=2025) annual_cycles,
+ (SELECT COUNT(*) FROM annual_evaluation_members m JOIN evaluations ev ON ev.evaluation_id=m.evaluation_id WHERE ev.legacy_reference LIKE 'PRES-ANNUAL-%' AND YEAR(ev.evaluation_period_end)<=2025) annual_members,
+ (SELECT COUNT(*) FROM annual_evaluation_versions v JOIN annual_evaluation_members m ON m.member_id=v.member_id JOIN evaluations ev ON ev.evaluation_id=m.evaluation_id WHERE ev.legacy_reference LIKE 'PRES-ANNUAL-%' AND YEAR(ev.evaluation_period_end)<=2025) result_versions,
+ 101 expected_completed_each,21 expected_open_2026;
+
+SELECT 'ANNUAL_HISTORICAL_COVERAGE' check_name,
+ COUNT(*) completed_annual_evaluations,
+ SUM(YEAR(ev.evaluation_period_end)<=2025 AND YEAR(ev.evaluation_period_end)>YEAR(e.regularization_effective_date)) eligible_records,
+ 101 expected_records
+FROM evaluations ev JOIN employees e ON e.employee_id=ev.employee_id
+WHERE ev.legacy_reference LIKE 'PRES-ANNUAL-%' AND ev.status='Approved' AND YEAR(ev.evaluation_period_end)<=2025;
+
+SELECT 'MISSING_ANNUAL_HISTORY_YEARS' check_name,COUNT(*) missing_count,0 expected_count
+FROM employees e
+JOIN (SELECT 2016 y UNION ALL SELECT 2017 UNION ALL SELECT 2018 UNION ALL SELECT 2019 UNION ALL SELECT 2020
+      UNION ALL SELECT 2021 UNION ALL SELECT 2022 UNION ALL SELECT 2023 UNION ALL SELECT 2024 UNION ALL SELECT 2025) years
+  ON years.y>YEAR(e.regularization_effective_date)
+WHERE e.employee_code LIKE 'DEMO-%-REG%'
+  AND NOT EXISTS(SELECT 1 FROM evaluations ev WHERE ev.employee_id=e.employee_id AND ev.evaluation_type='Annual'
+      AND YEAR(ev.evaluation_period_end)=years.y AND ev.status='Approved' AND ev.legacy_reference LIKE 'PRES-ANNUAL-%');
 
 SELECT 'ANNUAL_360_COMPLETENESS' check_name,COUNT(*) expected_ratings,
  SUM(EXISTS(SELECT 1 FROM annual_peer_submissions ps WHERE ps.cycle_id=rr.cycle_id AND ps.target_employee_id=rr.target_employee_id AND ps.rater_employee_id=rr.rater_employee_id)) submitted_ratings,
- COUNT(DISTINCT rr.cycle_id) cycles_with_raters,63 expected_cycles_with_raters
+ COUNT(DISTINCT rr.cycle_id) cycles_with_raters,101 expected_completed_cycles
 FROM annual_required_raters rr JOIN annual_evaluation_cycles c ON c.cycle_id=rr.cycle_id
 JOIN evaluations ev ON ev.evaluation_id=c.individual_evaluation_id WHERE ev.legacy_reference LIKE 'PRES-ANNUAL-%';
 
 SELECT 'ANNUAL_SELF_RATING_SHAPE' check_name,COUNT(*) invalid_count,0 expected_count
 FROM annual_evaluation_members m JOIN evaluations ev ON ev.evaluation_id=m.evaluation_id
-WHERE ev.legacy_reference LIKE 'PRES-ANNUAL-%' AND (m.self_values_json IS NULL OR JSON_LENGTH(m.self_values_json)<>8);
+WHERE ev.legacy_reference LIKE 'PRES-ANNUAL-%' AND YEAR(ev.evaluation_period_end)<=2025
+ AND (m.self_values_json IS NULL OR JSON_LENGTH(m.self_values_json)<>8);
 
 SELECT 'ANNUAL_KRA_SCORE_COMPLETENESS' check_name,COUNT(*) invalid_count,0 expected_count
 FROM (SELECT ev.evaluation_id,COUNT(*) score_count FROM evaluations ev
@@ -62,10 +80,10 @@ FROM (SELECT ev.evaluation_id,COUNT(*) score_count FROM evaluations ev
 SELECT 'ANNUAL_APPROVAL_COMPLETENESS' check_name,COUNT(*) annual_members,
  SUM(m.head_approved_by IS NOT NULL AND m.head_approved_at IS NOT NULL) head_approved,
  SUM(a.approval_id IS NOT NULL) kra_approved,
- SUM(m.current_version=1 AND m.finalized_at IS NOT NULL) finalized,63 expected_each
+ SUM(m.current_version=1 AND m.finalized_at IS NOT NULL) finalized,101 expected_each
 FROM annual_evaluation_members m JOIN evaluations ev ON ev.evaluation_id=m.evaluation_id
 LEFT JOIN annual_kra_approvals a ON a.member_id=m.member_id
-WHERE ev.legacy_reference LIKE 'PRES-ANNUAL-%';
+WHERE ev.legacy_reference LIKE 'PRES-ANNUAL-%' AND YEAR(ev.evaluation_period_end)<=2025;
 
 SELECT 'ANNUAL_FORMULA_MISMATCH' check_name,COUNT(*) mismatch_count,0 expected_count
 FROM (SELECT ev.evaluation_id,ev.kra_subtotal,ev.behavior_average,ev.total_score,
@@ -84,7 +102,7 @@ WHERE ABS(kra_subtotal-expected_kra)>.01 OR ABS(behavior_average-expected_behavi
 
 SELECT 'ANNUAL_PERFORMANCE_VARIATION' check_name,performance_level,COUNT(*) evaluation_count,
  MIN(total_score) minimum_score,MAX(total_score) maximum_score
-FROM evaluations WHERE legacy_reference LIKE 'PRES-ANNUAL-%'
+FROM evaluations WHERE legacy_reference LIKE 'PRES-ANNUAL-%' AND status='Approved'
 GROUP BY performance_level ORDER BY minimum_score;
 
 SELECT 'ANNUAL_EMPLOYEE_TRENDS' check_name,trend_type,COUNT(*) employee_count
@@ -104,7 +122,7 @@ FROM (
 SELECT 'ANNUAL_KRA_BEHAVIOR_CONTRASTS' check_name,
  SUM(kra_subtotal>=3.50 AND behavior_average<=2.80) high_kra_low_behavior,
  SUM(kra_subtotal<=2.90 AND behavior_average>=3.40) low_kra_high_behavior
-FROM evaluations WHERE legacy_reference LIKE 'PRES-ANNUAL-%';
+FROM evaluations WHERE legacy_reference LIKE 'PRES-ANNUAL-%' AND status='Approved';
 
 SELECT 'PRESENTATION_QUARTERLY_RECORDS' check_name,COUNT(*) actual_count,0 expected_count
 FROM evaluations WHERE legacy_reference LIKE 'PRES-%' AND evaluation_type='Quarterly';

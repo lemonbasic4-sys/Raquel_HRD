@@ -6,7 +6,7 @@ START TRANSACTION;
 INSERT INTO annual_required_raters(cycle_id,target_employee_id,rater_employee_id)
 SELECT c.cycle_id,target.employee_id,rater.employee_id
 FROM annual_evaluation_cycles c
-JOIN evaluations ev ON ev.evaluation_id=c.individual_evaluation_id AND ev.legacy_reference LIKE 'PRES-ANNUAL-%'
+JOIN evaluations ev ON ev.evaluation_id=c.individual_evaluation_id AND ev.legacy_reference LIKE 'PRES-ANNUAL-%' AND YEAR(ev.evaluation_period_end)<=2025
 JOIN employees target ON target.employee_id=ev.employee_id
 JOIN employees rater ON rater.department_id=target.department_id AND rater.employee_id<>target.employee_id
  AND rater.employment_status='Regular' AND rater.is_active=1 AND rater.deleted_at IS NULL
@@ -23,6 +23,7 @@ SELECT rr.cycle_id,rr.rater_employee_id,rr.target_employee_id,
 FROM annual_required_raters rr
 JOIN annual_evaluation_cycles c ON c.cycle_id=rr.cycle_id
 JOIN annual_evaluation_members m ON m.cycle_id=rr.cycle_id AND m.employee_id=rr.target_employee_id
+JOIN evaluations ev ON ev.evaluation_id=m.evaluation_id AND YEAR(ev.evaluation_period_end)<=2025
 JOIN employees rater ON rater.employee_id=rr.rater_employee_id
 JOIN (
  SELECT m2.member_id,LEAST(4.00,GREATEST(1.00,
