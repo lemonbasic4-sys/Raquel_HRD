@@ -12,20 +12,20 @@ SELECT ev.evaluation_id,
  CASE
   WHEN ev.evaluation_type<>'Annual' THEN LEAST(4.00,2.70+MOD(CRC32(e.employee_code),6)*0.18+IF(ev.evaluation_type='Final',0.20,0))
   WHEN MOD(CRC32(e.employee_code),6)=0 THEN 3.80
-  WHEN MOD(CRC32(e.employee_code),6)=1 THEN LEAST(4.00,2.90+MOD(GREATEST(0,YEAR(ev.evaluation_period_end)-YEAR(e.regularization_effective_date)-1),4)*0.20)
+  WHEN MOD(CRC32(e.employee_code),6)=1 THEN LEAST(4.00,2.90+MOD(GREATEST(0,YEAR(ev.evaluation_period_end)-YEAR(COALESCE(e.regularization_effective_date,DATE_ADD(e.hire_date,INTERVAL 6 MONTH)))-1),4)*0.20)
   WHEN MOD(CRC32(e.employee_code),6)=2 THEN 2.70
   WHEN MOD(CRC32(e.employee_code),6)=3 THEN 3.70
-  WHEN MOD(CRC32(e.employee_code),6)=4 THEN GREATEST(2.60,3.80-MOD(GREATEST(0,YEAR(ev.evaluation_period_end)-YEAR(e.regularization_effective_date)-1),4)*0.25)
-  ELSE CASE MOD(GREATEST(0,YEAR(ev.evaluation_period_end)-YEAR(e.regularization_effective_date)-1),3) WHEN 0 THEN 3.20 WHEN 1 THEN 3.70 ELSE 2.95 END
+  WHEN MOD(CRC32(e.employee_code),6)=4 THEN GREATEST(2.60,3.80-MOD(GREATEST(0,YEAR(ev.evaluation_period_end)-YEAR(COALESCE(e.regularization_effective_date,DATE_ADD(e.hire_date,INTERVAL 6 MONTH)))-1),4)*0.25)
+  ELSE CASE MOD(GREATEST(0,YEAR(ev.evaluation_period_end)-YEAR(COALESCE(e.regularization_effective_date,DATE_ADD(e.hire_date,INTERVAL 6 MONTH)))-1),3) WHEN 0 THEN 3.20 WHEN 1 THEN 3.70 ELSE 2.95 END
  END,
  CASE
   WHEN ev.evaluation_type<>'Annual' THEN LEAST(4.00,2.80+MOD(CRC32(CONCAT(e.employee_code,'B')),6)*0.16+IF(ev.evaluation_type='Final',0.15,0))
   WHEN MOD(CRC32(e.employee_code),6)=0 THEN 3.60
-  WHEN MOD(CRC32(e.employee_code),6)=1 THEN LEAST(4.00,3.00+MOD(GREATEST(0,YEAR(ev.evaluation_period_end)-YEAR(e.regularization_effective_date)-1),4)*0.18)
+  WHEN MOD(CRC32(e.employee_code),6)=1 THEN LEAST(4.00,3.00+MOD(GREATEST(0,YEAR(ev.evaluation_period_end)-YEAR(COALESCE(e.regularization_effective_date,DATE_ADD(e.hire_date,INTERVAL 6 MONTH)))-1),4)*0.18)
   WHEN MOD(CRC32(e.employee_code),6)=2 THEN 3.60
   WHEN MOD(CRC32(e.employee_code),6)=3 THEN 2.50
-  WHEN MOD(CRC32(e.employee_code),6)=4 THEN GREATEST(2.60,3.60-MOD(GREATEST(0,YEAR(ev.evaluation_period_end)-YEAR(e.regularization_effective_date)-1),4)*0.20)
-  ELSE CASE MOD(GREATEST(0,YEAR(ev.evaluation_period_end)-YEAR(e.regularization_effective_date)-1),3) WHEN 0 THEN 3.45 WHEN 1 THEN 3.05 ELSE 3.70 END
+  WHEN MOD(CRC32(e.employee_code),6)=4 THEN GREATEST(2.60,3.60-MOD(GREATEST(0,YEAR(ev.evaluation_period_end)-YEAR(COALESCE(e.regularization_effective_date,DATE_ADD(e.hire_date,INTERVAL 6 MONTH)))-1),4)*0.20)
+  ELSE CASE MOD(GREATEST(0,YEAR(ev.evaluation_period_end)-YEAR(COALESCE(e.regularization_effective_date,DATE_ADD(e.hire_date,INTERVAL 6 MONTH)))-1),3) WHEN 0 THEN 3.45 WHEN 1 THEN 3.05 ELSE 3.70 END
  END
 FROM evaluations ev JOIN employees e ON e.employee_id=ev.employee_id
 WHERE ev.legacy_reference LIKE 'PRES-%'

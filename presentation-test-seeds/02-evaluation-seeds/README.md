@@ -1,6 +1,6 @@
 # Phase 2 — Initial, Final, and Annual
 
-This phase excludes Quarterly by explicit user direction because Quarterly is temporarily disabled. Every seeded Regular employee has completed Initial and Final histories, completed Annual records from the calendar year after regularization through 2025, and one open 2026 Annual assignment for the live demonstration.
+This phase excludes Quarterly by explicit user direction because Quarterly is temporarily disabled. Every seed-controlled Regular employee except the President/CEO has completed Initial and Final histories, completed Annual records from the calendar year after regularization through 2025, and one open 2026 Annual assignment for the live demonstration. This includes `AP-001`, `HRD-001`, `HRD-002`, and `HRD-003` without overwriting their employee master records.
 
 Import order:
 

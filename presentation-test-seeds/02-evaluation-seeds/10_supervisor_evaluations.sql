@@ -9,19 +9,20 @@ JOIN evaluations ev ON ev.evaluation_id=s.evaluation_id AND ev.legacy_reference 
 JOIN evaluation_criteria c ON c.criterion_id=s.criterion_id AND c.section='KRA'
 JOIN employees e ON e.employee_id=ev.employee_id
 SET s.supervisor_override_score=LEAST(4.00,GREATEST(1.00,s.score_value+IF(MOD(ev.evaluation_id,2)=0,0.10,-0.05))),
- s.supervisor_override_by=(SELECT u.user_id FROM users u WHERE u.employee_id=e.reports_to AND u.is_active=1 AND u.deleted_at IS NULL ORDER BY (u.role='Employee') DESC,u.user_id LIMIT 1),
+ s.supervisor_override_by=(SELECT u.user_id FROM users u WHERE u.employee_id=COALESCE(e.reports_to,(SELECT employee_id FROM employees WHERE employee_code='CEO-001' LIMIT 1)) AND u.is_active=1 AND u.deleted_at IS NULL ORDER BY (u.role='Employee') DESC,u.user_id LIMIT 1),
  s.supervisor_override_at=DATE_SUB(ev.evaluation_period_end,INTERVAL 2 DAY)
 WHERE s.supervisor_override_score IS NULL;
 
 INSERT INTO annual_kra_approvals(member_id,approved_by,approved_at,remarks,ratings_json,rater_signature_data,rater_signed_at)
 SELECT m.member_id,
  (SELECT u.user_id FROM users u JOIN employees target ON target.employee_id=m.employee_id
-  WHERE u.employee_id=target.reports_to AND u.is_active=1 AND u.deleted_at IS NULL ORDER BY (u.role='Employee') DESC,u.user_id LIMIT 1),
+  WHERE u.employee_id=COALESCE(target.reports_to,(SELECT employee_id FROM employees WHERE employee_code='CEO-001' LIMIT 1)) AND u.is_active=1 AND u.deleted_at IS NULL ORDER BY (u.role='Employee') DESC,u.user_id LIMIT 1),
  DATE_SUB(c.period_end,INTERVAL 2 DAY),'Immediate head reviewed all Annual KRA ratings and supporting evidence.',
  JSON_OBJECT('source','Presentation Seed','reviewed_items',15),
  CONCAT('presentation-head-signature:',manager.employee_code),DATE_SUB(c.period_end,INTERVAL 2 DAY)
 FROM annual_evaluation_members m JOIN annual_evaluation_cycles c ON c.cycle_id=m.cycle_id
-JOIN employees target ON target.employee_id=m.employee_id JOIN employees manager ON manager.employee_id=target.reports_to
+JOIN employees target ON target.employee_id=m.employee_id
+JOIN employees manager ON manager.employee_id=COALESCE(target.reports_to,(SELECT employee_id FROM employees WHERE employee_code='CEO-001' LIMIT 1))
 JOIN evaluations ev ON ev.evaluation_id=m.evaluation_id AND ev.legacy_reference LIKE 'PRES-ANNUAL-%' AND YEAR(ev.evaluation_period_end)<=2025
 WHERE NOT EXISTS(SELECT 1 FROM annual_kra_approvals x WHERE x.member_id=m.member_id);
 

@@ -6,15 +6,16 @@ START TRANSACTION;
 INSERT INTO evaluation_package_route_steps
  (package_id,step_order,reviewer_employee_id,reviewer_user_id,step_label,step_type,
   action_status,acted_at,comments)
-SELECT p.package_id,1,e.reports_to,
- (SELECT u.user_id FROM users u WHERE u.employee_id=e.reports_to AND u.is_active=1 AND u.deleted_at IS NULL ORDER BY (u.role='Employee') DESC,u.user_id LIMIT 1),
+SELECT p.package_id,1,COALESCE(e.reports_to,(SELECT employee_id FROM employees WHERE employee_code='CEO-001' LIMIT 1)),
+ (SELECT u.user_id FROM users u WHERE u.employee_id=COALESCE(e.reports_to,(SELECT employee_id FROM employees WHERE employee_code='CEO-001' LIMIT 1)) AND u.is_active=1 AND u.deleted_at IS NULL ORDER BY (u.role='Employee') DESC,u.user_id LIMIT 1),
  'Immediate Head Review','Review',
  IF(e.employee_code LIKE 'DEMO-%-P02','Pending','Approved'),
  IF(e.employee_code LIKE 'DEMO-%-P02',NULL,DATE_SUB(ev.evaluation_period_end,INTERVAL 1 DAY)),
  IF(e.employee_code LIKE 'DEMO-%-P02',NULL,'Reviewed against documented KRA evidence and Core Values ratings.')
 FROM evaluation_package_members pm JOIN evaluation_packages p ON p.package_id=pm.package_id
 JOIN evaluations ev ON ev.evaluation_id=pm.evaluation_id AND ev.legacy_reference LIKE 'PRES-%'
-JOIN employees e ON e.employee_id=ev.employee_id JOIN employees manager ON manager.employee_id=e.reports_to
+JOIN employees e ON e.employee_id=ev.employee_id
+JOIN employees manager ON manager.employee_id=COALESCE(e.reports_to,(SELECT employee_id FROM employees WHERE employee_code='CEO-001' LIMIT 1))
 WHERE ev.evaluation_type IN('Initial','Final')
  AND NOT EXISTS(SELECT 1 FROM evaluation_package_route_steps x WHERE x.package_id=p.package_id AND x.step_order=1);
 
@@ -32,11 +33,12 @@ INSERT INTO probationary_evaluation_reviews
 SELECT ev.evaluation_id,
  IF(ev.evaluation_type='Final','Recommend Regularization','Continue Probation'),
  IF(ev.evaluation_type='Final','The employee completed the probationary requirements and demonstrated sustained role readiness.','The employee is progressing and should continue the documented probationary development plan.'),
- (SELECT u.user_id FROM users u WHERE u.employee_id=e.reports_to AND u.is_active=1 AND u.deleted_at IS NULL ORDER BY (u.role='Employee') DESC,u.user_id LIMIT 1),
+ (SELECT u.user_id FROM users u WHERE u.employee_id=COALESCE(e.reports_to,(SELECT employee_id FROM employees WHERE employee_code='CEO-001' LIMIT 1)) AND u.is_active=1 AND u.deleted_at IS NULL ORDER BY (u.role='Employee') DESC,u.user_id LIMIT 1),
  CONCAT('presentation-head-signature:',manager.employee_code),DATE_SUB(ev.evaluation_period_end,INTERVAL 1 DAY),
  (SELECT u.user_id FROM users u WHERE u.employee_id=e.employee_id AND u.role='Employee' AND u.is_active=1 AND u.deleted_at IS NULL ORDER BY u.user_id LIMIT 1),
  CONCAT('presentation-employee-signature:',e.employee_code),ev.evaluation_period_end
-FROM evaluations ev JOIN employees e ON e.employee_id=ev.employee_id JOIN employees manager ON manager.employee_id=e.reports_to
+FROM evaluations ev JOIN employees e ON e.employee_id=ev.employee_id
+JOIN employees manager ON manager.employee_id=COALESCE(e.reports_to,(SELECT employee_id FROM employees WHERE employee_code='CEO-001' LIMIT 1))
 WHERE ev.legacy_reference LIKE 'PRES-%' AND ev.evaluation_type IN('Initial','Final')
  AND e.employee_code NOT LIKE 'DEMO-%-P02'
  AND NOT EXISTS(SELECT 1 FROM probationary_evaluation_reviews x WHERE x.evaluation_id=ev.evaluation_id);
@@ -55,7 +57,7 @@ WHERE ev.legacy_reference LIKE 'PRES-%'
 UPDATE annual_evaluation_members m
 JOIN evaluations ev ON ev.evaluation_id=m.evaluation_id AND ev.legacy_reference LIKE 'PRES-ANNUAL-%' AND YEAR(ev.evaluation_period_end)<=2025
 JOIN employees e ON e.employee_id=m.employee_id
-SET m.head_approved_by=(SELECT u.user_id FROM users u WHERE u.employee_id=e.reports_to AND u.is_active=1 AND u.deleted_at IS NULL ORDER BY (u.role='Employee') DESC,u.user_id LIMIT 1),
+SET m.head_approved_by=(SELECT u.user_id FROM users u WHERE u.employee_id=COALESCE(e.reports_to,(SELECT employee_id FROM employees WHERE employee_code='CEO-001' LIMIT 1)) AND u.is_active=1 AND u.deleted_at IS NULL ORDER BY (u.role='Employee') DESC,u.user_id LIMIT 1),
  m.head_approved_at=DATE_SUB(ev.evaluation_period_end,INTERVAL 1 DAY);
 
 COMMIT;

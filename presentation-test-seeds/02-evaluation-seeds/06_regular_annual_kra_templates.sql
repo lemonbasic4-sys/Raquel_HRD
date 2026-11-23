@@ -8,6 +8,7 @@ CREATE TEMPORARY TABLE tmp_annual_template_targets (
  creator_code VARCHAR(30),job_title_id INT,domain_label VARCHAR(120),form_code VARCHAR(50)
 );
 INSERT INTO tmp_annual_template_targets VALUES
+('AP-001',1,'AP','Acquired Properties','CEO-001',100,'acquired properties executive leadership','PRES-AP-VP-ANNUAL'),
 ('DEMO-AP-REG',1,'AP','Acquired Properties','AP-001',101,'property portfolio management','PRES-AP-REG-ANNUAL'),
 ('DEMO-AUD-REG',2,'AUD','Audit','CEO-001',200,'department audit leadership','PRES-AUD-MGR-ANNUAL'),
 ('DEMO-AUD-REG2',2,'AUD','Audit','DEMO-AUD-REG',201,'audit planning and evidence review','PRES-AUD-PEER-ANNUAL'),
@@ -19,6 +20,9 @@ INSERT INTO tmp_annual_template_targets VALUES
 ('DEMO-FIN-REG2',5,'FIN','Finance','DEMO-FIN-REG',502,'accounting supervision and reconciliation','PRES-FIN-PEER-ANNUAL'),
 ('DEMO-GS-REG',6,'GS','General Services','CEO-001',601,'general services management','PRES-GS-MGR-ANNUAL'),
 ('DEMO-GS-REG2',6,'GS','General Services','DEMO-GS-REG',605,'facilities and support supervision','PRES-GS-PEER-ANNUAL'),
+('HRD-001',7,'HR','Human Resources','CEO-001',700,'human resources management and governance','PRES-HR-MGR-ANNUAL'),
+('HRD-002',7,'HR','Human Resources','HRD-001',705,'human resources supervision and coordination','PRES-HR-SUP-ANNUAL'),
+('HRD-003',7,'HR','Human Resources','HRD-002',711,'human resources records and staff support','PRES-HR-STAFF-ANNUAL'),
 ('DEMO-HR-REG',7,'HR','Human Resources','HRD-002',712,'HR records and employee services','PRES-HR-REG-ANNUAL'),
 ('DEMO-IT-REG',8,'IT','Information Technology','CEO-001',800,'technology management and service delivery','PRES-IT-MGR-ANNUAL'),
 ('DEMO-IT-REG2',8,'IT','Information Technology','DEMO-IT-REG',801,'systems delivery and team coordination','PRES-IT-PEER-ANNUAL'),

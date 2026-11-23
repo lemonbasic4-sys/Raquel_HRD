@@ -14,7 +14,7 @@ The completed seed set adds 45 fictional employees across all 12 active departme
 - 9 additional Regular peer employees required for same-department Annual 360 eligibility
 - Active reviewer accounts for the existing CEO and AP executive employees
 
-The protected records for Elena Delgado (`HRD-001`), Patricia Gomez (`HRD-002`), and Miguel Torres (`HRD-003`) are never targeted by these seed statements.
+The employee master records for Elena Delgado (`HRD-001`), Patricia Gomez (`HRD-002`), and Miguel Torres (`HRD-003`) are not overwritten. Phase 2 now adds evaluation-only presentation history for them so every seed-controlled employee except the President/CEO has an evaluation entry.
 
 ## Prerequisites
 
@@ -167,14 +167,14 @@ Phase 2 expected results:
 | Initial templates | 12 with 12 KRAs each |
 | Final templates | 12 with 12 KRAs each |
 | Annual templates | 21 with 15 KRAs each |
-| Initial evaluations | 45: 33 approved, 12 pending |
-| Final evaluations | 21 approved |
-| Historical Annual evaluations/cycles/versions | 101 approved |
+| Initial evaluations | 49: 37 approved, 12 pending |
+| Final evaluations | 25 approved |
+| Historical Annual evaluations/cycles/versions | 130 approved |
 | 2026 Annual demonstration assignments | 21 Pending Self-Rating |
 | Required/submitted historical Annual 360 ratings | 107 / 107 |
 | Quarterly presentation records | 0 |
 
-Compare the three protected-record result sets with the saved pre-import output. Any difference is a stop condition.
+Compare the protected employee-master result sets with the saved pre-import output. Evaluation-only rows are expected for `AP-001` and `HRD-001/002/003`; changes to their employee master fields remain a stop condition.
 
 ## Phase 3 import - chronological order
 
@@ -221,7 +221,7 @@ C:\xampp\mysql\bin\mysql.exe --default-character-set=utf8mb4 -u root -D raquel_h
 if ($LASTEXITCODE -ne 0) { throw "Complete presentation-seed validation failed." }
 ```
 
-Every Phase 4 result labeled `failures` must be `0`. Aggregate result sets are expected to contain 45 presentation employees, 12 departments, 188 evaluations (167 completed or probationary-workflow records plus 21 open 2026 Annual assignments), 21 complete regularization histories, 6 transfers, and 4 promotion endorsements.
+Every Phase 4 result labeled `failures` must be `0`. Evaluation coverage includes the 45 `DEMO-*` employees plus evaluation-only history for `AP-001` and the three HR portal personnel. `CEO-001` remains excluded. Expected evaluation totals are 229 records: 204 completed or probationary-workflow records plus 25 open 2026 Annual assignments.
 
 ## Safe re-import behavior
 

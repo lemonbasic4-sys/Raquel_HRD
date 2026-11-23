@@ -87,7 +87,7 @@ The seed statements select only deterministic `DEMO-*` codes. They never update,
 - Every template has eight Core Behaviors, 100% KRA item weights, and an 80%/20% final split.
 - 21 Regular employees have Initial and Final histories.
 - 24 current probationary employees have Initial records: 12 approved and 12 pending review.
-- 101 completed Annual histories cover every eligible calendar year after regularization through 2025, with self, required same-department Regular raters, peer submissions, head review, approval, version snapshots, results, and development plans.
+- 130 completed Annual histories cover every eligible calendar year after regularization through 2025 for all seed-controlled Regular employees except the President/CEO, with self, required same-department Regular raters, peer submissions, head review, approval, version snapshots, results, and development plans.
 - Twenty-one 2026 Annual assignments remain Pending Self-Rating for the live presentation workflow.
 - Stored Annual totals are recalculated by validation from underlying KRA and 360 records.
 
@@ -104,7 +104,7 @@ The seed statements select only deterministic `DEMO-*` codes. They never update,
 - Added read-only workforce summaries by department, branch, and classification.
 - Added finalized evaluation summaries by approval year, evaluation year, department, KRA, behavior, and performance level.
 - Added regularization, transfer, and succession-promotion readiness summaries.
-- Added explicit zero-failure checks for duplicate identities/evaluations, missing organization references, job-title/department mismatches, incomplete approved metrics, invalid dates, broken movement/promotion references, and protected-employee presentation data.
+- Added explicit zero-failure checks for duplicate identities/evaluations, missing organization references, job-title/department mismatches, incomplete approved metrics, invalid dates, broken movement/promotion references, and accidental President/CEO evaluation data.
 - Live validation passed on 2026-11-23 after restoring the previously approved Phase 2 dataset, which had been absent from the reinitialized live database.
 
 ## Remaining manual verification

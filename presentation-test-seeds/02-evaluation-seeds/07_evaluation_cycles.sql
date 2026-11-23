@@ -10,8 +10,8 @@ INSERT INTO evaluations
 SELECT e.employee_id,t.template_id,p.eval_type,
  e.hire_date,
  CASE p.eval_type WHEN 'Initial' THEN DATE_ADD(e.hire_date,INTERVAL 3 MONTH) ELSE DATE_ADD(e.hire_date,INTERVAL 5 MONTH) END,
- (SELECT u.user_id FROM users u WHERE u.employee_id=e.employee_id AND u.role='Employee' AND u.is_active=1 AND u.deleted_at IS NULL ORDER BY u.user_id LIMIT 1),
- (SELECT u.user_id FROM users u WHERE u.employee_id=e.reports_to AND u.is_active=1 AND u.deleted_at IS NULL ORDER BY (u.role='Employee') DESC,u.user_id LIMIT 1),
+ (SELECT u.user_id FROM users u WHERE u.employee_id=e.employee_id AND u.is_active=1 AND u.deleted_at IS NULL ORDER BY (u.role='Employee') DESC,u.user_id LIMIT 1),
+ (SELECT u.user_id FROM users u WHERE u.employee_id=COALESCE(e.reports_to,(SELECT employee_id FROM employees WHERE employee_code='CEO-001' LIMIT 1)) AND u.is_active=1 AND u.deleted_at IS NULL ORDER BY (u.role='Employee') DESC,u.user_id LIMIT 1),
  DATE_ADD(e.hire_date,INTERVAL 5 DAY),'Pending Reporting Review',
  CASE p.eval_type WHEN 'Initial' THEN DATE_ADD(e.hire_date,INTERVAL 3 MONTH) ELSE DATE_ADD(e.hire_date,INTERVAL 5 MONTH) END,
  CONCAT('Historical ',p.eval_type,' self-assessment for the presentation dataset.'),e.job_title,
@@ -22,7 +22,7 @@ FROM employees e
 CROSS JOIN(SELECT 'Initial' eval_type UNION ALL SELECT 'Final') p
 JOIN evaluation_templates t ON t.target_department_id=e.department_id AND t.evaluation_type=p.eval_type
  AND t.form_code LIKE 'PRES-%' AND t.deleted_at IS NULL
-WHERE e.employee_code LIKE 'DEMO-%-REG%'
+WHERE (e.employee_code LIKE 'DEMO-%-REG%' OR e.employee_code IN('AP-001','HRD-001','HRD-002','HRD-003'))
  AND NOT EXISTS(SELECT 1 FROM evaluations x WHERE x.legacy_reference=CONCAT('PRES-',UPPER(p.eval_type),'-',e.employee_code));
 
 -- Current probationary employees receive an Initial record appropriate to current tenure.
@@ -31,8 +31,8 @@ INSERT INTO evaluations
   submitted_by,assigned_by,assigned_at,status,submitted_date,staff_comments,current_position,
   months_in_position,employee_consent_agreed,is_historical,record_source,legacy_reference,historical_remarks)
 SELECT e.employee_id,t.template_id,'Initial',e.hire_date,DATE_ADD(e.hire_date,INTERVAL 3 MONTH),
- (SELECT u.user_id FROM users u WHERE u.employee_id=e.employee_id AND u.role='Employee' AND u.is_active=1 AND u.deleted_at IS NULL ORDER BY u.user_id LIMIT 1),
- (SELECT u.user_id FROM users u WHERE u.employee_id=e.reports_to AND u.is_active=1 AND u.deleted_at IS NULL ORDER BY (u.role='Employee') DESC,u.user_id LIMIT 1),
+ (SELECT u.user_id FROM users u WHERE u.employee_id=e.employee_id AND u.is_active=1 AND u.deleted_at IS NULL ORDER BY (u.role='Employee') DESC,u.user_id LIMIT 1),
+ (SELECT u.user_id FROM users u WHERE u.employee_id=COALESCE(e.reports_to,(SELECT employee_id FROM employees WHERE employee_code='CEO-001' LIMIT 1)) AND u.is_active=1 AND u.deleted_at IS NULL ORDER BY (u.role='Employee') DESC,u.user_id LIMIT 1),
  DATE_ADD(e.hire_date,INTERVAL 5 DAY),'Pending Reporting Review',DATE_ADD(e.hire_date,INTERVAL 3 MONTH),
  'Initial probationary self-assessment for the presentation dataset.',e.job_title,3,1,0,'Presentation Seed',
  CONCAT('PRES-INITIAL-',e.employee_code),'Current probationary Initial evaluation.'
@@ -47,8 +47,8 @@ INSERT INTO evaluations
   submitted_by,assigned_by,assigned_at,status,submitted_date,staff_comments,current_position,
   months_in_position,employee_consent_agreed,is_historical,record_source,legacy_reference,historical_remarks)
 SELECT e.employee_id,t.template_id,'Annual',MAKEDATE(y.eval_year,1),STR_TO_DATE(CONCAT(y.eval_year,'-12-31'),'%Y-%m-%d'),
- (SELECT u.user_id FROM users u WHERE u.employee_id=e.employee_id AND u.role='Employee' AND u.is_active=1 AND u.deleted_at IS NULL ORDER BY u.user_id LIMIT 1),
- (SELECT u.user_id FROM users u WHERE u.employee_id=e.reports_to AND u.is_active=1 AND u.deleted_at IS NULL ORDER BY (u.role='Employee') DESC,u.user_id LIMIT 1),
+ (SELECT u.user_id FROM users u WHERE u.employee_id=e.employee_id AND u.is_active=1 AND u.deleted_at IS NULL ORDER BY (u.role='Employee') DESC,u.user_id LIMIT 1),
+ (SELECT u.user_id FROM users u WHERE u.employee_id=COALESCE(e.reports_to,(SELECT employee_id FROM employees WHERE employee_code='CEO-001' LIMIT 1)) AND u.is_active=1 AND u.deleted_at IS NULL ORDER BY (u.role='Employee') DESC,u.user_id LIMIT 1),
  STR_TO_DATE(CONCAT(y.eval_year,'-01-05'),'%Y-%m-%d'),'Pending Reporting Review',
  STR_TO_DATE(CONCAT(y.eval_year,'-12-15'),'%Y-%m-%d'),
  CONCAT('Annual self-assessment for ',y.eval_year,'.'),e.job_title,TIMESTAMPDIFF(MONTH,e.hire_date,STR_TO_DATE(CONCAT(y.eval_year,'-12-31'),'%Y-%m-%d')),
@@ -58,11 +58,12 @@ FROM employees e
 JOIN evaluation_templates t ON t.target_department_id=e.department_id AND t.evaluation_type='Annual'
  AND t.form_code LIKE 'PRES-%-ANNUAL' AND t.target_job_title_id=e.job_title_id AND t.deleted_at IS NULL
 CROSS JOIN(
- SELECT 2016 eval_year UNION ALL SELECT 2017 UNION ALL SELECT 2018 UNION ALL SELECT 2019 UNION ALL SELECT 2020
+ SELECT 2013 eval_year UNION ALL SELECT 2014 UNION ALL SELECT 2015 UNION ALL SELECT 2016 UNION ALL SELECT 2017
+ UNION ALL SELECT 2018 UNION ALL SELECT 2019 UNION ALL SELECT 2020
  UNION ALL SELECT 2021 UNION ALL SELECT 2022 UNION ALL SELECT 2023 UNION ALL SELECT 2024 UNION ALL SELECT 2025
 ) y
-WHERE e.employee_code LIKE 'DEMO-%-REG%'
- AND YEAR(e.regularization_effective_date)<y.eval_year
+WHERE (e.employee_code LIKE 'DEMO-%-REG%' OR e.employee_code IN('AP-001','HRD-001','HRD-002','HRD-003'))
+ AND YEAR(COALESCE(e.regularization_effective_date,DATE_ADD(e.hire_date,INTERVAL 6 MONTH)))<y.eval_year
  AND NOT EXISTS(SELECT 1 FROM evaluations x WHERE x.legacy_reference=CONCAT('PRES-ANNUAL-',e.employee_code,'-',y.eval_year));
 
 -- One individual Annual cycle and member per Annual evaluation.
@@ -80,14 +81,15 @@ INSERT INTO annual_evaluation_members
   current_version,revision_pending,finalized_at,is_late_participant,head_approved_by,head_approved_at)
 SELECT c.cycle_id,e.employee_id,ev.evaluation_id,e.job_title_id,manager.job_title_id,e.job_title,NULL,0,0,NULL,0,NULL,NULL
 FROM evaluations ev JOIN employees e ON e.employee_id=ev.employee_id
-JOIN employees manager ON manager.employee_id=e.reports_to
+JOIN employees manager ON manager.employee_id=COALESCE(e.reports_to,(SELECT employee_id FROM employees WHERE employee_code='CEO-001' LIMIT 1))
 JOIN annual_evaluation_cycles c ON c.individual_evaluation_id=ev.evaluation_id
 WHERE ev.legacy_reference LIKE 'PRES-ANNUAL-%' AND YEAR(ev.evaluation_period_end)<=2025
  AND NOT EXISTS(SELECT 1 FROM annual_evaluation_members m WHERE m.evaluation_id=ev.evaluation_id);
 
 -- A package preserves the approval trail for every Initial/Final evaluation.
 INSERT INTO evaluation_packages(department_id,template_id,evaluation_type,period_start,period_end,consolidator_employee_id,current_step_order,status)
-SELECT e.department_id,ev.template_id,ev.evaluation_type,ev.evaluation_period_start,ev.evaluation_period_end,e.reports_to,1,'Pending Review'
+SELECT e.department_id,ev.template_id,ev.evaluation_type,ev.evaluation_period_start,ev.evaluation_period_end,
+ COALESCE(e.reports_to,(SELECT employee_id FROM employees WHERE employee_code='CEO-001' LIMIT 1)),1,'Pending Review'
 FROM evaluations ev JOIN employees e ON e.employee_id=ev.employee_id
 WHERE ev.legacy_reference LIKE 'PRES-%' AND ev.evaluation_type IN('Initial','Final')
  AND NOT EXISTS(SELECT 1 FROM evaluation_package_members pm WHERE pm.evaluation_id=ev.evaluation_id);

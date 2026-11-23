@@ -19,7 +19,7 @@ JOIN employees e ON e.employee_id=ev.employee_id
 SET ev.kra_subtotal=r.kra_score,ev.behavior_average=r.behavior_score,
  ev.total_score=ROUND(r.kra_score*.80+r.behavior_score*.20,2),
  ev.performance_level=CASE WHEN ROUND(r.kra_score*.80+r.behavior_score*.20,2)>=3.60 THEN 'Outstanding' WHEN ROUND(r.kra_score*.80+r.behavior_score*.20,2)>=2.60 THEN 'Exceeds Expectations' WHEN ROUND(r.kra_score*.80+r.behavior_score*.20,2)>=2.00 THEN 'Meets Expectations' ELSE 'Needs Improvement' END,
- ev.status='Approved',ev.approved_by=(SELECT u.user_id FROM users u WHERE u.employee_id=e.reports_to AND u.is_active=1 AND u.deleted_at IS NULL ORDER BY (u.role='Employee') DESC,u.user_id LIMIT 1),
+ ev.status='Approved',ev.approved_by=(SELECT u.user_id FROM users u WHERE u.employee_id=COALESCE(e.reports_to,(SELECT employee_id FROM employees WHERE employee_code='CEO-001' LIMIT 1)) AND u.is_active=1 AND u.deleted_at IS NULL ORDER BY (u.role='Employee') DESC,u.user_id LIMIT 1),
  ev.approved_date=ev.evaluation_period_end,ev.supervisor_comments='Immediate head validated the KRA evidence and probationary development progress.';
 
 -- Compute Annual results from effective KRA scores plus self and every submitted required rater.
@@ -48,7 +48,7 @@ JOIN employees e ON e.employee_id=ev.employee_id
 SET ev.kra_subtotal=r.kra_score,ev.behavior_average=r.behavior_score,
  ev.total_score=ROUND(r.kra_score*.80+r.behavior_score*.20,2),
  ev.performance_level=CASE WHEN ROUND(r.kra_score*.80+r.behavior_score*.20,2)>=3.60 THEN 'Outstanding' WHEN ROUND(r.kra_score*.80+r.behavior_score*.20,2)>=2.60 THEN 'Exceeds Expectations' WHEN ROUND(r.kra_score*.80+r.behavior_score*.20,2)>=2.00 THEN 'Meets Expectations' ELSE 'Needs Improvement' END,
- ev.status='Approved',ev.approved_by=(SELECT u.user_id FROM users u WHERE u.employee_id=e.reports_to AND u.is_active=1 AND u.deleted_at IS NULL ORDER BY (u.role='Employee') DESC,u.user_id LIMIT 1),
+ ev.status='Approved',ev.approved_by=(SELECT u.user_id FROM users u WHERE u.employee_id=COALESCE(e.reports_to,(SELECT employee_id FROM employees WHERE employee_code='CEO-001' LIMIT 1)) AND u.is_active=1 AND u.deleted_at IS NULL ORDER BY (u.role='Employee') DESC,u.user_id LIMIT 1),
  ev.approved_date=DATE_ADD(ev.evaluation_period_end,INTERVAL 5 DAY),
  ev.supervisor_comments='Immediate head finalized the Annual KRA review after all assigned 360 ratings were submitted.';
 
