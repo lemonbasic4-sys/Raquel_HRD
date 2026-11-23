@@ -77,7 +77,7 @@ foreach ($files as $file) {
 usort($backups, function($a, $b) { return $b['date'] - $a['date']; });
 
 // Load auto-backup schedule settings
-$ab_enabled  = (int)getSetting($conn, 'auto_backup_enabled',   '0');
+$ab_enabled  = (int)getSetting($conn, 'auto_backup_enabled',   '1');
 $ab_freq     = getSetting($conn, 'auto_backup_frequency', 'daily');
 $ab_weekday  = (int)getSetting($conn, 'auto_backup_weekday',  '1');
 $ab_monthday = (int)getSetting($conn, 'auto_backup_monthday', '1');

@@ -94,7 +94,7 @@ function ab_next_run($frequency, $weekday, $monthday, $time) {
 }
 
 function ab_run_due_backup($conn) {
-    if ((int)ab_get_setting($conn, 'auto_backup_enabled', '0') !== 1) {
+    if ((int)ab_get_setting($conn, 'auto_backup_enabled', '1') !== 1) {
         return ['checked' => true, 'ran' => false, 'reason' => 'disabled'];
     }
 

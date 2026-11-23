@@ -144,7 +144,7 @@ $held_accounts = $conn->query("
     ORDER BY u.full_name LIMIT 3
 ");
 
-$auto_backup_enabled = (int) getSetting($conn, 'auto_backup_enabled', '0');
+$auto_backup_enabled = (int) getSetting($conn, 'auto_backup_enabled', '1');
 $auto_backup_last_run = getSetting($conn, 'auto_backup_last_run', '');
 $auto_backup_next_run = getSetting($conn, 'auto_backup_next_run', '');
 $auto_backup_next_run_at = $auto_backup_next_run ? strtotime($auto_backup_next_run) : false;

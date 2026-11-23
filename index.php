@@ -168,7 +168,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 // Register failed attempt
                 registerLoginAttempt($conn, $username, $ip);
-                logLoginAudit($conn, $username, 'HRIS Portal', 'Failed', 'Password did not match the account.', (int)$user['user_id']);
+                logLoginAudit($conn, $username, 'HRMS Portal', 'Failed', 'Password did not match the account.', (int)$user['user_id']);
 
                 // Notify Admins of failed login (wrong password)
                 $ip = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
@@ -185,7 +185,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             // Register failed attempt
             registerLoginAttempt($conn, $username, $ip);
-            logLoginAudit($conn, $username, 'HRIS Portal', 'Failed', 'Account was not found.');
+            logLoginAudit($conn, $username, 'HRMS Portal', 'Failed', 'Account was not found.');
 
             // Notify Admins of failed login (invalid account)
             $ip = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
@@ -211,7 +211,7 @@ $sys_logo = getSetting($conn, 'system_logo', 'assets/img/logo/logo.png');
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>Login - Raquel Pawnshop HRIS</title>
+  <title>Login - Raquel Pawnshop HRMS</title>
   <meta name="description" content="Login to Raquel Pawnshop Human Resource Information System">
   <!-- Browser Tab Icon (Favicon) -->
   <link rel="icon" type="image/png" href="<?php echo BASE_URL . '/' . htmlspecialchars($sys_logo); ?>">
@@ -237,7 +237,7 @@ $sys_logo = getSetting($conn, 'system_logo', 'assets/img/logo/logo.png');
   <div class="root">
     <div class="track" id="track">
 
-      <!-- ══ HRIS SCREEN ══ -->
+      <!-- ══ HRMS SCREEN ══ -->
       <div class="screen">
         <div class="brand page-hero">
           <div class="cr tl"></div>
@@ -287,9 +287,9 @@ $sys_logo = getSetting($conn, 'system_logo', 'assets/img/logo/logo.png');
         </div>
 
         <div class="form-panel">
-          <!-- ── HRIS Login Card ── -->
+          <!-- ── HRMS Login Card ── -->
           <div class="form-inner hris" id="hrisCard">
-            <p class="eyebrow ey-gold"><i class="ti ti-briefcase" aria-hidden="true"></i> HRIS Portal</p>
+            <p class="eyebrow ey-gold"><i class="ti ti-briefcase" aria-hidden="true"></i> Human Resource Portal</p>
             <h2 class="form-title">Welcome Back!</h2>
             <p class="form-sub">Login to access your HR management account</p>
 
@@ -338,7 +338,7 @@ $sys_logo = getSetting($conn, 'system_logo', 'assets/img/logo/logo.png');
               Employee Portal Login
             </button>
 
-            <p class="ffoot">&copy; <?php echo date('Y'); ?> Raquel Pawnshop. All rights reserved.</p>
+            <p class="ffoot">&copy; <?php echo date('Y'); ?> Raquel Pawnshop | Student Capstone Project.</p>
           </div>
 
           <!-- ── ESS Login Card ── -->
@@ -391,7 +391,7 @@ $sys_logo = getSetting($conn, 'system_logo', 'assets/img/logo/logo.png');
               HR Management Login
             </button>
 
-            <p class="ffoot">&copy; <?php echo date('Y'); ?> Raquel Pawnshop. All rights reserved.</p>
+            <p class="ffoot">&copy; <?php echo date('Y'); ?> Raquel Pawnshop | Student Capstone Project.</p>
           </div>
         </div>
       </div><!-- /HRIS screen -->
