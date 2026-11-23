@@ -25,6 +25,7 @@ $sys_logo = 'assets/img/logo/logo.png';
 
 // Determine current page for active nav highlighting
 $current_page = basename($_SERVER['PHP_SELF']);
+if ($current_page === 'succession-candidate.php') $current_page = 'succession-planning.php';
 $current_dir = basename(dirname($_SERVER['PHP_SELF']));
 
 $effective_role = $_SESSION['role'] ?? '';
@@ -120,6 +121,13 @@ switch ($effective_role) {
             $_mgr_pkg_pending+=annualPendingCount($conn,$_annual_manager_actor);
         }
         $_mgr_approvals_pending = countManagerPendingApprovals($conn);
+        $_mgr_succession_pending = 0;
+        try {
+            $r = $conn->query("SELECT COUNT(*) AS c FROM succession_endorsements WHERE status = 'Pending HR Review'");
+            if ($r) $_mgr_succession_pending = (int)($r->fetch_assoc()['c'] ?? 0);
+        } catch (mysqli_sql_exception $e) {
+            // The succession migration may not be installed yet.
+        }
 
         $sidebar_menus = [
             'MAIN' => [
@@ -147,7 +155,8 @@ switch ($effective_role) {
             'CAREER' => [
                 ['icon' => 'fas fa-route', 'label' => 'Career Movements', 'url' => BASE_URL . '/manager/career-movements.php', 'page' => 'career-movements.php',
                  'badge' => $_mgr_career_pending ?: null, 'badge_class' => 'bg-warning text-dark'],
-                ['icon' => 'fas fa-user-tie', 'label' => 'Succession Planning', 'url' => BASE_URL . '/manager/succession-planning.php', 'page' => 'succession-planning.php'],
+                ['icon' => 'fas fa-user-tie', 'label' => 'Succession Planning', 'url' => BASE_URL . '/manager/succession-planning.php', 'page' => 'succession-planning.php',
+                 'badge' => $_mgr_succession_pending ?: null, 'badge_class' => 'bg-warning text-dark'],
             ],
             'ANALYTICS' => [
                 ['icon' => 'fas fa-chart-bar', 'label' => 'Analytics', 'url' => BASE_URL . '/manager/analytics.php', 'page' => 'analytics.php'],
@@ -193,6 +202,7 @@ switch ($effective_role) {
                 ['icon' => 'fas fa-route', 'label' => 'Career Movements', 'url' => BASE_URL . '/supervisor/career-movements.php', 'page' => 'career-movements.php',
                  'badge' => $_sup_career_pending ?: null, 'badge_class' => 'bg-warning text-dark'],
                 ['icon' => 'fas fa-chart-line', 'label' => 'Career Progression', 'url' => BASE_URL . '/supervisor/career-progression.php', 'page' => 'career-progression.php'],
+                ['icon' => 'fas fa-user-tie', 'label' => 'Succession Planning', 'url' => BASE_URL . '/supervisor/succession-planning.php', 'page' => 'succession-planning.php'],
             ],
             'ANALYTICS' => [
                 ['icon' => 'fas fa-chart-bar', 'label' => 'Analytics', 'url' => BASE_URL . '/supervisor/analytics.php', 'page' => 'analytics.php'],
@@ -449,6 +459,18 @@ switch ($effective_role) {
 
         // ── Section 4: Career (rank-based) ─────────────────────────────────
         $menu_career = [];
+        require_once __DIR__ . '/succession-endorsements.php';
+        if (successionIsCeoUser($conn, (int)($_SESSION['user_id'] ?? 0))) {
+            $_ceo_succession_pending = 0;
+            try {
+                $r = $conn->query("SELECT COUNT(*) AS c FROM succession_endorsements WHERE status='Pending CEO Approval'");
+                if ($r) $_ceo_succession_pending = (int)($r->fetch_assoc()['c'] ?? 0);
+            } catch (mysqli_sql_exception $e) {
+                // The succession migration may not be installed yet.
+            }
+            $menu_career[] = ['icon' => 'fas fa-user-tie', 'label' => 'Succession Planning', 'url' => BASE_URL . '/employee/succession-planning.php', 'page' => 'succession-planning.php',
+                'badge' => $_ceo_succession_pending ?: null, 'badge_class' => 'bg-warning text-dark'];
+        }
         // Branch Manager (rank 3): can approve/reject Transfer requests from their branch
         if (!$is_probationary_employee && !$is_hr_personnel && $_hdr_emp_rank === 3) {
             // Count pending BM approvals for badge — guarded in case schema migration hasn't run yet

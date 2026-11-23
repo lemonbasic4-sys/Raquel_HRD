@@ -123,6 +123,7 @@ if (in_array($_ft_role, ['HR Manager', 'HR Supervisor', 'HR Staff', 'Admin'])):
     <!-- More Menu -->
     <button type="button" class="hr-nav-item" id="hrNavMoreBtn" aria-label="More options">
         <i class="fas fa-ellipsis-h hr-nav-icon"></i>
+        <?php if (($_mgr_succession_pending ?? 0) > 0): ?><span class="hr-mobile-badge"><?php echo $_mgr_succession_pending > 9 ? '9+' : $_mgr_succession_pending; ?></span><?php endif; ?>
         <span class="hr-nav-label">More</span>
         <div class="hr-nav-more-dropdown" id="hrNavMoreMenu" role="menu">
             <a href="<?php echo BASE_URL; ?>/manager/branches.php"><i class="fas fa-building"></i>Branches</a>
@@ -130,6 +131,7 @@ if (in_array($_ft_role, ['HR Manager', 'HR Supervisor', 'HR Staff', 'Admin'])):
             <a href="<?php echo BASE_URL; ?>/manager/positions.php"><i class="fas fa-briefcase"></i>Positions</a>
             <a href="<?php echo BASE_URL; ?>/manager/templates.php"><i class="fas fa-file-alt"></i>Templates</a>
             <a href="<?php echo BASE_URL; ?>/manager/career-movements.php"><i class="fas fa-route"></i>Career Movements</a>
+            <a href="<?php echo BASE_URL; ?>/manager/succession-planning.php"><i class="fas fa-user-tie"></i>Succession Planning<?php if (($_mgr_succession_pending ?? 0) > 0): ?><span class="badge rounded-pill bg-warning text-dark ms-auto"><?php echo $_mgr_succession_pending > 9 ? '9+' : $_mgr_succession_pending; ?></span><?php endif; ?></a>
             <a href="<?php echo BASE_URL; ?>/manager/evaluation-history.php"><i class="fas fa-history"></i>Eval History</a>
             <a href="<?php echo BASE_URL; ?>/manager/audit-trail.php"><i class="fas fa-clipboard-list"></i>Audit Trail</a>
             <a href="<?php echo BASE_URL; ?>/manager/add-employee.php"><i class="fas fa-user-plus"></i>Add Employee</a>
@@ -202,6 +204,7 @@ if (in_array($_ft_role, ['HR Manager', 'HR Supervisor', 'HR Staff', 'Admin'])):
             <a href="<?php echo BASE_URL; ?>/supervisor/analytics.php"><i class="fas fa-chart-bar"></i>Analytics</a>
             <a href="<?php echo BASE_URL; ?>/supervisor/audit-trail.php"><i class="fas fa-clipboard-list"></i>My Audit Trail</a>
             <a href="<?php echo BASE_URL; ?>/supervisor/career-progression.php"><i class="fas fa-chart-line"></i>Career Progression</a>
+            <a href="<?php echo BASE_URL; ?>/supervisor/succession-planning.php"><i class="fas fa-user-tie"></i>Succession Planning</a>
             <hr>
             <a href="<?php echo BASE_URL; ?>/logout.php" class="text-danger"><i class="fas fa-sign-out-alt"></i>Logout</a>
         </div>

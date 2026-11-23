@@ -496,7 +496,7 @@ function startNotificationPolling() {
                         const freshLink = [...freshNav.querySelectorAll('a[href]')]
                             .find(candidate => new URL(candidate.href, window.location.origin).pathname === path);
                         if (!freshLink) return;
-                        const badgeSelector = selector === '#sidebar-nav' ? '.badge' : '.mobile-notif-badge, .hr-mobile-badge';
+                        const badgeSelector = selector === '#sidebar-nav' ? '.badge' : '.mobile-notif-badge, .hr-mobile-badge, .badge';
                         link.querySelector(badgeSelector)?.remove();
                         const freshBadge = freshLink.querySelector(badgeSelector);
                         if (freshBadge) {
@@ -505,6 +505,15 @@ function startNotificationPolling() {
                             (iconWrapper || link).appendChild(badge);
                         }
                     });
+                    if (selector === '.hr-bottom-nav') {
+                        const currentMore = currentNav.querySelector('#hrNavMoreBtn');
+                        const freshMore = freshNav.querySelector('#hrNavMoreBtn');
+                        if (currentMore && freshMore) {
+                            currentMore.querySelector(':scope > .hr-mobile-badge')?.remove();
+                            const freshBadge = freshMore.querySelector(':scope > .hr-mobile-badge');
+                            if (freshBadge) currentMore.insertBefore(document.importNode(freshBadge, true), currentMore.querySelector('.hr-nav-label'));
+                        }
+                    }
                 }
             })
             .catch(err => console.error('Error refreshing navigation badges:', err));
