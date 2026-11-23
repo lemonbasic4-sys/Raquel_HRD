@@ -169,7 +169,7 @@ function successionHandlePost(mysqli $conn): void
 function successionListEndorsements(mysqli $conn): array
 {
     $sql = "SELECT se.*,CONCAT(e.first_name,' ',e.last_name) employee_name,COALESCE(se.previous_job_title,e.job_title) current_title,
-        e.profile_picture,d.department_name,b.branch_name,j.job_title target_title,
+        e.profile_picture,e.department_id,d.department_name,b.branch_name,j.job_title target_title,
         u.full_name recommender_name, h.full_name hr_reviewer_name, c.full_name ceo_name
         FROM succession_endorsements se
         JOIN employees e ON e.employee_id=se.employee_id
@@ -179,6 +179,6 @@ function successionListEndorsements(mysqli $conn): array
         JOIN users u ON u.user_id=se.recommended_by
         LEFT JOIN users h ON h.user_id=se.hr_reviewed_by
         LEFT JOIN users c ON c.user_id=se.ceo_decided_by
-        ORDER BY FIELD(se.status,'Pending HR Review','Pending CEO Approval','Returned','Approved','Rejected'),se.created_at DESC LIMIT 100";
+        ORDER BY FIELD(se.status,'Pending HR Review','Pending CEO Approval','Returned','Approved','Rejected'),se.created_at DESC";
     return $conn->query($sql)->fetch_all(MYSQLI_ASSOC);
 }

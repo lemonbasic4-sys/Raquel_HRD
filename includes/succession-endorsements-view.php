@@ -8,6 +8,10 @@
 .succession-status-tab[aria-selected="true"] { background:#0a3b19; color:#fff; box-shadow:0 3px 8px rgba(8,46,6,.16); }
 .succession-status-tab .badge { background:rgba(15,61,30,.1); color:inherit; }
 .succession-status-tab[aria-selected="true"] .badge { background:rgba(255,255,255,.2); }
+.succession-endorsement-toolbar { display:grid; grid-template-columns:minmax(0,1fr) minmax(210px,280px); gap:.75rem; align-items:end; margin-bottom:1rem; }
+.succession-endorsement-toolbar .succession-status-tabs { margin-bottom:0; }
+.succession-department-filter label { display:block; margin:0 0 .3rem; color:#4b5d49; font-size:.7rem; font-weight:800; letter-spacing:.04em; text-transform:uppercase; }
+.succession-department-filter .form-select { min-height:44px; border-color:#dce6d6; border-radius:10px; color:#29442c; font-size:.8rem; font-weight:650; background-color:#fff; }
 .succession-endorsement-card[hidden], .succession-status-empty[hidden] { display:none !important; }
 .succession-endorsement-entry { overflow:hidden; border:1px solid #dce6d6; border-radius:16px; background:#fff; box-shadow:0 8px 22px rgba(8,46,6,.06); transition:border-color .18s ease,box-shadow .18s ease,transform .18s ease; }
 .succession-endorsement-entry:hover { border-color:#bfd0b8; box-shadow:0 14px 30px rgba(8,46,6,.1); transform:translateY(-1px); }
@@ -50,6 +54,11 @@
 .succession-verification-chip { display:inline-flex; align-items:center; gap:.32rem; padding:.3rem .48rem; border-radius:999px; background:#edf7ef; color:#26723e; font-size:.65rem; font-weight:700; }
 .succession-endorsement-footer { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:.75rem; margin-top:.85rem; padding-top:.85rem; border-top:1px solid #e8ede5; }
 .succession-endorsement-id { color:#879083; font-size:.66rem; }
+.succession-endorsement-pagination { display:flex; align-items:center; justify-content:space-between; gap:.75rem; margin-top:1rem; padding:.75rem .85rem; border:1px solid #e2e9de; border-radius:11px; background:#f8faf6; }
+.succession-page-summary { color:#667262; font-size:.72rem; font-weight:650; }
+.succession-page-controls { display:flex; align-items:center; gap:.45rem; }
+.succession-page-controls .btn { min-width:38px; min-height:34px; border-radius:8px; }
+.succession-page-indicator { min-width:84px; color:#2f472f; font-size:.72rem; font-weight:800; text-align:center; }
 .succession-endorsement-action { min-width:0; margin:0; padding:1.1rem 1.2rem; border-left:1px solid #e3e9dd; background:#fbfcfa; }
 .succession-endorsement-action .form-control { min-height:104px; }
 .succession-endorsement-action label.d-block { margin:.35rem 0; line-height:1.4; }
@@ -57,7 +66,8 @@
 .succession-approved-note { margin-top:.8rem; padding:.7rem .8rem; border:1px solid #b9dec3; border-radius:10px; background:#edf8ef; color:#17472a; font-size:.75rem; line-height:1.45; }
 @media(max-width:1199.98px) { .succession-endorsement-overview { grid-template-columns:minmax(0,1fr); } }
 @media(max-width:991.98px) { .succession-endorsement-layout { grid-template-columns:minmax(0,1fr); } .succession-endorsement-action { border-left:0; border-top:1px solid #e3e9dd; } }
-@media(max-width:575.98px) { .succession-endorsement-head { align-items:flex-start; } .succession-candidate-meta { display:block; } .succession-candidate-meta span { display:flex; margin-top:.15rem; } .succession-position-route { grid-template-columns:minmax(0,1fr); gap:.55rem; } .succession-position-arrow { justify-content:start; transform:rotate(90deg); } .succession-position-block.target { padding:.55rem 0 0; border-top:1px dashed #bdcdb6; border-left:0; } .succession-endorsement-details,.succession-endorsement-action { padding:.9rem; } .succession-endorsement-action .d-flex > .btn { flex:1 1 100%; } }
+@media(max-width:767.98px) { .succession-endorsement-toolbar { grid-template-columns:minmax(0,1fr); } }
+@media(max-width:575.98px) { .succession-endorsement-head { align-items:flex-start; } .succession-candidate-meta { display:block; } .succession-candidate-meta span { display:flex; margin-top:.15rem; } .succession-position-route { grid-template-columns:minmax(0,1fr); gap:.55rem; } .succession-position-arrow { justify-content:start; transform:rotate(90deg); } .succession-position-block.target { padding:.55rem 0 0; border-top:1px dashed #bdcdb6; border-left:0; } .succession-endorsement-details,.succession-endorsement-action { padding:.9rem; } .succession-endorsement-action .d-flex > .btn { flex:1 1 100%; } .succession-endorsement-pagination { align-items:stretch; flex-direction:column; } .succession-page-controls { justify-content:space-between; } }
 @media(prefers-reduced-motion:reduce) { .succession-endorsement-entry { transition:none; } }
 </style>
 <?php
@@ -78,6 +88,14 @@ foreach ($successionEndorsements as $endorsement) {
     };
     if ($group !== null) $successionStatusCounts[$group]++;
 }
+$successionEndorsementDepartments = [];
+foreach ($successionEndorsements as $endorsement) {
+    $departmentId = (int)($endorsement['department_id'] ?? 0);
+    if ($departmentId > 0 && !empty($endorsement['department_name'])) {
+        $successionEndorsementDepartments[$departmentId] = $endorsement['department_name'];
+    }
+}
+asort($successionEndorsementDepartments, SORT_NATURAL | SORT_FLAG_CASE);
 ?>
 <section class="succession-panel succession-endorsement-list mb-4" id="endorsements" aria-labelledby="endorsementsTitle">
     <div class="succession-panel-header">
@@ -90,10 +108,21 @@ foreach ($successionEndorsements as $endorsement) {
         <?php if (!$successionEndorsements): ?>
             <p class="text-muted mb-0">No endorsements yet.</p>
         <?php else: ?>
-            <div class="succession-status-tabs" role="tablist" aria-label="Filter promotion endorsements by status">
-                <?php foreach (['ongoing'=>'Ongoing','approved'=>'Approved','rejected'=>'Rejected','returned'=>'Returned','all'=>'All'] as $key=>$label): ?>
-                <button type="button" class="succession-status-tab" role="tab" data-succession-status="<?php echo $key; ?>" aria-selected="false" aria-controls="successionEndorsementCards"><?php echo $label; ?> <span class="badge rounded-pill"><?php echo $successionStatusCounts[$key]; ?></span></button>
-                <?php endforeach; ?>
+            <div class="succession-endorsement-toolbar">
+                <div class="succession-status-tabs" role="tablist" aria-label="Filter promotion endorsements by status">
+                    <?php foreach (['ongoing'=>'Ongoing','approved'=>'Approved','rejected'=>'Rejected','returned'=>'Returned','all'=>'All'] as $key=>$label): ?>
+                    <button type="button" class="succession-status-tab" role="tab" data-succession-status="<?php echo $key; ?>" aria-selected="false" aria-controls="successionEndorsementCards"><?php echo $label; ?> <span class="badge rounded-pill"><?php echo $successionStatusCounts[$key]; ?></span></button>
+                    <?php endforeach; ?>
+                </div>
+                <div class="succession-department-filter">
+                    <label for="successionDepartmentFilter"><i class="fas fa-sitemap me-1" aria-hidden="true"></i>Department</label>
+                    <select class="form-select" id="successionDepartmentFilter">
+                        <option value="all">All departments</option>
+                        <?php foreach ($successionEndorsementDepartments as $departmentId=>$departmentName): ?>
+                        <option value="<?php echo (int)$departmentId; ?>"><?php echo e($departmentName); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
             </div>
             <p class="succession-status-empty text-muted mb-0" hidden>No endorsements in this status.</p>
             <div class="row g-3" id="successionEndorsementCards" role="tabpanel" aria-label="Promotion endorsements">
@@ -110,7 +139,7 @@ foreach ($successionEndorsements as $endorsement) {
                 $avatar = !empty($endorsement['profile_picture']) ? getEmployeeAvatar($endorsement['profile_picture']) : '';
                 $displayRecommendation = preg_replace('/^\[PRESENTATION-SEED:[^\]]+\]\s*/', '', (string)$endorsement['recommendation_reason']);
             ?>
-                <div class="col-12 succession-endorsement-card" data-status-group="<?php echo e($statusGroup); ?>">
+                <div class="col-12 succession-endorsement-card" data-status-group="<?php echo e($statusGroup); ?>" data-department-id="<?php echo (int)($endorsement['department_id'] ?? 0); ?>">
                     <article class="succession-endorsement-entry">
                         <div class="succession-endorsement-head">
                             <div class="succession-candidate-identity">
@@ -200,6 +229,14 @@ foreach ($successionEndorsements as $endorsement) {
                 </div>
             <?php endforeach; ?>
             </div>
+            <nav class="succession-endorsement-pagination" id="successionEndorsementPagination" aria-label="Promotion endorsement pages">
+                <span class="succession-page-summary" id="successionPageSummary"></span>
+                <span class="succession-page-controls">
+                    <button type="button" class="btn btn-outline-success btn-sm" id="successionPrevPage" aria-label="Previous endorsement page"><i class="fas fa-chevron-left" aria-hidden="true"></i></button>
+                    <span class="succession-page-indicator" id="successionPageIndicator" aria-live="polite"></span>
+                    <button type="button" class="btn btn-outline-success btn-sm" id="successionNextPage" aria-label="Next endorsement page"><i class="fas fa-chevron-right" aria-hidden="true"></i></button>
+                </span>
+            </nav>
         <?php endif; ?>
     </div>
 </section>
@@ -210,24 +247,59 @@ document.addEventListener('DOMContentLoaded', function () {
     const tabs = [...section.querySelectorAll('[data-succession-status]')];
     const cards = [...section.querySelectorAll('.succession-endorsement-card')];
     const empty = section.querySelector('.succession-status-empty');
+    const departmentFilter = section.querySelector('#successionDepartmentFilter');
+    const pagination = section.querySelector('#successionEndorsementPagination');
+    const pageSummary = section.querySelector('#successionPageSummary');
+    const pageIndicator = section.querySelector('#successionPageIndicator');
+    const previousPage = section.querySelector('#successionPrevPage');
+    const nextPage = section.querySelector('#successionNextPage');
     const savedStatusKey = 'successionEndorsementStatus:' + window.location.pathname;
+    const savedDepartmentKey = 'successionEndorsementDepartment:' + window.location.pathname;
+    const pageSize = 5;
+    let activeStatus = 'all';
+    let activeDepartment = 'all';
+    let activePage = 1;
     if (!tabs.length) return;
-    function selectStatus(status) {
-        let visible = 0;
-        tabs.forEach(tab => tab.setAttribute('aria-selected', tab.dataset.successionStatus === status ? 'true' : 'false'));
-        cards.forEach(card => {
-            card.hidden = status !== 'all' && card.dataset.statusGroup !== status;
-            if (!card.hidden) visible++;
-        });
-        empty.hidden = visible > 0;
-        try { sessionStorage.setItem(savedStatusKey, status); } catch (_) {}
+    function renderEndorsements() {
+        const matches = cards.filter(card =>
+            (activeStatus === 'all' || card.dataset.statusGroup === activeStatus) &&
+            (activeDepartment === 'all' || card.dataset.departmentId === activeDepartment)
+        );
+        const totalPages = Math.max(1, Math.ceil(matches.length / pageSize));
+        activePage = Math.min(Math.max(1, activePage), totalPages);
+        const pageStart = (activePage - 1) * pageSize;
+        const visibleCards = new Set(matches.slice(pageStart, pageStart + pageSize));
+        cards.forEach(card => { card.hidden = !visibleCards.has(card); });
+        tabs.forEach(tab => tab.setAttribute('aria-selected', tab.dataset.successionStatus === activeStatus ? 'true' : 'false'));
+        empty.hidden = matches.length > 0;
+        pagination.hidden = matches.length === 0;
+        pageIndicator.textContent = `Page ${activePage} of ${totalPages}`;
+        const firstResult = matches.length ? pageStart + 1 : 0;
+        const lastResult = Math.min(pageStart + pageSize, matches.length);
+        pageSummary.textContent = `Showing ${firstResult}–${lastResult} of ${matches.length} endorsement${matches.length === 1 ? '' : 's'}`;
+        previousPage.disabled = activePage <= 1;
+        nextPage.disabled = activePage >= totalPages;
+        try {
+            sessionStorage.setItem(savedStatusKey, activeStatus);
+            sessionStorage.setItem(savedDepartmentKey, activeDepartment);
+        } catch (_) {}
     }
+    function selectStatus(status) { activeStatus = status; activePage = 1; renderEndorsements(); }
     tabs.forEach(tab => tab.addEventListener('click', () => selectStatus(tab.dataset.successionStatus)));
+    departmentFilter?.addEventListener('change', () => { activeDepartment = departmentFilter.value; activePage = 1; renderEndorsements(); });
+    previousPage?.addEventListener('click', () => { if (activePage > 1) { activePage--; renderEndorsements(); section.querySelector('#successionEndorsementCards')?.scrollIntoView({behavior:'smooth',block:'start'}); } });
+    nextPage?.addEventListener('click', () => { activePage++; renderEndorsements(); section.querySelector('#successionEndorsementCards')?.scrollIntoView({behavior:'smooth',block:'start'}); });
     const firstAvailable = ['ongoing', 'approved', 'rejected', 'returned'].find(status => cards.some(card => card.dataset.statusGroup === status)) || 'all';
     const afterDecision = <?php echo json_encode($successionSelectedStatus); ?>;
     let savedStatus = null;
-    try { savedStatus = sessionStorage.getItem(savedStatusKey); } catch (_) {}
+    let savedDepartment = null;
+    try { savedStatus = sessionStorage.getItem(savedStatusKey); savedDepartment = sessionStorage.getItem(savedDepartmentKey); } catch (_) {}
     const initialStatus = afterDecision || savedStatus || firstAvailable;
-    selectStatus(tabs.some(tab => tab.dataset.successionStatus === initialStatus) ? initialStatus : firstAvailable);
+    activeStatus = tabs.some(tab => tab.dataset.successionStatus === initialStatus) ? initialStatus : firstAvailable;
+    if (departmentFilter && [...departmentFilter.options].some(option => option.value === savedDepartment)) {
+        activeDepartment = savedDepartment;
+        departmentFilter.value = savedDepartment;
+    }
+    renderEndorsements();
 });
 </script>
