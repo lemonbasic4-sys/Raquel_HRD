@@ -155,7 +155,9 @@ $positions = $conn->query("
     LEFT JOIN rank_categories rc ON jt.rank_category_id = rc.rank_category_id
     LEFT JOIN job_titles parent ON jt.reports_to = parent.job_title_id
     $positionWhere
-    ORDER BY jt.job_title
+    ORDER BY d.department_name,
+             COALESCE(rc.level_order, 2147483647),
+             jt.job_title
 ");
 $positionOptions = $conn->query("
     SELECT parent.job_title_id, parent.job_title, parent.department_id,
