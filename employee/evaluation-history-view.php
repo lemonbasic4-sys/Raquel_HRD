@@ -45,8 +45,7 @@ $annualResultMember=$is_annual_peer_evaluation ? ($peerEvalType === 'quarterly' 
 $is_cancelled_cycle=$annualResultMember && !empty($annualResultMember['cancelled_at']);
 $annualReceivedPeers=$annualResultMember ? ($peerEvalType === 'quarterly' ? quarterlyPeers($conn,$annualResultMember) : annualPeers($conn,$annualResultMember)) : [];
 $annualResultComplete=$annualResultMember && count($annualReceivedPeers)>=($peerEvalType === 'quarterly' ? quarterlyExpectedPeers($conn,(int)$annualResultMember['cycle_id'],(int)$annualResultMember['employee_id']) : annualExpectedPeers($conn,(int)$annualResultMember['cycle_id'],(int)$annualResultMember['employee_id']));
-$annualOwnActor=$annualResultMember ? ($peerEvalType === 'quarterly' ? quarterlyActor($conn,$user_id) : annualActor($conn,$user_id)) : null;
-$annualNamedPeers=$annualOwnActor && ($peerEvalType === 'quarterly' ? quarterlyCanSeeOwnPeerNames($conn,$annualOwnActor,$annualResultMember) : annualCanSeeOwnPeerNames($conn,$annualOwnActor,$annualResultMember));
+$annualNamedPeers=(bool)$annualResultMember;
 $annualReceivedPeers=$annualResultMember ? ($peerEvalType === 'quarterly' ? quarterlyPeers($conn,$annualResultMember,$annualNamedPeers) : annualPeers($conn,$annualResultMember,$annualNamedPeers)) : [];
 $annualPeerSelf=$annualResultMember ? (json_decode($annualResultMember['self_values_json'] ?? '[]',true) ?: []) : [];
 $annualPeerBreakdown=$annualResultMember && count($annualPeerSelf)===count(annualCoreValues())

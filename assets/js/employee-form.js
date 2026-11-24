@@ -179,9 +179,14 @@ function showStep(step, scrollToTop = true) {
         updatePDSSummary();
     }
 
-    // Scroll page to top smoothly only if requested (don't scroll to top when focusing an invalid field)
-    if (scrollToTop) {
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+    // Keep the newly selected form fields in view instead of returning to the page hero.
+    if (scrollToTop && target) {
+        window.requestAnimationFrame(() => {
+            const navbarHeight = document.querySelector('.top-navbar')?.getBoundingClientRect().height || 0;
+            const stepNavHeight = document.querySelector('.portal-tabs')?.getBoundingClientRect().height || 0;
+            const targetY = window.scrollY + target.getBoundingClientRect().top - navbarHeight - stepNavHeight - 26;
+            window.scrollTo({ top: Math.max(0, targetY), behavior: 'smooth' });
+        });
     }
 }
 
@@ -201,30 +206,48 @@ function getFieldLabel(el) {
     return el.placeholder || el.name || 'This field';
 }
 
-function showValidationAlertBanner(stepNum, message) {
-    let existing = document.getElementById('wizardValidationAlert');
-    if (existing) existing.remove();
+function showValidationToast(stepNum, message) {
+    document.getElementById('wizardValidationToast')?.remove();
 
-    const banner = document.createElement('div');
-    banner.id = 'wizardValidationAlert';
-    banner.className = 'alert alert-danger alert-dismissible fade show shadow-sm mb-3 d-flex align-items-center justify-content-between';
-    banner.style.borderRadius = '10px';
-    banner.style.borderLeft = '5px solid #dc3545';
-    banner.innerHTML = `
-        <div class="d-flex align-items-center">
-            <i class="fas fa-exclamation-circle fs-4 me-3 text-danger"></i>
-            <div>
-                <strong>Action Required:</strong> ${message}
-                <div class="small text-muted">We shifted to <strong>Step ${stepNum}</strong> and placed your focus directly on the input below.</div>
-            </div>
-        </div>
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    `;
-
-    const cardBody = document.querySelector('.content-card .card-body') || document.querySelector('form');
-    if (cardBody) {
-        cardBody.insertBefore(banner, cardBody.firstChild);
+    let stack = document.getElementById('hrdToastStack');
+    if (!stack) {
+        stack = document.createElement('div');
+        stack.id = 'hrdToastStack';
+        stack.className = 'hrd-toast-stack';
+        stack.setAttribute('aria-live', 'assertive');
+        stack.setAttribute('role', 'region');
+        stack.setAttribute('aria-label', 'Form notifications');
+        document.body.appendChild(stack);
     }
+
+    const toast = document.createElement('div');
+    toast.id = 'wizardValidationToast';
+    toast.className = 'hrd-toast hrd-toast--error';
+    toast.setAttribute('role', 'alert');
+    toast.innerHTML = `
+        <div class="hrd-toast__icon"><i class="fas fa-exclamation-triangle"></i></div>
+        <div class="hrd-toast__body">
+            <span class="hrd-toast__label">Employee Form</span>
+            <span class="hrd-toast__title">Action Required</span>
+            <span class="hrd-toast__text"></span>
+        </div>
+        <div class="hrd-toast__dot" aria-hidden="true"></div>
+        <button type="button" class="hrd-toast__close" aria-label="Close">&times;</button>
+    `;
+    toast.querySelector('.hrd-toast__text').textContent = `${message} Step ${stepNum} is now open and the required field is focused.`;
+
+    const dismiss = () => {
+        if (typeof window._hrdDismissToast === 'function') {
+            window._hrdDismissToast(toast);
+            return;
+        }
+        toast.classList.remove('show');
+        window.setTimeout(() => toast.remove(), 380);
+    };
+    toast.querySelector('.hrd-toast__close').addEventListener('click', dismiss);
+    stack.appendChild(toast);
+    window.requestAnimationFrame(() => toast.classList.add('show'));
+    window.setTimeout(dismiss, 8000);
 }
 
 function highlightAndFocusInvalidField(inputElement, errorMessage) {
@@ -255,8 +278,8 @@ function highlightAndFocusInvalidField(inputElement, errorMessage) {
     feedback.innerHTML = `<i class="fas fa-exclamation-circle me-1"></i>${errorMessage}`;
     feedback.style.display = 'block';
 
-    // Show floating alert banner
-    showValidationAlertBanner(stepNum, errorMessage);
+    // Show a floating notification without shifting the form layout.
+    showValidationToast(stepNum, errorMessage);
 
     // Center the element smoothly in viewport and focus
     setTimeout(() => {
@@ -1534,11 +1557,11 @@ document.addEventListener("DOMContentLoaded", function () {
     const employeeForm = document.getElementById('addEmployeeForm') || document.getElementById('editEmployeeForm') || document.getElementById('pdsWizardForm');
     const urlStep = urlParams.get('step');
     if (urlStep) {
-        showStep(parseInt(urlStep));
+        showStep(parseInt(urlStep), false);
     } else {
         const stepInput = document.getElementById('currentStepInput');
         const defaultStep = stepInput ? parseInt(stepInput.value, 10) : 1;
-        showStep(isNaN(defaultStep) ? 1 : defaultStep);
+        showStep(isNaN(defaultStep) ? 1 : defaultStep, false);
     }
 
     if (employeeForm) {

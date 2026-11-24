@@ -5126,6 +5126,27 @@ video {
     width: 100%;
 }
 
+/* Keep wizard progress navigation available while completing long sections. */
+.employee-create-page .portal-tabs,
+.employee-edit-page .portal-tabs {
+    position: sticky;
+    top: calc(var(--header-height) + 10px);
+    z-index: 1020;
+    background: rgba(255, 255, 255, .96);
+    border: 1px solid #e5ebe2;
+    border-radius: 16px;
+    box-shadow: 0 8px 20px rgba(18, 45, 19, .08);
+    padding: 10px;
+    backdrop-filter: blur(10px);
+}
+
+.employee-create-page .wizard-footer,
+.employee-edit-page .wizard-footer {
+    position: sticky;
+    bottom: 0;
+    z-index: 1025;
+}
+
 .portal-tab {
     flex: 1;
     display: flex;

@@ -551,7 +551,6 @@ require_once __DIR__ . '/header.php';
             <?php if ($submitted): ?><div class="alert alert-success">Submitted and locked. These ratings cannot be edited.</div><?php endif; ?>
             <form method="post" id="annualRatingForm" data-draft-key="annual-rating-overrides-v3-<?php echo (int)$actor['user_id']; ?>-<?php echo $evaluationId; ?>-<?php echo substr(hash('sha256',json_encode([$member['employee_id'],$member['evaluation_created_at'],$member['evaluation_submitted_at'],$member['period_start'],$member['period_end']])),0,24); ?>" data-resume-tab="<?php echo $_SERVER['REQUEST_METHOD']==='POST' ? '1' : '0'; ?>" data-submitted="<?php echo $submitted ? '1' : '0'; ?>" data-override-only="<?php echo !$submitted ? '1' : '0'; ?>">
                 <p id="annualRatingScaleNotice" class="alert alert-warning" role="status" hidden></p>
-                <?php if ($canFinalize && !$submitted): ?><p id="annualHeadOverallPreview" class="alert alert-success" aria-live="polite"></p><?php endif; ?>
                 <?php echo csrfField(); ?><input type="hidden" name="action" value="rate"><input type="hidden" name="cycle_id" value="<?php echo $cycleId; ?>"><input type="hidden" name="confirmed" id="annualConfirmed" value="0">
                 <?php if ($canFinalize && !$submitted): $rateKras=annualKraRows($conn,$evaluationId); ?>
                     <input type="hidden" name="review_token" value="<?php echo annualReviewToken($conn,$member); ?>">
@@ -789,7 +788,6 @@ document.addEventListener('DOMContentLoaded', () => {
 <?php if ($executiveKraOnly && $view==='rate'): ?>
 // Executives approve KRAs; department coworkers provide behavior ratings.
 ['annualRateCoreTab','annualRatePlanTab','annualRateCorePanel','annualRatePlanPanel'].forEach(id=>document.getElementById(id)?.remove());
-document.getElementById('annualHeadOverallPreview')?.remove();
 const executiveNext=document.getElementById('annualRateKraNext');
 if (executiveNext) { executiveNext.dataset.annualTab='#annualRateReviewPanel'; executiveNext.setAttribute('aria-controls','annualRateReviewPanel'); executiveNext.textContent='Next: Review & Submit'; }
 const executiveBack=document.getElementById('annualRateReviewBack');
@@ -825,17 +823,6 @@ function updateAnnualProgress() {
     const kraTotal=document.getElementById('annualRateKraTotal');
     if (kraTotal) kraTotal.textContent=kraInputs.length && kraInputs.every(input=>annualEffectiveRating(input)!==null)
         ? kraInputs.reduce((sum,input)=>sum+Number(input.dataset.weight)/100*annualEffectiveRating(input),0).toFixed(2) : '—';
-    const overallPreview=document.getElementById('annualHeadOverallPreview');
-    if (overallPreview) {
-        const valid=kraInputs.length>0 && inputs.length===8 && [...kraInputs,...inputs].every(input=>annualEffectiveRating(input)!==null);
-        if (valid) {
-            const kra=Math.round((kraInputs.reduce((sum,input)=>sum+Math.round(Number(input.dataset.weight)/100*annualEffectiveRating(input)*100)/100,0)+Number.EPSILON)*100)/100;
-            const core=Math.round((inputs.reduce((sum,input)=>sum+annualEffectiveRating(input),0)/8+Number.EPSILON)*100)/100;
-            const total=Math.round((kra*.8+core*.2+Number.EPSILON)*100)/100;
-            const label=total>=3.6 ? 'Outstanding' : total>=2.6 ? 'Exceeds Expectations' : total>=2 ? 'Meets Expectations' : 'Needs Improvement';
-            overallPreview.textContent='Proposed overall score: '+total.toFixed(2)+' / 4.00 · '+label+' — (KRA '+kra.toFixed(2)+' × 80%) + (Behavior '+core.toFixed(2)+' × 20%).';
-        } else overallPreview.textContent='Complete all ratings from 1.00 to 4.00 to preview the overall score.';
-    }
     renderAnnualRatingPreview();
     annualRenderPlanSummary();
 }
