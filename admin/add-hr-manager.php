@@ -16,6 +16,8 @@ if ($department_id) {
 $branches = $conn->query("SELECT branch_id, branch_name FROM branches WHERE is_active = 1 AND deleted_at IS NULL ORDER BY branch_name")->fetch_all(MYSQLI_ASSOC);
 $existing = $conn->query("SELECT e.employee_id FROM employees e JOIN departments d ON d.department_id = e.department_id JOIN job_titles jt ON jt.job_title_id = e.job_title_id JOIN rank_categories rc ON rc.rank_category_id = e.rank_category_id WHERE d.department_name = 'Human Resources' AND (LOWER(jt.job_title) LIKE '%manager%' OR LOWER(rc.rank_name) LIKE '%manager%') AND e.deleted_at IS NULL LIMIT 1")->fetch_assoc();
 $errors = [];
+$setupSuccess = !empty($_SESSION['hr_manager_setup_success']);
+unset($_SESSION['hr_manager_setup_success']);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verifyCsrfToken();
@@ -31,13 +33,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $type = $_POST['employment_type'] ?? '';
     $title = null;
     foreach ($titles as $candidate) if ((int) $candidate['job_title_id'] === $title_id) $title = $candidate;
-    $valid_branch = false;
-    foreach ($branches as $branch) if ((int) $branch['branch_id'] === $branch_id) $valid_branch = true;
+    $branchName = null;
+    foreach ($branches as $branch) if ((int) $branch['branch_id'] === $branch_id) $branchName = $branch['branch_name'];
     $date = DateTimeImmutable::createFromFormat('!Y-m-d', $hire);
 
     if ($existing) $errors[] = 'An HR Manager employee already exists. Admin setup is available only once.';
     if (!$department_id || !$title) $errors[] = 'Select an active Human Resources manager position.';
-    if (!$valid_branch) $errors[] = 'Select an active branch.';
+    if ($branchName === null) $errors[] = 'Select an active branch.';
     if ($first === '' || $last === '' || $code === '') $errors[] = 'First name, last name, and employee ID are required.';
     if (strlen($code) > 30) $errors[] = 'Employee ID must be 30 characters or fewer.';
     if (!filter_var($email, FILTER_VALIDATE_EMAIL) || strlen($email) > 100) $errors[] = 'Enter a valid email address.';
@@ -71,7 +73,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->close();
             logAudit($conn, (int) $_SESSION['user_id'], 'CREATE', 'Employee', $employee_id, "Admin created initial HR Manager employee: $first $last");
             $conn->commit();
-            redirectWith(BASE_URL . '/admin/users.php?setup_employee=' . $employee_id, 'success', 'HR Manager employee created. Add their user account to grant HRIS access.');
+            $_SESSION['hr_manager_setup_success'] = true;
+            header('Location: ' . BASE_URL . '/admin/add-hr-manager.php', true, 303);
+            exit;
         } catch (Throwable $error) {
             $conn->rollback();
             $errors[] = $error instanceof mysqli_sql_exception && $error->getCode() === 1062 ? 'Employee ID already exists.' : 'Could not create the HR Manager employee. Check the details and try again.';
@@ -116,7 +120,9 @@ require_once '../includes/header.php';
     <div class="setup-progress"><div class="setup-step"><i class="fas fa-id-card"></i><span>1. Create employee record</span></div><div class="setup-step next"><i class="fas fa-key"></i><span>2. Create HRIS user account</span></div></div>
     <?php foreach ($errors as $error): ?><div class="alert alert-danger"><?php echo e($error); ?></div><?php endforeach; ?>
     <?php if ($existing): ?>
+        <?php if (!$setupSuccess): ?>
         <div class="alert alert-info">An HR Manager employee already exists. Use User Management to give them access.</div>
+        <?php endif; ?>
     <?php elseif (!$department_id || !$titles || !$branches): ?>
         <div class="alert alert-warning">Set up an active Human Resources department, manager position, and branch before creating this employee.</div>
     <?php else: ?>
@@ -144,4 +150,5 @@ require_once '../includes/header.php';
     </form>
     <?php endif; ?>
 </div>
+<?php if ($setupSuccess) renderFlashPopup('success', 'HR Manager added successfully.'); ?>
 <?php require_once '../includes/footer.php'; ?>

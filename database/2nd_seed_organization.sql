@@ -349,4 +349,11 @@ REPLACE INTO job_titles (job_title_id, job_title, rank_category_id, department_i
 (1200, 'Procurement Supervisor I', 4, 12, 1, 1, 601, NOW(), NOW()),
 (1202, 'Purchasing Staff I', 5, 12, 1, 0, 1200, NOW(), NOW());
 
+-- -- ====================================
+-- 1. System Administrator (Standalone)
+-- ====================================
+REPLACE INTO users (user_id, employee_id, username, email, full_name, password_hash, role, branch_id, is_active, created_at) VALUES
+(1, NULL, 'admin', 'admin@company.com', 'System Admin', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Admin', 102, 1, NOW());
+
+
 SET FOREIGN_KEY_CHECKS = 1;

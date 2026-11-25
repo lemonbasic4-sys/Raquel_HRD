@@ -317,6 +317,8 @@ $department_options = $conn->query("
     ORDER BY department_name
 ");
 
+$requested_title = $_GET['title'] ?? '';
+$title_search = is_string($requested_title) ? mb_substr(trim($requested_title), 0, 200) : '';
 $template_where = "WHERE et.status = 'Active' AND et.evaluation_type <> 'Quarterly' AND ($template_scope_sql)";
 if ($selected_department !== '') {
     $safe_department = $conn->real_escape_string($selected_department);
@@ -327,8 +329,12 @@ if ($filter_type !== '') {
     $template_where .= " AND et.evaluation_type = '$safe_type'";
 }
 
+if ($title_search !== '') {
+    $template_where .= ' AND LOCATE(LOWER(?), LOWER(et.template_name)) > 0';
+}
+
 // Fetch active templates with criteria counts
-$templates = $conn->query("SELECT et.*,
+$template_stmt = $conn->prepare("SELECT et.*,
     (SELECT GROUP_CONCAT(DISTINCT jt.job_title ORDER BY jt.job_title SEPARATOR ', ')
         FROM job_titles jt
         WHERE jt.job_title_id IN (
@@ -349,6 +355,12 @@ $templates = $conn->query("SELECT et.*,
     LEFT JOIN job_titles creator_position ON creator_position.job_title_id = creator_emp.job_title_id
     $template_where
     ORDER BY et.updated_at DESC");
+if ($title_search !== '') {
+    $template_stmt->bind_param('s', $title_search);
+}
+$template_stmt->execute();
+$templates = $template_stmt->get_result();
+$template_stmt->close();
 $filtered_template_count = $templates->num_rows;
 $active_template_count = (int) $conn->query("SELECT COUNT(*) as cnt FROM evaluation_templates et WHERE status = 'Active' AND et.evaluation_type <> 'Quarterly' AND ($template_scope_sql)")->fetch_assoc()['cnt'];
 $archived_template_count = (int) $conn->query("SELECT COUNT(*) as cnt FROM evaluation_templates et WHERE status = 'Archived' AND et.evaluation_type <> 'Quarterly' AND ($template_scope_sql)")->fetch_assoc()['cnt'];
@@ -429,6 +441,11 @@ $used_template_count = (int) $conn->query("SELECT COUNT(DISTINCT ev.template_id)
 <div class="content-card fadeup-1 mb-4">
     <div class="card-body">
         <form method="GET" action="<?php echo e($template_list_url); ?>" class="row g-3 align-items-end">
+            <div class="col-12">
+                <label class="form-label" for="templateTitleSearch">Search by template title</label>
+                <input class="form-control" type="search" id="templateTitleSearch" name="title" maxlength="200"
+                       placeholder="Enter all or part of a title" value="<?php echo e($title_search); ?>">
+            </div>
             <div class="col-md-6 col-lg-5">
                 <label class="form-label">Department</label>
                 <select class="form-select" name="department">
@@ -461,6 +478,7 @@ $used_template_count = (int) $conn->query("SELECT COUNT(DISTINCT ev.template_id)
                 <div class="small text-muted">
                     Showing <?php echo number_format($filtered_template_count); ?> active template<?php echo $filtered_template_count === 1 ? '' : 's'; ?><?php
                     $active_filter_labels = [];
+                    if ($title_search !== '') $active_filter_labels[] = 'title: ' . e($title_search);
                     if ($selected_department !== '') $active_filter_labels[] = e($selected_department);
                     if ($filter_type !== '') $active_filter_labels[] = e($filter_type);
                     echo $active_filter_labels ? ' matching ' . implode(' · ', $active_filter_labels) : ' across all available departments and evaluation types';
@@ -508,12 +526,14 @@ $used_template_count = (int) $conn->query("SELECT COUNT(DISTINCT ev.template_id)
                         <input class="template-checkbox" type="checkbox" name="template_ids[]" value="<?php echo $t['template_id']; ?>" aria-label="Select <?php echo e($t['template_name']); ?> for batch deletion" onchange="toggleBatchDeleteBtn()">
                     </div>
                     <?php endif; ?>
-                    <div class="card-body p-4 pt-5 template-list-card-body">
+                    <div class="card-body p-4 template-list-card-body">
                         <!-- Top -->
                         <div class="template-list-card-top mb-3">
-                            <div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#e8f5e9,#c8e6c9);display:flex;align-items:center;justify-content:center;color:#2e7d32;font-size:1.1rem;">
+                            <div class="template-list-card-icon">
                                 <i class="fas fa-file-alt"></i>
                             </div>
+                            <div class="template-list-card-heading">
+                            <h6 class="fw-bold mb-2 template-list-card-title"><?php echo e($t['template_name']); ?></h6>
                             <div class="template-list-card-tags">
                                 <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2" style="font-size:0.65rem;">
                                     <?php echo e($t['evaluation_type'] ?? 'Annual'); ?>
@@ -523,15 +543,16 @@ $used_template_count = (int) $conn->query("SELECT COUNT(DISTINCT ev.template_id)
                                         <?php echo e($t['target_department']); ?>
                                     </span>
                                 <?php endif; ?>
-                                <?php if (!empty($t['target_job_title_id'])): ?>
-                                    <span class="badge bg-secondary-subtle text-secondary border px-2" style="font-size:0.65rem;">
-                                        <?php echo e($t['target_position_name'] ?? 'Position'); ?>
-                                    </span>
-                                <?php endif; ?>
+                            </div>
                             </div>
                         </div>
 
-                        <h6 class="fw-bold mb-2 template-list-card-title"><?php echo e($t['template_name']); ?></h6>
+                        <?php if (!empty($t['target_position_name'])): ?>
+                            <div class="template-list-card-positions small mb-3">
+                                <strong class="d-block mb-1">Target positions</strong>
+                                <?php echo e($t['target_position_name']); ?>
+                            </div>
+                        <?php endif; ?>
                         <div class="small text-muted mb-2">
                             <i class="fas fa-user-edit me-1"></i>Created by <?php echo e($t['created_by_name'] ?? 'Unknown'); ?><?php if (!empty($t['created_by_position'])): ?> · <?php echo e($t['created_by_position']); ?><?php endif; ?>
                             <?php if ($is_template_owner): ?>
@@ -555,7 +576,7 @@ $used_template_count = (int) $conn->query("SELECT COUNT(DISTINCT ev.template_id)
                                 <i class="fas fa-heart me-1"></i><?php echo $t['behavior_count']; ?> Behavior
                             </span>
                             <span class="badge <?php echo $wclass; ?> px-2" style="font-size:0.7rem;">
-                                <i class="fas fa-balance-scale me-1"></i><?php echo $kra_w; ?>%
+                                <i class="fas fa-balance-scale me-1"></i>KRA total <?php echo $kra_w; ?>%
                             </span>
                             <span class="badge bg-secondary px-2" style="font-size:0.7rem;">
                                 <i class="fas fa-chart-bar me-1"></i><?php echo $t['usage_count']; ?> used
@@ -581,7 +602,7 @@ $used_template_count = (int) $conn->query("SELECT COUNT(DISTINCT ev.template_id)
                                     ? '/staff/view-template.php?id='
                                     : '/manager/view-template.php?id=');
                             ?>
-                            <a href="<?php echo BASE_URL . $view_template_path . (int)$t['template_id']; ?>" class="btn btn-sm btn-outline-primary flex-fill" title="View template (read only)">
+                            <a href="<?php echo BASE_URL . $view_template_path . (int)$t['template_id']; ?>" class="btn btn-sm btn-primary flex-fill" title="View template (read only)">
                                 <i class="fas fa-eye me-1"></i>View
                             </a>
                             <?php if ($is_template_manager): ?>
@@ -800,6 +821,9 @@ function confirmBatchDelete() {
 .bg-info-subtle { background-color: #e0f7fa; }
 .chart-card.probation-template-card { border-color: #3730a3; }
 .template-list-card {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid #dfe8dc;
     border-radius: 16px;
     box-shadow: 0 6px 24px rgba(19, 43, 21, .07);
     overflow: hidden;
@@ -809,19 +833,33 @@ function confirmBatchDelete() {
     transform: translateY(-3px);
     box-shadow: 0 12px 30px rgba(19, 43, 21, .12);
 }
-.template-list-card-body { display: flex; flex-direction: column; }
+.template-list-card-body { display: flex; flex: 1; flex-direction: column; }
 .template-list-card-top {
     display: flex;
-    flex-wrap: wrap;
     align-items: flex-start;
     gap: 12px;
     padding-right: 22px;
 }
+.template-list-card-heading { min-width: 0; }
+.template-list-card-icon {
+    flex: 0 0 44px;
+    height: 44px;
+    display: grid;
+    place-items: center;
+    border-radius: 12px;
+    background: #e8f2e5;
+    color: #285d2d;
+}
+.template-list-card-positions {
+    padding: .75rem;
+    background: #f4f7f2;
+    border-radius: 10px;
+    color: #394d3a;
+    overflow-wrap: anywhere;
+}
 .template-list-card-tags {
     display: flex;
-    flex: 1 1 220px;
     flex-wrap: wrap;
-    justify-content: flex-end;
     gap: 6px;
     min-width: 0;
 }
@@ -831,14 +869,12 @@ function confirmBatchDelete() {
     text-align: left;
     white-space: normal;
 }
-.template-list-card-title { color: #16331d; font-size: 1.08rem; line-height: 1.35; }
+.template-list-card-title { color: #16331d; font-size: 1.2rem; line-height: 1.3; overflow-wrap: anywhere; }
 .template-list-card-description { line-height: 1.55; overflow-wrap: anywhere; }
 .template-list-card-stats { margin-top: auto; }
 .template-list-card-actions .btn { min-height: 34px; }
 @media (max-width: 575.98px) {
-    .template-list-card .card-body { padding: 20px !important; padding-top: 48px !important; }
-    .template-list-card-top { padding-right: 0; }
-    .template-list-card-tags { justify-content: flex-start; }
+    .template-list-card .card-body { padding: 20px !important; }
     .template-list-card-actions .btn.flex-fill { flex: 1 1 40% !important; }
 }
 .template-checkbox {

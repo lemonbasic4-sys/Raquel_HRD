@@ -184,7 +184,7 @@ REPLACE INTO employee_references (employee_id, reference_name, reference_address
 (302, 'Prof. Antonio Lopez', 'Caloocan City', '02-3456-7891');
 
 -- ========================
--- 17. HRIS USER ACCOUNTS
+-- 17. HRMS USER ACCOUNTS
 -- ========================
 REPLACE INTO users
     (user_id, employee_id, username, email, full_name, password_hash, role,

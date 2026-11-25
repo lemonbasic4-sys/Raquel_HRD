@@ -4,7 +4,7 @@
  *
  * Tasks applied:
  *   14.1 — Logical sections, .content-card layout, .form-group wrapping, 1.5rem headings
- *   14.2 — .form-error containers after inputs; is-invalid on server-side errors
+ *   14.2 — Toast feedback and is-invalid on server-side errors
  *   14.3 — form-label above inputs, required-indicator * + aria-required="true"
  *   14.4 — input type="password", class="form-control", min-height 48px, placeholder text
  *   14.5 — Visual section completion indicator at the top
@@ -72,7 +72,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') !== 'updat
     if ($confirm === '') {
         $field_errors['confirm_password'] = 'Please confirm your new password.';
     } elseif ($new !== '' && $new !== $confirm) {
-        $field_errors['confirm_password'] = 'New passwords do not match.';
+        $field_errors['confirm_password'] = 'New passwords do not match try again!.';
     }
 
     // Only hit the DB if field-level checks pass
@@ -126,7 +126,7 @@ $section_account_complete = true;
 $section_password_complete = ($success !== '');
 
 // Determine overall form errors exist
-$has_any_field_error = array_filter($field_errors, fn($e) => $e !== '');
+$passwordToastError = $general_error ?: (array_values(array_filter($field_errors))[0] ?? '');
 // ───────────────────────────────────────────────────────────────────────────
 
 require_once '../includes/header.php';
@@ -313,22 +313,15 @@ require_once '../includes/header.php';
             </div>
             <div class="content-card-body">
 
-                <!-- Success alert (ARIA live region — req 20.8) -->
-                <?php if ($success): ?>
-                <div class="alert alert-success border-0 shadow-sm mb-4" role="alert" aria-live="polite">
-                    <i class="fas fa-check-circle me-2" aria-hidden="true"></i><?php echo e($success); ?>
-                </div>
-                <?php endif; ?>
-
-                <!-- General error alert -->
-                <?php if ($general_error): ?>
-                <div class="alert alert-danger border-0 shadow-sm mb-4" role="alert" aria-live="assertive">
-                    <i class="fas fa-exclamation-circle me-2" aria-hidden="true"></i><?php echo e($general_error); ?>
-                </div>
+                <?php if ($success || $passwordToastError): ?>
+                <script>
+                document.addEventListener('DOMContentLoaded', function () {
+                    window.showToast(<?php echo json_encode($passwordToastError ?: $success, JSON_HEX_TAG); ?>, <?php echo $passwordToastError ? "'error'" : "'success'"; ?>);
+                });
+                </script>
                 <?php endif; ?>
 
                 <form method="POST"
-                      data-validate
                       aria-label="Change password form"
                       novalidate>
 
@@ -354,14 +347,7 @@ require_once '../includes/header.php';
                                aria-required="true"
                                autocomplete="current-password"
                                style="min-height:48px;"
-                               aria-describedby="current_password_error">
-                        <!-- 14.2: form-error container after input, ARIA live for screen readers -->
-                        <div class="form-error<?php echo ($field_errors['current_password'] !== '') ? ' is-visible' : ''; ?>"
-                             id="current_password_error"
-                             role="alert"
-                             aria-live="polite">
-                            <?php echo e($field_errors['current_password']); ?>
-                        </div>
+                               aria-invalid="<?php echo $field_errors['current_password'] !== '' ? 'true' : 'false'; ?>">
                     </div>
 
                     <hr class="my-4 opacity-25">
@@ -382,16 +368,9 @@ require_once '../includes/header.php';
                                minlength="6"
                                autocomplete="new-password"
                                style="min-height:48px;"
-                               aria-describedby="new_password_help new_password_error">
+                               aria-describedby="new_password_help" aria-invalid="<?php echo $field_errors['new_password'] !== '' ? 'true' : 'false'; ?>">
                         <!-- 14.4: helper text with instructions/examples -->
                         <small id="new_password_help" class="form-helper">Use a mix of letters, numbers, and symbols for a stronger password.</small>
-                        <!-- 14.2: form-error container -->
-                        <div class="form-error<?php echo ($field_errors['new_password'] !== '') ? ' is-visible' : ''; ?>"
-                             id="new_password_error"
-                             role="alert"
-                             aria-live="polite">
-                            <?php echo e($field_errors['new_password']); ?>
-                        </div>
                     </div>
 
                     <!-- ── Field 3: Confirm New Password ── -->
@@ -410,14 +389,7 @@ require_once '../includes/header.php';
                                minlength="6"
                                autocomplete="new-password"
                                style="min-height:48px;"
-                               aria-describedby="confirm_password_error">
-                        <!-- 14.2: form-error container -->
-                        <div class="form-error<?php echo ($field_errors['confirm_password'] !== '') ? ' is-visible' : ''; ?>"
-                             id="confirm_password_error"
-                             role="alert"
-                             aria-live="polite">
-                            <?php echo e($field_errors['confirm_password']); ?>
-                        </div>
+                               aria-invalid="<?php echo $field_errors['confirm_password'] !== '' ? 'true' : 'false'; ?>">
                     </div>
 
                     <!-- Submit -->

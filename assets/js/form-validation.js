@@ -216,7 +216,9 @@
    */
   function clearError(input) {
     input.classList.remove('is-invalid');
-    input.classList.add('is-valid');
+    if (!input.closest('form[data-hide-valid-state]')) {
+      input.classList.add('is-valid');
+    }
     input.setAttribute('aria-invalid', 'false');
 
     const errorContainer = input.parentElement.querySelector('.form-error');
