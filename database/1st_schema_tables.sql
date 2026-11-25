@@ -131,6 +131,7 @@ CREATE TABLE employees (
 
 -- ============================================
 -- 6. Users (System accounts)
+-- (username, email, full_name, password_hash, role, employee_id) need sa admin lang
 -- ============================================
 DROP TABLE IF EXISTS users;
 CREATE TABLE users (
