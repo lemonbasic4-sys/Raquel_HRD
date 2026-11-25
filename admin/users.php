@@ -152,7 +152,7 @@ unset($_SESSION['new_employee_credentials']);
         <h5 class="modal-title">Account Credentials</h5>
       </div>
       <div class="modal-body text-center px-4 pt-3 pb-4">
-        <p class="text-muted small mb-1">Account created successfully for:</p>
+        <p class="text-muted small mb-1"><?php echo e($new_creds['password_reset_message'] ?? 'Account created successfully for:'); ?></p>
         <h5 class="fw-bold mb-3" style="color: var(--primary-blue);"><?php echo e($new_creds['full_name']); ?></h5>
         
         <div class="creds-card-box">
@@ -160,17 +160,17 @@ unset($_SESSION['new_employee_credentials']);
             <div class="creds-field-label">Username</div>
             <div class="creds-input-wrapper">
               <div class="creds-value-display" id="display_username"><?php echo e($new_creds['username']); ?></div>
-              <button type="button" class="creds-copy-btn" onclick="copyCredValue(this, '<?php echo e(addslashes($new_creds['username'])); ?>')" title="Copy Username">
+              <button type="button" class="creds-copy-btn" onclick="copyCredValue(this, document.getElementById('display_username').textContent)" title="Copy Username">
                 <i class="far fa-copy"></i>
               </button>
             </div>
           </div>
           
           <div class="creds-field-group">
-            <div class="creds-field-label">Temporary Password</div>
+            <div class="creds-field-label"><?php echo isset($new_creds['password_reset_message']) ? 'New Password' : 'Temporary Password'; ?></div>
             <div class="creds-input-wrapper">
               <div class="creds-value-display" id="display_password"><?php echo e($new_creds['password']); ?></div>
-              <button type="button" class="creds-copy-btn" onclick="copyCredValue(this, '<?php echo e(addslashes($new_creds['password'])); ?>')" title="Copy Password">
+              <button type="button" class="creds-copy-btn" onclick="copyCredValue(this, document.getElementById('display_password').textContent)" title="Copy Password">
                 <i class="far fa-copy"></i>
               </button>
             </div>
@@ -287,9 +287,6 @@ document.addEventListener('DOMContentLoaded', () => new bootstrap.Modal(document
         </div>
         <div class="hero-actions d-flex gap-2 flex-wrap justify-content-end">
             <a class="btn btn-outline-light" href="<?php echo BASE_URL; ?>/admin/add-hr-manager.php"><i class="fas fa-user-tie me-2"></i>Set Up HR Manager Employee</a>
-            <button class="btn btn-outline-light" data-bs-toggle="modal" data-bs-target="#addAdminModal">
-                <i class="fas fa-user-shield me-2"></i>Add New Admin
-            </button>
             <button class="btn btn-light text-primary" data-bs-toggle="modal" data-bs-target="#addUserModal">
                 <i class="fas fa-plus me-2"></i>Add New User
             </button>
@@ -564,16 +561,23 @@ document.addEventListener('DOMContentLoaded', () => new bootstrap.Modal(document
 </div>
 
 <!-- Add User Modal -->
-<div class="modal fade account-create-modal" id="addUserModal" tabindex="-1">
+<div class="modal fade account-create-modal" id="addUserModal" tabindex="-1" aria-labelledby="addUserModalTitle">
     <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title"><span class="modal-title-icon"><i class="fas fa-user-plus"></i></span>Add New User</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <h5 class="modal-title" id="addUserModalTitle"><span class="modal-title-icon"><i class="fas fa-user-plus" aria-hidden="true"></i></span>Add New User</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
+            <div class="modal-body p-0">
+            <div class="nav nav-tabs px-3 pt-2 bg-light" role="tablist" aria-label="Account type">
+                <button class="nav-link active" id="addHrUserTab" type="button" data-bs-toggle="tab" data-bs-target="#addHrUserPanel" role="tab" aria-controls="addHrUserPanel" aria-selected="true">HR Personnel</button>
+                <button class="nav-link" id="addAdminUserTab" type="button" data-bs-toggle="tab" data-bs-target="#addAdminUserPanel" role="tab" aria-controls="addAdminUserPanel" aria-selected="false">New Admin</button>
+            </div>
+            <div class="tab-content">
+            <div class="tab-pane show active" id="addHrUserPanel" role="tabpanel" aria-labelledby="addHrUserTab">
             <form method="POST" action="<?php echo BASE_URL; ?>/admin/add-user.php">
                 <?php echo csrfField(); ?>
-                <div class="modal-body"><div class="compact-form-grid">
+                <div class="p-3"><div class="compact-form-grid">
                     <div class="form-field form-span-2">
                         <label class="form-label">Select Employee <span class="text-danger">*</span></label>
                         <select class="form-select" name="employee_id" required onchange="prefillUserInfo(this)">
@@ -633,21 +637,11 @@ document.addEventListener('DOMContentLoaded', () => new bootstrap.Modal(document
                     <button type="submit" class="btn btn-primary"><i class="fas fa-save me-2"></i>Create User</button>
                 </div>
             </form>
-        </div>
-    </div>
-</div>
-
-<!-- Add Admin Modal -->
-<div class="modal fade account-create-modal" id="addAdminModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title"><span class="modal-title-icon"><i class="fas fa-user-shield"></i></span>Add New Admin</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
+            <div class="tab-pane" id="addAdminUserPanel" role="tabpanel" aria-labelledby="addAdminUserTab">
             <form method="POST" action="<?php echo BASE_URL; ?>/admin/add-user.php">
                 <?php echo csrfField(); ?>
-                <div class="modal-body">
+                <div class="p-3">
                     <div class="account-note form-span-2">
                         <i class="fas fa-info-circle mt-1"></i><span>Admin accounts are standalone and are not linked to employee records.</span>
                     </div>
@@ -677,6 +671,9 @@ document.addEventListener('DOMContentLoaded', () => new bootstrap.Modal(document
                     <button type="submit" class="btn btn-primary"><i class="fas fa-save me-2"></i>Create Admin</button>
                 </div>
             </form>
+            </div>
+            </div>
+            </div>
         </div>
     </div>
 </div>

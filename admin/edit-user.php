@@ -25,12 +25,16 @@ $page_title = !empty($user['account_hold']) ? 'Manage Account Access' : 'Reset U
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verifyCsrfToken();
     $password = (string)($_POST['password'] ?? '');
+    $confirmation = (string)($_POST['confirm_password'] ?? '');
     $release_hold = !empty($user['account_hold']) && isset($_POST['release_hold']);
     if ($password === '' && !$release_hold) {
         redirectWith(BASE_URL . "/admin/edit-user.php?id=$uid", 'danger', 'Enter a new password or select Release hold.');
     }
     if ($password !== '' && strlen($password) < 6) {
         redirectWith(BASE_URL . "/admin/edit-user.php?id=$uid", 'danger', 'New passwords must have at least 6 characters.');
+    }
+    if ($password !== $confirmation) {
+        redirectWith(BASE_URL . "/admin/edit-user.php?id=$uid", 'danger', 'New passwords do not match. Try again.');
     }
 
     $conn->begin_transaction();
@@ -74,6 +78,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     notifyOtherAdmins($conn, (int)$_SESSION['user_id'], 'User Account Access Updated',
         'An administrator updated access for ' . $user['username'] . '. ' . $result_message,
         BASE_URL . '/admin/edit-user.php?id=' . $uid, 'accounts');
+    if ($password !== '') {
+        $_SESSION['new_employee_credentials'] = [
+            'username' => $user['username'],
+            'full_name' => $user['full_name'],
+            'password' => $password,
+            'password_reset_message' => $result_message,
+        ];
+    }
     redirectWith(BASE_URL . '/admin/users.php', 'success', $result_message);
 }
 
@@ -98,6 +110,10 @@ require_once '../includes/header.php';
                     <label class="form-label" for="newPassword">New Password<?php if (empty($user['account_hold'])): ?> <span class="text-danger">*</span><?php endif; ?></label>
                     <input type="password" class="form-control" name="password" id="newPassword" minlength="6" autocomplete="new-password" <?php echo empty($user['account_hold']) ? 'required' : ''; ?>>
                     <div class="form-text"><?php echo !empty($user['account_hold']) ? 'Leave blank to keep the current password when releasing the hold.' : 'At least 6 characters.'; ?></div>
+                </div>
+                <div class="mb-3" style="max-width:430px;">
+                    <label class="form-label" for="confirmPassword">Confirm New Password</label>
+                    <input type="password" class="form-control" name="confirm_password" id="confirmPassword" minlength="6" autocomplete="new-password" <?php echo empty($user['account_hold']) ? 'required' : ''; ?>>
                 </div>
                 <?php if (!empty($user['account_hold'])): ?>
                     <div class="alert alert-warning" style="max-width:600px;">
