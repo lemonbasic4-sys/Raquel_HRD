@@ -43,7 +43,7 @@ $default_avatar_url = getEmployeeAvatar('');
     <div id="pendingPerformanceNotice" class="mp-notice" hidden></div>
     <div id="perfEmptyState" class="mp-card mp-empty" hidden>
         <h2>No finalized evaluations yet</h2>
-        <p>Your results will appear when your evaluation is approved and its score is complete.</p>
+        <p>Your results appear here after an evaluation is finalized or a past evaluation is imported.</p>
     </div>
 
     <div id="perfContent" hidden>
@@ -70,7 +70,7 @@ $default_avatar_url = getEmployeeAvatar('');
 
             <div class="mp-overview">
                 <section class="mp-card">
-                    <div class="mp-card-heading"><div><h2>Performance trend</h2><p>Approved, finalized cycles</p></div><span id="finalized-count" class="mp-muted"></span></div>
+                    <div class="mp-card-heading"><div><h2>Performance trend</h2><p>Finalized and imported evaluations</p></div><span id="finalized-count" class="mp-muted"></span></div>
                     <div class="mp-chart"><canvas id="perfTrendChart" role="img" aria-label="Scores for finalized evaluation cycles"></canvas></div>
                     <p id="chart-hint" class="mp-muted mp-chart-hint">Hover over or tap a point to see its evaluation date and score.</p>
                 </section>

@@ -12,7 +12,7 @@ if ($employee_id <= 0) {
 }
 
 require_once '../../includes/employee-performance-analysis.php';
-$history = employeePerformanceHistory($conn, $employee_id);
+$history = employeePerformanceHistory($conn, $employee_id, true);
 $chronological = $history['evaluations'];
 $all_evals = array_reverse($chronological);
 $total_count = count($all_evals);

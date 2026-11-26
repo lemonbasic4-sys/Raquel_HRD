@@ -1,4 +1,5 @@
 <?php
+$batchDownload = true;
 require_once __DIR__ . '/../includes/historical-import-controller.php';
 
 $stat_records_stmt = $conn->query("SELECT COUNT(*) AS total FROM evaluations WHERE is_historical = 1 AND deleted_at IS NULL");
@@ -142,14 +143,11 @@ require_once '../includes/header.php';
         <div>
             <div style="font-size:.72rem;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,.55);">HR Manager · Historical Evaluations</div>
             <h4 class="text-white fw-bold mb-0 mt-1"><i class="fas fa-file-import me-2" style="color:#BD9414;"></i>Historical Evaluation Import</h4>
-            <p class="text-white-50 small mb-0 mt-2">Bulk import legacy ratings, past performance records, and historical review scores into the evaluation repository.</p>
+            <p class="text-white-50 small mb-0 mt-2">Upload evaluations for employees across departments and branches in one CSV.</p>
         </div>
         <div class="d-flex align-items-center gap-2 flex-wrap">
-            <a href="historical-import.php?download=template" class="btn btn-outline-light btn-sm fw-semibold rounded-pill px-3">
-                <i class="fas fa-download me-1 text-warning"></i>Download CSV Template
-            </a>
-            <a href="evaluation-history.php" class="btn btn-light btn-sm fw-semibold rounded-pill px-3">
-                <i class="fas fa-arrow-left me-1" style="color:#082E06;"></i>Back to Evaluation History
+            <a href="historical-import-history.php" class="btn btn-light btn-sm fw-semibold rounded-pill px-3">
+                <i class="fas fa-arrow-left me-1" style="color:#082E06;"></i>Historical Import History
             </a>
         </div>
     </div>
@@ -203,18 +201,7 @@ require_once '../includes/header.php';
     </div>
 </div>
 
-<?php if ($message): ?>
-    <div class="alert alert-<?php echo e($message_type ?? 'info'); ?> alert-dismissible fade show rounded-4 border-0 shadow-sm mb-4" role="alert">
-        <div class="d-flex align-items-center">
-            <i class="fas fa-<?php echo $message_type === 'success' ? 'check-circle' : ($message_type === 'warning' ? 'exclamation-triangle' : ($message_type === 'danger' ? 'times-circle' : 'info-circle')); ?> fs-4 me-3"></i>
-            <div>
-                <strong class="d-block mb-1"><?php echo $message_type === 'success' ? 'Operation Successful' : ($message_type === 'danger' ? 'Action Failed' : 'Notice'); ?></strong>
-                <span class="small"><?php echo nl2br(e($message)); ?></span>
-            </div>
-            <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-    </div>
-<?php endif; ?>
+<?php if ($message) renderFlashPopup($message_type ?? 'info', $message); ?>
 
 <?php if ($import_summary): ?>
     <div class="content-card mb-4 fadeup">
@@ -259,6 +246,8 @@ require_once '../includes/header.php';
                 <form method="post" enctype="multipart/form-data" id="historicalUploadForm">
                     <?php echo csrfField(); ?>
 
+                    <a href="?download=sample" class="btn btn-sm btn-light border rounded-pill px-3"><i class="fas fa-file-csv me-1"></i>Download sample CSV</a>
+                    <a href="?download=template" class="btn btn-outline-primary btn-sm mb-3"><i class="fas fa-download me-1"></i>Download batch CSV template</a>
                     <div class="import-dropzone" id="dropzoneContainer" onclick="document.getElementById('historicalCsvInput').click();">
                         <div class="import-dropzone-icon">
                             <i class="fas fa-file-csv"></i>
@@ -312,7 +301,7 @@ require_once '../includes/header.php';
                     <div class="step-num">1</div>
                     <div class="step-content">
                         <h6>Download Template</h6>
-                        <p>Click <strong>Download CSV Template</strong> to get the verified header columns. Do not rename the column titles.</p>
+                        <p>Use the sample CSV as a guide. Replace its three example rows with your records, or start with the batch template. Enter one evaluation per row using the employee code and matching form name. Employees from different departments and branches can share the same file.</p>
                     </div>
                 </div>
 
@@ -348,7 +337,6 @@ require_once '../includes/header.php';
                 <div>
                     <span class="spec-pill optional">kra_subtotal</span>
                     <span class="spec-pill optional">behavior_average</span>
-                    <span class="spec-pill optional">performance_level</span>
                     <span class="spec-pill optional">template_name</span>
                     <span class="spec-pill optional">legacy_reference</span>
                     <span class="spec-pill optional">employee_comments</span>
@@ -357,23 +345,23 @@ require_once '../includes/header.php';
                     <span class="spec-pill optional">kra_scores</span>
                     <span class="spec-pill optional">behavior_scores</span>
                 </div>
-                <p class="small text-muted mt-3 mb-0">For detailed records, enter ratings in form order separated by semicolons: all KRA items in <code>kra_scores</code> and all eight Core Behaviors in <code>behavior_scores</code>. Summary rows leave both blank. Specify <code>template_name</code> when more than one form matches.</p>
+                <p class="small text-muted mt-3 mb-0">The system assigns the performance level from the total score. For detailed rows, fill the named ratings for that form and leave other forms? columns blank. For summary rows, leave all item ratings blank. Older CSVs can supply ordered lists instead: all KRA items in <code>kra_scores</code> and all eight Core Behaviors in <code>behavior_scores</code>. Summary rows leave both blank. Specify <code>template_name</code> when more than one form matches.</p>
             </div>
         </div>
     </div>
 </div>
 
-<?php if (!empty($preview_rows)): ?>
-    <!-- Validation Results Table -->
-    <div class="content-card mb-4 fadeup">
-        <div class="card-header">
-            <div class="d-flex align-items-center gap-2">
-                <i class="fas fa-clipboard-check text-primary fs-5"></i>
-                <h6 class="mb-0 fw-bold text-dark">Validation & Processing Results</h6>
-            </div>
-            <span class="badge bg-secondary rounded-pill px-3"><?php echo count($preview_rows); ?> Rows Checked</span>
-        </div>
-        <div class="card-body p-0">
+<?php if ($preview_rows && !$import_summary): ?>
+    <button type="button" class="btn btn-outline-primary mb-3" data-bs-toggle="modal" data-bs-target="#historicalReview">Review CSV preview</button>
+    <div class="modal fade" id="historicalReview" tabindex="-1" aria-labelledby="historicalReviewTitle" aria-hidden="true">
+      <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header bg-success text-white">
+            <h5 class="modal-title" id="historicalReviewTitle"><i class="fas fa-file-csv me-2"></i>Review Historical Evaluations</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body p-0">
+            <p class="small px-3 pt-3">Check the employee code, form, period, and ratings for each row before confirming the batch.</p>
             <div class="table-responsive">
                 <table class="table table-hover align-middle mb-0">
                     <thead style="background:#f8fafc; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.5px; color:#475569;">
@@ -397,6 +385,11 @@ require_once '../includes/header.php';
                                         <div class="small text-muted"><?php echo e($row['employee_name']); ?></div>
                                     <?php endif; ?>
                                     <?php if (!empty($row['template_name'])): ?><div class="small text-muted">Form: <?php echo e($row['template_name']); ?></div><?php endif; ?>
+                                    <?php if (!empty($row['named_ratings'])): ?>
+                                        <details class="small mt-1"><summary>Item ratings (<?= count($row['named_ratings']) ?>)</summary>
+                                            <ul><?php foreach ($row['named_ratings'] as $label => $rating): ?><li><?= e($label) ?>: <?= e($rating) ?></li><?php endforeach; ?></ul>
+                                        </details>
+                                    <?php endif; ?>
                                 </td>
                                 <td>
                                     <?php 
@@ -449,13 +442,30 @@ require_once '../includes/header.php';
                 </table>
             </div>
         </div>
-        <?php if ($historical_preview_ready && !$import_summary): ?>
-            <div class="card-footer d-flex flex-wrap align-items-center justify-content-between gap-2 p-3">
-                <span class="small text-muted">All <?php echo count($preview_rows); ?> rows are valid. Confirming saves them together as historical records.</span>
-                <form method="post" class="m-0"><?php echo csrfField(); ?><input type="hidden" name="import_action" value="confirm"><input type="hidden" name="preview_token" value="<?php echo e($historical_preview_token); ?>"><button type="submit" class="btn btn-success fw-bold"><i class="fas fa-check-circle me-1"></i>Confirm Import</button></form>
-            </div>
-        <?php endif; ?>
+          <div class="modal-footer bg-light">
+            <button type="button" class="btn btn-outline-secondary rounded-pill me-auto" data-bs-dismiss="modal">Back</button>
+            <?php if ($historical_preview_ready): ?>
+                <span class="small text-muted"><?= count($preview_rows) ?> ready to import</span>
+                <form method="post" class="m-0">
+                    <?= csrfField() ?>
+                    <input type="hidden" name="import_action" value="confirm">
+                    <input type="hidden" name="preview_token" value="<?= e($historical_preview_token) ?>">
+                    <button type="submit" class="btn btn-success rounded-pill px-4">Confirm &amp; Import</button>
+                </form>
+            <?php else: ?>
+                <span class="small text-danger">Correct the flagged rows and upload the CSV again.</span>
+            <?php endif; ?>
+          </div>
+        </div>
+      </div>
     </div>
+    <script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const review = document.getElementById('historicalReview');
+        document.body.appendChild(review);
+        bootstrap.Modal.getOrCreateInstance(review).show();
+    });
+    </script>
 <?php endif; ?>
 
 <!-- Recent Import Batches Audit History -->
@@ -600,3 +610,4 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
+<?php require_once '../includes/footer.php'; ?>

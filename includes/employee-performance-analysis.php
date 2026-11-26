@@ -35,6 +35,16 @@ function finalizedPerformanceSql(string $alias = 'ev'): string
     return '(' . implode(' AND ', $conditions) . ')';
 }
 
+function performanceReportStatusSql(): string
+{
+    return "(ev.status='Approved' OR (ev.status='Imported' AND ev.is_historical=1))";
+}
+
+function performanceReportDateSql(): string
+{
+    return "(CASE WHEN ev.status='Imported' AND ev.is_historical=1 THEN ev.evaluation_period_end ELSE ev.approved_date END)";
+}
+
 function employeePerformanceChange(?float $current, ?float $previous): array
 {
     if ($current === null || $previous === null) return ['delta' => null, 'direction' => 'insufficient_data'];
@@ -50,16 +60,19 @@ function employeePerformanceCriterionKey(array $row): string
         . $normalize($row['kpi_description'] ?? '') . '|' . $normalize($row['description'] ?? '');
 }
 
-function employeePerformanceHistory($conn, int $employeeId): array
+function employeePerformanceHistory($conn, int $employeeId, bool $includeImports = false): array
 {
     ensureAnnualEvaluationSchema($conn);
     ensureQuarterlyEvaluationSchema($conn);
+    $eligibleStatus = $includeImports ? performanceReportStatusSql() : "ev.status='Approved'";
     $finalizedSql = finalizedPerformanceSql('ev');
-    $rows = annualQuery($conn, "SELECT ev.evaluation_id, ev.evaluation_type, ev.template_id,
+    if ($includeImports) $finalizedSql = "(ev.is_historical=1 OR ($finalizedSql))";
+    $reportDate = performanceReportDateSql();
+    $rows = annualQuery($conn, "SELECT ev.is_historical, ev.evaluation_id, ev.evaluation_type, ev.template_id,
             ev.evaluation_period_start, ev.evaluation_period_end, ev.total_score, ev.kra_subtotal,
             ev.behavior_average, ev.performance_level, ev.approved_date, ev.supervisor_comments,
             et.template_name, et.kra_weight, et.behavior_weight,
-            COALESCE(ev.approved_date, ev.evaluation_period_end) AS display_date,
+            COALESCE($reportDate, ev.evaluation_period_end) AS display_date,
             ep.status AS package_status, ep.shared_behavior_score, $finalizedSql AS score_finalized,
             EXISTS(SELECT 1 FROM evaluation_packages open_pkg
                 WHERE open_pkg.department_id=ep.department_id AND open_pkg.template_id=ep.template_id
@@ -70,13 +83,13 @@ function employeePerformanceHistory($conn, int $employeeId): array
         LEFT JOIN evaluation_package_members pm ON pm.evaluation_id=ev.evaluation_id
             AND pm.package_id=(SELECT MAX(recent_pm.package_id) FROM evaluation_package_members recent_pm WHERE recent_pm.evaluation_id=ev.evaluation_id)
         LEFT JOIN evaluation_packages ep ON ep.package_id=pm.package_id
-        WHERE ev.employee_id=? AND ev.status='Approved' AND ev.deleted_at IS NULL AND ev.total_score IS NOT NULL
-        ORDER BY COALESCE(ev.approved_date, ev.evaluation_period_end), ev.evaluation_id", [$employeeId]);
+        WHERE ev.employee_id=? AND $eligibleStatus AND ev.deleted_at IS NULL AND ev.total_score IS NOT NULL
+        ORDER BY COALESCE($reportDate, ev.evaluation_period_end), ev.evaluation_id", [$employeeId]);
     $scoreRows = annualQuery($conn, "SELECT es.*, ec.section, ec.criterion_name, ec.description,
             ec.kpi_description, ec.weight, ec.sort_order
         FROM evaluation_scores es JOIN evaluation_criteria ec ON ec.criterion_id=es.criterion_id
         JOIN evaluations ev ON ev.evaluation_id=es.evaluation_id
-        WHERE ev.employee_id=? AND ev.status='Approved' AND ev.deleted_at IS NULL
+        WHERE ev.employee_id=? AND $eligibleStatus AND ev.deleted_at IS NULL
         ORDER BY ec.section, ec.sort_order, ec.criterion_id", [$employeeId]);
     $scores = [];
     foreach ($scoreRows as $row) $scores[(int)$row['evaluation_id']][] = $row;

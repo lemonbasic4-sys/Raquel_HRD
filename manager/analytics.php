@@ -7,7 +7,8 @@ require_once '../includes/employee-performance-analysis.php';
 // finalizedPerformanceSql references both cycle tables, including on a fresh database.
 ensureAnnualEvaluationSchema($conn);
 $finalized_eval_filter = finalizedPerformanceSql('ev');
-$finalized_eval_filter_unaliased = finalizedPerformanceSql('evaluations');
+$reportStatus = performanceReportStatusSql();
+$reportDate = performanceReportDateSql();
 require_once '../includes/header.php';
 
 /* ── Filters ────────────────────────────────────────────────────────────── */
@@ -21,15 +22,13 @@ $cohort        = (($_GET['cohort'] ?? 'regular') === 'probationary') ? 'probatio
 $evaluation_type_filter = $cohort === 'probationary'
     ? "ev.evaluation_type IN ('Initial','Final')"
     : "ev.evaluation_type = 'Annual'";
-$evaluation_type_filter_unaliased = $cohort === 'probationary'
-    ? "evaluation_type IN ('Initial','Final')"
-    : "evaluation_type = 'Annual'";
 
-$where  = "WHERE ev.status = 'Approved' AND $finalized_eval_filter AND $evaluation_type_filter";
+
+$where  = "WHERE $reportStatus AND $finalized_eval_filter AND $evaluation_type_filter";
 $params = [];  $types = '';
 
-if (!empty($date_from))    { $where .= " AND ev.approved_date >= ?";              $params[] = $date_from;           $types .= 's'; }
-if (!empty($date_to))      { $where .= " AND ev.approved_date <= ?";              $params[] = $date_to.' 23:59:59'; $types .= 's'; }
+if (!empty($date_from))    { $where .= " AND $reportDate >= ?";              $params[] = $date_from;           $types .= 's'; }
+if (!empty($date_to))      { $where .= " AND $reportDate <= ?";              $params[] = $date_to.' 23:59:59'; $types .= 's'; }
 if (!empty($filter_branch)){ $where .= " AND e.branch_id = ?";                    $params[] = (int)$filter_branch;  $types .= 'i'; }
 if (!empty($filter_dept))  { $where .= " AND e.department_id = ?";                $params[] = (int)$filter_dept;    $types .= 'i'; }
 
@@ -70,8 +69,8 @@ while ($row = $pr->fetch_assoc())
 $perf_q->close();
 
 /* ── Score Trend — per-year 12-month data (built-in year filter) ────────── */
-// Discover all years that have approved evaluations
-$yr_q = $conn->query("SELECT DISTINCT YEAR(approved_date) AS yr FROM evaluations WHERE status='Approved' AND $finalized_eval_filter_unaliased AND $evaluation_type_filter_unaliased ORDER BY yr DESC");
+// Discover all years with reportable evaluation scores
+$yr_q = $conn->query("SELECT DISTINCT YEAR($reportDate) AS yr FROM evaluations ev WHERE $reportStatus AND $finalized_eval_filter AND $evaluation_type_filter ORDER BY yr DESC");
 $available_years = [];
 while ($row = $yr_q->fetch_assoc()) $available_years[] = (int)$row['yr'];
 if (empty($available_years)) $available_years = [(int)date('Y')];
@@ -84,11 +83,11 @@ $all_years_trend = [];
 foreach ($available_years as $yr) {
     $yr_months = [];
     for ($m = 1; $m <= 12; $m++) {
-        $t_where  = "WHERE status='Approved' AND $finalized_eval_filter_unaliased AND $evaluation_type_filter_unaliased AND MONTH(approved_date)=$m AND YEAR(approved_date)=$yr AND employee_id NOT IN (SELECT employee_id FROM users WHERE role = 'Admin' AND employee_id IS NOT NULL)";
+        $t_where  = "WHERE $reportStatus AND $finalized_eval_filter AND $evaluation_type_filter AND MONTH($reportDate)=$m AND YEAR($reportDate)=$yr AND employee_id NOT IN (SELECT employee_id FROM users WHERE role = 'Admin' AND employee_id IS NOT NULL)";
         $t_params = []; $t_types = '';
         if (!empty($filter_branch)) { $t_where .= ' AND employee_id IN (SELECT employee_id FROM employees WHERE branch_id=?)';     $t_params[] = (int)$filter_branch; $t_types .= 'i'; }
         if (!empty($filter_dept))   { $t_where .= ' AND employee_id IN (SELECT employee_id FROM employees WHERE department_id=?)'; $t_params[] = (int)$filter_dept;   $t_types .= 'i'; }
-        $tq2 = $conn->prepare("SELECT ROUND(AVG(total_score),2) AS v, COUNT(*) AS cnt FROM evaluations $t_where");
+        $tq2 = $conn->prepare("SELECT ROUND(AVG(total_score),2) AS v, COUNT(*) AS cnt FROM evaluations ev $t_where");
         if (!empty($t_params)) $tq2->bind_param($t_types, ...$t_params);
         $tq2->execute();
         $r = $tq2->get_result()->fetch_assoc();
@@ -102,10 +101,10 @@ $trend_label = 'By Year';
 /* ── Branch Comparison  ──────────────────────────────────────────────────
    Always shows ALL branches; date filter respected but branch/dept filters
    are intentionally excluded so users can compare branches side-by-side.   */
-$br_where = "WHERE ev.status = 'Approved' AND $finalized_eval_filter AND $evaluation_type_filter";
+$br_where = "WHERE $reportStatus AND $finalized_eval_filter AND $evaluation_type_filter";
 $br_params = []; $br_types = '';
-if (!empty($date_from)) { $br_where .= " AND ev.approved_date >= ?"; $br_params[] = $date_from;            $br_types .= 's'; }
-if (!empty($date_to))   { $br_where .= " AND ev.approved_date <= ?"; $br_params[] = $date_to.' 23:59:59'; $br_types .= 's'; }
+if (!empty($date_from)) { $br_where .= " AND $reportDate >= ?"; $br_params[] = $date_from;            $br_types .= 's'; }
+if (!empty($date_to))   { $br_where .= " AND $reportDate <= ?"; $br_params[] = $date_to.' 23:59:59'; $br_types .= 's'; }
 
 $branch_data = [];
 $bq = $conn->prepare(
@@ -247,9 +246,9 @@ $tenure_data = [];
 $tenure_q = $conn->prepare("
     SELECT 
         CASE 
-            WHEN DATEDIFF(ev.approved_date, e.hire_date) / 365.25 < 1 THEN '< 1 Year'
-            WHEN DATEDIFF(ev.approved_date, e.hire_date) / 365.25 BETWEEN 1 AND 3 THEN '1-3 Years'
-            WHEN DATEDIFF(ev.approved_date, e.hire_date) / 365.25 BETWEEN 3 AND 5 THEN '3-5 Years'
+            WHEN DATEDIFF($reportDate, e.hire_date) / 365.25 < 1 THEN '< 1 Year'
+            WHEN DATEDIFF($reportDate, e.hire_date) / 365.25 BETWEEN 1 AND 3 THEN '1-3 Years'
+            WHEN DATEDIFF($reportDate, e.hire_date) / 365.25 BETWEEN 3 AND 5 THEN '3-5 Years'
             ELSE '5+ Years'
         END as tenure_bracket,
         ROUND(AVG(ev.total_score), 2) as avg_score,
@@ -488,7 +487,7 @@ $level_meta = [
 ];
 
 /* ── [NEW] YoY Progression Data ────────────────────────────────────────── */
-$yoy_date_expr = "COALESCE(ev.approved_date, ev.evaluation_period_end, ev.submitted_date, ev.updated_at, ev.created_at)";
+$yoy_date_expr = "COALESCE($reportDate, ev.evaluation_period_end, ev.submitted_date, ev.updated_at, ev.created_at)";
 
 // Fetch raw branch YoY data
 $yoy_branch_raw = [];
@@ -497,7 +496,7 @@ $yoy_branch_q = $conn->query("
     FROM evaluations ev
     INNER JOIN employees e ON ev.employee_id = e.employee_id
     INNER JOIN branches b ON e.branch_id = b.branch_id
-    WHERE ev.status = 'Approved' AND $finalized_eval_filter
+    WHERE $reportStatus AND $finalized_eval_filter
       AND $evaluation_type_filter
       AND ev.total_score IS NOT NULL
       AND $yoy_date_expr IS NOT NULL
@@ -516,7 +515,7 @@ $yoy_dept_q = $conn->query("
     FROM evaluations ev
     INNER JOIN employees e ON ev.employee_id = e.employee_id
     INNER JOIN departments d ON e.department_id = d.department_id
-    WHERE ev.status = 'Approved' AND $finalized_eval_filter
+    WHERE $reportStatus AND $finalized_eval_filter
       AND $evaluation_type_filter
       AND ev.total_score IS NOT NULL
       AND $yoy_date_expr IS NOT NULL
@@ -536,7 +535,7 @@ $yoy_emp_q = $conn->query("
            ROUND(AVG(ev.total_score), 2) as avg_score
     FROM evaluations ev
     INNER JOIN employees e ON ev.employee_id = e.employee_id
-    WHERE ev.status = 'Approved' AND $finalized_eval_filter
+    WHERE $reportStatus AND $finalized_eval_filter
       AND $evaluation_type_filter
       AND ev.total_score IS NOT NULL
       AND $yoy_date_expr IS NOT NULL

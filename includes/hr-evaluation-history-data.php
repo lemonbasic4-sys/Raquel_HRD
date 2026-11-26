@@ -21,6 +21,7 @@ function hrHistorySql(string $role): array
             OR (ep.package_id IS NULL AND ev.status IN ('Approved','Imported','Rejected','Returned')))
             AND ev.employee_id NOT IN (SELECT employee_id FROM users WHERE role='Admin' AND employee_id IS NOT NULL)"
         : "ev.status IN ('Approved','Imported','Rejected','Returned')";
+    $where .= ' AND COALESCE(ev.is_historical,0)=0';
     $type = 'COALESCE(ep.evaluation_type,et.evaluation_type,ev.evaluation_type)';
     $category = "CASE WHEN $type IN ('Initial','Final') THEN 'probationary' ELSE 'regular' END";
     $status = $role === 'HR Manager'

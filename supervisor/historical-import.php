@@ -145,7 +145,8 @@ require_once '../includes/header.php';
             <p class="text-white-50 small mb-0 mt-2">Bulk import legacy ratings, past performance records, and historical review scores into the evaluation repository.</p>
         </div>
         <div class="d-flex align-items-center gap-2 flex-wrap">
-            <a href="historical-import.php?download=template" class="btn btn-outline-light btn-sm fw-semibold rounded-pill px-3">
+            <a href="?download=sample" class="btn btn-sm btn-light border rounded-pill px-3"><i class="fas fa-file-csv me-1"></i>Download sample CSV</a>
+                    <a href="historical-import.php?download=template" class="btn btn-outline-light btn-sm fw-semibold rounded-pill px-3">
                 <i class="fas fa-download me-1 text-warning"></i>Download CSV Template
             </a>
             <a href="evaluation-history.php" class="btn btn-light btn-sm fw-semibold rounded-pill px-3">
@@ -348,7 +349,6 @@ require_once '../includes/header.php';
                 <div>
                     <span class="spec-pill optional">kra_subtotal</span>
                     <span class="spec-pill optional">behavior_average</span>
-                    <span class="spec-pill optional">performance_level</span>
                     <span class="spec-pill optional">template_name</span>
                     <span class="spec-pill optional">legacy_reference</span>
                     <span class="spec-pill optional">employee_comments</span>
@@ -357,7 +357,7 @@ require_once '../includes/header.php';
                     <span class="spec-pill optional">kra_scores</span>
                     <span class="spec-pill optional">behavior_scores</span>
                 </div>
-                <p class="small text-muted mt-3 mb-0">For detailed records, enter ratings in form order separated by semicolons: all KRA items in <code>kra_scores</code> and all eight Core Behaviors in <code>behavior_scores</code>. Summary rows leave both blank. Specify <code>template_name</code> when more than one form matches.</p>
+                <p class="small text-muted mt-3 mb-0">The system assigns the performance level from the total score. For detailed records, enter ratings in form order separated by semicolons: all KRA items in <code>kra_scores</code> and all eight Core Behaviors in <code>behavior_scores</code>. Summary rows leave both blank. Specify <code>template_name</code> when more than one form matches.</p>
             </div>
         </div>
     </div>

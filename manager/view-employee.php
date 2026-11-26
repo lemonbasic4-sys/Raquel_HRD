@@ -761,7 +761,7 @@ $hero_name = trim($emp['first_name'] . ' ' . ($emp['middle_name'] ? $emp['middle
         <?php
         // Use the same finalized official records, chronology and change as the Employee Portal.
         require_once __DIR__ . '/../includes/employee-performance-analysis.php';
-        $performance_history = employeePerformanceHistory($conn, (int)$eid);
+        $performance_history = employeePerformanceHistory($conn, (int)$eid, true);
         $perf_history_data = $performance_history['evaluations'];
         $performanceYears = array_values(array_unique(array_map(static fn($item) => date('Y', strtotime($item['display_date'])), $perf_history_data)));
         rsort($performanceYears);
