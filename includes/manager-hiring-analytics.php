@@ -35,9 +35,9 @@ $hiringStart = $hiringMonth ? sprintf('%04d-%02d-01', $hiringYear, $hiringMonth)
 $hiringEnd = $hiringMonth ? date('Y-m-d', strtotime($hiringStart . ' +1 month')) : $hiringYearEnd;
 $hiringPeriod = $hiringMonth ? date('F Y', strtotime($hiringStart)) : (string)$hiringYear;
 $hiringPeriodTotal = $hiringMonth ? $hiringMonthly[$hiringMonth] : $hiringSelectedTotal;
-$hiringPages = max(1, (int)ceil($hiringPeriodTotal / 25));
+$hiringPages = max(1, (int)ceil($hiringPeriodTotal / 10));
 $hiringPage = min($hiringPage, $hiringPages);
-$hiringOffset = ($hiringPage - 1) * 25;
+$hiringOffset = ($hiringPage - 1) * 10;
 $hiringStmt = $conn->prepare("SELECT COALESCE(d.department_name,'Unassigned') AS department_name, COUNT(*) AS total
     FROM employees e LEFT JOIN departments d ON d.department_id=e.department_id
     WHERE $hiringScope AND e.hire_date >= ? AND e.hire_date < ?
@@ -52,7 +52,7 @@ $hiringStmt = $conn->prepare("SELECT e.employee_code, e.first_name, e.last_name,
     FROM employees e LEFT JOIN departments d ON d.department_id=e.department_id
     LEFT JOIN branches b ON b.branch_id=e.branch_id
     WHERE $hiringScope AND e.hire_date >= ? AND e.hire_date < ?
-    ORDER BY e.hire_date DESC,e.employee_id DESC LIMIT 25 OFFSET ?");
+    ORDER BY e.hire_date DESC,e.employee_id DESC LIMIT 10 OFFSET ?");
 $hiringStmt->bind_param('ssi', $hiringStart, $hiringEnd, $hiringOffset);
 $hiringStmt->execute();
 $hiringEmployees = $hiringStmt->get_result()->fetch_all(MYSQLI_ASSOC);
