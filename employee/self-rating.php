@@ -244,8 +244,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             redirectWith(BASE_URL . '/employee/self-rating.php', 'danger', 'That evaluation is not available for editing.');
         }
     }
-    $employee_consent_agreed = isset($_POST['employee_consent_agreed']) ? 1 : 0;
-    $employee_signature_data = trim($_POST['employee_signature_data'] ?? '');
+    $employee_consent_agreed = $action === 'submit' && ($_POST['employee_consent_agreed'] ?? '') === '1' ? 1 : 0;
+    $employee_signature_data = $action === 'submit' ? trim($_POST['employee_signature_data'] ?? '') : '';
     $employee_position_id = (int)($employee['job_title_id'] ?? 0);
     $position_eligibility = $is_valid_existing_edit
         ? '1 = 1'
@@ -2757,9 +2757,9 @@ require_once '../includes/header.php';
                                         <!-- Footer -->
                                         <div class="cm-footer">
                                             <span class="cm-footer-note"><i class="fas fa-lock"></i> Consent &amp; signature required</span>
-                                            <a href="<?php echo BASE_URL; ?>/employee/self-rating.php" class="cm-btn-back">Choose Another Template</a>
-                                            <button type="button" class="cm-btn-continue" onclick="confirmConsentAndContinue()">
-                                                Continue <i class="fas fa-arrow-right"></i>
+                                            <button type="button" class="cm-btn-back" data-bs-dismiss="modal">Back to ratings</button>
+                                            <button type="button" class="cm-btn-continue" id="btnConfirmSubmit" onclick="confirmFinalSubmit()">
+                                                Confirm &amp; Submit <i class="fas fa-check"></i>
                                             </button>
                                         </div>
 
@@ -2846,8 +2846,8 @@ require_once '../includes/header.php';
                 <button type="button" class="btn btn-outline-secondary rounded-pill review-modal-action" data-bs-dismiss="modal">
                     <i class="fas fa-arrow-left me-2"></i>Go Back & Edit
                 </button>
-                <button type="button" class="btn btn-primary rounded-pill review-modal-action" id="btnConfirmSubmit" onclick="confirmFinalSubmit()">
-                    <i class="fas fa-check-circle me-2"></i>Confirm & Submit
+                <button type="button" class="btn btn-primary rounded-pill review-modal-action" data-bs-target="#consentModal" data-bs-toggle="modal">
+                    <i class="fas fa-pen me-2"></i>Continue to consent
                 </button>
             </div>
         </div>
@@ -3060,17 +3060,6 @@ function syncConsentForSubmission() {
     if (submittedSignature) submittedSignature.value = signature ? signature.value : '';
 }
 
-function confirmConsentAndContinue() {
-    if (!validateConsentAndSignature()) return;
-    syncConsentForSubmission();
-
-    const consent = document.getElementById('employee_consent_agreed');
-    if (consent) consent.classList.remove('is-invalid');
-
-    const modalElement = document.getElementById('consentModal');
-    if (modalElement) bootstrap.Modal.getOrCreateInstance(modalElement).hide();
-}
-
 document.addEventListener('DOMContentLoaded', function() {
     const consentInput = document.getElementById('employee_consent_agreed');
     if (consentInput) {
@@ -3079,17 +3068,15 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    const shouldOpenConsentModal = <?php echo (!$view_mode && $selected_template_id > 0 && (!$edit_eval || empty($edit_eval['employee_consent_agreed']) || empty($edit_eval['employee_signature_data']))) ? 'true' : 'false'; ?>;
-    const modalElement = document.getElementById('consentModal');
-    if (shouldOpenConsentModal && modalElement) {
-        bootstrap.Modal.getOrCreateInstance(modalElement).show();
-    }
+    const consentModal = document.getElementById('consentModal');
+    consentModal?.addEventListener('show.bs.modal', function () {
+        consentInput.checked = false;
+        consentInput.classList.remove('is-invalid');
+    });
 });
 
 function showReviewModal() {
-    // Guard: do not open if any rating is missing or consent/signature is invalid
-    if (!validateAllRatings() || !validateConsentAndSignature()) return;
-    syncConsentForSubmission();
+    if (!validateAllRatings()) return;
 
     const modal = new bootstrap.Modal(document.getElementById('reviewModal'));
     const reviewContent = document.getElementById('reviewContent');
@@ -3155,7 +3142,7 @@ function confirmFinalSubmit() {
     }
 
     // Disable "Go Back & Edit" button
-    const backBtn = document.querySelector('.review-modal-footer button[data-bs-dismiss="modal"]');
+    const backBtn = document.querySelector('#consentModal .cm-btn-back');
     if (backBtn) {
         backBtn.disabled = true;
     }
