@@ -13,6 +13,7 @@ $hiringYears = array_values(array_unique($hiringYears));
 rsort($hiringYears);
 $hiringYearInput = filter_var($_GET['hire_year'] ?? $hiringCurrentYear, FILTER_VALIDATE_INT);
 $hiringYear = in_array($hiringYearInput, $hiringYears, true) ? $hiringYearInput : $hiringCurrentYear;
+$hiringTrendView = ($_GET['hire_trend'] ?? 'monthly') === 'yearly' ? 'yearly' : 'monthly';
 $hiringMonth = filter_var($_GET['hire_month'] ?? 0, FILTER_VALIDATE_INT);
 $hiringMonth = ($hiringMonth >= 1 && $hiringMonth <= 12) ? $hiringMonth : 0;
 $hiringPage = max(1, (int)filter_var($_GET['hire_page'] ?? 1, FILTER_VALIDATE_INT));
@@ -31,6 +32,18 @@ $hiringMonthlyRows = $hiringStmt->get_result();
 while ($hiringRow = $hiringMonthlyRows->fetch_assoc()) $hiringMonthly[(int)$hiringRow['mo']] = (int)$hiringRow['total'];
 $hiringStmt->close();
 $hiringSelectedTotal = array_sum($hiringMonthly);
+$hiringYearly = array_fill_keys(range(min($hiringYears), $hiringCurrentYear), 0);
+$hiringYearlyRows = $conn->query("SELECT YEAR(e.hire_date) AS yr, COUNT(*) AS total FROM employees e
+    WHERE $hiringScope GROUP BY YEAR(e.hire_date)");
+while ($hiringRow = $hiringYearlyRows->fetch_assoc()) {
+    $hiringYearly[(int)$hiringRow['yr']] = (int)$hiringRow['total'];
+}
+$hiringChartData = $hiringTrendView === 'yearly' ? $hiringYearly : $hiringMonthly;
+$hiringChartTotal = $hiringTrendView === 'yearly' ? array_sum($hiringYearly) : $hiringSelectedTotal;
+$hiringTrendLink = static function (string $view): string {
+    $query = array_filter($_GET, 'is_scalar');
+    return 'analytics.php?' . http_build_query(array_merge($query, ['tab' => 'hiring', 'hire_trend' => $view])) . '#hiring-analytics';
+};
 $hiringStart = $hiringMonth ? sprintf('%04d-%02d-01', $hiringYear, $hiringMonth) : $hiringYearStart;
 $hiringEnd = $hiringMonth ? date('Y-m-d', strtotime($hiringStart . ' +1 month')) : $hiringYearEnd;
 $hiringPeriod = $hiringMonth ? date('F Y', strtotime($hiringStart)) : (string)$hiringYear;
@@ -58,7 +71,7 @@ $hiringStmt->execute();
 $hiringEmployees = $hiringStmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $hiringStmt->close();
 $hiringLink = static function (int $page) use ($hiringYear, $hiringMonth): string {
-    $query = array_intersect_key($_GET, array_flip(['cohort','branch','department','date_from','date_to']));
+    $query = array_intersect_key($_GET, array_flip(['cohort','branch','department','date_from','date_to','hire_trend']));
     $query = array_filter($query, 'is_scalar');
     return 'analytics.php?' . http_build_query(array_merge($query, ['tab'=>'hiring','hire_year'=>$hiringYear,'hire_month'=>$hiringMonth,'hire_page'=>$page])) . '#hiring-analytics';
 };
@@ -90,6 +103,7 @@ $hiringLink = static function (int $page) use ($hiringYear, $hiringMonth): strin
 
     <form method="get" action="analytics.php#hiring-analytics" class="hiring-toolbar">
         <input type="hidden" name="tab" value="hiring">
+        <input type="hidden" name="hire_trend" value="<?php echo e($hiringTrendView); ?>">
         <?php foreach (['cohort','branch','department','date_from','date_to'] as $hiringKey):
             if (!isset($_GET[$hiringKey]) || !is_scalar($_GET[$hiringKey])) continue; ?>
         <input type="hidden" name="<?php echo e($hiringKey); ?>" value="<?php echo e((string)$_GET[$hiringKey]); ?>">
@@ -112,19 +126,24 @@ $hiringLink = static function (int $page) use ($hiringYear, $hiringMonth): strin
 
     <div class="hiring-insights">
         <article class="hiring-surface hiring-trend">
-            <header class="hiring-card-heading"><div><h3>Hiring trend</h3><p>Monthly new hires in <?php echo $hiringYear; ?></p></div><span class="hiring-chip"><?php echo number_format($hiringSelectedTotal); ?> hires</span></header>
-            <?php if ($hiringSelectedTotal > 0): ?>
-            <div class="hiring-chart-scroll" tabindex="0" role="region" aria-label="Monthly hiring counts for <?php echo $hiringYear; ?>">
-                <div class="hiring-bars">
-                <?php $hiringMax = max(1,max($hiringMonthly)); foreach ($hiringMonthly as $hiringM=>$hiringCount): ?>
-                    <div class="hiring-bar-column<?php echo $hiringMonth === $hiringM ? ' is-selected' : ''; ?>">
+            <header class="hiring-card-heading"><div><h3>Hiring trend</h3><p><?php echo $hiringTrendView === 'yearly' ? 'New hires by year' : 'Monthly new hires in ' . $hiringYear; ?></p></div>
+                <div class="hiring-trend-controls" aria-label="Hiring trend view">
+                    <a href="<?php echo e($hiringTrendLink('monthly')); ?>"<?php echo $hiringTrendView === 'monthly' ? ' aria-current="page"' : ''; ?>>Monthly</a>
+                    <a href="<?php echo e($hiringTrendLink('yearly')); ?>"<?php echo $hiringTrendView === 'yearly' ? ' aria-current="page"' : ''; ?>>Yearly</a>
+                </div>
+            </header>
+            <?php if ($hiringChartTotal > 0): ?>
+            <div class="hiring-chart-scroll" tabindex="0" role="region" aria-label="<?php echo $hiringTrendView === 'yearly' ? 'Yearly hiring counts' : 'Monthly hiring counts for ' . $hiringYear; ?>">
+                <div class="hiring-bars<?php echo $hiringTrendView === 'yearly' ? ' hiring-bars--yearly' : ''; ?>">
+                <?php $hiringMax = max(1,max($hiringChartData)); foreach ($hiringChartData as $hiringPeriodKey=>$hiringCount): ?>
+                    <div class="hiring-bar-column<?php echo $hiringTrendView === 'monthly' && $hiringMonth === $hiringPeriodKey ? ' is-selected' : ''; ?>">
                         <div class="hiring-bar-track"><div class="hiring-bar-fill" style="--bar-height:<?php echo round($hiringCount/$hiringMax*100,2); ?>%"><span><?php echo $hiringCount; ?></span></div></div>
-                        <div class="hiring-bar-label"><?php echo date('M',mktime(0,0,0,$hiringM,1)); ?></div>
+                        <div class="hiring-bar-label"><?php echo $hiringTrendView === 'yearly' ? $hiringPeriodKey : date('M',mktime(0,0,0,$hiringPeriodKey,1)); ?></div>
                     </div>
                 <?php endforeach; ?>
                 </div>
             </div>
-            <div class="hiring-chart-caption"><span><i aria-hidden="true"></i>New hires</span><span>January &ndash; December <?php echo $hiringYear; ?></span></div>
+            <div class="hiring-chart-caption"><span><i aria-hidden="true"></i>New hires</span><span><?php echo $hiringTrendView === 'yearly' ? min($hiringYears) . '–' . $hiringCurrentYear : 'January – December ' . $hiringYear; ?></span></div>
             <?php else: ?>
             <div class="hiring-empty hiring-empty--chart">
                 <span class="hiring-empty-icon"><i class="fas fa-chart-bar" aria-hidden="true"></i></span>

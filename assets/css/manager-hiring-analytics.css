@@ -54,6 +54,10 @@
 .hiring-chip { display:inline-flex; align-items:center; justify-content:center; background:#eff3e9; border:1px solid #e6ecde; color:#536d37; border-radius:7px; padding:4px 8px; font-size:.65rem; font-weight:600; white-space:nowrap; }
 .hiring-heading-icon { color:#a2af98; }
 .hiring-chart-scroll { overflow-x:auto; padding:28px 22px 0; scrollbar-width:thin; }
+.hiring-trend-controls { display:inline-flex; gap:3px; padding:3px; border:1px solid var(--hire-line); border-radius:9px; background:#f7f9f4; }
+.hiring-trend-controls a { padding:6px 10px; border-radius:6px; color:#617358; font-size:.72rem; font-weight:600; text-decoration:none; }
+.hiring-trend-controls a[aria-current="page"] { background:#294306; color:#fff; }
+.hiring-bars--yearly { grid-template-columns:repeat(var(--year-count, 17),minmax(34px,1fr)); min-width:max(600px, calc(46px * var(--year-count, 17))); }
 .hiring-bars { display:grid; grid-template-columns:repeat(12,minmax(30px,1fr)); gap:12px; min-width:480px; background:repeating-linear-gradient(to top,transparent,transparent 49px,#eff2eb 49px,#eff2eb 50px); }
 .hiring-bar-track { height:160px; display:flex; align-items:flex-end; justify-content:center; }
 .hiring-bar-fill { height:var(--bar-height); min-height:2px; width:64%; max-width:34px; background:linear-gradient(#8ca56a,#36591e); border-radius:5px 5px 0 0; position:relative; }
