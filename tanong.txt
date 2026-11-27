@@ -1,0 +1,4 @@
+bakit ang bagal ng analytics kapag madaming entries -- if may fix dito pagawamo
+bakit sa dashboard walang analytics na naka save dapat meron.
+
+dapat pag inaccess ko ang isang employee at tumungo sa employee portal nya makikita ko ang mga past evaluation nya hindi lang puro inject lang mula sa sql, gusto ko accessible lahat ng data.

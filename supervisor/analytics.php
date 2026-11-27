@@ -1012,6 +1012,9 @@ $yoy_emp    = formatYoYData($yoy_emp_raw, $yoy_years);
                         </div>
                         <!-- Year Pill Buttons -->
                         <div class="btn-group btn-group-sm" role="group">
+                            <button type="button" class="btn btn-outline-secondary trend-year-btn" data-year="all">
+                                All Years
+                            </button>
                             <?php foreach ($available_years as $yr): ?>
                             <button type="button" class="btn btn-outline-secondary trend-year-btn <?php echo $yr === $default_trend_year ? 'active btn-secondary text-white' : ''; ?>" data-year="<?php echo $yr; ?>">
                                 <?php echo $yr; ?>
@@ -1769,6 +1772,21 @@ document.addEventListener('DOMContentLoaded', function () {
     let currentTrendYear = <?php echo $default_trend_year; ?>;
 
     function getTrendDataForYear(yr) {
+        if (yr === 'all') {
+            const labels = [];
+            const vals = [];
+            Object.keys(allYearsTrend)
+                .map(year => parseInt(year))
+                .sort((a, b) => a - b)
+                .forEach(year => {
+                    (allYearsTrend[year] || []).forEach((d, monthIndex) => {
+                        labels.push(monthNames[monthIndex] + ' ' + year);
+                        vals.push(d.value || 0);
+                    });
+                });
+            return { labels: labels, vals: vals };
+        }
+
         const data = allYearsTrend[yr] || [];
         const vals = data.map(d => d.value || 0);
         return {
@@ -1866,7 +1884,7 @@ document.addEventListener('DOMContentLoaded', function () {
             this.classList.remove('btn-outline-secondary');
             this.classList.add('active', 'btn-secondary', 'text-white');
 
-            const yr = parseInt(this.dataset.year);
+            const yr = this.dataset.year === 'all' ? 'all' : parseInt(this.dataset.year);
             const newData = getTrendDataForYear(yr);
 
             // Update chart data
@@ -1876,7 +1894,8 @@ document.addEventListener('DOMContentLoaded', function () {
             trendChart.data.datasets[0].borderColor = newData.vals.map(v => scoreLevelBorder(v));
             trendChart.update();
 
-            document.getElementById('trendSubtitle').textContent = yr + ' Monthly Averages';
+            document.getElementById('trendSubtitle').textContent =
+                yr === 'all' ? 'All Years Monthly Averages' : yr + ' Monthly Averages';
         });
     });
 

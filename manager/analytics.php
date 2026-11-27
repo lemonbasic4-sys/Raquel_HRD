@@ -746,6 +746,21 @@ $yoy_emp    = formatYoYData($yoy_emp_raw, $yoy_years);
 </details>
 
 <style>
+.trend-year-scroll {
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 8px 16px 10px;
+    scrollbar-width: thin;
+}
+.trend-year-scroll .btn-group {
+    display: inline-flex;
+    flex-wrap: nowrap;
+    width: max-content;
+}
+.trend-year-scroll .trend-year-btn {
+    flex: 0 0 auto;
+}
 /* Compact, horizontally scrollable section navigation. */
 .analytics-page .analytics-nav {
     display: flex;
@@ -1004,13 +1019,17 @@ $yoy_emp    = formatYoYData($yoy_emp_raw, $yoy_years);
             <!-- Score Trend (Monthly Bar Chart) -->
             <div class="col-lg-7">
                 <div class="chart-card">
-                    <div class="cc-header d-flex justify-content-between align-items-center">
+                    <div class="cc-header">
                         <div>
                             <h6><i class="fas fa-chart-line me-2" style="color:#294306;"></i>Score Trend</h6>
                             <span style="font-size:.7rem;color:#aaa;" id="trendSubtitle"><?php echo $default_trend_year; ?> Monthly Averages</span>
                         </div>
-                        <!-- Year Pill Buttons -->
+                    </div>
+                    <div class="trend-year-scroll" role="region" aria-label="Score Trend years" tabindex="0">
                         <div class="btn-group btn-group-sm" role="group">
+                            <button type="button" class="btn btn-outline-secondary trend-year-btn" data-year="all">
+                                All Years
+                            </button>
                             <?php foreach ($available_years as $yr): ?>
                             <button type="button" class="btn btn-outline-secondary trend-year-btn <?php echo $yr === $default_trend_year ? 'active btn-secondary text-white' : ''; ?>" data-year="<?php echo $yr; ?>">
                                 <?php echo $yr; ?>
@@ -1768,6 +1787,21 @@ document.addEventListener('DOMContentLoaded', function () {
     let currentTrendYear = <?php echo $default_trend_year; ?>;
     
     function getTrendDataForYear(yr) {
+        if (yr === 'all') {
+            const labels = [];
+            const vals = [];
+            Object.keys(allYearsTrend)
+                .map(year => parseInt(year))
+                .sort((a, b) => a - b)
+                .forEach(year => {
+                    (allYearsTrend[year] || []).forEach((d, monthIndex) => {
+                        labels.push(monthNames[monthIndex] + ' ' + year);
+                        vals.push(d.value || 0);
+                    });
+                });
+            return { labels: labels, vals: vals };
+        }
+
         const data = allYearsTrend[yr] || [];
         const vals = data.map(d => d.value || 0);
         return {
@@ -1865,7 +1899,7 @@ document.addEventListener('DOMContentLoaded', function () {
             this.classList.remove('btn-outline-secondary');
             this.classList.add('active', 'btn-secondary', 'text-white');
             
-            const yr = parseInt(this.dataset.year);
+            const yr = this.dataset.year === 'all' ? 'all' : parseInt(this.dataset.year);
             const newData = getTrendDataForYear(yr);
             
             // Update chart data
@@ -1875,7 +1909,8 @@ document.addEventListener('DOMContentLoaded', function () {
             trendChart.data.datasets[0].borderColor = newData.vals.map(v => scoreLevelBorder(v));
             trendChart.update();
             
-            document.getElementById('trendSubtitle').textContent = yr + ' Monthly Averages';
+            document.getElementById('trendSubtitle').textContent =
+                yr === 'all' ? 'All Years Monthly Averages' : yr + ' Monthly Averages';
         });
     });
 
