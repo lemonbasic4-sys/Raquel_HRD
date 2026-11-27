@@ -988,10 +988,15 @@ body:not(.show-ess) .bcon {
     margin: 0;
   }
 
-  /* Push the form toward the bottom of the card */
+  /* Keep the fields directly below the heading and any login message. */
   .form-inner.hris #hrisForm,
   .form-inner.essf #essForm {
-    margin-top: auto;
+    margin-top: 16px;
+  }
+
+  .form-inner .login-error {
+    flex-shrink: 0;
+    margin-bottom: 0;
   }
 
   /* Footer sticks right below the form */
