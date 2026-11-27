@@ -14,6 +14,7 @@ rsort($hiringYears);
 $hiringYearInput = filter_var($_GET['hire_year'] ?? $hiringCurrentYear, FILTER_VALIDATE_INT);
 $hiringYear = in_array($hiringYearInput, $hiringYears, true) ? $hiringYearInput : $hiringCurrentYear;
 $hiringTrendView = ($_GET['hire_trend'] ?? 'monthly') === 'yearly' ? 'yearly' : 'monthly';
+$hiringDepartmentView = ($_GET['hire_department'] ?? 'selected') === 'all' ? 'all' : 'selected';
 $hiringMonth = filter_var($_GET['hire_month'] ?? 0, FILTER_VALIDATE_INT);
 $hiringMonth = ($hiringMonth >= 1 && $hiringMonth <= 12) ? $hiringMonth : 0;
 $hiringPage = max(1, (int)filter_var($_GET['hire_page'] ?? 1, FILTER_VALIDATE_INT));
@@ -44,6 +45,10 @@ $hiringTrendLink = static function (string $view): string {
     $query = array_filter($_GET, 'is_scalar');
     return 'analytics.php?' . http_build_query(array_merge($query, ['tab' => 'hiring', 'hire_trend' => $view])) . '#hiring-analytics';
 };
+$hiringDepartmentLink = static function (string $view): string {
+    $query = array_filter($_GET, 'is_scalar');
+    return 'analytics.php?' . http_build_query(array_merge($query, ['tab' => 'hiring', 'hire_department' => $view])) . '#hiring-analytics';
+};
 $hiringStart = $hiringMonth ? sprintf('%04d-%02d-01', $hiringYear, $hiringMonth) : $hiringYearStart;
 $hiringEnd = $hiringMonth ? date('Y-m-d', strtotime($hiringStart . ' +1 month')) : $hiringYearEnd;
 $hiringPeriod = $hiringMonth ? date('F Y', strtotime($hiringStart)) : (string)$hiringYear;
@@ -51,14 +56,23 @@ $hiringPeriodTotal = $hiringMonth ? $hiringMonthly[$hiringMonth] : $hiringSelect
 $hiringPages = max(1, (int)ceil($hiringPeriodTotal / 10));
 $hiringPage = min($hiringPage, $hiringPages);
 $hiringOffset = ($hiringPage - 1) * 10;
-$hiringStmt = $conn->prepare("SELECT COALESCE(d.department_name,'Unassigned') AS department_name, COUNT(*) AS total
-    FROM employees e LEFT JOIN departments d ON d.department_id=e.department_id
-    WHERE $hiringScope AND e.hire_date >= ? AND e.hire_date < ?
-    GROUP BY e.department_id,d.department_name ORDER BY total DESC,department_name");
-$hiringStmt->bind_param('ss', $hiringStart, $hiringEnd);
-$hiringStmt->execute();
-$hiringDepartments = $hiringStmt->get_result()->fetch_all(MYSQLI_ASSOC);
-$hiringStmt->close();
+if ($hiringDepartmentView === 'all') {
+    $hiringDepartments = $conn->query("SELECT d.department_name, COUNT(e.employee_id) AS total
+        FROM departments d LEFT JOIN employees e ON e.department_id=d.department_id AND $hiringScope
+        WHERE d.is_active=1 GROUP BY d.department_id,d.department_name
+        ORDER BY total DESC,d.department_name")->fetch_all(MYSQLI_ASSOC);
+} else {
+    $hiringStmt = $conn->prepare("SELECT d.department_name, COUNT(e.employee_id) AS total
+        FROM departments d LEFT JOIN employees e ON e.department_id=d.department_id
+            AND $hiringScope AND e.hire_date >= ? AND e.hire_date < ?
+        WHERE d.is_active=1 GROUP BY d.department_id,d.department_name
+        ORDER BY total DESC,d.department_name");
+    $hiringStmt->bind_param('ss', $hiringStart, $hiringEnd);
+    $hiringStmt->execute();
+    $hiringDepartments = $hiringStmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $hiringStmt->close();
+}
+$hiringDepartmentTotal = $hiringDepartmentView === 'all' ? array_sum($hiringYearly) : $hiringPeriodTotal;
 $hiringStmt = $conn->prepare("SELECT e.employee_code, e.first_name, e.last_name, e.job_title,e.hire_date,
     e.employment_status,COALESCE(d.department_name,'Unassigned') AS department_name,
     COALESCE(b.branch_name,'Unassigned') AS branch_name
@@ -71,7 +85,7 @@ $hiringStmt->execute();
 $hiringEmployees = $hiringStmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $hiringStmt->close();
 $hiringLink = static function (int $page) use ($hiringYear, $hiringMonth): string {
-    $query = array_intersect_key($_GET, array_flip(['cohort','branch','department','date_from','date_to','hire_trend']));
+    $query = array_intersect_key($_GET, array_flip(['cohort','branch','department','date_from','date_to','hire_trend','hire_department']));
     $query = array_filter($query, 'is_scalar');
     return 'analytics.php?' . http_build_query(array_merge($query, ['tab'=>'hiring','hire_year'=>$hiringYear,'hire_month'=>$hiringMonth,'hire_page'=>$page])) . '#hiring-analytics';
 };
@@ -104,6 +118,7 @@ $hiringLink = static function (int $page) use ($hiringYear, $hiringMonth): strin
     <form method="get" action="analytics.php#hiring-analytics" class="hiring-toolbar">
         <input type="hidden" name="tab" value="hiring">
         <input type="hidden" name="hire_trend" value="<?php echo e($hiringTrendView); ?>">
+        <input type="hidden" name="hire_department" value="<?php echo e($hiringDepartmentView); ?>">
         <?php foreach (['cohort','branch','department','date_from','date_to'] as $hiringKey):
             if (!isset($_GET[$hiringKey]) || !is_scalar($_GET[$hiringKey])) continue; ?>
         <input type="hidden" name="<?php echo e($hiringKey); ?>" value="<?php echo e((string)$_GET[$hiringKey]); ?>">
@@ -158,13 +173,18 @@ $hiringLink = static function (int $page) use ($hiringYear, $hiringMonth): strin
         </article>
 
         <article class="hiring-surface hiring-departments">
-            <header class="hiring-card-heading"><div><h3>Department breakdown</h3><p><?php echo e($hiringPeriod); ?> &middot; Share of new hires</p></div><span class="hiring-heading-icon"><i class="fas fa-sitemap" aria-hidden="true"></i></span></header>
+            <header class="hiring-card-heading"><div><h3>Department breakdown</h3><p><?php echo $hiringDepartmentView === 'all' ? 'All years' : e($hiringPeriod); ?> &middot; Share of new hires</p></div>
+                <div class="hiring-trend-controls" aria-label="Department breakdown period">
+                    <a href="<?php echo e($hiringDepartmentLink('selected')); ?>"<?php echo $hiringDepartmentView === 'selected' ? ' aria-current="page"' : ''; ?>>Selected period</a>
+                    <a href="<?php echo e($hiringDepartmentLink('all')); ?>"<?php echo $hiringDepartmentView === 'all' ? ' aria-current="page"' : ''; ?>>All years</a>
+                </div>
+            </header>
             <?php if (!$hiringDepartments): ?>
             <div class="hiring-empty"><span class="hiring-empty-icon"><i class="fas fa-building" aria-hidden="true"></i></span><strong>No department data yet</strong><p>Department totals appear when hires are recorded for this period.</p></div>
             <?php else: ?>
             <div class="hiring-department-list" tabindex="0" role="region" aria-label="New hires by department">
             <?php foreach ($hiringDepartments as $hiringDepartment):
-                $hiringShare = $hiringPeriodTotal ? round((int)$hiringDepartment['total']/$hiringPeriodTotal*100) : 0; ?>
+                $hiringShare = $hiringDepartmentTotal ? round((int)$hiringDepartment['total']/$hiringDepartmentTotal*100) : 0; ?>
                 <div class="hiring-department">
                     <div><span><?php echo e($hiringDepartment['department_name']); ?></span><strong><?php echo (int)$hiringDepartment['total']; ?> <small><?php echo $hiringShare; ?>%</small></strong></div>
                     <div class="hiring-share-track"><span style="width:<?php echo $hiringShare; ?>%"></span></div>
