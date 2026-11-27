@@ -19,7 +19,7 @@ unset($_SESSION['new_employee_credentials']);
 // Fetch user + employee details
 $stmt = $conn->prepare("
     SELECT
-        u.user_id, u.employee_id, u.username, u.email, u.full_name, u.role, u.is_active, u.account_hold, u.account_hold_reason, u.created_at,
+        u.user_id, u.employee_id, u.username, u.email, u.full_name, u.role, u.is_active, u.account_hold, u.account_hold_reason, u.portal_login_failures, u.created_at,
         e.employee_code, e.first_name, e.last_name, e.job_title, e.profile_picture,
         b.branch_name
     FROM users u
@@ -95,6 +95,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $errors[] = 'Password must be at least 6 characters.';
     }
 
+    if ($is_active && $new_password === '' && (int)$user['portal_login_failures'] >= 9) {
+        $errors[] = 'Set a new password to reactivate this account.';
+    }
+
     // Unique username (global)
     if (empty($errors)) {
         $dup = $conn->prepare("SELECT user_id FROM users WHERE username = ? AND user_id <> ? LIMIT 1");
@@ -112,7 +116,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($new_password !== '') {
         $hash = password_hash($new_password, PASSWORD_DEFAULT);
-        $upd = $conn->prepare("UPDATE users SET username=?, is_active=?, password_hash=?, account_hold=0, account_hold_reason=NULL, account_hold_at=NULL, account_hold_movement_id=NULL WHERE user_id=?");
+        $upd = $conn->prepare("UPDATE users SET username=?, is_active=?, password_hash=?, portal_login_failures=0, portal_locked_until=NULL, account_hold=0, account_hold_reason=NULL, account_hold_at=NULL, account_hold_movement_id=NULL WHERE user_id=?");
         $upd->bind_param("sisi", $new_username, $is_active, $hash, $user_id);
     } else {
         $upd = $conn->prepare("UPDATE users SET username=?, is_active=? WHERE user_id=?");

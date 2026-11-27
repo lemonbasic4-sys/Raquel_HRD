@@ -862,6 +862,8 @@ function ensureUserAccountSecuritySchema($conn): bool
     }
 
     $definitions = [
+        'portal_login_failures' => "ALTER TABLE users ADD COLUMN portal_login_failures TINYINT UNSIGNED NOT NULL DEFAULT 0",
+        'portal_locked_until' => "ALTER TABLE users ADD COLUMN portal_locked_until DATETIME NULL",
         'account_hold' => "ALTER TABLE users ADD COLUMN account_hold TINYINT(1) NOT NULL DEFAULT 0 AFTER is_active",
         'account_hold_reason' => "ALTER TABLE users ADD COLUMN account_hold_reason TEXT NULL AFTER account_hold",
         'account_hold_at' => "ALTER TABLE users ADD COLUMN account_hold_at DATETIME NULL AFTER account_hold_reason",
@@ -2407,6 +2409,64 @@ function updateSetting($conn, $key, $value)
 
     return $success;
 
+}
+
+// Serialize password checks for each account, including simultaneous submissions.
+function checkEmployeePortalCredentials($conn, $username, $password, $exactUsername)
+{
+    $disabled = 'Your account has been disabled after repeated failed login attempts. Please contact the IT Department or your department head to request account reactivation and a password reset.';
+    $conn->begin_transaction();
+    try {
+        $stmt = $conn->prepare("
+            SELECT u.user_id, u.employee_id, u.username, u.email, u.password_hash, u.portal_login_failures, TIMESTAMPDIFF(SECOND, NOW(), u.portal_locked_until) AS wait_seconds, u.full_name, u.role, u.branch_id, u.is_active, u.account_hold, u.first_login_completed, u.must_change_password, e.is_active as emp_is_active, e.employment_status
+            FROM users u
+            LEFT JOIN employees e ON u.employee_id = e.employee_id
+            WHERE BINARY u.username = ?
+              AND u.employee_id IS NOT NULL
+              AND u.role IN ('Employee', 'President and CEO')
+            LIMIT 1 FOR UPDATE
+        ");
+        $stmt->bind_param("s", $username);
+        $stmt->execute();
+        $user = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        $error = '';
+        if (!$user) {
+            $error = 'Invalid credentials.';
+        } elseif ((int)$user['portal_login_failures'] >= 9) {
+            $error = $disabled;
+        } elseif (!$user['is_active'] || (string)$user['emp_is_active'] === '0' || strcasecmp($user['employment_status'] ?? '', 'Inactive') === 0) {
+            $error = 'Your account has been deactivated.';
+        } elseif ($user['account_hold']) {
+            $error = 'Your account is on hold after an employee movement. Please contact an administrator for new credentials.';
+        } elseif ($user['role'] !== 'Employee') {
+            if (!$exactUsername || !password_verify($password, $user['password_hash'])) {
+                $error = 'Invalid credentials.';
+            }
+        } elseif ($user['wait_seconds'] > 0) {
+            $error = "Too many failed login attempts. Please try again in {$user['wait_seconds']} seconds.  ";
+        } else {
+            $valid = $exactUsername && password_verify($password, $user['password_hash']);
+            $failures = $valid ? 0 : (int)$user['portal_login_failures'] + 1;
+            $seconds = [3 => 60, 6 => 180][$failures] ?? 0; //dito po
+            if ($failures || $user['portal_login_failures']) {
+                $update = $conn->prepare("UPDATE users SET portal_login_failures=?, portal_locked_until=IF(? > 0, DATE_ADD(NOW(), INTERVAL ? SECOND), NULL), is_active=IF(? >= 9, 0, is_active) WHERE user_id=?");
+                $update->bind_param('iiiii', $failures, $seconds, $seconds, $failures, $user['user_id']);
+                $update->execute();
+            }
+            if (!$valid) {
+                $error = $failures >= 9 ? $disabled : 'Invalid credentials.';
+                if ($seconds) {
+                    $error = 'Too many failed login attempts. Please try again in ' . ($seconds === 60 ? '1 minute.' : '3 minutes.');
+                }
+            }
+        }
+        $conn->commit();
+        return [$user, $error];
+    } catch (Throwable $e) {
+        $conn->rollback();
+        throw $e;
+    }
 }
 
 /**

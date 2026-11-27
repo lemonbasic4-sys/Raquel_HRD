@@ -145,6 +145,8 @@ CREATE TABLE users (
     role ENUM('Admin', 'HR Manager', 'HR Supervisor', 'HR Staff', 'Employee', 'President and CEO') NOT NULL,
     branch_id INT NULL,
     is_active TINYINT(1) DEFAULT 1,
+    portal_login_failures TINYINT UNSIGNED NOT NULL DEFAULT 0,
+    portal_locked_until DATETIME NULL,
     account_hold TINYINT(1) NOT NULL DEFAULT 0,
     account_hold_reason TEXT NULL,
     account_hold_at DATETIME NULL,

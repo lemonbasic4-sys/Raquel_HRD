@@ -27,87 +27,57 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (empty($username) || empty($password)) {
         $error = 'Please enter both username and password.';
         logLoginAudit($conn, $username, 'Employee Portal', 'Failed', 'Username or password was not provided.');
-    } elseif ($entered_username !== $username) {
-        $error = 'Invalid credentials.';
-        registerLoginAttempt($conn, $username, $ip);
-        logLoginAudit($conn, $username, 'Employee Portal', 'Failed', 'Username contained leading or trailing whitespace.');
     } else {
-        $stmt = $conn->prepare("
-            SELECT u.user_id, u.employee_id, u.username, u.email, u.password_hash, u.full_name, u.role, u.branch_id, u.is_active, u.account_hold, u.first_login_completed, u.must_change_password, e.is_active as emp_is_active, e.employment_status
-            FROM users u
-            LEFT JOIN employees e ON u.employee_id = e.employee_id
-            WHERE BINARY u.username = ? 
-              AND u.employee_id IS NOT NULL
-              AND u.role IN ('Employee', 'President and CEO')
-            LIMIT 1
-        ");
-        $stmt->bind_param("s", $username);
-        $stmt->execute();
-        $result = $stmt->get_result();
-
-        if ($result->num_rows === 1) {
-            $user = $result->fetch_assoc();
-            $is_emp_inactive = ($user['emp_is_active'] !== null && (int)$user['emp_is_active'] === 0) || (strcasecmp($user['employment_status'] ?? '', 'Inactive') === 0);
-            if (!$user['is_active'] || $is_emp_inactive) {
-                $error = 'Your account has been deactivated.';
-                logLoginAudit($conn, $username, 'Employee Portal', 'Failed', 'Account is deactivated.', (int)$user['user_id']);
-            } elseif (!empty($user['account_hold'])) {
-                $error = 'Your account is on hold after an employee movement. Please contact an administrator for new credentials.';
+        [$user, $error] = checkEmployeePortalCredentials($conn, $username, $password, $entered_username === $username);
+        if ($error !== '') {
+            if (!$user || $error === 'Invalid credentials.') {
                 registerLoginAttempt($conn, $username, $ip);
-                logLoginAudit($conn, $username, 'Employee Portal', 'Failed', 'Account is on hold.', (int)$user['user_id']);
-            } elseif (password_verify($password, $user['password_hash'])) {
-                // Clear attempts on successful login
-                clearLoginAttempts($conn, $username, $ip);
-
-                // First successful Employee Portal login requires a password change.
-                if (empty($user['first_login_completed'])) {
-                    $require_password_change = $conn->prepare("UPDATE users SET must_change_password = 1 WHERE user_id = ?");
-                    $require_password_change->bind_param('i', $user['user_id']);
-                    $require_password_change->execute();
-                    $require_password_change->close();
-                    $user['must_change_password'] = 1;
-                }
-
-                // Handle Remember Me functionality
-                if (!empty($_POST['remember'])) {
-                    setcookie('remember_employee_username', $username, time() + (30 * 24 * 60 * 60), '/');
-                    $params = session_get_cookie_params();
-                    setcookie(
-                        session_name(),
-                        session_id(),
-                        time() + (30 * 24 * 60 * 60),
-                        $params["path"],
-                        $params["domain"],
-                        $params["secure"],
-                        $params["httponly"]
-                    );
-                } else {
-                    setcookie('remember_employee_username', '', time() - 3600, '/');
-                }
-
-                // Set session
-                $_SESSION['user_id'] = $user['user_id'];
-                $_SESSION['employee_id'] = $user['employee_id'];
-                $_SESSION['username'] = $user['username'];
-                $_SESSION['full_name'] = $user['full_name'];
-                $_SESSION['role'] = $user['role'];
-                $_SESSION['first_login_completed'] = (bool) ($user['first_login_completed'] ?? false);
-                $_SESSION['must_change_password'] = (bool) ($user['must_change_password'] ?? false);
-                unset($_SESSION['first_login_password_notice_dismissed']);
-
-                logLoginAudit($conn, $username, 'Employee Portal', 'Successful', '', (int)$user['user_id']);
-
-                header('Location: dashboard.php');
-                exit();
-            } else {
-                $error = 'Invalid credentials.';
-                registerLoginAttempt($conn, $username, $ip);
-                logLoginAudit($conn, $username, 'Employee Portal', 'Failed', 'Password did not match the account.', (int)$user['user_id']);
             }
+            logLoginAudit($conn, $username, 'Employee Portal', 'Failed', $error, $user['user_id'] ?? null);
         } else {
-            $error = 'Only Employee and President/CEO accounts can access the Employee Portal.';
-            registerLoginAttempt($conn, $username, $ip);
-            logLoginAudit($conn, $username, 'Employee Portal', 'Failed', 'No eligible employee or President/CEO account was found.');
+            // Clear attempts on successful login
+            clearLoginAttempts($conn, $username, $ip);
+
+            // First successful Employee Portal login requires a password change.
+            if (empty($user['first_login_completed'])) {
+                $require_password_change = $conn->prepare("UPDATE users SET must_change_password = 1 WHERE user_id = ?");
+                $require_password_change->bind_param('i', $user['user_id']);
+                $require_password_change->execute();
+                $require_password_change->close();
+                $user['must_change_password'] = 1;
+            }
+
+            // Handle Remember Me functionality
+            if (!empty($_POST['remember'])) {
+                setcookie('remember_employee_username', $username, time() + (30 * 24 * 60 * 60), '/');
+                $params = session_get_cookie_params();
+                setcookie(
+                    session_name(),
+                    session_id(),
+                    time() + (30 * 24 * 60 * 60),
+                    $params["path"],
+                    $params["domain"],
+                    $params["secure"],
+                    $params["httponly"]
+                );
+            } else {
+                setcookie('remember_employee_username', '', time() - 3600, '/');
+            }
+
+            // Set session
+            $_SESSION['user_id'] = $user['user_id'];
+            $_SESSION['employee_id'] = $user['employee_id'];
+            $_SESSION['username'] = $user['username'];
+            $_SESSION['full_name'] = $user['full_name'];
+            $_SESSION['role'] = $user['role'];
+            $_SESSION['first_login_completed'] = (bool) ($user['first_login_completed'] ?? false);
+            $_SESSION['must_change_password'] = (bool) ($user['must_change_password'] ?? false);
+            unset($_SESSION['first_login_password_notice_dismissed']);
+
+            logLoginAudit($conn, $username, 'Employee Portal', 'Successful', '', (int)$user['user_id']);
+
+            header('Location: dashboard.php');
+            exit();
         }
     }
 }
