@@ -134,7 +134,7 @@ $hiringLink = static function (int $page) use ($hiringYear, $hiringMonth): strin
             </header>
             <?php if ($hiringChartTotal > 0): ?>
             <div class="hiring-chart-scroll" tabindex="0" role="region" aria-label="<?php echo $hiringTrendView === 'yearly' ? 'Yearly hiring counts' : 'Monthly hiring counts for ' . $hiringYear; ?>">
-                <div class="hiring-bars<?php echo $hiringTrendView === 'yearly' ? ' hiring-bars--yearly' : ''; ?>">
+                <div class="hiring-bars<?php echo $hiringTrendView === 'yearly' ? ' hiring-bars--yearly' : ''; ?>"<?php echo $hiringTrendView === 'yearly' ? ' style="--year-count:' . count($hiringYearly) . '"' : ''; ?>>
                 <?php $hiringMax = max(1,max($hiringChartData)); foreach ($hiringChartData as $hiringPeriodKey=>$hiringCount): ?>
                     <div class="hiring-bar-column<?php echo $hiringTrendView === 'monthly' && $hiringMonth === $hiringPeriodKey ? ' is-selected' : ''; ?>">
                         <div class="hiring-bar-track"><div class="hiring-bar-fill" style="--bar-height:<?php echo round($hiringCount/$hiringMax*100,2); ?>%"><span><?php echo $hiringCount; ?></span></div></div>
