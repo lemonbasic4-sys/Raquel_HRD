@@ -293,6 +293,7 @@ $sys_logo = getSetting($conn, 'system_logo', 'assets/img/logo/logo.png');
             <div class="login-error" id="hrisError" style="<?php echo $error ? 'display: flex;' : 'display: none;'; ?>">
               <i class="ti ti-alert-circle"></i>
               <span id="hrisErrorMsg"><?php echo htmlspecialchars($error); ?></span>
+              <button type="button" class="login-error-close" aria-label="Close notification"><i class="ti ti-x" aria-hidden="true"></i></button>
             </div>
 
             <form method="POST" action="index.php" id="hrisForm">
@@ -346,6 +347,7 @@ $sys_logo = getSetting($conn, 'system_logo', 'assets/img/logo/logo.png');
             <div class="login-error" id="essError" style="display:none">
               <i class="ti ti-alert-circle"></i>
               <span id="essErrorMsg"></span>
+              <button type="button" class="login-error-close" aria-label="Close notification"><i class="ti ti-x" aria-hidden="true"></i></button>
             </div>
 
             <form method="POST" action="<?php echo BASE_URL; ?>/employee/index.php" id="essForm">
@@ -409,7 +411,7 @@ $sys_logo = getSetting($conn, 'system_logo', 'assets/img/logo/logo.png');
                     seconds--;
                     if (seconds <= 0) {
                         clearInterval(interval);
-                        if (errorContainer) errorContainer.style.display = "none";
+                        if (errorContainer) window.closeLoginToast(errorContainer);
                         errorEl.textContent = "";
                     } else {
                         errorEl.textContent = `Too many failed login attempts. Please try again in ${seconds} seconds.`;

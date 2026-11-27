@@ -84,6 +84,44 @@ document.addEventListener('DOMContentLoaded', function () {
      HRIS form — client-side validation
   ───────────────────────────────────────── */
   const hrisForm = document.getElementById('hrisForm');
+  if (window.innerWidth > 640) {
+    document.querySelectorAll('.login-error').forEach(function (toast) {
+      document.body.appendChild(toast);
+    });
+  }
+
+  window.closeLoginToast = function (toast) {
+    if (!toast || toast.style.display === 'none' || toast.classList.contains('is-closing')) return;
+    if (window.innerWidth <= 640 || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      toast.style.display = 'none';
+      return;
+    }
+    toast.classList.add('is-closing');
+    toast.addEventListener('animationend', function () {
+      toast.style.display = 'none';
+      toast.classList.remove('is-closing');
+    }, { once: true });
+  };
+
+  const toastTimers = new WeakMap();
+  function scheduleLoginToast(toast) {
+    if (window.innerWidth <= 640) return;
+    clearTimeout(toastTimers.get(toast));
+    toastTimers.set(toast, setTimeout(function () {
+      window.closeLoginToast(toast);
+    }, 15000));
+  }
+
+  document.querySelectorAll('.login-error').forEach(function (toast) {
+    if (toast.style.display !== 'none') scheduleLoginToast(toast);
+  });
+
+  document.querySelectorAll('.login-error-close').forEach(function (button) {
+    button.addEventListener('click', function () {
+      window.closeLoginToast(button.closest('.login-error'));
+    });
+  });
+
   if (hrisForm) {
     const hrisUser = document.getElementById('hris-username');
     const hrisPass = document.getElementById('hp');
@@ -98,7 +136,9 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('hrisErrorMsg').textContent =
           'Please fill in both username and password.';
         hrisErr.style.display = 'flex';
-        hrisErr.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        hrisErr.classList.remove('is-closing');
+        scheduleLoginToast(hrisErr);
+        if (window.innerWidth <= 640) hrisErr.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       }
     });
 
@@ -133,7 +173,9 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('essErrorMsg').textContent =
           'Please fill in both username and password.';
         essErr.style.display = 'flex';
-        essErr.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        essErr.classList.remove('is-closing');
+        scheduleLoginToast(essErr);
+        if (window.innerWidth <= 640) essErr.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       }
     });
 

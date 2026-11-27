@@ -589,6 +589,90 @@ body:not(.show-ess) .bcon {
   margin-top: 1px;
 }
 
+@media (min-width: 641px) {
+  @keyframes loginToastEnter {
+    from { opacity: 0; transform: translateY(18px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes loginToastExit {
+    to { opacity: 0; transform: translateY(18px); }
+  }
+
+  .login-error {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: 1000;
+    width: min(380px, calc(100vw - 48px));
+    margin: 0;
+    padding: 17px 18px;
+    align-items: center;
+    gap: 13px;
+    background: linear-gradient(135deg, #fbfdf8, #f2f7ed);
+    border: 1px solid rgba(4, 82, 2, 0.18);
+    border-left: 4px solid var(--gold);
+    border-radius: 16px;
+    color: #243b20;
+    font-weight: 600;
+    box-shadow: 0 18px 46px rgba(3, 27, 2, 0.25);
+    animation: loginToastEnter 260ms ease-out both;
+  }
+
+  .login-error.is-closing {
+    pointer-events: none;
+    animation: loginToastExit 220ms ease-in both;
+  }
+
+  .login-error i {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    margin: 0;
+    border-radius: 9px;
+    background: rgba(189, 148, 20, 0.13);
+    color: #856711;
+    font-size: 19px;
+  }
+
+  .login-error-close {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 30px;
+    height: 30px;
+    margin-left: auto;
+    padding: 0;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: #526a4b;
+    cursor: pointer;
+  }
+
+  .login-error-close:hover,
+  .login-error-close:focus-visible {
+    background: rgba(4, 82, 2, 0.1);
+  }
+
+  .login-error-close i {
+    width: auto;
+    height: auto;
+    background: transparent;
+    color: inherit;
+  }
+}
+
+@media (min-width: 641px) and (prefers-reduced-motion: reduce) {
+  .login-error,
+  .login-error.is-closing { animation: none; }
+}
+
+@media (max-width: 640px) {
+  .login-error-close { display: none; }
+}
+
 /* Field wrapper */
 .field {
   margin-bottom: 12px;
@@ -999,9 +1083,9 @@ body:not(.show-ess) .bcon {
     margin-bottom: 0;
   }
 
-  /* Footer sticks right below the form */
+  /* Keep the footer at the bottom of the full-height card. */
   .form-inner .ffoot {
-    margin-top: 16px;
+    margin-top: auto;
   }
 
   /* Show/hide cards */
