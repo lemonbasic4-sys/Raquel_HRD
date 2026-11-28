@@ -9307,3 +9307,105 @@ INSERT INTO `users` (`user_id`, `employee_id`, `username`, `email`, `password_ha
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
+-- Spread the synthetic employee roster across departments and position levels.
+-- MOCK-001 remains the branch-staff demo login; real employee rows are untouched.
+START TRANSACTION;
+
+UPDATE employees
+SET job_title_id = CASE
+    WHEN employee_code BETWEEN 'MOCK-053' AND 'MOCK-077' THEN 1013
+    WHEN employee_code BETWEEN 'MOCK-078' AND 'MOCK-092' THEN 1014
+    WHEN employee_code BETWEEN 'MOCK-093' AND 'MOCK-099' THEN 1015
+    WHEN employee_code = 'MOCK-100' THEN 1001
+    WHEN employee_code BETWEEN 'MOCK-102' AND 'MOCK-105' THEN 1004
+    WHEN employee_code BETWEEN 'MOCK-106' AND 'MOCK-107' THEN 1007
+    WHEN employee_code = 'MOCK-152' THEN 1005
+    WHEN employee_code = 'MOCK-RESTORED-101' THEN 1005
+    ELSE job_title_id
+END
+WHERE employee_code BETWEEN 'MOCK-053' AND 'MOCK-152'
+   OR employee_code = 'MOCK-RESTORED-101';
+
+UPDATE employees e
+JOIN (
+    SELECT 108 AS employee_number, 101 AS job_title_id
+    UNION ALL SELECT 109, 105
+    UNION ALL SELECT 110, 108
+    UNION ALL SELECT 111, 109
+    UNION ALL SELECT 112, 200
+    UNION ALL SELECT 113, 203
+    UNION ALL SELECT 114, 206
+    UNION ALL SELECT 115, 207
+    UNION ALL SELECT 116, 300
+    UNION ALL SELECT 117, 302
+    UNION ALL SELECT 118, 303
+    UNION ALL SELECT 119, 302
+    UNION ALL SELECT 120, 400
+    UNION ALL SELECT 121, 401
+    UNION ALL SELECT 122, 403
+    UNION ALL SELECT 123, 404
+    UNION ALL SELECT 124, 501
+    UNION ALL SELECT 125, 502
+    UNION ALL SELECT 126, 511
+    UNION ALL SELECT 127, 512
+    UNION ALL SELECT 128, 601
+    UNION ALL SELECT 129, 605
+    UNION ALL SELECT 130, 609
+    UNION ALL SELECT 131, 614
+    UNION ALL SELECT 132, 701
+    UNION ALL SELECT 133, 705
+    UNION ALL SELECT 134, 710
+    UNION ALL SELECT 135, 711
+    UNION ALL SELECT 136, 800
+    UNION ALL SELECT 137, 804
+    UNION ALL SELECT 138, 809
+    UNION ALL SELECT 139, 810
+    UNION ALL SELECT 140, 900
+    UNION ALL SELECT 141, 902
+    UNION ALL SELECT 142, 904
+    UNION ALL SELECT 143, 905
+    UNION ALL SELECT 144, 1101
+    UNION ALL SELECT 145, 1102
+    UNION ALL SELECT 146, 1103
+    UNION ALL SELECT 147, 1101
+    UNION ALL SELECT 148, 1200
+    UNION ALL SELECT 149, 1202
+    UNION ALL SELECT 150, 1202
+    UNION ALL SELECT 151, 1202
+) assignment ON e.employee_code = CONCAT('MOCK-', LPAD(assignment.employee_number, 3, '0'))
+SET e.job_title_id = assignment.job_title_id,
+    e.branch_id = 102;
+
+UPDATE employees e
+JOIN job_titles jt ON jt.job_title_id = e.job_title_id
+SET e.job_title = jt.job_title,
+    e.department_id = jt.department_id,
+    e.rank_category_id = jt.rank_category_id
+WHERE e.employee_code BETWEEN 'MOCK-001' AND 'MOCK-152'
+   OR e.employee_code = 'MOCK-RESTORED-101';
+
+UPDATE employee_work_experience we
+JOIN employees e ON e.employee_id = we.employee_id
+SET we.job_title = e.job_title,
+    we.updated_at = NOW()
+WHERE (e.employee_code BETWEEN 'MOCK-001' AND 'MOCK-152'
+       OR e.employee_code = 'MOCK-RESTORED-101')
+  AND we.date_to IS NULL
+  AND we.company_name = 'Raquel Pawnshop';
+
+UPDATE employee_trainings et
+JOIN employees e ON e.employee_id = et.employee_id
+JOIN departments d ON d.department_id = e.department_id
+SET et.training_title = CONCAT(d.department_name, ' Role Development Workshop')
+WHERE e.employee_code BETWEEN 'MOCK-108' AND 'MOCK-151'
+  AND et.training_title = 'Branch Operations and Customer Service';
+
+UPDATE employee_eligibility ee
+JOIN employees e ON e.employee_id = ee.employee_id
+JOIN departments d ON d.department_id = e.department_id
+SET ee.license_title = CONCAT(d.department_name, ' Professional Development Certificate')
+WHERE e.employee_code BETWEEN 'MOCK-108' AND 'MOCK-151'
+  AND ee.license_title = 'Branch Operations Training Certificate';
+
+COMMIT;
+-- End synthetic employee distribution.

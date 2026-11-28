@@ -89,7 +89,7 @@
     function renderCriteria(ev, comparison) {
         const column = (cycle, baseline = null) => {
             if (!cycle) return '<section class="mp-evaluation-column"><p>Choose another evaluation on the right.</p></section>';
-            let html = `<section class="mp-evaluation-column"><div class="mp-cycle-title"><strong>${esc(cycle.evaluation_type)} evaluation</strong><span>${esc(cycle.cycle_label)}</span><b>Total score: ${num(cycle.total_score)} / 4</b></div>`;
+            let html = `<section class="mp-evaluation-column"><div class="mp-cycle-title"><strong>${esc(cycle.evaluation_type)} evaluation</strong><span>${esc(cycle.cycle_label)}</span><b>Total score: ${num(cycle.total_score)} / 4</b><a href="${BASE}/employee/evaluation-history-view.php?evaluation_id=${cycle.evaluation_id}">View full evaluation</a></div>`;
             for (const section of ['KRA', 'Behavior']) {
                 const rows = cycle.criteria.filter(row => section === 'KRA' ? row.section === 'KRA' : row.section !== 'KRA');
                 html += `<h3 class="mt-4">${section === 'KRA' ? 'Key Result Areas' : 'Core Behaviors & Values'}</h3><table class="mp-simple-ratings"><thead><tr><th>Item</th><th>Self</th><th>${cycle.peer_summary && section !== 'KRA' ? '360 final' : 'Reviewed'}</th></tr></thead><tbody>`;

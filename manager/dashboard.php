@@ -2,6 +2,11 @@
 $page_title = 'Manager Dashboard';
 require_once '../includes/session-check.php';
 checkRole(['HR Manager']);
+require_once '../includes/employee-performance-analysis.php';
+ensureAnnualEvaluationSchema($conn);
+$dashboardStatus = performanceReportStatusSql();
+$dashboardFinal = finalizedPerformanceSql('ev');
+$dashboardDate = performanceReportDateSql();
 require_once '../includes/header.php';
 
 // Keep dashboard performance analytics separate from the probationary Initial/Final pathway.
@@ -25,10 +30,10 @@ if (!empty($branch_id)) {
 
 $total_employees = $conn->query("SELECT COUNT(*) as c FROM employees WHERE is_active = 1 AND employee_id NOT IN (SELECT employee_id FROM users WHERE role = 'Admin' AND employee_id IS NOT NULL)")->fetch_assoc()['c'];
 $pending_evals = $conn->query("SELECT COUNT(*) as c FROM evaluations WHERE status = 'Pending Manager'")->fetch_assoc()['c'];
-$avg_score_result = $conn->query("SELECT AVG(total_score) as avg FROM evaluations WHERE status = 'Approved' AND $dashboard_regular_eval_filter");
+$avg_score_result = $conn->query("SELECT AVG(total_score) as avg FROM evaluations ev WHERE $dashboardStatus AND $dashboardFinal AND $dashboard_regular_eval_filter");
 $avg_score = round($avg_score_result->fetch_assoc()['avg'] ?? 0, 1);
 $new_evals_month = $conn->query("SELECT COUNT(*) as c FROM evaluations WHERE $dashboard_regular_eval_filter AND MONTH(submitted_date) = MONTH(CURRENT_DATE()) AND YEAR(submitted_date) = YEAR(CURRENT_DATE())")->fetch_assoc()['c'];
-$approved_evals = $conn->query("SELECT COUNT(*) as c FROM evaluations WHERE status = 'Approved' AND $dashboard_regular_eval_filter")->fetch_assoc()['c'];
+$approved_evals = $conn->query("SELECT COUNT(*) as c FROM evaluations ev WHERE $dashboardStatus AND $dashboardFinal AND $dashboard_regular_eval_filter")->fetch_assoc()['c'];
 $recent_hires = (int)$conn->query("SELECT COUNT(*) AS c FROM employees e
     WHERE e.deleted_at IS NULL AND e.hire_date >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
       AND e.hire_date <= CURDATE()
@@ -127,7 +132,7 @@ $dashboard_package_url=BASE_URL.'/employee/team-evaluation-packages.php?category
 $dashboard_queue_count = $queue_employee_count + $pending_package_count;
 
 // 1. Performance Distribution Data
-$perf_dist = $conn->query("SELECT performance_level, COUNT(*) as count FROM evaluations WHERE status = 'Approved' AND $dashboard_regular_eval_filter AND performance_level IS NOT NULL GROUP BY performance_level");
+$perf_dist = $conn->query("SELECT performance_level, COUNT(*) as count FROM evaluations ev WHERE $dashboardStatus AND $dashboardFinal AND $dashboard_regular_eval_filter AND performance_level IS NOT NULL GROUP BY performance_level");
 $perf_data = ['Outstanding' => 0, 'Exceeds Expectations' => 0, 'Meets Expectations' => 0, 'Needs Improvement' => 0];
 while ($row = $perf_dist->fetch_assoc()) {
     if (isset($perf_data[$row['performance_level']])) {
@@ -152,7 +157,7 @@ $top_performers = $conn->query("
     FROM evaluations ev
     JOIN employees e ON ev.employee_id = e.employee_id
     LEFT JOIN departments d ON e.department_id = d.department_id
-    WHERE ev.status = 'Approved' AND ev.evaluation_type = 'Annual'
+    WHERE $dashboardStatus AND $dashboardFinal AND ev.evaluation_type = 'Annual'
     ORDER BY ev.total_score DESC, ev.submitted_date DESC
     LIMIT 5
 ");
@@ -163,7 +168,7 @@ for ($i = 5; $i >= 0; $i--) {
     $month_label = date('M Y', strtotime("-$i months"));
     $month_num = date('n', strtotime("-$i months"));
     $year_num = date('Y', strtotime("-$i months"));
-    $avg_q = $conn->query("SELECT AVG(total_score) as avg_score FROM evaluations WHERE status = 'Approved' AND $dashboard_regular_eval_filter AND MONTH(approved_date) = $month_num AND YEAR(approved_date) = $year_num");
+    $avg_q = $conn->query("SELECT AVG(total_score) as avg_score FROM evaluations ev WHERE $dashboardStatus AND $dashboardFinal AND $dashboard_regular_eval_filter AND MONTH($dashboardDate) = $month_num AND YEAR($dashboardDate) = $year_num");
     $avg_val = round($avg_q->fetch_assoc()['avg_score'] ?? 0, 1);
     $monthly_data[] = ['label' => $month_label, 'value' => $avg_val];
 }
@@ -174,7 +179,7 @@ $branch_q = $conn->query("SELECT b.branch_name, AVG(ev.total_score) as avg_score
     FROM evaluations ev
     LEFT JOIN employees e ON ev.employee_id = e.employee_id
     LEFT JOIN branches b ON e.branch_id = b.branch_id
-    WHERE ev.status = 'Approved' AND ev.evaluation_type = 'Annual' AND b.branch_name IS NOT NULL
+    WHERE $dashboardStatus AND $dashboardFinal AND ev.evaluation_type = 'Annual' AND b.branch_name IS NOT NULL
     GROUP BY b.branch_id, b.branch_name
     ORDER BY avg_score DESC LIMIT 10");
 while ($row = $branch_q->fetch_assoc()) {
@@ -813,7 +818,7 @@ $critical_count_watchlist = count(array_filter($expiring_staff, fn($r) => $r['ur
             <div class="d-flex justify-content-between align-items-start">
                 <div>
                     <div class="stat-value"><?php echo $approved_evals; ?></div>
-                    <div class="stat-label">Approved Regular Evals</div>
+                    <div class="stat-label">Finalized Regular Evals</div>
                 </div>
                 <i class="fas fa-check-circle stat-icon" style="color:#20c997;"></i>
             </div>

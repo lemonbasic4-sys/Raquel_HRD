@@ -1,4 +1,4 @@
-﻿</main><!-- end .main-content -->
+</main><!-- end .main-content -->
 
 
 
@@ -246,13 +246,6 @@ if (in_array($_ft_role, ['HR Manager', 'HR Supervisor', 'HR Staff', 'Admin'])):
        aria-label="Evaluation History">
         <i class="fas fa-history hr-nav-icon"></i>
         <span class="hr-nav-label">Evaluations</span>
-    </a>
-    <a href="<?php echo BASE_URL; ?>/staff/career-movements.php"
-       class="hr-nav-item<?php echo ($_ft_page === 'career-movements.php') ? ' active' : ''; ?>"
-       data-page="career-movements.php"
-       aria-label="Career Movements">
-        <i class="fas fa-route hr-nav-icon"></i>
-        <span class="hr-nav-label">Movements</span>
     </a>
     <!-- More Menu -->
     <button type="button" class="hr-nav-item" id="hrNavMoreBtn" aria-label="More options">

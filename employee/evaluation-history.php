@@ -39,7 +39,7 @@ if ($employee_id > 0) {
         LEFT JOIN evaluation_package_members pm ON pm.evaluation_id = ev.evaluation_id
         LEFT JOIN evaluation_packages ep ON ep.package_id = pm.package_id
         WHERE ev.employee_id = ? AND ev.deleted_at IS NULL
-        ORDER BY COALESCE(ev.submitted_date, ev.created_at) DESC, ev.evaluation_id DESC");
+        ORDER BY COALESCE(ev.evaluation_period_end, ev.submitted_date, ev.created_at) DESC, ev.evaluation_id DESC");
     $history_stmt->bind_param('i', $employee_id);
     $history_stmt->execute();
     $evaluations = $history_stmt->get_result()->fetch_all(MYSQLI_ASSOC);

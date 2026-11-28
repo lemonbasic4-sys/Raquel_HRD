@@ -81,21 +81,34 @@ if (!in_array($default_trend_year, $available_years)) $default_trend_year = $ava
 // Build 12-month arrays for every available year (respects branch/dept filter)
 $all_years_trend = [];
 foreach ($available_years as $yr) {
-    $yr_months = [];
-    for ($m = 1; $m <= 12; $m++) {
-        $t_where  = "WHERE $reportStatus AND $finalized_eval_filter AND $evaluation_type_filter AND MONTH($reportDate)=$m AND YEAR($reportDate)=$yr AND employee_id NOT IN (SELECT employee_id FROM users WHERE role = 'Admin' AND employee_id IS NOT NULL)";
-        $t_params = []; $t_types = '';
-        if (!empty($filter_branch)) { $t_where .= ' AND employee_id IN (SELECT employee_id FROM employees WHERE branch_id=?)';     $t_params[] = (int)$filter_branch; $t_types .= 'i'; }
-        if (!empty($filter_dept))   { $t_where .= ' AND employee_id IN (SELECT employee_id FROM employees WHERE department_id=?)'; $t_params[] = (int)$filter_dept;   $t_types .= 'i'; }
-        $tq2 = $conn->prepare("SELECT ROUND(AVG(total_score),2) AS v, COUNT(*) AS cnt FROM evaluations ev $t_where");
-        if (!empty($t_params)) $tq2->bind_param($t_types, ...$t_params);
-        $tq2->execute();
-        $r = $tq2->get_result()->fetch_assoc();
-        $tq2->close();
-        $yr_months[] = ['value' => (float)($r['v'] ?? 0), 'count' => (int)($r['cnt'] ?? 0)];
-    }
-    $all_years_trend[$yr] = $yr_months;
+    $all_years_trend[$yr] = array_fill(0, 12, ['value'=>0.0, 'count'=>0]);
 }
+$trendWhere = "WHERE $reportStatus AND $finalized_eval_filter AND $evaluation_type_filter
+    AND ev.employee_id NOT IN (SELECT employee_id FROM users WHERE role='Admin' AND employee_id IS NOT NULL)";
+$trendParams = [];
+$trendTypes = '';
+if ($filter_branch !== '') {
+    $trendWhere .= ' AND e.branch_id=?';
+    $trendParams[] = (int)$filter_branch;
+    $trendTypes .= 'i';
+}
+if ($filter_dept !== '') {
+    $trendWhere .= ' AND e.department_id=?';
+    $trendParams[] = (int)$filter_dept;
+    $trendTypes .= 'i';
+}
+$trendStmt = $conn->prepare("SELECT YEAR($reportDate) AS yr,MONTH($reportDate) AS mo,
+    ROUND(AVG(ev.total_score),2) AS score,COUNT(*) AS total
+    FROM evaluations ev JOIN employees e ON e.employee_id=ev.employee_id
+    $trendWhere GROUP BY YEAR($reportDate),MONTH($reportDate)");
+if ($trendParams) $trendStmt->bind_param($trendTypes, ...$trendParams);
+$trendStmt->execute();
+foreach ($trendStmt->get_result() as $row) {
+    if (isset($all_years_trend[(int)$row['yr']]) && (int)$row['mo'] > 0) {
+        $all_years_trend[(int)$row['yr']][(int)$row['mo']-1] = ['value'=>(float)$row['score'], 'count'=>(int)$row['total']];
+    }
+}
+$trendStmt->close();
 $trend_label = 'By Year';
 
 /* ── Branch Comparison  ──────────────────────────────────────────────────
